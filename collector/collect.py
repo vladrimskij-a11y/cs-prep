@@ -52,8 +52,8 @@ NEWS_DAYS = int(os.environ.get("NEWS_DAYS", "7"))
 MAPS_WINDOW_DAYS = 120
 
 # Ленты профильных сайтов. Любую можно убрать или добавить свою.
+# Только русскоязычные источники.
 RSS_FEEDS = [
-    ("HLTV", "https://www.hltv.org/rss/news"),
     ("Cybersport.ru", "https://www.cybersport.ru/rss/materials"),
 ]
 
@@ -727,16 +727,21 @@ def google_news(query: str, lang: str) -> list[dict]:
 
 
 CS_CONTEXT = re.compile(
-    r"\bCS ?2\b|\bCS:?GO\b|Counter[- ]Strike|\bКС ?2?\b|\bHLTV\b|\bIEM\b|\bBLAST\b|\bPGL\b|\bESL\b|\bmajor\b|мейджор"
+    r"\bCS ?2\b|\bCS:?GO\b|\bCS\b|Counter[- ]Strike|\bКС ?2?\b|контр-?страйк\w*|\bHLTV\b|\bIEM\b|\bBLAST\b|\bPGL\b|\bESL\b|\bmajor\b|мейджор"
     r"|\bAWP\b|\bIGL\b|капитан|снайпер|roster|состав|transfer|трансфер",
     re.IGNORECASE)
 CS_SOURCES = {"hltv", "cybersport.ru", "dust2.us", "dust2.com.br", "bo3.gg", "esports.gg", "dexerto", "egamersworld",
               "escorenews", "cyber.sports.ru", "sports.ru", "championat", "offstage.ru", "vpesports", "esportsinsider",
               "hotspawn", "dust2", "gamespot", "pcgamer", "esports.net", "thespike", "gosugamers", "liquipedia"}
 OTHER_GAMES = re.compile(
-    r"\b(MLBB|Mobile Legends|Dota|Valorant|League of Legends|\bLoL\b|PUBG|Fortnite|Apex|Rainbow Six|\bR6\b|Overwatch"
-    r"|Rocket League|Call of Duty|\bCoD\b|Standoff|Deadlock|Marvel Rivals|EA FC|FIFA|Free Fire|StarCraft|Tekken)\b",
+    r"\b(MLBB|Mobile Legends|Dota|Дот[аеуыо]\w*|The International|DreamLeague|Riyadh Masters|ESL One|Wallachia|BetBoom Dacha"
+    r"|Valorant|Валорант\w*|League of Legends|\bLoL\b|PUBG|Fortnite|Apex|Rainbow Six|\bR6\b|Overwatch"
+    r"|Rocket League|Call of Duty|\bCoD\b|Standoff|Стандофф\w*|Deadlock|Marvel Rivals|EA FC|FIFA|Free Fire|StarCraft"
+    r"|Tekken|Hearthstone|World of Tanks|Мир танков|Warface|Brawl Stars|Clash|Fortnite|шахмат\w*|Chess)\b",
     re.IGNORECASE)
+CS_STRICT = re.compile(r"\bCS ?2\b|\bCS:?GO\b|\bCS\b|Counter[- ]Strike|\bКС ?2?\b|контр-?страйк\w*|\bHLTV\b|\bIEM\b"
+                       r"|\bBLAST\b|мейджор\w*|\bAWP\b|авп\w*", re.IGNORECASE)
+NON_CS_SOURCES = re.compile(r"dota|dota2\.ru|valorant|lol|mlbb", re.IGNORECASE)
 SPAM = re.compile(
     r"prediction|predictions|прогноз|ставк|коэффициент|\bodds\b|betting|букмекер|live stream|how to watch|где смотреть"
     r"|расписание|schedule|^Матч .+ · |\bvs\.? .+ \d{1,2} (ноября|октября|декабря)",
@@ -913,6 +918,24 @@ def article_lead(url: str) -> dict:
     return {"lead": lead, "image": _meta(html, "og:image", "twitter:image")}
 
 
+def resolve_link(it: dict) -> dict:
+    """Настоящая ссылка на статью вместо ссылки Google News (для встроенного браузера Telegram)."""
+    k = it["key"]
+    if k in art_cache and art_cache[k].get("url"):
+        return art_cache[k]
+    if "news.google.com" not in (it["url"] or ""):
+        return {"url": it["url"]}
+    if _art_new[0] >= ART_NEW_LIMIT:
+        return {}
+    _art_new[0] += 1
+    real = gnews_decode(it["url"])
+    time.sleep(0.5)
+    info = {"url": real, "t": iso(NOW)} if real else {}
+    if real:
+        art_cache[k] = info
+    return info
+
+
 def enrich_article(it: dict) -> dict:
     k = it["key"]
     if k in art_cache:
@@ -952,12 +975,10 @@ def gather_news(teams: list[dict]) -> list[dict]:
     pool: list[dict] = []
     cs = '(CS2 OR "Counter-Strike")'
     for t in teams:
-        for lang in ("ru", "en"):
-            pool += google_news(f'"{t["name"]}" {cs}', lang)
+        pool += google_news(f'"{t["name"]}" {cs}', "ru")
         for p in t.get("players") or []:
             if p.get("nick") and len(p["nick"]) >= 2:
-                for lang in ("ru", "en"):
-                    pool += google_news(f'"{p["nick"]}" {cs}', lang)
+                pool += google_news(f'"{p["nick"]}" {cs}', "ru")
     for source, url in RSS_FEEDS:
         pool += fetch_feed(url, source)
 
@@ -967,7 +988,9 @@ def gather_news(teams: list[dict]) -> list[dict]:
         title, text = it["title"], f"{it['title']} {it['snippet']}"
         if SPAM.search(title):
             continue
-        if OTHER_GAMES.search(title) and not CS_CONTEXT.search(title):
+        if not has_cyrillic(title):
+            continue  # только новости на русском
+        if (OTHER_GAMES.search(text) or NON_CS_SOURCES.search(it["source"] or "")) and not CS_STRICT.search(title):
             continue
         src = (it["source"] or "").lower()
         cs_src = any(s in src for s in CS_SOURCES)
@@ -984,7 +1007,10 @@ def gather_news(teams: list[dict]) -> list[dict]:
                 about.append(label)
         if not about:
             continue
-        if not (cs_src or CS_CONTEXT.search(text) or any(n in about for n in team_names)):
+        only_teams = all(a in team_names for a in about)
+        if only_teams and not CS_STRICT.search(text):
+            continue
+        if not (cs_src or CS_CONTEXT.search(text) or not only_teams):
             continue
         k = item_key(it)
         cur = found.get(k)
@@ -998,19 +1024,10 @@ def gather_news(teams: list[dict]) -> list[dict]:
     items = sorted(found.values(), key=lambda i: i["date"], reverse=True)[:60]
     out = []
     for it in items:
-        ru, lang = translate_ex(it["title"])
-        art = enrich_article(it)
-        lead_lang = art.get("lead_lang")
-        src_lang = lead_lang or lang
+        art = resolve_link(it)
         out.append({
             "key": it["key"],
             "title": it["title"],
-            "title_ru": ru,
-            "lang": src_lang,
-            "lang_ru": LANG_RU.get(src_lang or "", src_lang) if src_lang and src_lang != "ru" else None,
-            "lead": art.get("lead"),
-            "lead_ru": art.get("lead_ru"),
-            "image": art.get("image"),
             "kind": classify(it["title"]),
             "about": it["about"],
             "source": it["source"],
