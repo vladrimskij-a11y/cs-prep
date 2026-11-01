@@ -1,0 +1,136 @@
+=== LP Natus Vincere: 200 len=48350
+'''Natus Vincere'''}}</ref>
+}}
+
+==Player Roster==
+{{tabs dynamic
+|name1={{GameNoLink/cs2}}&nbsp;CS2
+|name2={{GameNoLink/csgo}}&nbsp;CS:GO
+|name3={{GameNoLink/cs16}}&nbsp;CS
+
+|content1=
+===Active===
+{{Squad|status=active
+|{{Person|flag=ua|id=b1t|name=Valerii Vakhovskyi|joindate=2020-12-20 <ref name="+b1t"/>}}
+|{{Person|flag=fi|id=Aleksib|igl=y|name=Aleksi Virolainen|joindate=2023-06-30 <ref name="EU23"/>}}
+|{{Person|flag=ro|id=iM|name=Mihai Ivan|joindate=2023-06-30 <ref name="EU23"/>}}
+|{{Person|flag=ua|id=w0nderful|name=Ihor Zhdanov|joindate=2023-10-31 <ref name="+w0nderful"/>}}
+|{{Person|flag=xk|id=makazze|name=Drin Shaqiri|joindate=2025-07-08 <ref name="jL bench +makazze"/>}}
+|{{Person|flag=ua|id=B1ad3|name=Andrii Horodenskyi|role=Coach|joindate=2019-09-20 <ref name="+GuardiaN; B1ad3 (C)"/>}}
+}}
+
+===Former===
+{{Squad|status=former|title=Former Players
+|{{Person|flag=lt|id=jL|name=Justinas Lekavičius|joindate=2023-06-30 <ref name="EU23"/>|inactivedate={{abbr|2025-07-08|Was on loan to MOUZ from 2026-04-18 to 2026-05-24}} <ref name="jL bench +makazze"/><ref name="jL loan"/><ref name="-jL mouz"/>|leavedate=2026-07-01 <ref name="-jL"/>|newteam=}}
+|{{Person|flag=ua|id=npl|name=Andrii Kukharskyi|role=On Loan|team=B8|joindate=2022-12-30 <ref name="sdy npl"/>|inactivedate=2023-06-30 <ref name="EU23"/><ref name="npl loan"/>|leavedate=2025-08-04 <ref name="-npl"/>|newteam=b8}}
+|{{Person|flag=ua|id=s1mple|name=Oleksandr Kostyliev|joindate=2016-08-04 <ref name="Zeus benched; +s1mple"/>|inactivedate={{abbr|2023-10-26|Was on loan to Team Falcons from 2024-09-27 to 2024-11-21 and loaned to FaZe Clan from 2025-05-05 to 2025-07-09}} <ref name="s1mple break"/><ref name="s1mple loan"/><ref name="s1mple back"/><ref name="s1mple loan faze"/><ref name="s1mple back 2025"/>|leavedate=2025-07-28 <ref name="-s1mple"/>|newteam=bc.game}}
+}}
+
+{{Stand-ins table|
+{{Stand-in|flag=ua|id=B1ad3|team=navi|name=Andrii Horodenskyi|forflag=ua|for=s1mple|forname=Oleksandr Kostyliev|tournament={{LeagueIconSmall/iem}} [[Intel Extreme Masters/2023/Sydney|IEM Sydney 2023]] <ref>{{cite web|url=https://navi.gg/en/publications/navi-cs-roster-for-iem-sydney-2023|title=NAVI CS roster for IEM Sydney 2023|date=2023-10-15|publisher='''Natus Vincere'''}}</ref>}}
+}}
+
+|content2=
+===Former===
+{{Squad|status=former|title=Former Players
+|{{Person|flag=xx|id=electroNic|igl=y|name=Denis Sharipov|joindate=2017-11-06 <ref name="+electronic; seized loan F3"/>|inactivedate=2023-06-30 <ref name="EU23"/>|leavedate=2023-07-14 <ref name="-electronic -Perfecto"/>|newteam=cloud9}}
+|{{Person|flag=xx|id=Perfecto|name=Ilya Zalutskiy|joindate=2020-01-24 <ref name="GuardiaN benched; +Perfecto"/>|inactivedate=2023-06-30 <ref name="EU23"/>|leavedate=2023-07-14 <ref name="-electronic -Perfecto"/>|newteam=cloud9}}
+|{{Person|flag=ru|id=Boombl4|igl=y|name=Kirill Mikhaylov|joindate=2019-05-29 <ref name="+Boombl4; Edward loan Winstrike"/>|inactivedate=2022-05-28 <ref name="Boom bench"/>|leavedate=2023-01-01 <ref name="-Boombl4"/>|newteam=1win}}
+|{{Person|flag=ua|id=sdy|name=Viktor Orudzhev|role=Stand-in|joindate=2022-06-03 <ref name="+sdy loan"/>|leavedate=2022-12-30 <ref name="sdy npl"/>|newteam=monte}}
+|{{Person|flag=ru|id=flamie|name=Egor Vasilyev|joindate=2015-04-10 <ref name="+flamie"/>|inactivedate=2021-04-11 <ref name="flamie bench"/>|leavedate=2021-09-16 <ref name="-flamie"/>|newteam=1win}}
+|{{Person|flag=sk|id=GuardiaN|name=Ladislav Kovács|joindate=2019-09-20 <ref name="+GuardiaN; B1ad3 (C)"/>|inactivedate=2020-01-24 <ref name="GuardiaN benched; +Perfecto"/>|leavedate=2021-02-12 <ref name="-GuardiaN 2021"/>|newteam=trident clan|newrole=Stand-in}}
+|{{Person|flag=ua|id=Edward|name=Ioann Sukhariev|joindate=
+=== LP The MongolZ: 200 len=27817
+olZ CS2 roster|date=2026-10-05|author='''The MongolZ'''}}</ref>
+}}
+
+==Player Roster==
+{{Tabs dynamic
+|name1={{GameNoLink/cs2}}&nbsp;CS2
+|name2={{GameNoLink/csgo}}&nbsp;CS:GO
+|content1=
+===Active===
+{{Squad|status=active
+|{{Person|flag=mn|id=bLitz|name=Garidmagnai Byambasuren|igl=y|joindate=2023-04-03 <ref name="the mongolz 2023"/>}}
+|{{Person|flag=mn|id=Techno4K|name=Sodbayar Munkhbold|joindate=2023-04-03 <ref name="the mongolz 2023"/>}}
+|{{Person|flag=mn|id=910|name=Usukhbayar Banzragch|joindate=2023-05-31 <ref name="update 2023/>}}
+|{{Person|flag=mn|id=cobrazera|name=Anarbileg Uuganbayar|joindate={{abbr|2025-12-31|Was inactive from 2026-07-12 to 2026-10-05}} <ref name="+cobra"/><ref name="cobrazera bench"/><ref name="+nin9 +cobrazera"/>}}
+|{{Person|flag=mn|id=nin9|name=Yesuntumur Gantulga|joindate=2026-10-05 <ref name="+nin9 +cobrazera"/>}}
+|{{Person|flag=mn|id=maaRaa|role=Coach|name=Erdenedalai Bayanbat|joindate=2023-04-03 <ref name="the mongolz 2023"/>}}
+}}
+
+===Inactive===
+{{Squad|status=inactive
+|{{Person|flag=mn|id=DarkMeister|name=Ireedui Dugarsuren|joindate=2026-07-12 <ref name="+tikuak +DarkMeister/>|inactivedate=2026-09-15 <ref name="tikuak darkmeister bench"/>}}
+}}
+
+===Former===
+{{Squad|status=former|title=Former Players
+|{{Person|flag=mn|id=tikuak|name=Zolbayar Chimedtseren|joindate=2026-07-12 <ref name="+tikuak +DarkMeister/>|inactivedate=2026-09-15 <ref name="tikuak darkmeister bench"/>|leavedate=2026-09-27 <ref name="-tikuak"/>|newteam=chinggis}}
+|{{Person|flag=mn|id=mzinho|name=Ayush Batbold|joindate=2023-05-31 <ref name="update 2023"/>|leavedate=2026-07-09 <ref name="-mzinho"/>|newteam=bc.game}}
+|{{Person|flag=mn|id=Senzu|team=bc.game|role=On Loan|name=Azbayar Munkhbold|joindate=2023-09-07 <ref name="+Senzu23"/>|inactivedate={{abbr|2025-10-22|Was on loan to Passion UA from 2026-02-13 to 2026-04-27}} <ref name="senzu bench"/><ref name="senzu loan"/><ref name="senzu loan2"/>|leavedate=2026-06-23 <ref name="-senzu"/>|newteam=bc.game}}
+}}
+
+{{Stand-ins table|
+{{Stand-in|flag=mn|id=cobrazera|team=mongolz|name=Anarbileg Uuganbayar|for=Techno4K|forflag=mn|forname=	Sodbayar Munkhbold|tournament={{LeagueIconSmall/fissure}} [[FISSURE/Playground/3|FISSURE Playground #3]] <ref>{{cite web|url=https://x.com/1mongolz/status/2095406456065659157|title=We will participate in “FISSURE Playground 3” with the following roster: bLitz, 910, tikuak, DarkMeister, and cobrazera|date=2026-09-03|author='''The MongolZ'''}}</ref>}}
+{{Stand-in|flag=mn|id=controlez|team=chinggis warriors|name=Unudelger Baasanjargal|tournament={{LeagueIconSmall/custom|StarLadder Budapest Major 2025 allmode.png|link=StarLadder/2025/Major}} [[StarLadder/2025/Major|StarLadder Budapest Major 2025]] <ref name="controlez major">{{cite web|url=https://t.me/mongolzcs2/2452|title=Тэмцээнүүдийн хуваарь|trans_title=Tournament schedules|language={{Flag|mn}} Mongolian|date=2025-10-30|author='''The MongolZ'''}}</ref><br>{{LeagueIconSmall/custom|BLAST Rivals icon allmode.png|link=BLAST/Rivals/2025/Fall}} [[BLAST/Rivals/2025/Fall|BLAST Rivals Fall 2025]] <ref name="controlez major"/><br>{{LeagueIconSmall/iem}} [[Intel Extreme Masters/2025/Chengdu|IEM Chengdu 2025]] <ref>{{cite web|url=https://x.com/1mongolz/status/1981354183384322259|title=We have decided that controlez will play as a stand-in for IEM Chengdu 2025|date=2025-10-23|author='''The MongolZ'''}}</ref>}}
+}}
+
+|content2=
+===Former===
+{{Tabs dynamic
+|name1=2023
+|name2=2022
+|name3=2019
+|name4=2015 – 2018
+|This=1
+
+|content1=
+{{Squad|status=former|title=Former Players
+|{{Person|flag=mn|id=hasteka|name=Chinguun Bayarmaa|joindate=2023-04-03 <ref name="the mongolz 2023"/>|leavedate=2023-09-04 <ref name="-hasteka"/>|newteam=Clutch 
+=== LP FURIA: 200 len=33941
+RIA|date=2026-07-18|publisher=[[HLTV]]|author=[[MIRAA]]}}</ref>
+}}
+
+==Player Roster==
+{{tabs dynamic
+|name1={{GameNoLink/cs2}}&nbsp;CS2
+|name2={{GameNoLink/csgo}}&nbsp;CS:GO
+|content1=
+===Active===
+{{Squad|status=active
+|{{Person|flag=br|id=yuurih|name=Yuri Boian|joindate=2017-11-08 <ref name="+yuurih"/>}}
+|{{Person|flag=br|id=KSCERATO|name=Kaike Cerato|joindate=2018-02-06 <ref name="Feb 2018"/>}}
+|{{Person|flag=br|id=FalleN|igl=y|name=Gabriel Toledo|joindate=2023-07-03 <ref name="+FalleN"/>}}
+|{{Person|flag=kz|id=molodoy|name=Danil Golubenko|joindate=2025-04-11 <ref name="+molodoy"/>}}
+|{{Person|flag=lv|id=YEKINDAR|name=Mareks Gaļinskis|joindate={{abbr|2025-04-22|Player was a stand-in from 2025-04-22 to 2025-07-04}} <ref name="+YEKINDAR"/><ref name="+YEKINDAR perm"/>}}
+|{{Person|flag=br|id=sidde|name=Sidnei Macedo|role=Coach|joindate=2024-07-09 <ref name="July 2024"/>}}
+}}
+
+===Former===
+{{Squad|status=former|title=Former Players
+|{{Person|flag=br|id=skullz|name=Felipe Medeiros|joindate=2024-07-09 <ref name="July 2024"/>|inactivedate=2025-04-22 <ref name="skullz bench"/>|leavedate=2025-08-20 <ref name="-skullz"/>|newteam=imperial esports}}
+|{{Person|flag=br|id=chelo|name=Marcelo Cespedes|joindate=2023-07-03 <ref name="+chelo"/>|inactivedate=2025-04-11 <ref name="chelo bench"/>|leavedate=2025-07-01 <ref name="-chelo"/>|newteam=imperial esports}}
+|{{Person|flag=br|id=guerri|role=Coach|name=Nicholas Nogueira|joindate=2018-02-02 <ref name="guerri (C)"/>|leavedate=2024-07-09 <ref name="July 2024"/>|newteam=furia|newrole=Head of Esports}}
+|{{Person|flag=br|id=arT|name=Andrei Piovezan|igl=y|joindate=2018-02-06 <ref name="Feb 2018"/>|inactivedate=2024-04-16 <ref name="arT bench"/>|leavedate=2024-05-09 <ref name="-arT"/>|newteam=fluxo}}
+}}
+
+{{Stand-ins table|
+{{Stand-in|flag=br|id=kye|team=furia.a|name=Kayke Bertolucci|tournament={{LeagueIconSmall/esl pro league}} [[ESL/Pro League/Season 19|ESL Pro League Season 19]] <ref name="arT bench"/><br>{{LeagueIconSmall/global esports tour}} [[Global Esports Tour/2024/Rio de Janeiro|Global Esports Tour Rio de Janeiro 2024]] <ref name="arT bench"/>}}
+}}
+
+|content2=
+===Former===
+{{Squad|status=former|title=Former Players
+|{{Person|flag=br|id=saffee|name=Rafael Costa|joindate=2022-01-06 <ref name="+saffee"/>|inactivedate=2023-06-28 <ref name="bench saffee"/>|leavedate=2023-06-30 <ref name="-drop -saffee"/>|newteam=mibr}}
+|{{Person|flag=br|id=drop|name=André Abreu|joindate=2021-08-23 <ref name="+drop"/>|inactivedate=2023-06-27 <ref name="bench drop"/>|leavedate=2023-06-30 <ref name="-drop -saffee"/>|newteam=mibr}}
+|{{Person|flag=br|id=VINI|team=Last Dance|name=Vinicius Figueiredo|joindate=2018-02-06 <ref name="Feb 2018"/>|inactivedate=2021-11-25 <ref name="VINI bench"/> |leavedate=2022-02-18 <ref name="last dance"/>|newteam=imperial esports}}
+|{{Person|flag=us|id=junior|name=Paytyn Johnson|joindate=2021-01-08 <ref name="+Junior"/>|inactivedate=2021-06-03 <ref name="Junior bench"/>|leavedate=2022-01-18 <ref name="COL 2022"/>|newteam=col}}
+|{{Person|flag=br|id=honda|name=Lucas Honda|joindate=2021-01-14 <ref name="+honda"/>|leavedate=2021-08-23 <ref name="+drop"/>|newteam=furia academy}}
+|{{Person|flag=br|id=HEN1|name=Henrique Teles|joindate=2019-09-23 <ref name="ableJ benched; +HEN1"/>|inactivedate=2021-01-08 <ref name="HEN1 benched"/>|leavedate=2021-05-01 <ref name="-HEN1"/>|newteam=o plano}}
+|{{Person|flag=br|id=ableJ|name=Rinaldo Moda|joindate=2018-10-02 <ref name="+ableJ"/>|inactivedate=2019-09-23 <ref name="ableJ benched; +HEN1"/>|leavedate=2019-10-09 <ref name="ableJ to furia academy"/>|newteam=furia academy}}
+|{{Person|flag=br|id=spacca|name=Guilherme Spacca|joindate=2017-08-10 <ref name="FURIA 2017
+=== bo3 players by team: 200 len=30026
+{"total":{"count":20696,"pages":2070,"offset":0,"limit":10},"results":[{"id":3,"slug":"flamie","nickname":"flamie","first_name":"Egor","last_name":"Vasilyev","birthday":"1997-04-05","role":null,"twitter":null,"twitch":null,"facebook":null,"image_url":"https://files.bo3.gg/uploads/player/3/image/webp-bbd2ba10b37ddf421a50d85f6bae7213.webp","created_at":"2021-01-05T21:56:18.059+00:00","updated_at":"2026-11-01T22:07:26.986+00:00","country_id":56,"team_id":null,"vkontakte":"","instagram":"","status":1,"total_winnings":0,"current_value":0,"is_approved":false,"bio":"","value":0,"image_data":"{\"id\":\"player/3/image/a147c80a926dbbdd8bad89f0eb9788ca\",\"storage\":\"store_pub\",\"metadata\":{\"filename\":\"File name\",\"size\":210065,\"mime_type\":\"image/png\",\"width\":354,\"height\":455},\"derivatives\":{\"webp\":{\"id\":\"player/3/image/webp-bbd2ba10b37ddf421a50d85f6bae7213.webp\",\"storage\":\"store_pub\",\"metadata\":{\"filename\":\"image_processing20250526-1-jah2lz.webp\",\"size\":17348,\"mime_type\":null,\"width\":354,\"height\":455}},\"20x20\":{\"id\":\"player/3/image/20x20-fd7145d92b59e57ca4f948c0cf8c94d0.webp\",\"storage\":\"store_pub\",\"metadata\":{\"filename\":\"image_processing20250526-1-q8ll33.webp\",\"size\":402,\"mime_type\":null,\"width\":16,\"height\":20}},\"50x50\":{\"id\":\"player/3/image/50x50-4c7499e4315ac916cb9880d16024252d.webp\",\"storage\":\"store_pub\",\"metadata\":{\"filename\":\"image_processing20250526-1-1wwdyy0.webp\",\"size\":1056,\"mime_type\":null,\"width\":39,\"height\":50}},\"150x150\":{\"id\":\"player/3/image/150x150-19aae2959b52fb539f3ad5ed38f8acdd.webp\",\"storage\":\"store_pub\",\"metadata\":{\"filename\":\"image_processing20250526-1-55qnxu.webp\",\"size\":3840,\"mime_type\":null,\"width\":117,\"height\":150}},\"400x400\":{\"id\":\"player/3/image/400x400-3c20223d6c7fb16c2fed60cd0dea8283.webp\",\"storage\":\"store_pub\",\"metadata\":{\"filename\":\"image_processing20250526-1-1wzplv4.webp\",\"size\":13268,\"mime_type\":null,\"width\":311,\"height\":400}}}}","rank":null,"image_versions":{"webp":"https://files.bo3.gg/uploads/player/3/image/webp-bbd2ba10b37ddf421a50d85f6bae7213.webp","20x20":"https://files.bo3.gg/uploads/player/3/image/20x20-fd7145d92b59e57ca4f948c0cf8c94d0.webp","50x50":"https://files.bo3.gg/uploads/player/3/image/50x50-4c7499e4315ac916cb9880d16024252d.webp","150x150":"https://files.bo3.gg/uploads/player/3/image/150x150-19aae2959b52fb539f3ad5ed38f8acdd.webp","400x400":"https://files.bo3.gg/uploads/player/3/imag
+=== bo3 team with players: 200 len=11387
+{"total":{"count":1,"pages":1,"offset":0,"limit":10},"results":[{"id":787,"slug":"natus-vincere","name":"Natus Vincere","image_url":"https://files.bo3.gg/uploads/team/787/image/webp-ea9885f81f1572c7a6c9fb6cbf747c99.webp","facebook":"https://www.facebook.com/NatusVincere","twitter":"https://twitter.com/natusvincere","rank":34,"created_at":"2020-10-19T08:52:58.625+00:00","updated_at":"2026-11-01T22:07:25.603+00:00","country_id":58,"ps_id":3216,"image_data":"{\"id\":\"team/787/image/1152af2612c347629f85308ac2ac4359.png\",\"storage\":\"store_pub\",\"metadata\":{\"filename\":\"Navi.png\",\"size\":5325,\"mime_type\":\"image/png\",\"width\":500,\"height\":500},\"derivatives\":{\"webp\":{\"id\":\"team/787/image/webp-ea9885f81f1572c7a6c9fb6cbf747c99.webp\",\"storage\":\"store_pub\",\"metadata\":{\"filename\":\"image_processing20240202-1-c2zxed.webp\",\"size\":9468,\"mime_type\":null,\"width\":500,\"height\":500}},\"20x20\":{\"id\":\"team/787/image/20x20-50d6258d4d293866e91a532b52088489.webp\",\"storage\":\"store_pub\",\"metadata\":{\"filename\":\"image_processing20240202-1-6kaswo.webp\",\"size\":458,\"mime_type\":null,\"width\":20,\"height\":20}},\"50x50\":{\"id\":\"team/787/image/50x50-80e2b27d098e4be9c9647fd16a92e969.webp\",\"storage\":\"store_pub\",\"metadata\":{\"filename\":\"image_processing20240202-1-w6gjz9.webp\",\"size\":1148,\"mime_type\":null,\"width\":50,\"height\":50}},\"150x150\":{\"id\":\"team/787/image/150x150-2cba0752440dfdb70976027a5d7179c0.webp\",\"storage\":\"store_pub\",\"metadata\":{\"filename\":\"image_processing20240202-1-1k03j9o.webp\",\"size\":4066,\"mime_type\":null,\"width\":150,\"height\":150}},\"400x400\":{\"id\":\"team/787/image/400x400-e26b110b2c86bed87ef8f3144175047a.webp\",\"storage\":\"store_pub\",\"metadata\":{\"filename\":\"image_processing20240202-1-1f9nhyt.webp\",\"size\":12506,\"mime_type\":null,\"width\":400,\"height\":400}}}}","image_versions":{"webp":"https://files.bo3.gg/uploads/team/787/image/webp-ea9885f81f1572c7a6c9fb6cbf747c99.webp","20x20":"https://files.bo3.gg/uploads/team/787/image/20x20-50d6258d4d293866e91a532b52088489.webp","50x50":"https://files.bo3.gg/uploads/team/787/image/50x50-80e2b27d098e4be9c9647fd16a92e969.webp","150x150":"https://files.bo3.gg/uploads/team/787/image/150x150-2cba0752440dfdb70976027a5d7179c0.webp","400x400":"https://files.bo3.gg/uploads/team/787/image/400x400-e26b110b2c86bed87ef8f3144175047a.webp","original":"https://files.bo3.gg/uploads/team/787/image/1152af2612c347629f85308ac2ac4359.png"},
