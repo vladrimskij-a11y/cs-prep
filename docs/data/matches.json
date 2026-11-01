@@ -1,5 +1,5 @@
 {
- "updated": "2026-11-01T23:07:41Z",
+ "updated": "2026-11-01T23:24:39Z",
  "tiers": [
   "a",
   "s"
@@ -759,8 +759,49 @@
  "meta": {
   "panda_requests": 19,
   "bo3_requests": 32,
-  "liquipedia_requests": 36,
-  "translations": 0,
-  "warnings": []
+  "liquipedia_requests": 0,
+  "translations": 101,
+  "warnings": [
+   "Google News ссылка: <HTTPError 429: 'Too Many Requests'>",
+   "Google News ссылка: <HTTPError 429: 'Too Many Requests'>",
+   "Google News ссылка: <HTTPError 429: 'Too Many Requests'>",
+   "Google News ссылка: <HTTPError 429: 'Too Many Requests'>",
+   "Google News ссылка: <HTTPError 429: 'Too Many Requests'>",
+   "Google News ссылка: <HTTPError 429: 'Too Many Requests'>",
+   "Google News ссылка: <HTTPError 429: 'Too Many Requests'>",
+   "Google News ссылка: <HTTPError 429: 'Too Many Requests'>",
+   "Google News ссылка: <HTTPError 429: 'Too Many Requests'>",
+   "Google News ссылка: <HTTPError 429: 'Too Many Requests'>",
+   "Google News ссылка: <HTTPError 429: 'Too Many Requests'>",
+   "Google News ссылка: <HTTPError 429: 'Too Many Requests'>",
+   "Google News ссылка: <HTTPError 429: 'Too Many Requests'>",
+   "Google News ссылка: <HTTPError 429: 'Too Many Requests'>",
+   "Google News ссылка: <HTTPError 429: 'Too Many Requests'>",
+   "Google News ссылка: <HTTPError 429: 'Too Many Requests'>",
+   "Google News ссылка: <HTTPError 429: 'Too Many Requests'>",
+   "Google News ссылка: <HTTPError 429: 'Too Many Requests'>",
+   "Google News ссылка: <HTTPError 429: 'Too Many Requests'>",
+   "Google News ссылка: <HTTPError 429: 'Too Many Requests'>",
+   "Google News ссылка: <HTTPError 429: 'Too Many Requests'>",
+   "Google News ссылка: <HTTPError 429: 'Too Many Requests'>",
+   "Google News ссылка: <HTTPError 429: 'Too Many Requests'>",
+   "Google News ссылка: <HTTPError 429: 'Too Many Requests'>",
+   "Google News ссылка: <HTTPError 429: 'Too Many Requests'>",
+   "Google News ссылка: <HTTPError 429: 'Too Many Requests'>",
+   "Google News ссылка: <HTTPError 429: 'Too Many Requests'>",
+   "Google News ссылка: <HTTPError 429: 'Too Many Requests'>",
+   "Google News ссылка: <HTTPError 429: 'Too Many Requests'>",
+   "Google News ссылка: <HTTPError 429: 'Too Many Requests'>",
+   "Google News ссылка: <HTTPError 429: 'Too Many Requests'>",
+   "Google News ссылка: <HTTPError 429: 'Too Many Requests'>",
+   "Google News ссылка: <HTTPError 429: 'Too Many Requests'>",
+   "Google News ссылка: <HTTPError 429: 'Too Many Requests'>",
+   "Google News ссылка: <HTTPError 429: 'Too Many Requests'>",
+   "Google News ссылка: <HTTPError 429: 'Too Many Requests'>",
+   "Google News ссылка: <HTTPError 429: 'Too Many Requests'>",
+   "Google News ссылка: <HTTPError 429: 'Too Many Requests'>",
+   "Google News ссылка: <HTTPError 429: 'Too Many Requests'>",
+   "Google News ссылка: <HTTPError 429: 'Too Many Requests'>"
+  ]
  }
 }
