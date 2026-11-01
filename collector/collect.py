@@ -60,7 +60,7 @@ RSS_FEEDS = [
 UA = "Mozilla/5.0 (compatible; cs-prep-bot/1.0; +https://github.com)"
 NOW = datetime.now(timezone.utc)
 
-stats = {"panda_requests": 0, "bo3_requests": 0, "translations": 0, "warnings": []}
+stats = {"panda_requests": 0, "bo3_requests": 0, "liquipedia_requests": 0, "translations": 0, "warnings": []}
 
 
 def warn(msg: str) -> None:
@@ -141,9 +141,11 @@ def save_json(path: Path, data, pretty: bool = False) -> None:
 GAMES_CACHE_F = CACHE / "bo3_games.json"     # карты по завершённым матчам bo3 (не меняются)
 TEAMS_CACHE_F = CACHE / "bo3_teams.json"     # PandaScore id → bo3 id
 TR_CACHE_F = CACHE / "translations.json"     # переводы заголовков
+ROSTER_CACHE_F = CACHE / "liquipedia_rosters.json"  # тренер и роли игроков с Liquipedia
 games_cache: dict = load_json(GAMES_CACHE_F, {})
 teams_map: dict = load_json(TEAMS_CACHE_F, {})
 tr_cache: dict = load_json(TR_CACHE_F, {})
+roster_cache: dict = load_json(ROSTER_CACHE_F, {})
 
 
 # ---------------------------------------------------------------- helpers
@@ -204,6 +206,13 @@ def match_brief(m: dict) -> dict:
         "tournament": tournament_label(m),
         "stage": stage_label(m),
         "tier": ((m.get("tournament") or {}).get("tier") or "").lower(),
+        "serie": {
+            "id": (m.get("serie") or {}).get("id"),
+            "begin": (m.get("serie") or {}).get("begin_at"),
+            "end": (m.get("serie") or {}).get("end_at"),
+            "image": (m.get("league") or {}).get("image_url"),
+            "prize": (m.get("tournament") or {}).get("prizepool"),
+        },
         "teams": opps,
         "stream": (ru or main or {}).get("raw_url"),
     }
@@ -266,6 +275,159 @@ def player_brief(p: dict) -> dict:
         "image": p.get("image_url"),
     }
 
+
+
+# ---------------------------------------------------------------- Liquipedia: тренер и роли
+
+LP_API = "https://liquipedia.net/counterstrike/api.php"
+LP_UA = "cs-prep/1.0 (https://github.com/vladrimskij-a11y/cs-prep; cs-prep-bot@users.noreply.github.com)"
+ROSTER_TTL_DAYS = 3
+_lp_last = [0.0]
+
+
+def lp_pages(titles: list[str]) -> dict[str, str]:
+    """Вики-текст страниц Liquipedia: {запрошенное название: текст}. Не чаще запроса в 2,5 с (правила Liquipedia)."""
+    wait = 2.5 - (time.time() - _lp_last[0])
+    if wait > 0:
+        time.sleep(wait)
+    _lp_last[0] = time.time()
+    stats["liquipedia_requests"] += 1
+    url = LP_API + "?" + urllib.parse.urlencode({
+        "action": "query", "prop": "revisions", "rvprop": "content", "rvslots": "main",
+        "titles": "|".join(titles), "redirects": 1, "format": "json"})
+    data = json.loads(http_get(url, {"User-Agent": LP_UA, "Accept": "application/json"}))
+    q = data.get("query") or {}
+    alias = {}
+    for k in ("normalized", "redirects"):
+        for r in q.get(k) or []:
+            alias[r["from"]] = r["to"]
+    by_title = {}
+    for pg in (q.get("pages") or {}).values():
+        try:
+            by_title[pg["title"]] = pg["revisions"][0]["slots"]["main"]["*"]
+        except (KeyError, IndexError):
+            pass
+    out = {}
+    for t in titles:
+        cur, seen = t, set()
+        while cur in alias and cur not in seen:
+            seen.add(cur)
+            cur = alias[cur]
+        if cur in by_title:
+            out[t] = by_title[cur]
+    return out
+
+
+def lp_param(line: str, key: str) -> str | None:
+    m = re.search(r"\|\s*" + key + r"\s*=\s*([^|}<\n]*)", line)
+    return m.group(1).strip() if m and m.group(1).strip() else None
+
+
+ROLE_RU = [
+    (r"leader|\bigl\b", "Капитан"),
+    (r"awp|sniper", "Снайпер"),
+    (r"entry", "Рифлер · энтри"),
+    (r"lurk", "Рифлер · люркер"),
+    (r"support", "Рифлер · саппорт"),
+    (r"rifl", "Рифлер"),
+]
+
+
+def player_roles(wikitext: str) -> list[str]:
+    """Роли из инфобокса страницы игрока: role=, role2=, roles=."""
+    box = wikitext[: wikitext.find("\n}}") + 3] if "\n}}" in wikitext else wikitext[:4000]
+    raw = []
+    for m in re.finditer(r"\|\s*roles?\d?\s*=\s*([^\n|}]*)", box, re.IGNORECASE):
+        raw += [x.strip() for x in re.split(r"[,/;]", m.group(1)) if x.strip()]
+    res = []
+    for r in raw:
+        for rx, ru in ROLE_RU:
+            if re.search(rx, r, re.IGNORECASE):
+                if ru not in res:
+                    res.append(ru)
+                break
+    # «Рифлер» без уточнения лишний, если есть «Рифлер · …»
+    if any(x.startswith("Рифлер ·") for x in res) and "Рифлер" in res:
+        res.remove("Рифлер")
+    return res
+
+
+def lp_roster(t: dict) -> dict | None:
+    """Активный состав с Liquipedia: тренер, капитан, роли. Кэш на ROSTER_TTL_DAYS дней."""
+    key = str(t["id"])
+    cached = roster_cache.get(key)
+    if cached and (parse_iso(cached.get("t")) or NOW) > NOW - timedelta(days=ROSTER_TTL_DAYS):
+        return cached.get("data")
+    names = []
+    for nm in (t.get("name"), re.sub(r"(?<=[a-z])(?=[A-Z])", " ", t.get("name") or ""), t.get("acronym")):
+        if nm and nm not in names:
+            names.append(nm)
+    data = None
+    try:
+        pages = lp_pages(names)
+        text = next((pages[n] for n in names if n in pages and "Squad|status=active" in pages[n]), None)
+        if text is None:
+            warn(f"Liquipedia: нет страницы команды {t.get('name')}")
+        else:
+            i = text.find("Squad|status=active")
+            block = text[i: text.find("\n}}", i)]
+            people = []
+            for line in block.split("\n"):
+                if "{{Person" not in line:
+                    continue
+                pid = lp_param(line, "id")
+                if not pid:
+                    continue
+                role = (lp_param(line, "role") or "").lower()
+                people.append({
+                    "nick": pid,
+                    "page": lp_param(line, "link") or pid,
+                    "name": lp_param(line, "name"),
+                    "flag": (lp_param(line, "flag") or "").upper()[:2] or None,
+                    "igl": lp_param(line, "igl") == "y",
+                    "coach": "coach" in role,
+                    "note": None if "coach" in role or not role else role,
+                })
+            players = [p for p in people if not p["coach"]]
+            ppages = lp_pages([p["page"] for p in players]) if players else {}
+            for p in players:
+                p["roles"] = player_roles(ppages.get(p["page"], ""))
+            data = {
+                "coach": [{"nick": p["nick"], "name": p["name"], "flag": p["flag"]} for p in people if p["coach"]],
+                "players": [{k: p[k] for k in ("nick", "name", "flag", "igl", "roles", "note")} for p in players],
+            }
+    except Exception as e:
+        warn(f"Liquipedia {t.get('name')}: {e!r}")
+        return cached.get("data") if cached else None
+    roster_cache[key] = {"t": iso(NOW), "data": data}
+    return data
+
+
+def merge_roster(panda_players: list[dict], lp: dict | None) -> tuple[list[dict], list[dict]]:
+    """Состав: берём активный состав Liquipedia (он точнее), дополняем данными PandaScore."""
+    if not lp or not lp.get("players"):
+        return panda_players, []
+    by_nick = {norm(p.get("nick")): p for p in panda_players}
+    res = []
+    for lp_p in lp["players"]:
+        pp = by_nick.get(norm(lp_p["nick"]), {})
+        tags = list(dict.fromkeys((["Капитан"] if lp_p.get("igl") else []) + list(lp_p.get("roles") or [])))
+        if lp_p.get("note") and lp_p["note"] not in ("player",):
+            tags.append({"stand-in": "Замена", "loan": "В аренде", "inactive": "Неактивен"}.get(lp_p["note"], lp_p["note"]))
+        first, last = pp.get("first_name"), pp.get("last_name")
+        if not (first or last) and lp_p.get("name"):
+            first, last = lp_p["name"], None
+        res.append({
+            "id": pp.get("id"),
+            "nick": lp_p["nick"],
+            "first_name": first,
+            "last_name": last,
+            "nationality": pp.get("nationality") or lp_p.get("flag"),
+            "age": pp.get("age"),
+            "image": pp.get("image"),
+            "tags": tags,
+        })
+    return res, lp.get("coach") or []
 
 # ---------------------------------------------------------------- bo3.gg: история, карты
 
@@ -701,11 +863,12 @@ def build_detail(m: dict, prev: dict | None) -> dict:
     for t in brief["teams"]:
         full = fetch_team(t["id"])
         players = [player_brief(p) for p in full.get("players") or [] if p.get("active", True)]
+        players, coach = merge_roster(players, lp_roster({**t, "name": full.get("name") or t.get("name")}))
         bid = bo3_team_id({**t, "slug": full.get("slug") or t.get("slug")})
         hist = bo3_history(bid) if bid else []
         bids.append(bid)
         hists.append(hist)
-        teams.append({**t, "players": players, "form": build_form(bid, hist) if bid else []})
+        teams.append({**t, "players": players, "coach": coach, "form": build_form(bid, hist) if bid else []})
     detail = {**brief, "teams": teams, "updated": iso(NOW)}
     if len(bids) == 2 and all(bids):
         detail["h2h"] = build_h2h(bids[0], bids[1], hists[0])
@@ -764,9 +927,27 @@ def main() -> int:
     save_json(GAMES_CACHE_F, games_cache)
     save_json(TEAMS_CACHE_F, teams_map)
     save_json(TR_CACHE_F, tr_cache)
+    save_json(ROSTER_CACHE_F, roster_cache)
+    tours: dict = {}
+    for b in listing:
+        sid = str((b.get("serie") or {}).get("id") or re.sub(r"\W+", "-", b["tournament"]).strip("-").lower())
+        tr = tours.setdefault(sid, {"id": sid, "name": b["tournament"], "tier": b["tier"], "image": b["serie"].get("image"),
+                                    "begin": b["serie"].get("begin"), "end": b["serie"].get("end"),
+                                    "prize": b["serie"].get("prize"), "matches": 0, "next": None, "live": 0})
+        tr["matches"] += 1
+        if b.get("status") == "running":
+            tr["live"] += 1
+        if b.get("tier") == "s":
+            tr["tier"] = "s"
+        if not tr["prize"] and b["serie"].get("prize"):
+            tr["prize"] = b["serie"]["prize"]
+        if b.get("status") != "running" and (tr["next"] is None or (b["begin_at"] or "") < tr["next"]):
+            tr["next"] = b["begin_at"]
+    tour_list = sorted(tours.values(), key=lambda x: (x["tier"] != "s", x["next"] or "9999"))
     save_json(OUT / "matches.json", {
         "updated": iso(NOW),
         "tiers": sorted(TIERS),
+        "tournaments": tour_list,
         "matches": listing,
         "meta": stats,
     }, pretty=True)
