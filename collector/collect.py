@@ -318,38 +318,52 @@ def lp_pages(titles: list[str]) -> dict[str, str]:
     return out
 
 
+def lp_search(name: str) -> str | None:
+    """Поиск страницы команды по названию (The Mongolz → The MongolZ, 9z → 9z Team)."""
+    wait = 2.5 - (time.time() - _lp_last[0])
+    if wait > 0:
+        time.sleep(wait)
+    _lp_last[0] = time.time()
+    stats["liquipedia_requests"] += 1
+    url = LP_API + "?" + urllib.parse.urlencode({"action": "opensearch", "search": name, "limit": 5, "format": "json"})
+    try:
+        res = json.loads(http_get(url, {"User-Agent": LP_UA, "Accept": "application/json"}))
+    except Exception as e:
+        warn(f"Liquipedia поиск {name}: {e!r}")
+        return None
+    for title in (res[1] if len(res) > 1 else []):
+        if "/" not in title and "academy" not in title.lower():
+            return title
+    return None
+
+
 def lp_param(line: str, key: str) -> str | None:
     m = re.search(r"\|\s*" + key + r"\s*=\s*([^|}<\n]*)", line)
     return m.group(1).strip() if m and m.group(1).strip() else None
 
 
-ROLE_RU = [
-    (r"leader|\bigl\b", "Капитан"),
-    (r"awp|sniper", "Снайпер"),
-    (r"entry", "Рифлер · энтри"),
-    (r"lurk", "Рифлер · люркер"),
-    (r"support", "Рифлер · саппорт"),
-    (r"rifl", "Рифлер"),
-]
-
-
-def player_roles(wikitext: str) -> list[str]:
-    """Роли из инфобокса страницы игрока: role=, role2=, roles=."""
+def player_roles(wikitext: str) -> tuple[list[str], bool]:
+    """Текущие роли из инфобокса игрока (roles=igl,entry / role=…). Возвращает (роли, igl)."""
     box = wikitext[: wikitext.find("\n}}") + 3] if "\n}}" in wikitext else wikitext[:4000]
-    raw = []
+    raw: list[str] = []
     for m in re.finditer(r"\|\s*roles?\d?\s*=\s*([^\n|}]*)", box, re.IGNORECASE):
-        raw += [x.strip() for x in re.split(r"[,/;]", m.group(1)) if x.strip()]
+        raw += [x.strip().lower() for x in re.split(r"[,/;]", m.group(1)) if x.strip()]
+    igl = any(re.search(r"\bigl\b|leader", r) for r in raw)
+    awp = any(re.search(r"awp|sniper", r) for r in raw)
+    rifle_kind = None
+    for rx, ru in ((r"entry", "энтри"), (r"lurk", "люркер"), (r"support", "саппорт"), (r"anchor", "опорник")):
+        if any(re.search(rx, r) for r in raw):
+            rifle_kind = ru
+            break
+    rifle = rifle_kind is not None or any(re.search(r"rifl", r) for r in raw)
     res = []
-    for r in raw:
-        for rx, ru in ROLE_RU:
-            if re.search(rx, r, re.IGNORECASE):
-                if ru not in res:
-                    res.append(ru)
-                break
-    # «Рифлер» без уточнения лишний, если есть «Рифлер · …»
-    if any(x.startswith("Рифлер ·") for x in res) and "Рифлер" in res:
-        res.remove("Рифлер")
-    return res
+    if awp and rifle:
+        res.append("Рифл + AWP")
+    elif awp:
+        res.append("Снайпер")
+    elif rifle:
+        res.append("Рифлер" + (f" · {rifle_kind}" if rifle_kind else ""))
+    return res, igl
 
 
 def lp_roster(t: dict) -> dict | None:
@@ -366,6 +380,12 @@ def lp_roster(t: dict) -> dict | None:
     try:
         pages = lp_pages(names)
         text = next((pages[n] for n in names if n in pages and "Squad|status=active" in pages[n]), None)
+        if text is None:
+            found = lp_search(re.sub(r"(?<=[a-z])(?=[A-Z])", " ", t.get("name") or ""))
+            if found:
+                text = lp_pages([found]).get(found)
+                if text and "Squad|status=active" not in text:
+                    text = None
         if text is None:
             warn(f"Liquipedia: нет страницы команды {t.get('name')}")
         else:
@@ -390,8 +410,12 @@ def lp_roster(t: dict) -> dict | None:
                 })
             players = [p for p in people if not p["coach"]]
             ppages = lp_pages([p["page"] for p in players]) if players else {}
+            any_igl = any(p["igl"] for p in players)
             for p in players:
-                p["roles"] = player_roles(ppages.get(p["page"], ""))
+                roles, igl = player_roles(ppages.get(p["page"], ""))
+                p["roles"] = roles
+                if not any_igl and igl:
+                    p["igl"] = True  # в составе капитан не отмечен — берём со страницы игрока
             data = {
                 "coach": [{"nick": p["nick"], "name": p["name"], "flag": p["flag"]} for p in people if p["coach"]],
                 "players": [{k: p[k] for k in ("nick", "name", "flag", "igl", "roles", "note")} for p in players],
