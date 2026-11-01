@@ -1,0 +1,565 @@
+{
+ "updated": "2026-11-01T22:30:20Z",
+ "tiers": [
+  "a",
+  "s"
+ ],
+ "matches": [
+  {
+   "id": 1761571,
+   "begin_at": "2026-11-02T02:00:00Z",
+   "status": "not_started",
+   "bo": 3,
+   "name": "Upper Bracket Quarterfinal 2: HERO vs B8",
+   "tournament": "IEM Beijing 2026 · Group A",
+   "league": "IEM",
+   "league_image": null,
+   "tier": "s",
+   "teams": [
+    {
+     "id": 3246,
+     "name": "Heroic",
+     "acronym": "HERO",
+     "image": "https://cdn-api.pandascore.co/images/team/image/3246/680px_heroic_2023_allmode.png",
+     "location": "DK"
+    },
+    {
+     "id": 129381,
+     "name": "B8",
+     "acronym": "B8",
+     "image": "https://cdn-api.pandascore.co/images/team/image/129381/b8_lightmode.png",
+     "location": "UA"
+    }
+   ],
+   "stream": "https://www.twitch.tv/Mikotohero",
+   "has_detail": true
+  },
+  {
+   "id": 1761567,
+   "begin_at": "2026-11-02T02:00:00Z",
+   "status": "not_started",
+   "bo": 3,
+   "name": "Upper Bracket Quarterfinal 1: LGC vs MGLZ",
+   "tournament": "IEM Beijing 2026 · Group A",
+   "league": "IEM",
+   "league_image": null,
+   "tier": "s",
+   "teams": [
+    {
+     "id": 133708,
+     "name": "Legacy",
+     "acronym": "LGC",
+     "image": "https://cdn-api.pandascore.co/images/team/image/133708/593px_legacy_allmode.png",
+     "location": "BR"
+    },
+    {
+     "id": 3272,
+     "name": "TheMongolz",
+     "acronym": "MGLZ",
+     "image": "https://cdn-api.pandascore.co/images/team/image/3272/702px_the_mongol_z_2024_03_allmode.png",
+     "location": "MN"
+    }
+   ],
+   "stream": "https://www.twitch.tv/keliencs",
+   "has_detail": true
+  },
+  {
+   "id": 1761578,
+   "begin_at": "2026-11-02T04:30:00Z",
+   "status": "not_started",
+   "bo": 3,
+   "name": "Upper Bracket Quarterfinal 4: PRV vs G2",
+   "tournament": "IEM Beijing 2026 · Group B",
+   "league": "IEM",
+   "league_image": null,
+   "tier": "s",
+   "teams": [
+    {
+     "id": 133719,
+     "name": "PARIVISION",
+     "acronym": "PRV",
+     "image": "https://cdn-api.pandascore.co/images/team/image/133719/250px_parivision_allmode.png",
+     "location": "RU"
+    },
+    {
+     "id": 3210,
+     "name": "G2",
+     "acronym": "G2",
+     "image": "https://cdn-api.pandascore.co/images/team/image/3210/5995.png",
+     "location": "DE"
+    }
+   ],
+   "stream": "https://www.twitch.tv/keliencs",
+   "has_detail": true
+  },
+  {
+   "id": 1761577,
+   "begin_at": "2026-11-02T04:30:00Z",
+   "status": "not_started",
+   "bo": 3,
+   "name": "Upper Bracket Quarterfinal 3: AUR vs TL",
+   "tournament": "IEM Beijing 2026 · Group B",
+   "league": "IEM",
+   "league_image": null,
+   "tier": "s",
+   "teams": [
+    {
+     "id": 131505,
+     "name": "Aurora Gaming",
+     "acronym": "AUR",
+     "image": "https://cdn-api.pandascore.co/images/team/image/131505/600px_aurora_gaming_2025_allmode.png",
+     "location": "RU"
+    },
+    {
+     "id": 3213,
+     "name": "Liquid",
+     "acronym": "TL",
+     "image": "https://cdn-api.pandascore.co/images/team/image/3213/463px_team_liquid_2024_full_lightmode.png",
+     "location": "US"
+    }
+   ],
+   "stream": "https://www.twitch.tv/ESLCS",
+   "has_detail": true
+  },
+  {
+   "id": 1761576,
+   "begin_at": "2026-11-02T07:00:00Z",
+   "status": "not_started",
+   "bo": 3,
+   "name": "Upper Bracket Quarterfinal 2: 9z vs BB",
+   "tournament": "IEM Beijing 2026 · Group B",
+   "league": "IEM",
+   "league_image": null,
+   "tier": "s",
+   "teams": [
+    {
+     "id": 126709,
+     "name": "9z",
+     "acronym": "9z",
+     "image": "https://cdn-api.pandascore.co/images/team/image/126709/9z_team_2024_lightmode.png",
+     "location": "AR"
+    },
+    {
+     "id": 133458,
+     "name": "BetBoom Team",
+     "acronym": "BB",
+     "image": "https://cdn-api.pandascore.co/images/team/image/133458/bet_boom_team_2024_allmode.png",
+     "location": "RU"
+    }
+   ],
+   "stream": "https://www.twitch.tv/gr0mjkeee",
+   "has_detail": true
+  },
+  {
+   "id": 1761572,
+   "begin_at": "2026-11-02T07:00:00Z",
+   "status": "not_started",
+   "bo": 3,
+   "name": "Upper Bracket Quarterfinal 3: FURIA vs FaZe",
+   "tournament": "IEM Beijing 2026 · Group A",
+   "league": "IEM",
+   "league_image": null,
+   "tier": "s",
+   "teams": [
+    {
+     "id": 124530,
+     "name": "FURIA",
+     "acronym": "FURIA",
+     "image": "https://cdn-api.pandascore.co/images/team/image/124530/8297.png",
+     "location": "BR"
+    },
+    {
+     "id": 3212,
+     "name": "FaZe",
+     "acronym": "FaZe",
+     "image": "https://cdn-api.pandascore.co/images/team/image/3212/285px_fa_ze_esports_october_2025_lightmode.png",
+     "location": "US"
+    }
+   ],
+   "stream": "https://www.twitch.tv/bysl4m",
+   "has_detail": true
+  },
+  {
+   "id": 1761575,
+   "begin_at": "2026-11-02T09:30:00Z",
+   "status": "not_started",
+   "bo": 3,
+   "name": "Upper Bracket Quarterfinal 1: MOUZ vs TYLOO",
+   "tournament": "IEM Beijing 2026 · Group B",
+   "league": "IEM",
+   "league_image": null,
+   "tier": "s",
+   "teams": [
+    {
+     "id": 3240,
+     "name": "MOUZ",
+     "acronym": "MOUZ",
+     "image": "https://cdn-api.pandascore.co/images/team/image/3240/208px_mouz_2021_allmode.png",
+     "location": "DE"
+    },
+    {
+     "id": 3248,
+     "name": "TYLOO",
+     "acronym": "TYLOO",
+     "image": "https://cdn-api.pandascore.co/images/team/image/3248/TYLOO.png",
+     "location": "CN"
+    }
+   ],
+   "stream": "https://www.twitch.tv/mgfongabe",
+   "has_detail": true
+  },
+  {
+   "id": 1761573,
+   "begin_at": "2026-11-02T09:30:00Z",
+   "status": "not_started",
+   "bo": 3,
+   "name": "Upper Bracket Quarterfinal 4: NAVI vs FAL",
+   "tournament": "IEM Beijing 2026 · Group A",
+   "league": "IEM",
+   "league_image": null,
+   "tier": "s",
+   "teams": [
+    {
+     "id": 3216,
+     "name": "Natus Vincere",
+     "acronym": "NAVI",
+     "image": "https://cdn-api.pandascore.co/images/team/image/3216/1022px_natus_vincere_2021_lightmode.png",
+     "location": "UA"
+    },
+    {
+     "id": 130564,
+     "name": "Team Falcons",
+     "acronym": "FAL",
+     "image": "https://cdn-api.pandascore.co/images/team/image/130564/team_falconslogo_square.png",
+     "location": "SA"
+    }
+   ],
+   "stream": "https://www.twitch.tv/bysl4m",
+   "has_detail": true
+  },
+  {
+   "id": 1781462,
+   "begin_at": "2026-11-03T02:00:00Z",
+   "status": "not_started",
+   "bo": 3,
+   "name": "Upper Bracket Semifinal 2: TBD vs TBD",
+   "tournament": "IEM Beijing 2026 · Group A",
+   "league": "IEM",
+   "league_image": null,
+   "tier": "s",
+   "teams": [],
+   "stream": "https://www.twitch.tv/ESLCS",
+   "has_detail": false
+  },
+  {
+   "id": 1781461,
+   "begin_at": "2026-11-03T02:00:00Z",
+   "status": "not_started",
+   "bo": 3,
+   "name": "Upper Bracket Semifinal 1: TBD vs TBD",
+   "tournament": "IEM Beijing 2026 · Group A",
+   "league": "IEM",
+   "league_image": null,
+   "tier": "s",
+   "teams": [],
+   "stream": "https://www.twitch.tv/ESLCS",
+   "has_detail": false
+  },
+  {
+   "id": 1781465,
+   "begin_at": "2026-11-03T04:30:00Z",
+   "status": "not_started",
+   "bo": 3,
+   "name": "Lower Bracket Quarterfinal 2: TBD vs TBD",
+   "tournament": "IEM Beijing 2026 · Group A",
+   "league": "IEM",
+   "league_image": null,
+   "tier": "s",
+   "teams": [],
+   "stream": "https://www.twitch.tv/ESLCS",
+   "has_detail": false
+  },
+  {
+   "id": 1781464,
+   "begin_at": "2026-11-03T04:30:00Z",
+   "status": "not_started",
+   "bo": 3,
+   "name": "Lower Bracket Quarterfinal 1: TBD vs TBD",
+   "tournament": "IEM Beijing 2026 · Group A",
+   "league": "IEM",
+   "league_image": null,
+   "tier": "s",
+   "teams": [],
+   "stream": "https://www.twitch.tv/ESLCS",
+   "has_detail": false
+  },
+  {
+   "id": 1781467,
+   "begin_at": "2026-11-03T07:00:00Z",
+   "status": "not_started",
+   "bo": 3,
+   "name": "Lower Bracket Semifinal 2: TBD vs TBD",
+   "tournament": "IEM Beijing 2026 · Group A",
+   "league": "IEM",
+   "league_image": null,
+   "tier": "s",
+   "teams": [],
+   "stream": "https://www.twitch.tv/ESLCS",
+   "has_detail": false
+  },
+  {
+   "id": 1781466,
+   "begin_at": "2026-11-03T07:00:00Z",
+   "status": "not_started",
+   "bo": 3,
+   "name": "Lower Bracket Semifinal 1: TBD vs TBD",
+   "tournament": "IEM Beijing 2026 · Group A",
+   "league": "IEM",
+   "league_image": null,
+   "tier": "s",
+   "teams": [],
+   "stream": "https://www.twitch.tv/ESLCS",
+   "has_detail": false
+  },
+  {
+   "id": 1781468,
+   "begin_at": "2026-11-03T09:30:00Z",
+   "status": "not_started",
+   "bo": 3,
+   "name": "Lower Bracket Final: TBD vs TBD",
+   "tournament": "IEM Beijing 2026 · Group A",
+   "league": "IEM",
+   "league_image": null,
+   "tier": "s",
+   "teams": [],
+   "stream": "https://www.twitch.tv/ESLCS",
+   "has_detail": false
+  },
+  {
+   "id": 1781463,
+   "begin_at": "2026-11-03T09:30:00Z",
+   "status": "not_started",
+   "bo": 3,
+   "name": "Upper Bracket Final: TBD vs TBD",
+   "tournament": "IEM Beijing 2026 · Group A",
+   "league": "IEM",
+   "league_image": null,
+   "tier": "s",
+   "teams": [],
+   "stream": "https://www.twitch.tv/ESLCS",
+   "has_detail": false
+  },
+  {
+   "id": 1781470,
+   "begin_at": "2026-11-04T02:00:00Z",
+   "status": "not_started",
+   "bo": 3,
+   "name": "Upper Bracket Semifinal 2: TBD vs TBD",
+   "tournament": "IEM Beijing 2026 · Group B",
+   "league": "IEM",
+   "league_image": null,
+   "tier": "s",
+   "teams": [],
+   "stream": "https://www.twitch.tv/ESLCS",
+   "has_detail": false
+  },
+  {
+   "id": 1781469,
+   "begin_at": "2026-11-04T02:00:00Z",
+   "status": "not_started",
+   "bo": 3,
+   "name": "Upper Bracket Semifinal 1: TBD vs TBD",
+   "tournament": "IEM Beijing 2026 · Group B",
+   "league": "IEM",
+   "league_image": null,
+   "tier": "s",
+   "teams": [],
+   "stream": "https://www.twitch.tv/ESLCS",
+   "has_detail": false
+  },
+  {
+   "id": 1781473,
+   "begin_at": "2026-11-04T04:30:00Z",
+   "status": "not_started",
+   "bo": 3,
+   "name": "Lower Bracket Quarterfinal 2: TBD vs TBD",
+   "tournament": "IEM Beijing 2026 · Group B",
+   "league": "IEM",
+   "league_image": null,
+   "tier": "s",
+   "teams": [],
+   "stream": "https://www.twitch.tv/ESLCS",
+   "has_detail": false
+  },
+  {
+   "id": 1781472,
+   "begin_at": "2026-11-04T04:30:00Z",
+   "status": "not_started",
+   "bo": 3,
+   "name": "Lower Bracket Quarterfinal 1: TBD vs TBD",
+   "tournament": "IEM Beijing 2026 · Group B",
+   "league": "IEM",
+   "league_image": null,
+   "tier": "s",
+   "teams": [],
+   "stream": "https://www.twitch.tv/ESLCS",
+   "has_detail": false
+  },
+  {
+   "id": 1781475,
+   "begin_at": "2026-11-04T07:00:00Z",
+   "status": "not_started",
+   "bo": 3,
+   "name": "Lower Bracket Semifinal 2: TBD vs TBD",
+   "tournament": "IEM Beijing 2026 · Group B",
+   "league": "IEM",
+   "league_image": null,
+   "tier": "s",
+   "teams": [],
+   "stream": "https://www.twitch.tv/ESLCS",
+   "has_detail": false
+  },
+  {
+   "id": 1781474,
+   "begin_at": "2026-11-04T07:00:00Z",
+   "status": "not_started",
+   "bo": 3,
+   "name": "Lower Bracket Semifinal 1: TBD vs TBD",
+   "tournament": "IEM Beijing 2026 · Group B",
+   "league": "IEM",
+   "league_image": null,
+   "tier": "s",
+   "teams": [],
+   "stream": "https://www.twitch.tv/ESLCS",
+   "has_detail": false
+  },
+  {
+   "id": 1781476,
+   "begin_at": "2026-11-04T09:30:00Z",
+   "status": "not_started",
+   "bo": 3,
+   "name": "Lower Bracket Final: TBD vs TBD",
+   "tournament": "IEM Beijing 2026 · Group B",
+   "league": "IEM",
+   "league_image": null,
+   "tier": "s",
+   "teams": [],
+   "stream": "https://www.twitch.tv/ESLCS",
+   "has_detail": false
+  },
+  {
+   "id": 1781471,
+   "begin_at": "2026-11-04T09:30:00Z",
+   "status": "not_started",
+   "bo": 3,
+   "name": "Upper Bracket Final: TBD vs TBD",
+   "tournament": "IEM Beijing 2026 · Group B",
+   "league": "IEM",
+   "league_image": null,
+   "tier": "s",
+   "teams": [],
+   "stream": "https://www.twitch.tv/ESLCS",
+   "has_detail": false
+  },
+  {
+   "id": 1781482,
+   "begin_at": "2026-11-06T06:30:00Z",
+   "status": "not_started",
+   "bo": 3,
+   "name": "Quarterfinal 1: TBD vs TBD",
+   "tournament": "IEM Beijing 2026 · Playoffs",
+   "league": "IEM",
+   "league_image": null,
+   "tier": "s",
+   "teams": [],
+   "stream": "https://www.twitch.tv/ESLCS",
+   "has_detail": false
+  },
+  {
+   "id": 1781483,
+   "begin_at": "2026-11-06T09:45:00Z",
+   "status": "not_started",
+   "bo": 3,
+   "name": "Quarterfinal 2: TBD vs TBD",
+   "tournament": "IEM Beijing 2026 · Playoffs",
+   "league": "IEM",
+   "league_image": null,
+   "tier": "s",
+   "teams": [],
+   "stream": "https://www.twitch.tv/ESLCS",
+   "has_detail": false
+  },
+  {
+   "id": 1781484,
+   "begin_at": "2026-11-07T06:30:00Z",
+   "status": "not_started",
+   "bo": 3,
+   "name": "Semifinal 1: TBD vs TBD",
+   "tournament": "IEM Beijing 2026 · Playoffs",
+   "league": "IEM",
+   "league_image": null,
+   "tier": "s",
+   "teams": [],
+   "stream": "https://www.twitch.tv/ESLCS",
+   "has_detail": false
+  },
+  {
+   "id": 1781485,
+   "begin_at": "2026-11-07T09:45:00Z",
+   "status": "not_started",
+   "bo": 3,
+   "name": "Semifinal 2: TBD vs TBD",
+   "tournament": "IEM Beijing 2026 · Playoffs",
+   "league": "IEM",
+   "league_image": null,
+   "tier": "s",
+   "teams": [],
+   "stream": "https://www.twitch.tv/ESLCS",
+   "has_detail": false
+  },
+  {
+   "id": 1781487,
+   "begin_at": "2026-11-08T04:00:00Z",
+   "status": "not_started",
+   "bo": 3,
+   "name": "Third Place Match: TBD vs TBD",
+   "tournament": "IEM Beijing 2026 · Playoffs",
+   "league": "IEM",
+   "league_image": null,
+   "tier": "s",
+   "teams": [],
+   "stream": "https://www.twitch.tv/ESLCS",
+   "has_detail": false
+  },
+  {
+   "id": 1781486,
+   "begin_at": "2026-11-08T07:30:00Z",
+   "status": "not_started",
+   "bo": 5,
+   "name": "Grand Final: TBD vs TBD",
+   "tournament": "IEM Beijing 2026 · Playoffs",
+   "league": "IEM",
+   "league_image": null,
+   "tier": "s",
+   "teams": [],
+   "stream": "https://www.twitch.tv/ESLCS",
+   "has_detail": false
+  }
+ ],
+ "meta": {
+  "maps_available": false,
+  "panda_requests": 52,
+  "ai_calls": 8,
+  "warnings": [
+   "Карты по матчам недоступны на бесплатном тарифе PandaScore — нужен другой источник",
+   "Нейросеть: Expecting value: line 1 column 1 (char 0)",
+   "Нейросеть: Expecting value: line 1 column 1 (char 0)",
+   "Нейросеть: Expecting value: line 1 column 1 (char 0)",
+   "Нейросеть: Expecting value: line 1 column 1 (char 0)",
+   "Нейросеть: Expecting value: line 1 column 1 (char 0)",
+   "Нейросеть: Expecting value: line 1 column 1 (char 0)",
+   "Нейросеть: Expecting value: line 1 column 1 (char 0)",
+   "Нейросеть: Expecting value: line 1 column 1 (char 0)"
+  ]
+ }
+}
