@@ -4,10 +4,12 @@ on:
   schedule:
     - cron: "17 */3 * * *"   # каждые 3 часа
   workflow_dispatch:          # кнопка «Run workflow» для ручного запуска
+  push:                       # и сразу после обновления сборщика
+    branches: [main]
+    paths: ["collector/**", ".github/workflows/collect.yml"]
 
 permissions:
   contents: write   # сохранить свежие данные в репозиторий
-  models: read      # бесплатная нейросеть GitHub Models для новостей
 
 concurrency:
   group: collect
@@ -27,8 +29,6 @@ jobs:
       - name: Собрать матчи, статистику и новости
         env:
           PANDASCORE_TOKEN: ${{ secrets.PANDASCORE_TOKEN }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          AI_MODEL: ${{ vars.AI_MODEL || 'openai/gpt-4.1-mini' }}
         run: python collector/collect.py
 
       - name: Сохранить данные
@@ -37,4 +37,5 @@ jobs:
           git config user.email "cs-prep-bot@users.noreply.github.com"
           git add docs/data cache
           git diff --cached --quiet || git commit -m "Данные: $(date -u +'%Y-%m-%d %H:%M') UTC"
+          git pull --rebase -q origin main || true
           git push

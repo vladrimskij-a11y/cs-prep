@@ -313,7 +313,7 @@ a { color: inherit; }
           '<div class="time">' + (live ? '<span class="live">LIVE</span>' : esc(hm(m.begin_at))) + '<small>BO' + esc(m.bo || "?") + '</small></div>' +
           '<div class="vs"><div class="row"><span class="dot a"></span><span class="tname">' + esc(a ? a.name : "TBD") + '</span></div>' +
           '<div class="row"><span class="dot b"></span><span class="tname">' + esc(b ? b.name : "TBD") + '</span></div>' +
-          '<div class="tour">' + esc(m.tournament) + '</div></div>' +
+          '<div class="tour">' + esc(m.stage ? m.tournament + " · " + m.stage : m.tournament) + '</div></div>' +
           '<div class="side"><span class="pill ' + esc(m.tier) + '">' + esc((m.tier || "?").toUpperCase()) + '</span>' +
           '<button class="mic" data-mine="' + m.id + '" aria-pressed="' + on + '" aria-label="Комментирую этот матч">' + MIC + '</button></div></div>';
       });
@@ -339,7 +339,7 @@ a { color: inherit; }
         '<div class="sc"><span class="a">' + esc(x.score[0]) + '</span><span class="x">:</span><span class="b">' + esc(x.score[1]) + '</span></div>' +
         '<div class="tr">' + esc(x.tournament) + '</div>';
       if (x.maps && x.maps.length) {
-        html += '<div class="maps">' + x.maps.map(function (g) { return '<span class="mp ' + (g.winner === 0 ? "a" : g.winner === 1 ? "b" : "n") + '">' + esc(g.map || "?") + '</span>'; }).join("") + '</div>';
+        html += '<div class="maps">' + x.maps.map(function (g) { return '<span class="mp ' + (g.winner === 0 ? "a" : g.winner === 1 ? "b" : "n") + '">' + esc(g.map || "?") + (g.score ? ' <span class="num">' + esc(g.score) + '</span>' : '') + '</span>'; }).join("") + '</div>';
       }
       html += '</div>';
     });
@@ -350,7 +350,7 @@ a { color: inherit; }
     var M = m.maps;
     var A = m.teams[0], B = m.teams[1];
     if (!M || !M.available || !M.table.length) {
-      return '<div class="sec"><h3>Карты</h3><div class="box note">Статистика по картам пока недоступна: бесплатный тариф PandaScore не отдаёт карты. Подключим другой источник.</div></div>';
+      return '<div class="sec"><h3>Карты</h3><div class="box note">Нет данных по картам за последние 4 месяца.</div></div>';
     }
     var html = '<div class="sec"><h3>Карты <span>за ' + Math.round(M.window_days / 30) + ' мес.</span></h3><div class="box" style="overflow-x:auto"><table class="mtab"><thead><tr><th>Карта</th><th>' + esc(abbr(A)) + '</th><th>' + esc(abbr(B)) + '</th></tr></thead><tbody>';
     M.table.forEach(function (r) {
@@ -377,7 +377,7 @@ a { color: inherit; }
       html += '<div class="box col ' + (i ? "b" : "a") + '"><div class="hd">' + esc(abbr(t)) + '</div>';
       if (!list.length) html += '<div class="g"><span class="d">не играли</span></div>';
       list.forEach(function (g) {
-        html += '<div class="g"><span>vs ' + esc(g.vs) + ' <span class="d">' + esc(dm(g.date)) + '</span></span><span class="wl ' + (g.won ? "w" : "l") + '">' + (g.won ? "W" : "L") + '</span></div>';
+        html += '<div class="g"><span>vs ' + esc(g.vs) + ' <span class="d">' + esc(dm(g.date)) + '</span></span><span class="wl ' + (g.won ? "w" : "l") + '">' + (g.score ? esc(g.score) : (g.won ? "W" : "L")) + '</span></div>';
       });
       html += '</div>';
     });
@@ -431,7 +431,6 @@ a { color: inherit; }
     var html = '<div class="sec"><div class="filt" role="group" aria-label="О ком">' + opts.map(function (o) {
       return '<button class="chip" data-nf="' + esc(o[0]) + '" aria-pressed="' + (who === o[0]) + '">' + esc(o[1]) + '<span class="c">' + newsFor(m, o[0]).length + '</span></button>';
     }).join("") + '</div>';
-    if (!N.ai) html += '<div class="banner">Нейросеть в этот раз не отработала — показаны найденные заголовки без перевода и проверки.</div>';
     var items = newsFor(m, who);
     if (!items.length) html += '<div class="box note">За ' + esc(N.days || 7) + ' дней ничего не нашлось.</div>';
     html += '<div class="news">';
@@ -454,7 +453,7 @@ a { color: inherit; }
     var A = m.teams[0] || {}, B = m.teams[1] || {}, on = mine.has(String(m.id));
     var nCount = ((m.news && m.news.items) || []).length;
     var html = '<div class="view"><div style="padding-top:12px">' + (TG ? '' : '<button class="back" id="back">' + ARROW + 'Все матчи</button>') + '</div>' +
-      '<section class="hero"><div class="meta"><span class="pill ' + esc(m.tier) + '">' + esc((m.tier || "").toUpperCase()) + '</span><span>' + esc(m.tournament) + '</span></div>' +
+      '<section class="hero"><div class="meta"><span class="pill ' + esc(m.tier) + '">' + esc((m.tier || "").toUpperCase()) + '</span><span>' + esc(m.tournament) + (m.stage ? " · " + esc(m.stage) : "") + '</span></div>' +
       '<div class="face"><div class="tm a"><span class="acr">' + esc(abbr(A)) + '</span><span class="full">' + esc(A.name) + '</span></div>' +
       '<div class="mid"><b>' + esc(hm(m.begin_at)) + '</b>' + esc(dm(m.begin_at)) + ' · BO' + esc(m.bo) + '</div>' +
       '<div class="tm b"><span class="acr">' + esc(abbr(B)) + '</span><span class="full">' + esc(B.name) + '</span></div></div>' +

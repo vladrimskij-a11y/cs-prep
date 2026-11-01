@@ -3,20 +3,18 @@
 Сборщик данных для CS Prep (Telegram Mini App для комментатора).
 
 Что делает за один запуск:
-  1. Берёт ближайшие матчи CS2 тир-1 (S и A) из PandaScore.
-  2. Для матчей в ближайшие DETAIL_HOURS часов собирает:
-     составы, форму команд, личные встречи, статистику по картам.
+  1. Берёт ближайшие матчи CS2 тир-1 (S и A) и составы из PandaScore.
+  2. Для матчей в ближайшие DETAIL_HOURS часов собирает из bo3.gg
+     форму команд, личные встречи и статистику по картам (со счётом по раундам).
   3. Ищет новости про игроков и команды за NEWS_DAYS дней
-     (Google News на русском и английском + RSS профильных сайтов),
-     нейросеть отсеивает лишнее и переводит на русский.
+     (Google News на русском и английском + RSS HLTV и Cybersport.ru),
+     отсеивает лишнее по правилам и переводит заголовки на русский.
   4. Складывает всё в docs/data/*.json — их читает Mini App.
 
 Работает только на стандартной библиотеке Python, ничего ставить не нужно.
 
 Переменные окружения:
   PANDASCORE_TOKEN  — токен PandaScore (обязателен)
-  GITHUB_TOKEN      — токен для нейросети GitHub Models (в GitHub Actions есть сам)
-  AI_MODEL          — модель, по умолчанию openai/gpt-4.1-mini
   TIERS             — уровни турниров, по умолчанию "s,a"
   DAYS_AHEAD        — на сколько дней вперёд показывать матчи (7)
   DETAIL_HOURS      — для матчей в ближайшие N часов собирать подробности (72)
@@ -26,6 +24,7 @@
 from __future__ import annotations
 
 import email.utils
+import gzip
 import hashlib
 import json
 import os
@@ -44,14 +43,13 @@ OUT = ROOT / "docs" / "data"
 CACHE = ROOT / "cache"
 
 PANDA = "https://api.pandascore.co"
+BO3 = "https://api.bo3.gg/api/v1"
 TOKEN = os.environ.get("PANDASCORE_TOKEN", "").strip()
-GH_TOKEN = os.environ.get("GITHUB_TOKEN", "").strip()
-AI_MODEL = os.environ.get("AI_MODEL", "openai/gpt-4.1-mini")
-AI_URL = "https://models.github.ai/inference/chat/completions"
 TIERS = {t.strip().lower() for t in os.environ.get("TIERS", "s,a").split(",") if t.strip()}
 DAYS_AHEAD = int(os.environ.get("DAYS_AHEAD", "7"))
 DETAIL_HOURS = int(os.environ.get("DETAIL_HOURS", "72"))
 NEWS_DAYS = int(os.environ.get("NEWS_DAYS", "7"))
+MAPS_WINDOW_DAYS = 120
 
 # Ленты профильных сайтов. Любую можно убрать или добавить свою.
 RSS_FEEDS = [
@@ -62,32 +60,36 @@ RSS_FEEDS = [
 UA = "Mozilla/5.0 (compatible; cs-prep-bot/1.0; +https://github.com)"
 NOW = datetime.now(timezone.utc)
 
-stats = {"panda_requests": 0, "ai_calls": 0, "warnings": []}
+stats = {"panda_requests": 0, "bo3_requests": 0, "translations": 0, "warnings": []}
 
 
 def warn(msg: str) -> None:
     print("WARN:", msg, file=sys.stderr)
-    stats["warnings"].append(msg)
+    if len(stats["warnings"]) < 40:
+        stats["warnings"].append(msg)
 
 
 # ---------------------------------------------------------------- HTTP
 
 def http_get(url: str, headers: dict | None = None, timeout: int = 30) -> bytes:
-    h = {"User-Agent": UA, "Accept": "*/*"}
+    h = {"User-Agent": UA, "Accept": "*/*", "Accept-Encoding": "gzip"}
     h.update(headers or {})
     req = urllib.request.Request(url, headers=h)
-    last = None
+    last: Exception | None = None
     for attempt in range(3):
         try:
             with urllib.request.urlopen(req, timeout=timeout) as r:
-                return r.read()
+                body = r.read()
+                if r.headers.get("Content-Encoding") == "gzip":
+                    body = gzip.decompress(body)
+                return body
         except urllib.error.HTTPError as e:
             if e.code in (429, 500, 502, 503, 504) and attempt < 2:
-                time.sleep(3 * (attempt + 1))
+                time.sleep(4 * (attempt + 1))
                 last = e
                 continue
             raise
-        except (urllib.error.URLError, TimeoutError) as e:
+        except (urllib.error.URLError, TimeoutError, ConnectionError) as e:
             last = e
             time.sleep(2 * (attempt + 1))
     raise last  # type: ignore[misc]
@@ -110,6 +112,14 @@ def panda(path: str, params: dict | None = None):
     return json.loads(raw)
 
 
+def bo3(path: str, params: dict | None = None):
+    q = urllib.parse.urlencode(params or {})
+    url = f"{BO3}{path}" + (f"?{q}" if q else "")
+    stats["bo3_requests"] += 1
+    time.sleep(0.25)
+    return json.loads(http_get(url, {"Accept": "application/json"}))
+
+
 # ---------------------------------------------------------------- cache
 
 def load_json(path: Path, default):
@@ -121,15 +131,19 @@ def load_json(path: Path, default):
 
 def save_json(path: Path, data, pretty: bool = False) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    txt = json.dumps(data, ensure_ascii=False, indent=1 if pretty else None, separators=None if pretty else (",", ":"))
+    if pretty:
+        txt = json.dumps(data, ensure_ascii=False, indent=1)
+    else:
+        txt = json.dumps(data, ensure_ascii=False, separators=(",", ":"))
     path.write_text(txt, "utf-8")
 
 
-GAMES_CACHE_F = CACHE / "games.json"      # map info per past match id (never changes)
-AI_CACHE_F = CACHE / "news_ai.json"       # AI verdicts per news item
+GAMES_CACHE_F = CACHE / "bo3_games.json"     # карты по завершённым матчам bo3 (не меняются)
+TEAMS_CACHE_F = CACHE / "bo3_teams.json"     # PandaScore id → bo3 id
+TR_CACHE_F = CACHE / "translations.json"     # переводы заголовков
 games_cache: dict = load_json(GAMES_CACHE_F, {})
-ai_cache: dict = load_json(AI_CACHE_F, {})
-maps_endpoint_ok = True
+teams_map: dict = load_json(TEAMS_CACHE_F, {})
+tr_cache: dict = load_json(TR_CACHE_F, {})
 
 
 # ---------------------------------------------------------------- helpers
@@ -142,9 +156,14 @@ def parse_iso(s: str | None) -> datetime | None:
     if not s:
         return None
     try:
-        return datetime.fromisoformat(s.replace("Z", "+00:00"))
+        d = datetime.fromisoformat(s.replace("Z", "+00:00"))
+        return d if d.tzinfo else d.replace(tzinfo=timezone.utc)
     except ValueError:
         return None
+
+
+def norm(s: str | None) -> str:
+    return re.sub(r"[^a-z0-9а-я]", "", (s or "").lower())
 
 
 def team_brief(t: dict) -> dict:
@@ -152,6 +171,7 @@ def team_brief(t: dict) -> dict:
         "id": t.get("id"),
         "name": t.get("name"),
         "acronym": t.get("acronym"),
+        "slug": t.get("slug"),
         "image": t.get("image_url"),
         "location": t.get("location"),
     }
@@ -160,10 +180,14 @@ def team_brief(t: dict) -> dict:
 def tournament_label(m: dict) -> str:
     league = (m.get("league") or {}).get("name") or ""
     serie = (m.get("serie") or {}).get("full_name") or (m.get("serie") or {}).get("name") or ""
-    stage = (m.get("tournament") or {}).get("name") or ""
-    parts = [league, serie]
-    label = " ".join(p for p in parts if p).strip()
-    return f"{label} · {stage}" if stage else label
+    return " ".join(p for p in (league, serie) if p).strip()
+
+
+def stage_label(m: dict) -> str:
+    name = m.get("name") or ""
+    stage = name.split(":")[0].strip() if ":" in name else ""
+    group = (m.get("tournament") or {}).get("name") or ""
+    return " · ".join(p for p in (group, stage) if p)
 
 
 def match_brief(m: dict) -> dict:
@@ -178,15 +202,14 @@ def match_brief(m: dict) -> dict:
         "bo": m.get("number_of_games"),
         "name": m.get("name"),
         "tournament": tournament_label(m),
-        "league": (m.get("league") or {}).get("name"),
-        "league_image": (m.get("league") or {}).get("image_url"),
+        "stage": stage_label(m),
         "tier": ((m.get("tournament") or {}).get("tier") or "").lower(),
         "teams": opps,
         "stream": (ru or main or {}).get("raw_url"),
     }
 
 
-# ---------------------------------------------------------------- matches
+# ---------------------------------------------------------------- PandaScore: матчи и составы
 
 def fetch_upcoming() -> list[dict]:
     end = NOW + timedelta(days=DAYS_AHEAD)
@@ -214,7 +237,6 @@ def fetch_upcoming() -> list[dict]:
 
 
 _team_cache: dict[int, dict] = {}
-_past_cache: dict[int, list] = {}
 
 
 def fetch_team(team_id: int) -> dict:
@@ -227,155 +249,10 @@ def fetch_team(team_id: int) -> dict:
     return _team_cache[team_id]
 
 
-def fetch_past(team_id: int, pages: int = 2) -> list[dict]:
-    if team_id in _past_cache:
-        return _past_cache[team_id]
-    res: list[dict] = []
-    for page in range(1, pages + 1):
-        try:
-            batch = panda("/csgo/matches/past", {
-                "filter[opponent_id]": team_id, "sort": "-begin_at", "per_page": 100, "page": page})
-        except PandaForbidden as e:
-            warn(f"История матчей недоступна на этом тарифе: {e}")
-            break
-        except Exception as e:
-            warn(f"История команды {team_id}: {e}")
-            break
-        res.extend(batch)
-        if len(batch) < 100:
-            break
-    res = [m for m in res if m.get("status") == "finished" and not m.get("forfeit")]
-    _past_cache[team_id] = res
-    return res
-
-
-def map_name_from_game(g: dict) -> str | None:
-    mp = g.get("map")
-    if isinstance(mp, dict):
-        return mp.get("name")
-    if isinstance(mp, str):
-        return mp
-    return None
-
-
-def games_with_maps(m: dict, allow_fetch: bool) -> list[dict]:
-    """Список карт матча: [{'map': 'Mirage', 'winner_id': 123}]."""
-    global maps_endpoint_ok
-    key = str(m["id"])
-    if key in games_cache:
-        return games_cache[key]
-    games = sorted(m.get("games") or [], key=lambda g: g.get("position") or 0)
-    res = []
-    for g in games:
-        if g.get("status") != "finished":
-            continue
-        res.append({"map": map_name_from_game(g), "winner_id": (g.get("winner") or {}).get("id")})
-    if res and all(r["map"] for r in res):
-        games_cache[key] = res
-        return res
-    if allow_fetch and maps_endpoint_ok:
-        try:
-            full = panda(f"/csgo/matches/{m['id']}/games")
-            res = []
-            for g in sorted(full, key=lambda g: g.get("position") or 0):
-                if g.get("status") != "finished":
-                    continue
-                res.append({"map": map_name_from_game(g), "winner_id": (g.get("winner") or {}).get("id")})
-            games_cache[key] = res
-            return res
-        except PandaForbidden:
-            maps_endpoint_ok = False
-            warn("Карты по матчам недоступны на бесплатном тарифе PandaScore — нужен другой источник")
-        except Exception as e:
-            warn(f"Карты матча {m['id']}: {e}")
-    return res
-
-
-def score_of(m: dict, team_id: int) -> int | None:
-    for r in m.get("results") or []:
-        if r.get("team_id") == team_id:
-            return r.get("score")
-    return None
-
-
-def other_team(m: dict, team_id: int) -> dict:
-    for o in m.get("opponents") or []:
-        t = o.get("opponent") or {}
-        if t.get("id") != team_id:
-            return t
-    return {}
-
-
-def build_form(team_id: int, past: list[dict], n: int = 10) -> list[dict]:
-    res = []
-    for m in past[:n]:
-        opp = other_team(m, team_id)
-        res.append({
-            "date": m.get("begin_at"),
-            "opponent": opp.get("acronym") or opp.get("name"),
-            "opponent_name": opp.get("name"),
-            "score": score_of(m, team_id),
-            "opp_score": score_of(m, opp.get("id")),
-            "won": m.get("winner_id") == team_id,
-            "tournament": tournament_label(m),
-            "tier": ((m.get("tournament") or {}).get("tier") or "").lower(),
-        })
-    return res
-
-
-def build_h2h(a: int, b: int, past_a: list[dict]) -> list[dict]:
-    res = []
-    for m in past_a:
-        ids = {(o.get("opponent") or {}).get("id") for o in m.get("opponents") or []}
-        if b not in ids:
-            continue
-        maps = games_with_maps(m, allow_fetch=True)
-        res.append({
-            "date": m.get("begin_at"),
-            "tournament": tournament_label(m),
-            "bo": m.get("number_of_games"),
-            "score": [score_of(m, a), score_of(m, b)],
-            "winner": 0 if m.get("winner_id") == a else 1 if m.get("winner_id") == b else None,
-            "maps": [{"map": g["map"], "winner": 0 if g["winner_id"] == a else 1 if g["winner_id"] == b else None}
-                     for g in maps],
-        })
-    return res
-
-
-def build_maps(team_ids: list[int], pasts: list[list[dict]], window_days: int = 120, max_matches: int = 30) -> dict:
-    """Статистика по картам за последние window_days дней."""
-    since = NOW - timedelta(days=window_days)
-    table: dict[str, dict] = {}
-    recent: dict[str, list] = {}
-    any_maps = False
-    for idx, (tid, past) in enumerate(zip(team_ids, pasts)):
-        for m in past[:max_matches]:
-            d = parse_iso(m.get("begin_at"))
-            if d and d < since:
-                break
-            opp = other_team(m, tid)
-            for g in games_with_maps(m, allow_fetch=True):
-                name = g.get("map")
-                if not name:
-                    continue
-                any_maps = True
-                row = table.setdefault(name, {"map": name, "teams": [{"played": 0, "won": 0}, {"played": 0, "won": 0}]})
-                row["teams"][idx]["played"] += 1
-                won = g.get("winner_id") == tid
-                row["teams"][idx]["won"] += int(won)
-                lst = recent.setdefault(name, [])
-                lst.append({"team": idx, "date": m.get("begin_at"), "vs": opp.get("acronym") or opp.get("name"),
-                            "won": won, "tournament": tournament_label(m)})
-    for name in recent:
-        recent[name].sort(key=lambda r: r["date"] or "", reverse=True)
-    rows = sorted(table.values(), key=lambda r: -(r["teams"][0]["played"] + r["teams"][1]["played"]))
-    return {"available": any_maps, "window_days": window_days, "table": rows, "recent": recent}
-
-
 def player_brief(p: dict) -> dict:
     age = p.get("age")
     if not age and p.get("birthday"):
-        bd = parse_iso(p["birthday"] + "T00:00:00Z") if len(p["birthday"]) == 10 else parse_iso(p["birthday"])
+        bd = parse_iso(p["birthday"][:10] + "T00:00:00Z")
         if bd:
             age = int((NOW - bd).days // 365.25)
     return {
@@ -390,7 +267,208 @@ def player_brief(p: dict) -> dict:
     }
 
 
-# ---------------------------------------------------------------- news
+# ---------------------------------------------------------------- bo3.gg: история, карты
+
+def bo3_team_id(t: dict) -> int | None:
+    """Ищет команду PandaScore на bo3.gg: по ps_id, слагу, названию."""
+    key = str(t["id"])
+    if key in teams_map:
+        return teams_map[key]
+    found = None
+    tries = []
+    if t.get("slug"):
+        tries.append({"filter[teams.slug][eq]": t["slug"]})
+    if t.get("name"):
+        tries.append({"filter[teams.name][eq]": t["name"]})
+        tries.append({"filter[teams.slug][eq]": re.sub(r"[^a-z0-9]+", "-", t["name"].lower()).strip("-")})
+    if t.get("acronym"):
+        tries.append({"filter[teams.acronym][eq]": t["acronym"]})
+    for params in tries:
+        try:
+            res = (bo3("/teams", params).get("results") or [])
+        except Exception as e:
+            warn(f"bo3 поиск {t.get('name')}: {e}")
+            continue
+        exact = [r for r in res if r.get("ps_id") == t["id"]]
+        pick = exact[0] if exact else (res[0] if len(res) == 1 else None)
+        if pick:
+            found = pick["id"]
+            break
+    if found is None:
+        warn(f"bo3: не нашёл команду {t.get('name')}")
+    teams_map[key] = found
+    return found
+
+
+_bo3_hist: dict[int, list] = {}
+
+
+def bo3_history(bid: int, pages: int = 2) -> list[dict]:
+    if bid in _bo3_hist:
+        return _bo3_hist[bid]
+    res: list[dict] = []
+    for page in range(pages):
+        try:
+            j = bo3("/matches", {
+                "page[limit]": 50, "page[offset]": page * 50, "sort": "-start_date",
+                "filter[matches.status][in]": "finished",
+                "filter[matches.team_ids][overlap]": bid,
+                "with": "teams,tournament",
+            })
+        except Exception as e:
+            warn(f"bo3 история {bid}: {e}")
+            break
+        batch = j.get("results") or []
+        res.extend(batch)
+        if len(batch) < 50:
+            break
+    _bo3_hist[bid] = res
+    return res
+
+
+MAP_NAMES = {"dust2": "Dust2", "de_dust2": "Dust2"}
+
+
+def map_title(raw: str | None) -> str | None:
+    if not raw:
+        return None
+    r = raw.lower()
+    if r in MAP_NAMES:
+        return MAP_NAMES[r]
+    r = r.replace("de_", "").replace("cs_", "")
+    return r[:1].upper() + r[1:]
+
+
+def bo3_games(m: dict) -> list[dict]:
+    """Карты матча: [{'map','winner':1|2,'score':'13:10'}] в порядке игры. Кэшируется навсегда."""
+    key = str(m["id"])
+    if key in games_cache:
+        return games_cache[key]
+    try:
+        games = bo3("/games", {"filter[games.match_id][eq]": m["id"]}).get("results") or []
+    except Exception as e:
+        warn(f"bo3 карты {m['id']}: {e}")
+        return []
+    t1, t2 = m.get("team1") or {}, m.get("team2") or {}
+    n1 = {norm(t1.get("name")), norm(t1.get("slug")), norm(t1.get("acronym"))} - {""}
+    n2 = {norm(t2.get("name")), norm(t2.get("slug")), norm(t2.get("acronym"))} - {""}
+    ms = m.get("maps_score") or []
+    res = []
+    for g in sorted(games, key=lambda g: g.get("number") or 0):
+        if g.get("status") != "finished":
+            continue
+        w = norm(g.get("winner_clan_name"))
+        winner = 1 if w in n1 else 2 if w in n2 else None
+        if winner is None:
+            i = (g.get("number") or 0) - 1
+            if 0 <= i < len(ms):
+                winner = 1 if ms[i] else 2
+        ws, ls = g.get("winner_clan_score"), g.get("loser_clan_score")
+        score = None
+        if ws is not None and ls is not None and winner:
+            score = f"{ws}:{ls}" if winner == 1 else f"{ls}:{ws}"
+        res.append({"map": map_title(g.get("map_name")), "winner": winner, "score": score})
+    if m.get("status") == "finished":
+        games_cache[key] = res
+    return res
+
+
+def side_of(m: dict, bid: int) -> int:
+    return 1 if m.get("team1_id") == bid else 2
+
+
+def opp_of(m: dict, bid: int) -> dict:
+    return (m.get("team2") if m.get("team1_id") == bid else m.get("team1")) or {}
+
+
+def tour_name(m: dict) -> str:
+    return ((m.get("tournament") or {}).get("name") or "").strip()
+
+
+def from_side(score: str | None, side: int) -> str | None:
+    """Счёт по раундам с точки зрения команды на стороне side."""
+    if not score:
+        return None
+    a, b = score.split(":")
+    return score if side == 1 else f"{b}:{a}"
+
+
+def build_form(bid: int, hist: list[dict], n: int = 10) -> list[dict]:
+    res = []
+    for m in hist[:n]:
+        s = side_of(m, bid)
+        my = m.get("team1_score") if s == 1 else m.get("team2_score")
+        their = m.get("team2_score") if s == 1 else m.get("team1_score")
+        opp = opp_of(m, bid)
+        res.append({
+            "date": m.get("start_date"),
+            "opponent": opp.get("acronym") or opp.get("name"),
+            "opponent_name": opp.get("name"),
+            "score": my, "opp_score": their,
+            "won": m.get("winner_team_id") == bid,
+            "tournament": tour_name(m),
+            "tier": (m.get("tier") or "").lower(),
+        })
+    return res
+
+
+def build_h2h(a: int, b: int, hist_a: list[dict]) -> list[dict]:
+    since = NOW - timedelta(days=365)
+    res = []
+    for m in hist_a:
+        if {m.get("team1_id"), m.get("team2_id")} != {a, b}:
+            continue
+        d = parse_iso(m.get("start_date"))
+        if d and d < since:
+            break
+        sa = side_of(m, a)
+        maps = []
+        for g in bo3_games(m):
+            w = None if not g["winner"] else (0 if g["winner"] == sa else 1)
+            maps.append({"map": g["map"], "winner": w, "score": from_side(g["score"], sa)})
+        res.append({
+            "date": m.get("start_date"),
+            "tournament": tour_name(m),
+            "bo": m.get("bo_type"),
+            "score": [m.get("team1_score") if sa == 1 else m.get("team2_score"),
+                      m.get("team2_score") if sa == 1 else m.get("team1_score")],
+            "winner": 0 if m.get("winner_team_id") == a else 1 if m.get("winner_team_id") == b else None,
+            "maps": maps,
+        })
+    return res
+
+
+def build_maps(bids: list[int | None], hists: list[list[dict]], max_matches: int = 40) -> dict:
+    since = NOW - timedelta(days=MAPS_WINDOW_DAYS)
+    table: dict[str, dict] = {}
+    recent: dict[str, list] = {}
+    for idx, (bid, hist) in enumerate(zip(bids, hists)):
+        if not bid:
+            continue
+        for m in hist[:max_matches]:
+            d = parse_iso(m.get("start_date"))
+            if d and d < since:
+                break
+            s = side_of(m, bid)
+            opp = opp_of(m, bid)
+            for g in bo3_games(m):
+                name = g.get("map")
+                if not name or not g.get("winner"):
+                    continue
+                row = table.setdefault(name, {"map": name, "teams": [{"played": 0, "won": 0}, {"played": 0, "won": 0}]})
+                won = g["winner"] == s
+                row["teams"][idx]["played"] += 1
+                row["teams"][idx]["won"] += int(won)
+                recent.setdefault(name, []).append({
+                    "team": idx, "date": m.get("start_date"), "vs": opp.get("acronym") or opp.get("name"),
+                    "won": won, "score": from_side(g.get("score"), s), "tournament": tour_name(m)})
+    for name in recent:
+        recent[name].sort(key=lambda r: r["date"] or "", reverse=True)
+    rows = sorted(table.values(), key=lambda r: -(r["teams"][0]["played"] + r["teams"][1]["played"]))
+    return {"available": bool(rows), "window_days": MAPS_WINDOW_DAYS, "table": rows, "recent": recent}
+
+
+# ---------------------------------------------------------------- новости
 
 def parse_date(s: str | None) -> datetime | None:
     if not s:
@@ -421,13 +499,13 @@ def parse_rss(raw: bytes, default_source: str) -> list[dict]:
         src_el = it.find("source")
         source = (src_el.text or "").strip() if src_el is not None and src_el.text else default_source
         if source and title.endswith(" - " + source):
-            title = title[: -len(source) - 3]
+            title = title[: -len(source) - 3].strip()
         items.append({
             "title": title,
             "url": link,
             "source": source,
             "date": parse_date(it.findtext("pubDate")),
-            "snippet": strip_html(it.findtext("description") or "")[:300],
+            "snippet": strip_html(it.findtext("description") or "")[:400],
         })
     return items
 
@@ -446,7 +524,7 @@ def fetch_feed(url: str, source: str) -> list[dict]:
     since = NOW - timedelta(days=NEWS_DAYS)
     items = [i for i in items if i["date"] and i["date"] >= since and i["title"]]
     _feed_cache[url] = items
-    time.sleep(0.5)
+    time.sleep(0.4)
     return items
 
 
@@ -456,185 +534,184 @@ def google_news(query: str, lang: str) -> list[dict]:
         params = {"q": q, "hl": "ru", "gl": "RU", "ceid": "RU:ru"}
     else:
         params = {"q": q, "hl": "en-US", "gl": "US", "ceid": "US:en"}
-    url = "https://news.google.com/rss/search?" + urllib.parse.urlencode(params)
-    return fetch_feed(url, "Google News")
+    return fetch_feed("https://news.google.com/rss/search?" + urllib.parse.urlencode(params), "Google News")
 
 
-def word_re(word: str) -> re.Pattern:
-    return re.compile(r"(?<![\w])" + re.escape(word) + r"(?![\w])", re.IGNORECASE)
+CS_CONTEXT = re.compile(
+    r"\bCS ?2\b|\bCS:?GO\b|Counter[- ]Strike|\bКС ?2?\b|\bHLTV\b|\bIEM\b|\bBLAST\b|\bPGL\b|\bESL\b|\bmajor\b|мейджор"
+    r"|\bAWP\b|\bIGL\b|капитан|снайпер|roster|состав|transfer|трансфер",
+    re.IGNORECASE)
+CS_SOURCES = {"hltv", "cybersport.ru", "dust2.us", "dust2.com.br", "bo3.gg", "esports.gg", "dexerto", "egamersworld",
+              "escorenews", "cyber.sports.ru", "sports.ru", "championat", "offstage.ru", "vpesports", "esportsinsider",
+              "hotspawn", "dust2", "gamespot", "pcgamer", "esports.net", "thespike", "gosugamers", "liquipedia"}
+OTHER_GAMES = re.compile(
+    r"\b(MLBB|Mobile Legends|Dota|Valorant|League of Legends|\bLoL\b|PUBG|Fortnite|Apex|Rainbow Six|\bR6\b|Overwatch"
+    r"|Rocket League|Call of Duty|\bCoD\b|Standoff|Deadlock|Marvel Rivals|EA FC|FIFA|Free Fire|StarCraft|Tekken)\b",
+    re.IGNORECASE)
+SPAM = re.compile(
+    r"prediction|predictions|прогноз|ставк|коэффициент|\bodds\b|betting|букмекер|live stream|how to watch|где смотреть"
+    r"|расписание|schedule|^Матч .+ · |\bvs\.? .+ \d{1,2} (ноября|октября|декабря)",
+    re.IGNORECASE)
+COMMON_WORDS = {"try", "zone", "ice", "fire", "max", "flash", "ace", "one", "jack", "king", "magic", "hero", "legacy",
+                "spirit", "liquid", "heroic", "complexity", "falcons", "aurora", "monte", "rare", "nemiga", "apeks",
+                "sky", "fame", "mir", "boss", "chopper", "hunter", "techno", "snow", "smooya", "ex", "it", "im", "kyxsan"}
+
+KIND_RULES = [
+    ("интервью", r"interview|интервью|told|said|says|рассказал|заявил|признался|ответил|высказал|\""),
+    ("трансфер", r"sign|signs|signed|join|joins|leave|leaves|bench|benched|transfer|roster|подписал|перешёл|перешел|покинул|скамейк|замен|трансфер|состав"),
+    ("соцсети", r"tweet|twitter|\bX\b|post|stream|clip|reddit|instagram|соцсет|стрим|твит|пост|клип|ролик"),
+    ("слухи", r"rumou?r|report:|reportedly|insider|слух|инсайд|по данным"),
+    ("результат", r"beat|beats|defeat|win|wins|won|eliminat|advance|upset|обыграл|победил|вылетел|прош[её]л|разгромил|проиграл"),
+]
+
+
+def classify(title: str) -> str:
+    for kind, rx in KIND_RULES:
+        if re.search(rx, title, re.IGNORECASE):
+            return kind
+    return "новость"
+
+
+def entity_re(word: str, case: bool) -> re.Pattern:
+    return re.compile(r"(?<![\w])" + re.escape(word) + r"(?![\w])", 0 if case else re.IGNORECASE)
+
+
+def is_ambiguous(nick: str) -> bool:
+    n = nick.lower()
+    return len(nick) <= 3 or n in COMMON_WORDS or nick.isdigit() or (nick.islower() and nick.isalpha() and len(nick) <= 5)
 
 
 def item_key(it: dict) -> str:
-    norm = re.sub(r"\W+", "", it["title"].lower())[:120]
-    return hashlib.sha1(norm.encode()).hexdigest()[:16]
+    n = re.sub(r"\W+", "", it["title"].lower())[:120]
+    return hashlib.sha1(n.encode()).hexdigest()[:16]
 
 
-def gather_candidates(teams: list[dict]) -> list[dict]:
-    """Собирает новости-кандидаты про игроков и команды матча."""
-    found: dict[str, dict] = {}
+def has_cyrillic(s: str) -> bool:
+    return bool(re.search(r"[а-яё]", s, re.IGNORECASE))
 
-    def add(it: dict, about: str):
-        k = item_key(it)
-        cur = found.get(k)
-        if cur is None:
-            cur = dict(it)
-            cur["key"] = k
-            cur["about"] = []
-            found[k] = cur
-        if about not in cur["about"]:
-            cur["about"].append(about)
 
-    cs_ctx = '(CS2 OR "Counter-Strike" OR "КС2" OR "CS 2")'
-    for t in teams:
-        tname = t.get("name") or ""
-        for lang in ("ru", "en"):
-            for it in google_news(f'"{tname}" {cs_ctx}', lang):
-                add(it, tname)
+def translate(text: str) -> str | None:
+    if not text or has_cyrillic(text):
+        return None
+    k = hashlib.sha1(text.encode()).hexdigest()[:16]
+    if k in tr_cache:
+        return tr_cache[k]["ru"]
+    url = "https://translate.googleapis.com/translate_a/single?" + urllib.parse.urlencode(
+        {"client": "gtx", "sl": "auto", "tl": "ru", "dt": "t", "q": text})
+    try:
+        data = json.loads(http_get(url, timeout=15))
+        ru = "".join(part[0] for part in data[0] if part and part[0]).strip()
+        stats["translations"] += 1
+        time.sleep(0.3)
+    except Exception as e:
+        warn(f"Перевод: {e}")
+        return None
+    tr_cache[k] = {"ru": ru, "t": iso(NOW)}
+    return ru
+
+
+def gather_news(teams: list[dict]) -> list[dict]:
+    """Новости про игроков и команды: поиск, отбор по правилам, перевод."""
+    entities = []  # (метка, regex, неоднозначный ли, индекс команды)
+    for ti, t in enumerate(teams):
+        for label in {t.get("name"), t.get("acronym")} - {None, ""}:
+            amb = label.lower() in COMMON_WORDS or len(label) <= 3
+            entities.append((t["name"], entity_re(label, case=amb), amb, ti))
         for p in t.get("players") or []:
             nick = p.get("nick") or ""
             if len(nick) < 2:
                 continue
-            for lang in ("ru", "en"):
-                for it in google_news(f'"{nick}" {cs_ctx}', lang):
-                    add(it, nick)
+            amb = is_ambiguous(nick)
+            entities.append((nick, entity_re(nick, case=amb), amb, ti))
 
-    # профильные сайты: совпадение по нику или названию команды
-    patterns = []
+    pool: list[dict] = []
+    cs = '(CS2 OR "Counter-Strike")'
     for t in teams:
-        if t.get("name"):
-            patterns.append((t["name"], word_re(t["name"])))
+        for lang in ("ru", "en"):
+            pool += google_news(f'"{t["name"]}" {cs}', lang)
         for p in t.get("players") or []:
-            if p.get("nick") and len(p["nick"]) >= 3:
-                patterns.append((p["nick"], word_re(p["nick"])))
+            if p.get("nick") and len(p["nick"]) >= 2:
+                for lang in ("ru", "en"):
+                    pool += google_news(f'"{p["nick"]}" {cs}', lang)
     for source, url in RSS_FEEDS:
-        for it in fetch_feed(url, source):
-            text = f"{it['title']} {it['snippet']}"
-            for label, rx in patterns:
-                if rx.search(text):
-                    add(it, label)
-    res = sorted(found.values(), key=lambda i: i["date"], reverse=True)
-    return res
+        pool += fetch_feed(url, source)
 
-
-def ai_chat(system: str, user: str) -> dict | None:
-    if not GH_TOKEN:
-        return None
-    body = json.dumps({
-        "model": AI_MODEL,
-        "temperature": 0.2,
-        "response_format": {"type": "json_object"},
-        "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
-    }).encode()
-    req = urllib.request.Request(AI_URL, data=body, method="POST", headers={
-        "Authorization": f"Bearer {GH_TOKEN}",
-        "Content-Type": "application/json",
-        "Accept": "application/json",
-    })
-    for attempt in range(3):
-        try:
-            stats["ai_calls"] += 1
-            with urllib.request.urlopen(req, timeout=90) as r:
-                data = json.loads(r.read())
-            content = data["choices"][0]["message"]["content"]
-            return json.loads(content)
-        except urllib.error.HTTPError as e:
-            msg = e.read()[:300].decode("utf-8", "replace")
-            if e.code == 429 and attempt < 2:
-                time.sleep(20 * (attempt + 1))
+    team_names = [t["name"] for t in teams]
+    found: dict[str, dict] = {}
+    for it in pool:
+        title, text = it["title"], f"{it['title']} {it['snippet']}"
+        if SPAM.search(title):
+            continue
+        if OTHER_GAMES.search(title) and not CS_CONTEXT.search(title):
+            continue
+        src = (it["source"] or "").lower()
+        cs_src = any(s in src for s in CS_SOURCES)
+        about = []
+        for label, rx, amb, ti in entities:
+            if not rx.search(title):
                 continue
-            warn(f"Нейросеть: HTTP {e.code} {msg}")
-            return None
-        except Exception as e:
-            warn(f"Нейросеть: {e}")
-            return None
-    return None
+            if amb:
+                # неоднозначный ник/название: нужно, чтобы рядом была его команда или явный контекст CS
+                own_team = teams[ti]["name"]
+                if not (entity_re(own_team, False).search(text) and label != own_team) and not CS_CONTEXT.search(title):
+                    continue
+            if label not in about:
+                about.append(label)
+        if not about:
+            continue
+        if not (cs_src or CS_CONTEXT.search(text) or any(n in about for n in team_names)):
+            continue
+        k = item_key(it)
+        cur = found.get(k)
+        if cur:
+            for a in about:
+                if a not in cur["about"]:
+                    cur["about"].append(a)
+            continue
+        found[k] = {**it, "about": about, "key": k}
 
-
-AI_SYSTEM = """Ты помогаешь русскоязычному комментатору CS2 готовиться к трансляции.
-Тебе дают список игроков/команд и заголовки новостей за последние дни.
-Для КАЖДОЙ новости реши, действительно ли она про указанного игрока/команду из мира CS2
-(ники бывают обычными словами — отсекай совпадения не про киберспорт и не про этих людей).
-Для релевантных:
- - title_ru: заголовок на русском (если уже на русском — оставь как есть, поправь только явный мусор),
- - summary_ru: 1 короткое предложение по-русски, что из этого полезно комментатору (без выдумок, только из заголовка/описания),
- - kind: одно из "интервью", "заявление", "соцсети", "трансфер", "результат", "слухи", "другое",
- - about: список ников/команд из входа, о ком новость.
-Верни JSON: {"items":[{"key":"...","relevant":true|false,"title_ru":"...","summary_ru":"...","kind":"...","about":["..."]}]}
-Для нерелевантных достаточно {"key":"...","relevant":false}."""
-
-
-def ai_process(candidates: list[dict], teams: list[dict]) -> bool:
-    """Заполняет ai-поля у кандидатов, используя кэш. Возвращает True, если нейросеть отработала."""
-    todo = [c for c in candidates if c["key"] not in ai_cache]
-    if not GH_TOKEN:
-        return False
-    roster = []
-    for t in teams:
-        nicks = ", ".join(p.get("nick") or "" for p in t.get("players") or [])
-        roster.append(f"{t.get('name')}: {nicks}")
-    ok = True
-    for i in range(0, len(todo), 30):
-        chunk = todo[i:i + 30]
-        lines = []
-        for c in chunk:
-            d = c["date"].strftime("%d.%m") if c.get("date") else ""
-            snip = f" | {c['snippet'][:160]}" if c.get("snippet") and c["snippet"] not in c["title"] else ""
-            lines.append(f"key={c['key']} | {d} | {c['source']} | про: {', '.join(c['about'])} | {c['title']}{snip}")
-        user = "Составы:\n" + "\n".join(roster) + "\n\nНовости:\n" + "\n".join(lines)
-        res = ai_chat(AI_SYSTEM, user)
-        if not res:
-            ok = False
-            break
-        for r in res.get("items") or []:
-            k = r.get("key")
-            if k:
-                r["t"] = iso(NOW)
-                ai_cache[k] = r
-        time.sleep(2)
-    return ok
+    items = sorted(found.values(), key=lambda i: i["date"], reverse=True)[:60]
+    out = []
+    for it in items:
+        ru = translate(it["title"])
+        out.append({
+            "title": it["title"],
+            "title_ru": ru,
+            "kind": classify(it["title"]),
+            "about": it["about"],
+            "source": it["source"],
+            "url": it["url"],
+            "date": iso(it["date"]),
+        })
+    return out
 
 
 def build_news(teams: list[dict]) -> dict:
-    cands = gather_candidates(teams)
-    ai_ok = ai_process(cands, teams)
-    items = []
-    for c in cands:
-        v = ai_cache.get(c["key"])
-        if v is not None and not v.get("relevant"):
-            continue
-        items.append({
-            "title": c["title"],
-            "title_ru": (v or {}).get("title_ru"),
-            "summary_ru": (v or {}).get("summary_ru"),
-            "kind": (v or {}).get("kind"),
-            "about": (v or {}).get("about") or c["about"],
-            "source": c["source"],
-            "url": c["url"],
-            "date": iso(c["date"]) if c.get("date") else None,
-            "checked": v is not None,
-        })
-    return {"updated": iso(NOW), "ai": ai_ok and bool(GH_TOKEN), "days": NEWS_DAYS, "items": items[:80]}
+    return {"updated": iso(NOW), "days": NEWS_DAYS, "items": gather_news(teams)}
 
 
 # ---------------------------------------------------------------- main
 
 def build_detail(m: dict, prev: dict | None) -> dict:
     brief = match_brief(m)
-    team_ids = [t["id"] for t in brief["teams"]]
-    teams = []
-    pasts = []
+    teams, bids, hists = [], [], []
     for t in brief["teams"]:
         full = fetch_team(t["id"])
-        past = fetch_past(t["id"])
-        pasts.append(past)
         players = [player_brief(p) for p in full.get("players") or [] if p.get("active", True)]
-        teams.append({**t, "players": players, "form": build_form(t["id"], past)})
+        bid = bo3_team_id({**t, "slug": full.get("slug") or t.get("slug")})
+        hist = bo3_history(bid) if bid else []
+        bids.append(bid)
+        hists.append(hist)
+        teams.append({**t, "players": players, "form": build_form(bid, hist) if bid else []})
     detail = {**brief, "teams": teams, "updated": iso(NOW)}
-    if len(team_ids) == 2:
-        detail["h2h"] = build_h2h(team_ids[0], team_ids[1], pasts[0])
-        detail["maps"] = build_maps(team_ids, pasts)
+    if len(bids) == 2 and all(bids):
+        detail["h2h"] = build_h2h(bids[0], bids[1], hists[0])
+    else:
+        detail["h2h"] = []
+    detail["maps"] = build_maps(bids, hists)
     begin = parse_iso(brief["begin_at"])
-    if begin and begin - NOW <= timedelta(hours=48) or not (prev and prev.get("news")):
+    soon = begin is not None and begin - NOW <= timedelta(hours=48)
+    if soon or not (prev and prev.get("news")):
         detail["news"] = build_news(teams)
     else:
         detail["news"] = prev["news"]
@@ -643,8 +720,11 @@ def build_detail(m: dict, prev: dict | None) -> dict:
 
 def prune_caches() -> None:
     cutoff = iso(NOW - timedelta(days=NEWS_DAYS + 7))
-    for k in [k for k, v in ai_cache.items() if (v.get("t") or "") < cutoff]:
-        del ai_cache[k]
+    for k in [k for k, v in tr_cache.items() if (v.get("t") or "") < cutoff]:
+        del tr_cache[k]
+    if len(games_cache) > 6000:
+        for k in sorted(games_cache, key=int)[:-5000]:
+            del games_cache[k]
 
 
 def main() -> int:
@@ -666,29 +746,29 @@ def main() -> int:
                 save_json(path, build_detail(m, prev))
                 keep_ids.add(m["id"])
             except Exception as e:
-                warn(f"Матч {m['id']}: {e}")
+                warn(f"Матч {m['id']}: {e!r}")
                 detailed = path.exists()
                 if detailed:
                     keep_ids.add(m["id"])
         b["has_detail"] = detailed
         listing.append(b)
 
-    # удаляем старые карточки
     for f in (OUT / "match").glob("*.json"):
         if int(f.stem) not in keep_ids:
             f.unlink()
 
     prune_caches()
     save_json(GAMES_CACHE_F, games_cache)
-    save_json(AI_CACHE_F, ai_cache)
+    save_json(TEAMS_CACHE_F, teams_map)
+    save_json(TR_CACHE_F, tr_cache)
     save_json(OUT / "matches.json", {
         "updated": iso(NOW),
         "tiers": sorted(TIERS),
         "matches": listing,
-        "meta": {"maps_available": maps_endpoint_ok, **stats},
+        "meta": stats,
     }, pretty=True)
-    print(f"Готово: {len(listing)} матчей, запросов PandaScore: {stats['panda_requests']}, "
-          f"вызовов нейросети: {stats['ai_calls']}, предупреждений: {len(stats['warnings'])}")
+    print(f"Готово: {len(listing)} матчей, PandaScore: {stats['panda_requests']}, bo3: {stats['bo3_requests']}, "
+          f"переводов: {stats['translations']}, предупреждений: {len(stats['warnings'])}")
     return 0
 
 
