@@ -779,24 +779,160 @@ def has_cyrillic(s: str) -> bool:
     return bool(re.search(r"[а-яё]", s, re.IGNORECASE))
 
 
-def translate(text: str) -> str | None:
-    if not text or has_cyrillic(text):
-        return None
-    k = hashlib.sha1(text.encode()).hexdigest()[:16]
-    if k in tr_cache:
-        return tr_cache[k]["ru"]
+LANG_RU = {"en": "английского", "pt": "португальского", "es": "испанского", "de": "немецкого", "fr": "французского",
+           "pl": "польского", "uk": "украинского", "tr": "турецкого", "da": "датского", "sv": "шведского", "fi": "финского",
+           "cs": "чешского", "sk": "словацкого", "zh-CN": "китайского", "zh": "китайского", "ko": "корейского",
+           "ja": "японского", "it": "итальянского", "nl": "нидерландского", "no": "норвежского", "ro": "румынского",
+           "hu": "венгерского", "lt": "литовского", "lv": "латышского", "et": "эстонского", "kk": "казахского",
+           "mn": "монгольского", "be": "белорусского", "bg": "болгарского", "sr": "сербского", "hr": "хорватского",
+           "id": "индонезийского", "vi": "вьетнамского", "th": "тайского", "ar": "арабского", "he": "иврита"}
+
+
+def _gtx(text: str) -> tuple[str, str] | None:
     url = "https://translate.googleapis.com/translate_a/single?" + urllib.parse.urlencode(
         {"client": "gtx", "sl": "auto", "tl": "ru", "dt": "t", "q": text})
+    data = json.loads(http_get(url, timeout=20))
+    ru = "".join(part[0] for part in data[0] if part and part[0]).strip()
+    lang = data[2] if len(data) > 2 and isinstance(data[2], str) else ""
+    stats["translations"] += 1
+    time.sleep(0.3)
+    return ru, lang
+
+
+def translate_ex(text: str) -> tuple[str | None, str | None]:
+    """(перевод на русский или None, если уже русский; код исходного языка)."""
+    if not text:
+        return None, None
+    if has_cyrillic(text) and not re.search(r"[іїєґў]", text, re.IGNORECASE):
+        return None, "ru"
+    k = hashlib.sha1(text.encode()).hexdigest()[:16]
+    c = tr_cache.get(k)
+    if c and "lang" in c:
+        return c["ru"], c["lang"]
     try:
-        data = json.loads(http_get(url, timeout=15))
-        ru = "".join(part[0] for part in data[0] if part and part[0]).strip()
-        stats["translations"] += 1
-        time.sleep(0.3)
+        parts, lang = [], ""
+        # длинный текст переводим кусками по предложениям
+        chunk = ""
+        for sent in re.split(r"(?<=[.!?])\s+", text):
+            if len(chunk) + len(sent) > 1500 and chunk:
+                r = _gtx(chunk)
+                parts.append(r[0]); lang = lang or r[1]
+                chunk = ""
+            chunk += (" " if chunk else "") + sent
+        if chunk:
+            r = _gtx(chunk)
+            parts.append(r[0]); lang = lang or r[1]
+        ru = " ".join(parts).strip()
     except Exception as e:
-        warn(f"Перевод: {e}")
-        return None
-    tr_cache[k] = {"ru": ru, "t": iso(NOW)}
-    return ru
+        warn(f"Перевод: {e!r}")
+        return None, None
+    if lang == "ru":
+        ru = None
+    tr_cache[k] = {"ru": ru, "lang": lang, "t": iso(NOW)}
+    return ru, lang
+
+
+def translate(text: str) -> str | None:
+    return translate_ex(text)[0]
+
+
+# ---------------------------------------------------------------- статья: ссылка на оригинал и описание
+
+ART_CACHE_F = CACHE / "articles.json"
+art_cache: dict = load_json(ART_CACHE_F, {})
+ART_NEW_LIMIT = 150          # сколько новых статей обрабатывать за запуск
+_art_new = [0]
+
+
+def gnews_decode(url: str) -> str | None:
+    """Достаёт настоящую ссылку на статью из ссылки Google News."""
+    m = re.search(r"news\.google\.com/(?:rss/)?articles/([^?/]+)", url)
+    if not m:
+        return url
+    gid = m.group(1)
+    try:
+        html = http_get(f"https://news.google.com/articles/{gid}?hl=en-US&gl=US&ceid=US:en", timeout=20).decode("utf-8", "replace")
+        sg = re.search(r'data-n-a-sg="([^"]+)"', html)
+        ts = re.search(r'data-n-a-ts="([^"]+)"', html)
+        if not (sg and ts):
+            return None
+        inner = ('["garturlreq",[["X","X",["X","X"],null,null,1,1,"US:en",null,1,null,null,null,null,null,0,1],'
+                 '"X","X",1,[1,1,1],1,1,null,0,0,null,0],"%s",%s,"%s"]' % (gid, ts.group(1), sg.group(1)))
+        body = "f.req=" + urllib.parse.quote(json.dumps([[["Fbv4je", inner]]]))
+        req = urllib.request.Request("https://news.google.com/_/DotsSplashUi/data/batchexecute", data=body.encode(),
+                                     method="POST", headers={"User-Agent": UA,
+                                                             "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8"})
+        with urllib.request.urlopen(req, timeout=20) as r:
+            txt = r.read().decode("utf-8", "replace")
+        for chunk in txt.split("\n"):
+            chunk = chunk.strip()
+            if not chunk.startswith("[["):
+                continue
+            try:
+                arr = json.loads(chunk)
+                for row in arr:
+                    if isinstance(row, list) and len(row) > 2 and row[1] == "Fbv4je" and row[2]:
+                        res = json.loads(row[2])
+                        if isinstance(res, list) and len(res) > 1 and str(res[1]).startswith("http"):
+                            return res[1]
+            except Exception:
+                continue
+    except Exception as e:
+        warn(f"Google News ссылка: {e!r}")
+    return None
+
+
+def _meta(html: str, *names: str) -> str | None:
+    for n in names:
+        for pat in (r'<meta[^>]+(?:property|name)=["\']%s["\'][^>]*content=["\']([^"\']+)["\']' % re.escape(n),
+                    r'<meta[^>]+content=["\']([^"\']+)["\'][^>]*(?:property|name)=["\']%s["\']' % re.escape(n)):
+            m = re.search(pat, html, re.IGNORECASE)
+            if m and m.group(1).strip():
+                return strip_html(m.group(1))
+    return None
+
+
+def article_lead(url: str) -> dict:
+    """Описание статьи, которое сайт сам отдаёт для превью (og:description), и картинка."""
+    try:
+        raw = http_get(url, {"Accept": "text/html,application/xhtml+xml"}, timeout=20)[:600_000]
+        html = raw.decode("utf-8", "replace")
+    except Exception as e:
+        return {"error": str(e)[:80]}
+    lead = _meta(html, "og:description", "twitter:description", "description")
+    if lead and len(lead) < 60:
+        lead = None
+    if not lead:
+        for m in re.finditer(r"<p[^>]*>(.*?)</p>", html, re.IGNORECASE | re.DOTALL):
+            t = strip_html(m.group(1))
+            if len(t) > 80:
+                lead = t
+                break
+    if lead and len(lead) > 600:
+        lead = lead[:600].rsplit(" ", 1)[0] + "…"
+    return {"lead": lead, "image": _meta(html, "og:image", "twitter:image")}
+
+
+def enrich_article(it: dict) -> dict:
+    k = it["key"]
+    if k in art_cache:
+        return art_cache[k]
+    if _art_new[0] >= ART_NEW_LIMIT:
+        return {}
+    _art_new[0] += 1
+    real = gnews_decode(it["url"]) if "news.google.com" in (it["url"] or "") else it["url"]
+    info: dict = {"url": real}
+    if real:
+        info.update(article_lead(real))
+        time.sleep(0.3)
+    if not info.get("lead") and it.get("snippet") and norm(it["snippet"]) != norm(it["title"]) and len(it["snippet"]) > 60:
+        info["lead"] = it["snippet"][:600]
+    if info.get("lead"):
+        ru, lang = translate_ex(info["lead"])
+        info["lead_ru"], info["lead_lang"] = ru, lang
+    info["t"] = iso(NOW)
+    art_cache[k] = info
+    return info
 
 
 def gather_news(teams: list[dict]) -> list[dict]:
@@ -862,14 +998,23 @@ def gather_news(teams: list[dict]) -> list[dict]:
     items = sorted(found.values(), key=lambda i: i["date"], reverse=True)[:60]
     out = []
     for it in items:
-        ru = translate(it["title"])
+        ru, lang = translate_ex(it["title"])
+        art = enrich_article(it)
+        lead_lang = art.get("lead_lang")
+        src_lang = lead_lang or lang
         out.append({
+            "key": it["key"],
             "title": it["title"],
             "title_ru": ru,
+            "lang": src_lang,
+            "lang_ru": LANG_RU.get(src_lang or "", src_lang) if src_lang and src_lang != "ru" else None,
+            "lead": art.get("lead"),
+            "lead_ru": art.get("lead_ru"),
+            "image": art.get("image"),
             "kind": classify(it["title"]),
             "about": it["about"],
             "source": it["source"],
-            "url": it["url"],
+            "url": art.get("url") or it["url"],
             "date": iso(it["date"]),
         })
     return out
@@ -900,7 +1045,7 @@ def build_detail(m: dict, prev: dict | None) -> dict:
         detail["h2h"] = []
     detail["maps"] = build_maps(bids, hists)
     begin = parse_iso(brief["begin_at"])
-    soon = begin is not None and begin - NOW <= timedelta(hours=48)
+    soon = begin is not None and begin - NOW <= timedelta(hours=DETAIL_HOURS)
     if soon or not (prev and prev.get("news")):
         detail["news"] = build_news(teams)
     else:
@@ -952,6 +1097,9 @@ def main() -> int:
     save_json(TEAMS_CACHE_F, teams_map)
     save_json(TR_CACHE_F, tr_cache)
     save_json(ROSTER_CACHE_F, roster_cache)
+    for k in [k for k, v in art_cache.items() if (v.get("t") or "") < iso(NOW - timedelta(days=NEWS_DAYS + 7))]:
+        del art_cache[k]
+    save_json(ART_CACHE_F, art_cache)
     tours: dict = {}
     for b in listing:
         sid = str((b.get("serie") or {}).get("id") or re.sub(r"\W+", "-", b["tournament"]).strip("-").lower())

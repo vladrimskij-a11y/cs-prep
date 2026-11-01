@@ -166,7 +166,8 @@ a { color: inherit; }
 /* форма */
 .form { display: flex; flex-direction: column; }
 .form .tmh { padding: 10px 12px 6px; font-weight: 700; font-size: 13px; display: flex; justify-content: space-between; }
-.form .tmh.a { color: var(--ct); } .form .tmh.b { color: var(--t); border-top: 1px solid var(--line); }
+.form .tmh.a { color: var(--ct); } .form .tmh.b { color: var(--t); }
+.sec > .box.form + .box.form { margin-top: 0; }
 .form .tmh span { font-family: var(--mono); color: var(--muted); font-weight: 500; }
 .squares { display: flex; gap: 4px; padding: 0 12px 10px; flex-wrap: wrap; }
 .sq { width: 26px; height: 26px; border-radius: 5px; display: grid; place-items: center; font-family: var(--mono); font-size: 11px; font-weight: 700; color: #fff; }
@@ -209,10 +210,34 @@ a { color: inherit; }
 .coach .lbl { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 600; }
 .coach b { font-size: 15px; }
 
+/* группы по турнирам */
+.grp { display: flex; flex-direction: column; }
+.grp .gh { padding: 8px 12px 4px; font-size: 11px; font-weight: 600; color: var(--muted); border-top: 1px solid var(--line); display: flex; justify-content: space-between; gap: 8px; }
+.grp:first-of-type .gh { border-top: 0; }
+.grp .gh span:first-child { min-width: 0; overflow-wrap: anywhere; }
+.grp .gr { padding: 5px 12px; display: grid; grid-template-columns: 1fr auto; gap: 8px; font-size: 13px; align-items: baseline; }
+.grp .gr:last-child { padding-bottom: 9px; }
+.grp .gr .d { font-size: 11px; color: var(--muted); }
+.recent2 { display: flex; flex-direction: column; gap: 8px; }
+.recent2 .hd { font-weight: 700; font-size: 13px; padding: 10px 12px 2px; display: flex; justify-content: space-between; }
+.recent2 .a .hd { color: var(--ct); } .recent2 .b .hd { color: var(--t); }
+.recent2 .hd span { font-family: var(--mono); color: var(--muted); font-weight: 500; }
+
 /* новости */
 .filt { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
 .news { display: flex; flex-direction: column; gap: 8px; }
 .ni { padding: 12px; display: flex; flex-direction: column; gap: 6px; }
+.ni .head { display: flex; flex-direction: column; gap: 6px; text-align: left; width: 100%; padding: 0; }
+.ni .chev { margin-left: auto; color: var(--muted); transition: transform .15s; }
+.ni.open .chev { transform: rotate(180deg); }
+.ni.open { border-color: var(--fg); }
+.body { display: flex; flex-direction: column; gap: 10px; padding-top: 6px; border-top: 1px solid var(--line); margin-top: 4px; }
+.body img { border-radius: 8px; max-height: 200px; object-fit: cover; width: 100%; background: var(--sunk); }
+.body .lead { font-size: 15px; line-height: 1.55; margin: 0; color: var(--fg); }
+.body .trn { font-size: 12px; color: var(--muted); display: flex; justify-content: space-between; gap: 8px; align-items: center; flex-wrap: wrap; }
+.body .trn button { color: var(--ct); font-weight: 600; font-size: 12px; padding: 0; }
+.body .acts { display: flex; gap: 8px; flex-wrap: wrap; }
+.readbtn { display: inline-flex; align-items: center; gap: 6px; padding: 9px 14px; border-radius: 8px; background: var(--fg); color: var(--bg); font-weight: 600; font-size: 14px; text-decoration: none; }
 .ni .tags { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
 .kind { font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 4px; background: var(--sunk); color: var(--muted); }
 .kind.k-интервью, .kind.k-заявление { background: var(--ct-soft); color: var(--ct); }
@@ -324,13 +349,12 @@ a { color: inherit; }
     var a = m.teams[0], b = m.teams[1], on = mine.has(String(m.id));
     var live = m.status === "running";
     var sub = showTour ? (m.stage ? m.tournament + " · " + m.stage : m.tournament) : (m.stage || m.tournament);
-    return '<div class="match' + (on ? " mine" : "") + (m.has_detail ? "" : " nodetail") + '" data-open="' + m.id + '" role="button" tabindex="0" aria-label="' + esc(abbr(a) + " против " + abbr(b)) + '">' +
+    return '<div class="match' + (m.has_detail ? "" : " nodetail") + '" data-open="' + m.id + '" role="button" tabindex="0" aria-label="' + esc(abbr(a) + " против " + abbr(b)) + '">' +
       '<div class="time">' + (live ? '<span class="live">LIVE</span>' : esc(hm(m.begin_at))) + '<small>BO' + esc(m.bo || "?") + '</small></div>' +
       '<div class="vs"><div class="row"><span class="dot a"></span><span class="tname">' + esc(a ? a.name : "TBD") + '</span></div>' +
       '<div class="row"><span class="dot b"></span><span class="tname">' + esc(b ? b.name : "TBD") + '</span></div>' +
       '<div class="tour">' + esc(sub) + '</div></div>' +
-      '<div class="side">' + (showTour ? '<span class="pill ' + esc(m.tier) + '">' + esc((m.tier || "?").toUpperCase()) + '</span>' : '') +
-      '<button class="mic" data-mine="' + m.id + '" aria-pressed="' + on + '" aria-label="Комментирую этот матч">' + MIC + '</button></div></div>';
+      '<div class="side">' + (showTour ? '<span class="pill ' + esc(m.tier) + '">' + esc((m.tier || "?").toUpperCase()) + '</span>' : '') + '</div></div>';
   }
 
   function byDays(ms, showTour) {
@@ -350,7 +374,6 @@ a { color: inherit; }
     var today = dayKey(new Date().toISOString());
     var html = '<div class="view"><header class="top"><div class="brand"><h1>CS<b>·</b>Prep</h1>' +
       '<span class="upd">обновлено ' + esc(ago(L.updated)) + ' · время МСК</span></div></header>';
-    if (mineCount) html += '<button class="mine-bar" id="to-mine"><span>' + MIC.replace('<svg', '<svg width="16" height="16"') + ' Комментирую</span><span class="num">' + mineCount + '</span></button>';
     html += '<h2 class="sect-title">Турниры</h2><div class="tours">';
     if (!tours.length) html += '<div class="empty"><strong>Турниров тир-1 на неделю нет</strong>Данные обновляются каждые 3 часа.</div>';
     tours.forEach(function (t) {
@@ -434,33 +457,50 @@ a { color: inherit; }
     var rec = (M.recent[state.map] || []);
     html += '<div class="sec"><h3>Последние игры на карте</h3><div class="mapsel" role="group" aria-label="Карта">' +
       names.map(function (n) { return '<button class="chip" data-map="' + esc(n) + '" aria-pressed="' + (n === state.map) + '">' + esc(n) + '</button>'; }).join("") +
-      '</div><div class="recent">';
+      '</div><div class="recent2">';
     [0, 1].forEach(function (i) {
       var t = m.teams[i];
-      var list = rec.filter(function (g) { return g.team === i; }).slice(0, 5);
-      html += '<div class="box col ' + (i ? "b" : "a") + '"><div class="hd">' + esc(abbr(t)) + '</div>';
-      if (!list.length) html += '<div class="g"><span class="d">не играли</span></div>';
-      list.forEach(function (g) {
-        html += '<div class="g"><span>vs ' + esc(g.vs) + ' <span class="d">' + esc(dm(g.date)) + '</span></span><span class="wl ' + (g.won ? "w" : "l") + '">' + (g.score ? esc(g.score) : (g.won ? "W" : "L")) + '</span></div>';
+      var list = rec.filter(function (g) { return g.team === i; }).slice(0, 8);
+      var w = list.filter(function (g) { return g.won; }).length;
+      html += '<div class="box ' + (i ? "b" : "a") + '"><div class="hd">' + esc(t.name) + (list.length ? '<span>' + w + '–' + (list.length - w) + '</span>' : '') + '</div>';
+      if (!list.length) html += '<div class="note">На ' + esc(state.map) + ' не играли</div>';
+      html += groupByTour(list, function (g) {
+        return '<div class="gr"><span>vs ' + esc(g.vs) + ' <span class="d">' + esc(dm(g.date)) + '</span></span><span class="wl ' + (g.won ? "w" : "l") + '">' + (g.score ? esc(g.score) : (g.won ? "W" : "L")) + '</span></div>';
       });
       html += '</div>';
     });
     return html + '</div></div>';
   }
 
+  // подряд идущие записи одного турнира — под одним заголовком
+  function groupByTour(list, row) {
+    var html = "", cur = null;
+    list.forEach(function (x) {
+      var t = x.tournament || "Турнир не указан";
+      if (t !== cur) {
+        if (cur !== null) html += '</div>';
+        cur = t;
+        html += '<div class="grp"><div class="gh"><span>' + esc(t) + '</span>' + (x.tier ? '<span>' + esc(String(x.tier).toUpperCase()) + '</span>' : '') + '</div>';
+      }
+      html += row(x);
+    });
+    return cur === null ? html : html + '</div>';
+  }
+
   function formBlock(m) {
-    var html = '<div class="sec"><h3>Форма <span>последние 10 серий</span></h3><div class="box form">';
+    var html = '<div class="sec"><h3>Форма <span>последние 10 серий</span></h3>';
     m.teams.forEach(function (t, i) {
       var f = t.form || [];
       var w = f.filter(function (x) { return x.won; }).length;
-      html += '<div class="tmh ' + (i ? "b" : "a") + '">' + esc(t.name) + '<span>' + w + '–' + (f.length - w) + '</span></div>';
-      if (!f.length) { html += '<div class="fl">нет данных</div>'; return; }
+      html += '<div class="box form"><div class="tmh ' + (i ? "b" : "a") + '">' + esc(t.name) + '<span>' + w + '–' + (f.length - w) + '</span></div>';
+      if (!f.length) { html += '<div class="note">нет данных</div></div>'; return; }
       html += '<div class="squares">' + f.map(function (x) { return '<span class="sq ' + (x.won ? "w" : "l") + '" title="' + esc("vs " + x.opponent_name) + '">' + (x.won ? "W" : "L") + '</span>'; }).join("") + '</div>';
-      html += '<div class="fl">' + f.slice(0, 4).map(function (x) {
-        return '<div><span class="wl ' + (x.won ? "w" : "l") + ' num">' + esc(x.score) + ':' + esc(x.opp_score) + '</span><span>vs ' + esc(x.opponent) + ' · ' + esc(dm(x.date)) + '</span></div>';
-      }).join("") + '</div>';
+      html += groupByTour(f, function (x) {
+        return '<div class="gr"><span>vs ' + esc(x.opponent_name || x.opponent) + ' <span class="d">' + esc(dm(x.date)) + '</span></span><span class="wl ' + (x.won ? "w" : "l") + ' num">' + esc(x.score) + ':' + esc(x.opp_score) + '</span></div>';
+      });
+      html += '</div>';
     });
-    return html + '</div></div>';
+    return html + '</div>';
   }
 
   function newsFor(m, who) {
@@ -508,13 +548,25 @@ a { color: inherit; }
     html += '<div class="news">';
     var teamA = m.teams[0] && m.teams[0].players ? m.teams[0].players.map(function (p) { return p.nick; }).concat([m.teams[0].name]) : [];
     items.forEach(function (n) {
+      var key = n.key || n.url || n.title;
+      var open = state.openNews === key;
       var title = n.title_ru || n.title;
-      var translated = n.title_ru && n.title_ru !== n.title;
       var whoHtml = (n.about || []).map(function (a) { return '<span class="who" style="color:var(--' + (teamA.indexOf(a) >= 0 ? "ct" : "t") + ')">' + esc(a) + '</span>'; }).join(" ");
-      html += '<article class="box ni"><div class="tags">' + (n.kind ? '<span class="kind k-' + esc(n.kind) + '">' + esc(n.kind) + '</span>' : '') + whoHtml + '</div>' +
-        '<h4>' + esc(title) + '</h4>' + (n.summary_ru ? '<p>' + esc(n.summary_ru) + '</p>' : '') +
-        (translated ? '<div class="orig">' + esc(n.title) + '</div>' : '') +
-        '<div class="src"><span>' + esc(n.source) + ' · ' + esc(ago(n.date)) + '</span>' + (n.url ? '<a href="' + esc(n.url) + '" data-link="' + esc(n.url) + '" target="_blank" rel="noopener">Открыть</a>' : '') + '</div></article>';
+      html += '<article class="box ni' + (open ? " open" : "") + '"><button class="head" data-news="' + esc(key) + '" aria-expanded="' + open + '">' +
+        '<span class="tags">' + (n.kind ? '<span class="kind k-' + esc(n.kind) + '">' + esc(n.kind) + '</span>' : '') + whoHtml +
+        '<svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></span>' +
+        '<h4>' + esc(title) + '</h4>' +
+        '<span class="src"><span>' + esc(n.source) + ' · ' + esc(ago(n.date)) + (n.lang_ru ? ' · с ' + esc(n.lang_ru) : '') + '</span></span></button>';
+      if (open) {
+        var showOrig = state.showOrig === key;
+        var lead = showOrig ? n.lead : (n.lead_ru || n.lead);
+        html += '<div class="body">' + (n.image ? '<img src="' + esc(n.image) + '" alt="" loading="lazy" onerror="this.remove()">' : '') +
+          (showOrig && n.title_ru ? '<h4>' + esc(n.title) + '</h4>' : '') +
+          (lead ? '<p class="lead">' + esc(lead) + '</p>' : '<p class="lead" style="color:var(--muted)">Сайт не дал описание статьи — открой её целиком.</p>') +
+          ((n.title_ru || n.lead_ru) && n.lang_ru ? '<div class="trn"><span>Переведено с ' + esc(n.lang_ru) + '</span><button data-orig="' + esc(key) + '">' + (showOrig ? "Показать перевод" : "Показать оригинал") + '</button></div>' : '') +
+          '<div class="acts">' + (n.url ? '<a class="readbtn" href="' + esc(n.url) + '" data-read="' + esc(n.url) + '" target="_blank" rel="noopener">Читать полностью</a>' : '') + '</div></div>';
+      }
+      html += '</article>';
     });
     html += '</div>';
     if (N.updated) html += '<div class="upd" style="text-align:center">Новости собраны ' + esc(ago(N.updated)) + '</div>';
@@ -529,8 +581,7 @@ a { color: inherit; }
       '<div class="face"><div class="tm a"><span class="acr">' + esc(abbr(A)) + '</span><span class="full">' + esc(A.name) + '</span></div>' +
       '<div class="mid"><b>' + esc(hm(m.begin_at)) + '</b>' + esc(dm(m.begin_at)) + ' · BO' + esc(m.bo) + '</div>' +
       '<div class="tm b"><span class="acr">' + esc(abbr(B)) + '</span><span class="full">' + esc(B.name) + '</span></div></div>' +
-      '<div class="heroacts"><button class="btn' + (on ? " on" : "") + '" data-mine="' + m.id + '" aria-pressed="' + on + '">' + MIC + (on ? "Комментирую" : "Отметить: комментирую") + '</button>' +
-      (m.stream ? '<a class="btn" href="' + esc(m.stream) + '" data-link="' + esc(m.stream) + '" target="_blank" rel="noopener">' + PLAY + 'Трансляция</a>' : '') + '</div></section>' +
+      '</section>' +
       '<nav class="tabs" role="tablist">' +
       tabBtn("stats", "Статистика") + tabBtn("players", "Игроки") + tabBtn("news", "Новости", nCount) + '</nav><div id="tabbody">';
     if (state.tab === "stats") html += h2hBlock(m) + mapsBlock(m) + formBlock(m);
@@ -580,8 +631,11 @@ a { color: inherit; }
 
   // ---------- клики
   $app.addEventListener("click", function (e) {
-    var t = e.target.closest("[data-mine],[data-open],[data-tour],[data-tab],[data-map],[data-nf],[data-player],[data-link],#back,#to-mine");
+    var t = e.target.closest("[data-mine],[data-open],[data-tour],[data-tab],[data-map],[data-nf],[data-player],[data-link],[data-news],[data-orig],[data-read],#back,#to-mine");
     if (!t) return;
+    if (t.hasAttribute("data-news")) { var k = t.getAttribute("data-news"); state.openNews = state.openNews === k ? null : k; state.showOrig = null; renderMatch(state.details[state.openId]); var el = document.querySelector('[data-news="' + (window.CSS && CSS.escape ? CSS.escape(k) : k) + '"]'); if (el && state.openNews) el.scrollIntoView({ block: "nearest" }); return; }
+    if (t.hasAttribute("data-orig")) { var k2 = t.getAttribute("data-orig"); state.showOrig = state.showOrig === k2 ? null : k2; renderMatch(state.details[state.openId]); return; }
+    if (t.hasAttribute("data-read")) { if (TG) { e.preventDefault(); try { TG.openLink(t.getAttribute("data-read"), { try_instant_view: true }); } catch (x) { openLink(t.getAttribute("data-read")); } } return; }
     if (t.hasAttribute("data-link")) { if (TG) { e.preventDefault(); openLink(t.getAttribute("data-link")); } return; }
     if (t.hasAttribute("data-mine")) { e.stopPropagation(); toggleMine(t.getAttribute("data-mine")); state.openId ? renderMatch(state.details[state.openId]) : rerenderList(); return; }
     if (t.hasAttribute("data-open")) { go("#m-" + t.getAttribute("data-open")); return; }
@@ -589,7 +643,7 @@ a { color: inherit; }
     if (t.id === "to-mine") { go("#mine"); return; }
     if (t.hasAttribute("data-tab")) { state.tab = t.getAttribute("data-tab"); renderMatch(state.details[state.openId]); return; }
     if (t.hasAttribute("data-map")) { state.map = t.getAttribute("data-map"); renderMatch(state.details[state.openId]); return; }
-    if (t.hasAttribute("data-nf")) { state.newsFilter = t.getAttribute("data-nf"); renderMatch(state.details[state.openId]); return; }
+    if (t.hasAttribute("data-nf")) { state.openNews = null; state.newsFilter = t.getAttribute("data-nf"); renderMatch(state.details[state.openId]); return; }
     if (t.hasAttribute("data-player")) { state.tab = "news"; state.newsFilter = t.getAttribute("data-player"); renderMatch(state.details[state.openId]); window.scrollTo(0, 0); return; }
     if (t.id === "back") { goBack(); return; }
   });
