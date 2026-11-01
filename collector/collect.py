@@ -272,15 +272,17 @@ def player_brief(p: dict) -> dict:
 def bo3_team_id(t: dict) -> int | None:
     """Ищет команду PandaScore на bo3.gg: по ps_id, слагу, названию."""
     key = str(t["id"])
-    if key in teams_map:
+    if teams_map.get(key):
         return teams_map[key]
     found = None
     tries = []
     if t.get("slug"):
         tries.append({"filter[teams.slug][eq]": t["slug"]})
     if t.get("name"):
-        tries.append({"filter[teams.name][eq]": t["name"]})
-        tries.append({"filter[teams.slug][eq]": re.sub(r"[^a-z0-9]+", "-", t["name"].lower()).strip("-")})
+        spaced = re.sub(r"(?<=[a-z])(?=[A-Z])", " ", t["name"])  # TheMongolz → The Mongolz
+        for nm in dict.fromkeys([t["name"], spaced]):
+            tries.append({"filter[teams.name][eq]": nm})
+            tries.append({"filter[teams.slug][eq]": re.sub(r"[^a-z0-9]+", "-", nm.lower()).strip("-")})
     if t.get("acronym"):
         tries.append({"filter[teams.acronym][eq]": t["acronym"]})
     for params in tries:
@@ -296,7 +298,8 @@ def bo3_team_id(t: dict) -> int | None:
             break
     if found is None:
         warn(f"bo3: не нашёл команду {t.get('name')}")
-    teams_map[key] = found
+    else:
+        teams_map[key] = found
     return found
 
 
