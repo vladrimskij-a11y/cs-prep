@@ -1,0 +1,52 @@
+=== models openai/gpt-4.1-mini fmt=True: 200 len=4
+OK
+
+
+=== models openai/gpt-4.1-mini fmt=False: 200 len=4
+OK
+
+
+=== models openai/gpt-4o-mini fmt=True: 200 len=4
+OK
+
+
+=== models openai/gpt-4o-mini fmt=False: 200 len=4
+OK
+
+
+=== liquipedia played matches: 200 len=355
+{"error":{"code":"missingtitle","info":"The page you specified doesn't exist.","*":"See https://liquipedia.net/counterstrike/api.php for API usage. Subscribe to the mediawiki-api-announce mailing list at &lt;https://lists.wikimedia.org/postorius/lists/mediawiki-api-announce.lists.wikimedia.org/&gt; 
+
+maps mentioned: {'Mirage': 0, 'Inferno': 0, 'Nuke': 0, 'Ancient': 0, 'Anubis': 0, 'Dust2': 0, 'Train': 0}
+ctx: 
+=== liquipedia tournament: 200 len=351286
+{"parse":{"title":"Intel Extreme Masters/2026/Beijing","pageid":370157,"text":{"*":"<div class=\"mw-content-ltr mw-parser-output\" lang=\"en\" dir=\"ltr\"><div data-analytics-navbox-position=\"above i
+
+tournament maps mentioned: {'Mirage': 3, 'Inferno': 3, 'Nuke': 3, 'Ancient': 3, 'Anubis': 3, 'Dust2': 0, 'Train': 0}
+=== bo3 matches: 200 len=5634
+{"total":{"count":76817,"pages":38409,"offset":0,"limit":2},"results":[{"id":132775,"slug":"monte-vs-prodigy-ru-01-11-2026","round_id":41302,"team1_id":3581,"team2_id":25586,"winner_team_id":3581,"loser_team_id":25586,"tournament_id":6237,"team1_score":2,"team2_score":0,"status":"finished","bo_type":3,"start_date":"2026-11-01T20:15:00.000+00:00","end_date":"2026-11-01T22:10:17.000+00:00","stage_id":11087,"maps_score":[true,true,false],"parsed_status":"waiting","tier":"c","tier_rank":4,"position"
+
+=== bo3 teams: 200 len=7391
+{"total":{"count":1,"pages":1,"offset":0,"limit":10},"results":[{"id":787,"slug":"natus-vincere","name":"Natus Vincere","image_url":"https://files.bo3.gg/uploads/team/787/image/webp-ea9885f81f1572c7a6c9fb6cbf747c99.webp","facebook":"https://www.facebook.com/NatusVincere","twitter":"https://twitter.com/natusvincere","rank":34,"created_at":"2020-10-19T08:52:58.625+00:00","updated_at":"2026-11-01T22:07:25.603+00:00","country_id":58,"ps_id":3216,"image_data":"{\"id\":\"team/787/image/1152af2612c3476
+
+=== hltv results: 200 len=336432
+<!DOCTYPE html>
+<html lang="en" data-client-country-iso="US-CA" data-impression-tracking-endpoint="https://ncuxt.hltv.org" data-ad-tag-allowed-cookies="mobile-bottom-ad,desktop-bottom-ad" data-bc-content-allowed="true"><!--
+        --Worker debug info-- 
+        Ads API URL from origin: https://www.hltv.org/api/ads/rendered/[%7B%22key%22:%7B%22id%22:%22page%22%7D,%22value%22:%7B%22id%22:%22Unspecified%22%7D%7D]
+        Modified Ads API URL: https://www.hltv.org/api/ads/rendered/%5B%7B%22key%22%3
+
+=== hltv rss: 200 len=7526
+<?xml version="1.0" encoding="UTF-8" ?>
+<rss version="2.0" xmlns:media="http://search.yahoo.com/mrss/">
+<channel>
+  <title>HLTV.org - The home of competitive Counter-Strike</title>
+  <description>HLTV.org is the leading Counter-Strike site in the world, featuring news, demos, pictures, statistics, on-site coverage and much much more!</description>
+  <link>https://www.hltv.org/</link>
+  <language>en</language>
+  <ttl>60</ttl>
+  <image>
+    <url>https://www.hltv.org/img/static/openGraphHltvLogo.pn
+
+=== cybersport rss: 200 len=237970
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"><channel><title>Cybersport.ru - новости киберспорта и компьютерных игр</title><description>Киберспорт и игры - самые актуальные новости мира игровой индустрии и компьютерных онлайн игр</description><link>https://www.cybersport.ru</link><language>ru</language><lastBuildDate>Mon, 02 Nov 26 01:15:49 +0300</lastBuildDate><item><title>Team Gpk~ выиграла у Team samuraj и стала чемпионом BETBOOM Streamers Battle Valorant</title><link>https://www.
