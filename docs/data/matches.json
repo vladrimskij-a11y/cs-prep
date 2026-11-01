@@ -1,5 +1,5 @@
 {
- "updated": "2026-11-01T22:39:04Z",
+ "updated": "2026-11-01T22:46:45Z",
  "tiers": [
   "a",
   "s"
@@ -534,10 +534,8 @@
  ],
  "meta": {
   "panda_requests": 19,
-  "bo3_requests": 397,
-  "translations": 63,
-  "warnings": [
-   "bo3: не нашёл команду TheMongolz"
-  ]
+  "bo3_requests": 50,
+  "translations": 1,
+  "warnings": []
  }
 }
