@@ -136,11 +136,7 @@ a { color: inherit; }
 .sc .a { color: var(--ct); } .sc .b { color: var(--t); } .sc .x { color: var(--muted); padding: 0 2px; }
 .maps { grid-column: 1 / -1; display: flex; gap: 4px; flex-wrap: wrap; }
 .mp { font-size: 11px; font-weight: 600; padding: 2px 7px; border-radius: 4px; }
-.mp { padding: 3px 8px; font-weight: 500; }
-.mp.a { background: var(--ct); color: #fff; } .mp.b { background: var(--t); color: #fff; } .mp.n { background: var(--sunk); color: var(--muted); }
-.mp b { font-weight: 700; }
-.legend { display: flex; gap: 12px; font-size: 11px; color: var(--muted); padding: 8px 16px 0; }
-.legend i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 4px; vertical-align: 0; }
+.mp.a { background: var(--ct-soft); color: var(--ct); } .mp.b { background: var(--t-soft); color: var(--t); } .mp.n { background: var(--sunk); color: var(--muted); }
 
 /* карты */
 .mtab { width: 100%; border-collapse: collapse; font-size: 13px; }
@@ -427,15 +423,14 @@ a.ni { text-decoration: none; color: inherit; }
     var html = '<div class="sec"><h3>Личные встречи <span>' + h.length + ' за год</span></h3><div class="box">' +
       '<div class="tally"><div class="n a num">' + wa + '</div><div class="lbl">победы в сериях' + (mapsA + mapsB ? '<br><span class="num">' + mapsA + ':' + mapsB + '</span> по картам' : '') + '</div><div class="n b num">' + wb + '</div>' +
       '<div class="bar2"><i class="a" style="width:' + (100 * wa / tot) + '%"></i><i class="b" style="width:' + (100 * wb / tot) + '%"></i></div></div>' +
-      '<div class="legend"><span><i style="background:var(--ct)"></i>карту взяла ' + esc(abbr(A)) + '</span><span><i style="background:var(--t)"></i>карту взяла ' + esc(abbr(B)) + '</span></div><div class="h2h">';
+'<div class="h2h">';
     h.slice(0, 10).forEach(function (x) {
       html += '<div class="it"><div class="d">' + esc(dmy(x.date)) + ' · BO' + esc(x.bo) + '</div>' +
         '<div class="sc"><span class="a">' + esc(x.score[0]) + '</span><span class="x">:</span><span class="b">' + esc(x.score[1]) + '</span></div>' +
         '<div class="tr">' + esc(x.tournament) + '</div>';
       if (x.maps && x.maps.length) {
         html += '<div class="maps">' + x.maps.map(function (g) {
-          var w = g.winner === 0 ? A : g.winner === 1 ? B : null;
-          return '<span class="mp ' + (g.winner === 0 ? "a" : g.winner === 1 ? "b" : "n") + '"><b>' + esc(g.map || "?") + '</b>' + (g.score ? ' <span class="num">' + esc(g.score) + '</span>' : '') + (w ? ' · ' + esc(abbr(w)) : '') + '</span>';
+          return '<span class="mp ' + (g.winner === 0 ? "a" : g.winner === 1 ? "b" : "n") + '">' + esc(g.map || "?") + (g.score ? ' <span class="num">' + esc(g.score) + '</span>' : '') + '</span>';
         }).join("") + '</div>';
       }
       html += '</div>';
