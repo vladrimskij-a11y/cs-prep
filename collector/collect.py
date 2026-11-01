@@ -138,7 +138,7 @@ def save_json(path: Path, data, pretty: bool = False) -> None:
     path.write_text(txt, "utf-8")
 
 
-GAMES_CACHE_F = CACHE / "bo3_games.json"     # карты по завершённым матчам bo3 (не меняются)
+GAMES_CACHE_F = CACHE / "bo3_games_raw.json"  # карты по завершённым матчам bo3, как отдаёт bo3 (не меняются)
 TEAMS_CACHE_F = CACHE / "bo3_teams.json"     # PandaScore id → bo3 id
 TR_CACHE_F = CACHE / "translations.json"     # переводы заголовков
 ROSTER_CACHE_F = CACHE / "liquipedia_rosters.json"  # тренер и роли игроков с Liquipedia
@@ -481,6 +481,7 @@ def bo3_team_id(t: dict) -> int | None:
         pick = exact[0] if exact else (res[0] if len(res) == 1 else None)
         if pick:
             found = pick["id"]
+            add_alias(found, pick.get("name"), pick.get("slug"), pick.get("acronym"))
             break
     if found is None:
         warn(f"bo3: не нашёл команду {t.get('name')}")
@@ -529,7 +530,7 @@ def map_title(raw: str | None) -> str | None:
 
 
 def bo3_games(m: dict) -> list[dict]:
-    """Карты матча: [{'map','winner':1|2,'score':'13:10'}] в порядке игры. Кэшируется навсегда."""
+    """Карты матча как есть: [{'map','n','wn','ln','ws','ls'}] (кто выиграл — по клан-тегу). Кэш навсегда."""
     key = str(m["id"])
     if key in games_cache:
         return games_cache[key]
@@ -538,28 +539,87 @@ def bo3_games(m: dict) -> list[dict]:
     except Exception as e:
         warn(f"bo3 карты {m['id']}: {e}")
         return []
-    t1, t2 = m.get("team1") or {}, m.get("team2") or {}
-    n1 = {norm(t1.get("name")), norm(t1.get("slug")), norm(t1.get("acronym"))} - {""}
-    n2 = {norm(t2.get("name")), norm(t2.get("slug")), norm(t2.get("acronym"))} - {""}
-    ms = m.get("maps_score") or []
     res = []
     for g in sorted(games, key=lambda g: g.get("number") or 0):
         if g.get("status") != "finished":
             continue
-        w = norm(g.get("winner_clan_name"))
-        winner = 1 if w in n1 else 2 if w in n2 else None
-        if winner is None:
-            i = (g.get("number") or 0) - 1
-            if 0 <= i < len(ms):
-                winner = 1 if ms[i] else 2
-        ws, ls = g.get("winner_clan_score"), g.get("loser_clan_score")
-        score = None
-        if ws is not None and ls is not None and winner:
-            score = f"{ws}:{ls}" if winner == 1 else f"{ls}:{ws}"
-        res.append({"map": map_title(g.get("map_name")), "winner": winner, "score": score})
+        res.append({"map": map_title(g.get("map_name")), "n": g.get("number"),
+                    "wn": g.get("winner_clan_name"), "ln": g.get("loser_clan_name"),
+                    "ws": g.get("winner_clan_score"), "ls": g.get("loser_clan_score")})
     if m.get("status") == "finished":
         games_cache[key] = res
     return res
+
+
+# Все известные названия команды: официальное, аббревиатура, слаг — с PandaScore и bo3.
+team_aliases: dict[int, set] = {}
+
+
+def add_alias(bid: int | None, *names: str | None) -> None:
+    if not bid:
+        return
+    st = team_aliases.setdefault(bid, set())
+    for n in names:
+        if n and norm(n):
+            st.add(norm(n))
+            # «The MongolZ» → «mongolz», «Team Falcons» → «falcons»
+            st.add(norm(re.sub(r"^(the|team)\s+|\s+(team|esports|gaming|clan)$", "", n, flags=re.IGNORECASE)))
+    st.discard("")
+
+
+def clan_is(clan: str | None, names: set) -> bool:
+    c = norm(clan)
+    if not c or not names:
+        return False
+    if c in names:
+        return True
+    return any(len(n) >= 3 and len(c) >= 3 and (c in n or n in c) for n in names)
+
+
+def map_results(m: dict, bid: int) -> list[dict]:
+    """Карты матча с точки зрения команды bid: [{'map','won': True/False/None,'score'}].
+    Победитель карты определяется по клан-тегу и сверяется со счётом серии; если не сходится — None."""
+    games = bo3_games(m)
+    if not games:
+        return []
+    s = side_of(m, bid)
+    ours = set(team_aliases.get(bid, set()))
+    me_obj = (m.get("team1") if s == 1 else m.get("team2")) or {}
+    opp_obj = opp_of(m, bid)
+    add_alias(bid, me_obj.get("name"), me_obj.get("slug"))
+    ours |= team_aliases.get(bid, set())
+    theirs = {norm(opp_obj.get("name")), norm(opp_obj.get("slug")), norm(opp_obj.get("acronym"))} - {""}
+    theirs -= ours
+    out = []
+    for g in games:
+        votes = set()
+        if clan_is(g["wn"], ours): votes.add(True)
+        if clan_is(g["ln"], ours): votes.add(False)
+        if clan_is(g["wn"], theirs): votes.add(False)
+        if clan_is(g["ln"], theirs): votes.add(True)
+        won = votes.pop() if len(votes) == 1 else None
+        out.append({"map": g["map"], "won": won, "ws": g["ws"], "ls": g["ls"]})
+    my = m.get("team1_score") if s == 1 else m.get("team2_score")
+    their = m.get("team2_score") if s == 1 else m.get("team1_score")
+    if isinstance(my, int) and isinstance(their, int):
+        kw = sum(1 for r in out if r["won"] is True)
+        kl = sum(1 for r in out if r["won"] is False)
+        if kw > my or kl > their:
+            for r in out:
+                r["won"] = None  # клан-теги не сходятся со счётом серии — не угадываем
+        elif len(out) == my + their:
+            unknown = [r for r in out if r["won"] is None]
+            if unknown and my - kw == 0:
+                for r in unknown: r["won"] = False
+            elif unknown and their - kl == 0:
+                for r in unknown: r["won"] = True
+    for r in out:
+        ws, ls = r.pop("ws"), r.pop("ls")
+        if r["won"] is None or ws is None or ls is None:
+            r["score"] = None
+        else:
+            r["score"] = f"{ws}:{ls}" if r["won"] else f"{ls}:{ws}"
+    return out
 
 
 def side_of(m: dict, bid: int) -> int:
@@ -572,14 +632,6 @@ def opp_of(m: dict, bid: int) -> dict:
 
 def tour_name(m: dict) -> str:
     return ((m.get("tournament") or {}).get("name") or "").strip()
-
-
-def from_side(score: str | None, side: int) -> str | None:
-    """Счёт по раундам с точки зрения команды на стороне side."""
-    if not score:
-        return None
-    a, b = score.split(":")
-    return score if side == 1 else f"{b}:{a}"
 
 
 def build_form(bid: int, hist: list[dict], n: int = 10) -> list[dict]:
@@ -611,10 +663,8 @@ def build_h2h(a: int, b: int, hist_a: list[dict]) -> list[dict]:
         if d and d < since:
             break
         sa = side_of(m, a)
-        maps = []
-        for g in bo3_games(m):
-            w = None if not g["winner"] else (0 if g["winner"] == sa else 1)
-            maps.append({"map": g["map"], "winner": w, "score": from_side(g["score"], sa)})
+        maps = [{"map": r["map"], "winner": None if r["won"] is None else (0 if r["won"] else 1), "score": r["score"]}
+                for r in map_results(m, a)]
         res.append({
             "date": m.get("start_date"),
             "tournament": tour_name(m),
@@ -638,19 +688,17 @@ def build_maps(bids: list[int | None], hists: list[list[dict]], max_matches: int
             d = parse_iso(m.get("start_date"))
             if d and d < since:
                 break
-            s = side_of(m, bid)
             opp = opp_of(m, bid)
-            for g in bo3_games(m):
-                name = g.get("map")
-                if not name or not g.get("winner"):
+            for r in map_results(m, bid):
+                name = r.get("map")
+                if not name or r["won"] is None:
                     continue
                 row = table.setdefault(name, {"map": name, "teams": [{"played": 0, "won": 0}, {"played": 0, "won": 0}]})
-                won = g["winner"] == s
                 row["teams"][idx]["played"] += 1
-                row["teams"][idx]["won"] += int(won)
+                row["teams"][idx]["won"] += int(r["won"])
                 recent.setdefault(name, []).append({
                     "team": idx, "date": m.get("start_date"), "vs": opp.get("acronym") or opp.get("name"),
-                    "won": won, "score": from_side(g.get("score"), s), "tournament": tour_name(m)})
+                    "won": r["won"], "score": r["score"], "tournament": tour_name(m)})
     for name in recent:
         recent[name].sort(key=lambda r: r["date"] or "", reverse=True)
     rows = sorted(table.values(), key=lambda r: -(r["teams"][0]["played"] + r["teams"][1]["played"]))
@@ -1051,6 +1099,7 @@ def build_detail(m: dict, prev: dict | None) -> dict:
         players = [player_brief(p) for p in full.get("players") or [] if p.get("active", True)]
         players, coach = merge_roster(players, lp_roster({**t, "name": full.get("name") or t.get("name")}))
         bid = bo3_team_id({**t, "slug": full.get("slug") or t.get("slug")})
+        add_alias(bid, t.get("name"), t.get("acronym"), t.get("slug"), full.get("name"), full.get("acronym"))
         hist = bo3_history(bid) if bid else []
         bids.append(bid)
         hists.append(hist)
