@@ -893,7 +893,7 @@ def translate(text: str) -> str | None:
 
 ART_CACHE_F = CACHE / "articles.json"
 art_cache: dict = load_json(ART_CACHE_F, {})
-ART_NEW_LIMIT = 150          # сколько новых статей обрабатывать за запуск
+ART_NEW_LIMIT = 40           # сколько новых ссылок Google News раскрывать за запуск (Google ограничивает частоту)
 _art_new = [0]
 
 
@@ -930,6 +930,12 @@ def gnews_decode(url: str) -> str | None:
                             return res[1]
             except Exception:
                 continue
+    except urllib.error.HTTPError as e:
+        if e.code == 429:
+            _art_new[0] = ART_NEW_LIMIT  # Google просит притормозить — остальное в следующий запуск
+            warn("Google News: слишком часто, остальные ссылки раскроются в следующий запуск")
+        else:
+            warn(f"Google News ссылка: {e!r}")
     except Exception as e:
         warn(f"Google News ссылка: {e!r}")
     return None
@@ -977,7 +983,7 @@ def resolve_link(it: dict) -> dict:
         return {}
     _art_new[0] += 1
     real = gnews_decode(it["url"])
-    time.sleep(0.5)
+    time.sleep(2)
     info = {"url": real, "t": iso(NOW)} if real else {}
     if real:
         art_cache[k] = info
