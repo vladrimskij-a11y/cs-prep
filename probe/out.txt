@@ -1,0 +1,52 @@
+## Alex666
+
+## Brollan
+|status=Active
+|team=HEROIC
+|roles=igl,entry
+|steam64ID=76561198138828475
+|team_history=
+## Dumau
+|status=Active
+|team=Legacy
+|roles=rifle,awp
+|steam64ID=76561198194325317
+|team_history=
+## Jame
+|status=Active
+|team=PARIVISION
+|roles=igl,awp
+|steam64ID=76561198036125584
+|team_history=
+## Kyousuke
+
+## Latto
+|status=Active
+|team=Legacy
+|roles=rifle,awp
+|steam64ID=76561198850020186
+|team_history=
+## Magnojez
+
+## Npl
+|status=Active
+|team=B8
+|roles=igl,rifle
+|steam64ID=76561198305036904
+|team_history=
+## Try
+|status=Active
+|team=Legacy
+|roles=awp
+|steam64ID=76561198365118288
+|team_history=
+{{TH|2020-02-26 — 2020-03-27|9z Team|Stand-in}}
+{{TH|2020-03-27 — 2022-01-08|9z Team}}
+{{TH|2023-01-04 — 2023-10-19|9z Team}}<br>
+-->{{TH|2023-10-19 — 2024-07-16|9z Team|Inactive}}
+## Xelex
+
+## opensearch TheMongolz: ['TheMongolz', [], [], []]
+## opensearch 9z: ['9z', ['9z Team', '9z Team/Matches', '9z Team/Results', '9z Team/Matches/CSGO'], ['', '', '', ''], ['https://liquipedia.net/counterstrike/9z_Team', 'https://liquipedia.net/counterstrike/9z_Team/Matches', 'https://liquipedia.net/counterstrike/9z_Team/Results', 'https://liquipedia.net/counterstrike/9z_Team/Matches/CSGO']]
+## opensearch The Mongolz: ['The Mongolz', ['The MongolZ', 'The MongolZ Academy', 'The MongolZ Esports Club/Championship/1', 'The MongolZ/Matches', 'The MongolZ/Results'], ['', '', '', '', ''], ['https://liquipedia.net/counterstrike/The_MongolZ', 'https://liquipedia.net/counterstrike/The_MongolZ_Academy', 'https://liquipedia.net/counterstrike/The_MongolZ_Esports_Club/Championship/1', 'https://liquipedia.net/counterstrike/The_MongolZ/Matches', 'https://liquipedia.net/counterstrike/The_MongolZ/Results']]
+## opensearch Heroic: ['Heroic', ['HEROIC', 'HEROIC Academy', 'HEROIC x Thunderpick/Path To The Pros/Qualifier/Open/8', 'HEROIC x Thunderpick/Path To The Pros/Qualifier/Open/1', 'HEROIC x Thunderpick/Path To The Pros'], ['', '', '', '', ''], ['https://liquipedia.net/counterstrike/HEROIC', 'https://liquipedia.net/counterstrike/HEROIC_Academy', 'https://liquipedia.net/counterstrike/HEROIC_x_Thunderpick/Path_To_The_Pros/Qualifier/Open/8', 'https://liquipedia.net/counterstrike/HEROIC_x_Thunderpick/Path_To_The_Pros/Qualifier/Open/1', 'https://liquipedia.net/counterstrike/HEROIC_x_Thunderpick/Path_To_The_Pros']]
