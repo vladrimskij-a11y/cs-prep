@@ -1,5 +1,5 @@
 {
- "updated": "2026-11-01T23:02:18Z",
+ "updated": "2026-11-01T23:07:41Z",
  "tiers": [
   "a",
   "s"
@@ -759,11 +759,8 @@
  "meta": {
   "panda_requests": 19,
   "bo3_requests": 32,
-  "liquipedia_requests": 30,
-  "translations": 11,
-  "warnings": [
-   "Liquipedia: нет страницы команды TheMongolz",
-   "Liquipedia: нет страницы команды 9z"
-  ]
+  "liquipedia_requests": 36,
+  "translations": 0,
+  "warnings": []
  }
 }
