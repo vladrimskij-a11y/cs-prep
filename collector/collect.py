@@ -2262,7 +2262,7 @@ def build_news(teams: list[dict]) -> dict:
 
 # ---------------------------------------------------------------- факты для эфира
 
-FACTS_CACHE_F = CACHE / "facts_v2.json"
+FACTS_CACHE_F = CACHE / "facts_v3.json"
 facts_cache: dict = load_json(FACTS_CACHE_F, {})
 FACTS_TTL_H = 6
 FACTS_SYSTEM = """Ты помогаешь русскоязычному комментатору CS2 подготовиться к матчу.
@@ -2273,8 +2273,13 @@ FACTS_SYSTEM = """Ты помогаешь русскоязычному комм�
 - Каждый факт — одно предложение до 25 слов, по-русски, ники и названия команд латиницей как в данных.
 - Разные темы: личные встречи, форма, карты и стороны (CT/T, пистолетки), игроки (роли, возраст, K/D, ADR, KAST, лучшая карта),
   тренеры, новости недели. Не повторяй одно и то же разными словами.
-- Сначала самые яркие и полезные для эфира факты.
-- "tag" — одно слово: Встречи, Форма, Карты, Вето, Стороны, Игроки, Тренеры, Новости.
+- ПРИОРИТЕТ — факты вне статистики, их ставь первыми и делай большинство:
+  1) сюжеты из новостей недели (заявления, интервью, замены, аренды, переходы, конфликты, рекорды из новостей);
+  2) люди: возраст, национальности и состав по странам, роли (капитан, AWP), аренды и замены, тренеры;
+  3) история противостояния как сюжет (последняя встреча, где и с каким итогом, кто брал верх).
+  Статистику (карты, стороны, пистолетки, K/D, ADR, KAST, вето) — только после этого и не больше трети фактов.
+- "tag" — одно слово: Новости, Игроки, Тренеры, Встречи, Форма, Карты, Вето, Стороны.
+- Порядок в ответе = порядок важности для эфира.
 Ответ строго JSON: {"facts": [{"tag": "...", "text": "..."}]}"""
 
 
@@ -2284,7 +2289,8 @@ def facts_input(d: dict) -> dict:
         return {
             "name": t.get("name"),
             "coach": [{"nick": c.get("nick"), "age": c.get("age")} for c in t.get("coach") or []],
-            "players": [{"nick": p.get("nick"), "age": p.get("age"), "roles": p.get("tags")} for p in t.get("players") or []],
+            "players": [{"nick": p.get("nick"), "name": p.get("name_ru") or " ".join(x for x in (p.get("first_name"), p.get("last_name")) if x),
+                         "age": p.get("age"), "country": p.get("nationality"), "roles": p.get("tags")} for p in t.get("players") or []],
             "player_stats_3m": [{k: x.get(k) for k in ("nick", "kd", "adr", "kast", "best_map", "maps")} for x in t.get("stats") or []],
             "last10": [{"vs": f.get("opponent_name"), "score": f"{f.get('score')}:{f.get('opp_score')}", "won": f.get("won"),
                         "tournament": f.get("tournament"), "date": (f.get("date") or "")[:10]} for f in t.get("form") or []],
@@ -2302,7 +2308,8 @@ def facts_input(d: dict) -> dict:
         "sides_3m_total": {"team1": (sides.get("total") or [None, None])[0], "team2": (sides.get("total") or [None, None])[1]},
         "sides_3m_by_map": sides.get("maps"),
         "veto_last_matches": d.get("veto"),
-        "news_week": [{"about": n.get("about"), "title": n.get("title_ru") or n.get("title")} for n in ((d.get("news") or {}).get("items") or [])[:10]],
+        "news_week": [{"about": n.get("about"), "title": n.get("title_ru") or n.get("title"),
+                       "text": (n.get("summary_ru") or "")[:300]} for n in ((d.get("news") or {}).get("items") or [])[:15]],
     }
 
 
