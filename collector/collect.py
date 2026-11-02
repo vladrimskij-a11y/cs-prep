@@ -785,7 +785,8 @@ OTHER_GAMES = re.compile(
     r"\b(MLBB|Mobile Legends|Dota|Дот[аеуыо]\w*|The International|DreamLeague|Riyadh Masters|ESL One|Wallachia|BetBoom Dacha"
     r"|Valorant|Валорант\w*|League of Legends|\bLoL\b|PUBG|Fortnite|Apex|Rainbow Six|\bR6\b|Overwatch"
     r"|Rocket League|Call of Duty|\bCoD\b|Standoff|Стандофф\w*|Deadlock|Marvel Rivals|EA FC|FIFA|Free Fire|StarCraft"
-    r"|Tekken|Hearthstone|World of Tanks|Мир танков|Warface|Brawl Stars|Clash|Fortnite|шахмат\w*|Chess)\b",
+    r"|Tekken|Hearthstone|World of Tanks|Мир танков|Warface|Brawl Stars|Clash|Fortnite|шахмат\w*|Chess"
+    r"|Phantom Blade|трейлер\w*|trailer|PS5|PlayStation|Xbox|Nintendo|релиз игры|game release)\b",
     re.IGNORECASE)
 CS_STRICT = re.compile(r"\bCS ?2\b|\bCS:?GO\b|\bCS\b|Counter[- ]Strike|\bКС ?2?\b|контр-?страйк\w*|\bHLTV\b|\bIEM\b"
                        r"|\bBLAST\b|мейджор\w*|\bAWP\b|авп\w*", re.IGNORECASE)
@@ -821,6 +822,11 @@ def entity_re(word: str, case: bool) -> re.Pattern:
 def is_ambiguous(nick: str) -> bool:
     n = nick.lower()
     return len(nick) <= 3 or n in COMMON_WORDS or nick.isdigit() or (nick.islower() and nick.isalpha() and len(nick) <= 5)
+
+
+def distinctive_nick(nick: str) -> bool:
+    """Ник, который не спутать с обычным словом: есть цифры или заглавные внутри (m0NESY, Boombl4, NiKo, XANTARES)."""
+    return bool(re.search(r"\d", nick)) or bool(re.search(r"[a-z][A-Z]", nick)) or (nick.isupper() and len(nick) >= 5)
 
 
 def item_key(it: dict) -> str:
@@ -892,6 +898,8 @@ def translate(text: str) -> str | None:
 # ---------------------------------------------------------------- статья: ссылка на оригинал и описание
 
 ART_CACHE_F = CACHE / "articles.json"
+DEDUP_CACHE_F = CACHE / "news_dedup.json"
+dedup_cache: dict = load_json(DEDUP_CACHE_F, {})
 art_cache: dict = load_json(ART_CACHE_F, {})
 ART_NEW_LIMIT = 40           # сколько новых ссылок Google News раскрывать за запуск (Google ограничивает частоту)
 _art_new = [0]
@@ -1163,6 +1171,18 @@ def gather_news(teams: list[dict]) -> list[dict]:
                 about.append(label)
         if not about:
             continue
+        nick_only = [a for a in about if a not in team_names]
+        if nick_only and len(nick_only) == len(about) and all(not distinctive_nick(a) for a in nick_only):
+            # простой ник (Zero, Jee, Mercury): нужна команда, партнёр или явный CS рядом
+            team_of = {e[0]: teams[e[3]] for e in entities}
+            ctx_ok = CS_STRICT.search(text) or any(x in src for x in ("hltv", "dust2"))
+            for a in nick_only:
+                t = team_of.get(a) or {}
+                mates = [p.get("nick") for p in t.get("players") or [] if p.get("nick") and p.get("nick") != a]
+                if any(entity_re(x, False).search(text) for x in [t.get("name"), t.get("acronym")] + mates if x and len(x) >= 2):
+                    ctx_ok = True
+            if not ctx_ok:
+                continue
         only_teams = all(a in team_names for a in about)
         cs_only_src = any(x in src for x in ("hltv", "dust2"))
         if only_teams and not (CS_STRICT.search(text) or cs_only_src):
@@ -1178,14 +1198,23 @@ def gather_news(teams: list[dict]) -> list[dict]:
             continue
         found[k] = {**it, "about": about, "key": k}
 
-    items = sorted(found.values(), key=lambda i: i["date"], reverse=True)[:60]
-    out = []
+    items = sorted(found.values(), key=lambda i: i["date"], reverse=True)[:90]
     for it in items:
-        art = article_info(it)
         t_ru, t_lang = translate_ex(it["title"])
-        lang = art.get("lang") or t_lang
-        if lang == "ru":
-            t_ru = None
+        it["title_ru0"], it["lang0"] = (t_ru if t_lang != "ru" else None), t_lang
+    clusters = dedupe_news(items, teams)
+
+    out = []
+    for cl in clusters[:60]:
+        it, others = cl[0], cl[1:]
+        art = article_info(it)
+        lang = art.get("lang") or it["lang0"]
+        t_ru = it["title_ru0"] if lang != "ru" else None
+        about = []
+        for x in cl:
+            for a in x["about"]:
+                if a not in about:
+                    about.append(a)
         out.append({
             "key": it["key"],
             "title": it["title"],
@@ -1196,12 +1225,89 @@ def gather_news(teams: list[dict]) -> list[dict]:
             "quotes": art.get("quotes") or [],
             "image": art.get("image"),
             "kind": classify(it["title"]),
-            "about": it["about"],
+            "about": about,
             "source": it["source"],
             "url": art.get("url") or it["url"],
             "date": iso(it["date"]),
+            "also": [{"source": o["source"], "url": (art_cache.get(o["key"]) or {}).get("url") or o["url"],
+                      "title": o.get("title_ru0") or o["title"]} for o in others],
         })
     return out
+
+
+STOP = set("""и в во на с со по о об от до за из к ко у не что это как а но или же ли бы для при про над под после перед
+the a an of to in on at for and or but with from by is are was were be as his her their its he she they it this that
+после против vs""".split())
+SRC_RANK = ["cybersport.ru", "hltv", "sports.ru", "championat", "dust2", "bo3.gg", "escorenews", "esports.gg", "dexerto"]
+
+
+def title_tokens(t: str) -> set:
+    words = re.findall(r"[a-zа-яё0-9]+", (t or "").lower())
+    return {w[:6] for w in words if len(w) >= 3 and w not in STOP}  # первые 6 букв — грубый учёт склонений
+
+
+def src_rank(it: dict) -> tuple:
+    s = (it.get("source") or "").lower()
+    r = next((i for i, x in enumerate(SRC_RANK) if x in s), len(SRC_RANK))
+    return (r, 0 if it.get("lang0") == "ru" else 1, it["date"])
+
+
+DEDUP_SYSTEM = """Ты редактор новостей о Counter-Strike 2. Тебе дают пронумерованный список заголовков (уже по-русски) и составы двух команд.
+1) В "drop" перечисли номера заголовков, которые НЕ про киберспорт Counter-Strike и не про этих игроков/команды
+   (другие игры, кино, музыка, однофамильцы, составы клубов в Dota/Valorant и т.п.).
+2) В "groups" перечисли группы номеров, которые рассказывают ОДНУ И ТУ ЖЕ новость (одно событие), даже если формулировки и языки разные.
+   Разные события про одного игрока — это разные новости, их не объединяй.
+Ответ строго JSON: {"drop": [номера], "groups": [[номера], [номера]]}"""
+
+
+def dedupe_news(items: list[dict], teams: list[dict]) -> list[list[dict]]:
+    """Склеивает одну и ту же новость с разных сайтов. Первый в группе — основной."""
+    clusters: list[list[dict]] = []
+    for it in items:
+        tok = title_tokens(it["title_ru0"] or it["title"])
+        it["_tok"] = tok
+        best, best_sim = None, 0.0
+        for cl in clusters:
+            for o in cl:
+                inter = len(tok & o["_tok"])
+                union = len(tok | o["_tok"]) or 1
+                sim = inter / union
+                close = abs((it["date"] - o["date"]).total_seconds()) < 36 * 3600
+                same_who = bool(set(it["about"]) & set(o["about"]))
+                if close and same_who and (sim >= 0.45 or (sim >= 0.3 and inter >= 3)) and sim > best_sim:
+                    best, best_sim = cl, sim
+        if best is not None:
+            best.append(it)
+        else:
+            clusters.append([it])
+
+    # второй проход: GigaChat — посторонние новости и дубли, которые не поймали правила
+    if GIGA_KEY and not _giga["off"] and len(clusters) > 1:
+        roster = "\n".join(f"{t['name']}: " + ", ".join(p.get("nick") or "" for p in t.get("players") or []) for t in teams)
+        lines = "\n".join(f"{i + 1}. [{', '.join(cl[0]['about'])}] {cl[0]['title_ru0'] or cl[0]['title']}"
+                          for i, cl in enumerate(clusters))
+        sig = hashlib.sha1((roster + lines).encode()).hexdigest()[:16]
+        cached = dedup_cache.get(sig)
+        res = cached["res"] if cached else parse_json_loose(giga_chat(DEDUP_SYSTEM, f"Составы:\n{roster}\n\nЗаголовки:\n{lines}", 600))
+        if res is not None:
+            dedup_cache[sig] = {"res": res, "t": iso(NOW)}
+            drop = {int(x) - 1 for x in res.get("drop") or [] if str(x).isdigit()}
+            merged = []
+            used = set()
+            for g in res.get("groups") or []:
+                idx = sorted({int(x) - 1 for x in g if str(x).isdigit() and 0 < int(x) <= len(clusters)} - drop - used)
+                if len(idx) > 1:
+                    merged.append(sum((clusters[i] for i in idx), []))
+                    used |= set(idx)
+            for i, cl in enumerate(clusters):
+                if i not in used and i not in drop:
+                    merged.append(cl)
+            clusters = merged
+
+    for cl in clusters:
+        cl.sort(key=src_rank)
+    clusters.sort(key=lambda cl: max(x["date"] for x in cl), reverse=True)
+    return clusters
 
 
 def build_news(teams: list[dict]) -> dict:
@@ -1285,6 +1391,9 @@ def main() -> int:
     for k in [k for k, v in art_cache.items() if (v.get("t") or "") < iso(NOW - timedelta(days=NEWS_DAYS + 7))]:
         del art_cache[k]
     save_json(ART_CACHE_F, art_cache)
+    for k in [k for k, v in dedup_cache.items() if (v.get("t") or "") < iso(NOW - timedelta(days=2))]:
+        del dedup_cache[k]
+    save_json(DEDUP_CACHE_F, dedup_cache)
     tours: dict = {}
     for b in listing:
         sid = str((b.get("serie") or {}).get("id") or re.sub(r"\W+", "-", b["tournament"]).strip("-").lower())

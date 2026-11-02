@@ -223,6 +223,9 @@ a { color: inherit; }
 .rd blockquote cite { display: block; font-style: normal; font-size: 12px; color: var(--muted); margin-top: 4px; }
 .rd .readbtn { align-self: flex-start; margin-top: 4px; }
 button.ni { width: 100%; text-align: left; }
+.also { display: flex; flex-direction: column; gap: 0; border-top: 1px solid var(--line); padding-top: 10px; margin-top: 4px; }
+.also a { display: flex; flex-direction: column; gap: 2px; padding: 8px 0; border-bottom: 1px solid var(--line); text-decoration: none; color: inherit; font-size: 13px; }
+.also a b { font-size: 12px; color: var(--ct); }
 
 /* группы по турнирам */
 .grp { display: flex; flex-direction: column; }
@@ -571,13 +574,15 @@ a.ni { text-decoration: none; color: inherit; }
       html += '<button class="box ni" data-reader="' + esc(n.key) + '">' +
         '<span class="tags">' + (n.kind ? '<span class="kind k-' + esc(n.kind) + '">' + esc(n.kind) + '</span>' : '') + whoHtml + '</span>' +
         '<h4>' + esc(n.title_ru || n.title) + '</h4>' +
-        '<span class="src"><span>' + esc(n.source) + ' · ' + esc(ago(n.date)) + (n.lang_ru ? ' · с ' + esc(n.lang_ru) : '') + '</span>' +
+        '<span class="src"><span>' + esc(n.source) + ' · ' + esc(ago(n.date)) + (n.lang_ru ? ' · с ' + esc(n.lang_ru) : '') + ((n.also || []).length ? ' · ещё ' + n.also.length + ' ' + srcWord(n.also.length) : '') + '</span>' +
         (n.summary_ru ? '<span class="open">Читать ›</span>' : '<span class="open">Оригинал ›</span>') + '</span></button>';
     });
     html += '</div>';
     if (N.updated) html += '<div class="upd" style="text-align:center">Новости собраны ' + esc(ago(N.updated)) + '</div>';
     return html + '</div>';
   }
+
+  function srcWord(k) { k = k % 100; var d = k % 10; return (k > 10 && k < 20) || d === 0 || d > 4 ? "источников" : d === 1 ? "источник" : "источника"; }
 
   function readerView(m, n) {
     var paras = String(n.summary_ru || "").split(/\n+/).filter(Boolean);
@@ -596,7 +601,13 @@ a.ni { text-decoration: none; color: inherit; }
     } else {
       html += '<p class="rd-empty">Пересказа этой статьи пока нет: сайт не отдал текст или он ещё в очереди. Можно открыть оригинал.</p>';
     }
-    html += (n.url ? '<a class="readbtn" href="' + esc(n.url) + '" data-read="' + esc(n.url) + '" target="_blank" rel="noopener">Открыть оригинал</a>' : '') + '</article></div>';
+    html += (n.url ? '<a class="readbtn" href="' + esc(n.url) + '" data-read="' + esc(n.url) + '" target="_blank" rel="noopener">Открыть оригинал</a>' : '');
+    if ((n.also || []).length) {
+      html += '<div class="also"><div class="rd-meta">Также писали</div>' + n.also.map(function (a) {
+        return '<a href="' + esc(a.url) + '" data-read="' + esc(a.url) + '" target="_blank" rel="noopener"><b>' + esc(a.source) + '</b><span>' + esc(a.title) + '</span></a>';
+      }).join("") + '</div>';
+    }
+    html += '</article></div>';
     return html;
   }
 
