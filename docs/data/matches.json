@@ -1,5 +1,5 @@
 {
- "updated": "2026-11-02T07:36:58Z",
+ "updated": "2026-11-02T07:57:08Z",
  "tiers": [
   "s"
  ],
@@ -13,7 +13,7 @@
    "end": "2026-11-08T12:30:00Z",
    "prize": "1,250,000 United States Dollar",
    "matches": 27,
-   "next": "2026-11-02T08:00:00Z",
+   "next": "2026-11-02T08:45:00Z",
    "live": 2,
    "hltv": {
     "prize": 1250000,
@@ -694,7 +694,157 @@
    "prize_usd": 1250000,
    "matches": 0,
    "next": null,
-   "live": 0
+   "live": 0,
+   "major": {
+    "final": true,
+    "invite_date": "2 ноября 2026",
+    "stages": [
+     {
+      "stage": "Stage 3",
+      "teams": [
+       {
+        "name": "MOUZ",
+        "region": "Европа"
+       },
+       {
+        "name": "Aurora",
+        "region": "Европа"
+       },
+       {
+        "name": "BetBoom",
+        "region": "Европа"
+       },
+       {
+        "name": "Vitality",
+        "region": "Европа"
+       },
+       {
+        "name": "Spirit",
+        "region": "Европа"
+       },
+       {
+        "name": "Falcons",
+        "region": "Европа"
+       },
+       {
+        "name": "FURIA",
+        "region": "Америка"
+       },
+       {
+        "name": "Legacy",
+        "region": "Америка"
+       }
+      ]
+     },
+     {
+      "stage": "Stage 2",
+      "teams": [
+       {
+        "name": "FUT",
+        "region": "Европа"
+       },
+       {
+        "name": "Natus Vincere",
+        "region": "Европа"
+       },
+       {
+        "name": "1win",
+        "region": "Европа"
+       },
+       {
+        "name": "Nemiga",
+        "region": "Европа"
+       },
+       {
+        "name": "G2",
+        "region": "Европа"
+       },
+       {
+        "name": "Astralis",
+        "region": "Европа"
+       },
+       {
+        "name": "MIBR",
+        "region": "Америка"
+       },
+       {
+        "name": "The MongolZ",
+        "region": "Азия"
+       }
+      ]
+     },
+     {
+      "stage": "Stage 1",
+      "teams": [
+       {
+        "name": "Ninjas in Pyjamas",
+        "region": "Европа"
+       },
+       {
+        "name": "HEROIC",
+        "region": "Европа"
+       },
+       {
+        "name": "Eternal Fire",
+        "region": "Европа"
+       },
+       {
+        "name": "PARIVISION",
+        "region": "Европа"
+       },
+       {
+        "name": "FaZe",
+        "region": "Европа"
+       },
+       {
+        "name": "100 Thieves",
+        "region": "Европа"
+       },
+       {
+        "name": "Liquid",
+        "region": "Америка"
+       },
+       {
+        "name": "M80",
+        "region": "Америка"
+       },
+       {
+        "name": "Imperial",
+        "region": "Америка"
+       },
+       {
+        "name": "9z",
+        "region": "Америка"
+       },
+       {
+        "name": "DENDELE",
+        "region": "Америка"
+       },
+       {
+        "name": "Wildcard",
+        "region": "Америка"
+       },
+       {
+        "name": "BC.Game",
+        "region": "Азия"
+       },
+       {
+        "name": "FlyQuest",
+        "region": "Азия"
+       },
+       {
+        "name": "Chinggis Warriors",
+        "region": "Азия"
+       },
+       {
+        "name": "Lynn Vision",
+        "region": "Азия"
+       }
+      ]
+     }
+    ],
+    "source": "https://www.hltv.org/news/45879/pgl-major-singapore-invites-set"
+   }
   },
   {
    "id": "bo3-6202",
@@ -787,7 +937,7 @@
   },
   {
    "id": 1761572,
-   "begin_at": "2026-11-02T08:00:00Z",
+   "begin_at": "2026-11-02T08:45:00Z",
    "status": "not_started",
    "bo": 3,
    "name": "Upper Bracket Quarterfinal 3: FURIA vs FaZe",
@@ -1402,8 +1552,8 @@
    "Перевод: <HTTPError 429: 'Too Many Requests'>"
   ],
   "dust2_requests": 25,
-  "giga_calls": 73,
-  "giga_tokens": 49888,
+  "giga_calls": 80,
+  "giga_tokens": 56185,
   "hltv_requests": 1
  }
 }
