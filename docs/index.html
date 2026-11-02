@@ -302,6 +302,8 @@ button.ni { width: 100%; text-align: left; }
 .facts { display: flex; flex-direction: column; }
 .fact { display: flex; flex-direction: column; gap: 3px; padding: 10px 12px; border-top: 1px solid var(--line); font-size: 14px; line-height: 1.45; }
 .fact:first-child { border-top: 0; }
+.fact.link { width: 100%; text-align: left; color: inherit; }
+.fact .fgo { color: var(--muted); font-weight: 700; }
 .ftag { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
 .fmore { padding: 10px 12px; border-top: 1px solid var(--line); color: var(--ct); font-weight: 600; font-size: 13px; text-align: left; }
 
@@ -712,7 +714,10 @@ a.ni { text-decoration: none; color: inherit; }
     var shown = state.factsAll ? F : F.slice(0, 10);
     var html = '<div class="sec"><h3>Факты для эфира <span>по данным матча</span></h3><div class="box facts">';
     shown.forEach(function (f) {
-      html += '<div class="fact"><span class="ftag">' + esc(f.tag || "") + '</span><span>' + esc(f.text) + '</span></div>';
+      var hasSrc = f.src && ((m.news && m.news.items) || []).some(function (x) { return x.key === f.src; });
+      html += hasSrc
+        ? '<button class="fact link" data-reader="' + esc(f.src) + '"><span class="ftag">' + esc(f.tag || "") + '</span><span>' + esc(f.text) + ' <span class="fgo">›</span></span></button>'
+        : '<div class="fact"><span class="ftag">' + esc(f.tag || "") + '</span><span>' + esc(f.text) + '</span></div>';
     });
     if (F.length > 10) html += '<button class="fmore" id="facts-more">' + (state.factsAll ? "Свернуть" : "Показать ещё " + (F.length - 10)) + '</button>';
     return html + '</div></div>';

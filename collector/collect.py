@@ -2595,7 +2595,8 @@ FACTS_SYSTEM = """Ты помогаешь русскоязычному комм�
 - Если новостей нет — верни пустой список, не выдумывай.
 - Одно предложение до 25 слов, по-русски, ники и названия команд латиницей как в данных.
 - "tag": одно из — Новости, Цитата, Интервью, Трансфер, Слухи, Конфликт, Достижения, Особенности (необычные детали: привычки, здоровье, забавные факты).
-Ответ строго JSON: {"facts": [{"tag": "...", "text": "..."}]}"""
+- "src": номер новости ("n"), из которой взят факт.
+Ответ строго JSON: {"facts": [{"tag": "...", "text": "...", "src": 1}]}"""
 
 
 def facts_input(d: dict) -> dict:
@@ -2623,8 +2624,8 @@ def facts_input(d: dict) -> dict:
         "sides_3m_total": {"team1": (sides.get("total") or [None, None])[0], "team2": (sides.get("total") or [None, None])[1]},
         "sides_3m_by_map": sides.get("maps"),
         "veto_last_matches": d.get("veto"),
-        "news_week": [{"about": n.get("about"), "title": n.get("title_ru") or n.get("title"),
-                       "text": (n.get("summary_ru") or "")[:300]} for n in ((d.get("news") or {}).get("items") or [])[:15]],
+        "news_week": [{"n": i + 1, "about": n.get("about"), "title": n.get("title_ru") or n.get("title"),
+                       "text": (n.get("summary_ru") or "")[:300]} for i, n in enumerate(((d.get("news") or {}).get("items") or [])[:15])],
     }
 
 
@@ -2722,6 +2723,24 @@ def _risky_ok(text: str, source: str) -> bool:
     return True
 
 
+def fact_source(f: dict, news_items: list) -> str | None:
+    """Ключ новости, из которой взят факт: по номеру от модели, иначе по совпадению слов."""
+    try:
+        i = int(f.get("src")) - 1
+        if 0 <= i < len(news_items):
+            return news_items[i].get("key")
+    except (TypeError, ValueError):
+        pass
+    tok = title_tokens(f.get("text"))
+    best, score = None, 0.0
+    for n in news_items:
+        o = title_tokens((n.get("title_ru") or n.get("title") or "") + " " + (n.get("summary_ru") or "")[:200])
+        sc = len(tok & o) / max(1, len(tok))
+        if sc > score:
+            best, score = n.get("key"), sc
+    return best if score >= 0.4 else None
+
+
 def build_facts(d: dict, prev: dict | None) -> list | None:
     key = str(d["id"])
     stats_facts = code_facts(d)
@@ -2740,6 +2759,7 @@ def build_facts(d: dict, prev: dict | None) -> list | None:
         data = json.dumps(inp, ensure_ascii=False) if inp else ""
         res = parse_json_loose(giga_chat(FACTS_SYSTEM, data[:14000], 1800, model=os.environ.get("GIGACHAT_FACTS_MODEL", "GigaChat-2-Pro"))) if inp else {"facts": []}
         allowed = _numbers(data)
+        news_items = ((d.get("news") or {}).get("items") or [])[:15]
         failed = inp is not None and res is None
         story = []
         for f in (res or {}).get("facts") or []:
@@ -2757,7 +2777,7 @@ def build_facts(d: dict, prev: dict | None) -> list | None:
             if LIVE_NOISE.search(f["text"]) and not HAS_SUBSTANCE.search(f["text"]):
                 continue  # ход матча (камбэки, эко, счёт по раундам) — не факт для эфира
             tag = f.get("tag") if f.get("tag") in ("Новости", "Цитата", "Интервью", "Трансфер", "Слухи", "Конфликт", "Достижения", "Особенности") else "Новости"
-            story.append({"tag": tag, "text": f["text"].strip()})
+            story.append({"tag": tag, "text": f["text"].strip(), "src": fact_source(f, news_items)})
         story = story[:15]
         if failed:
             story = (c or {}).get("story")  # GigaChat не ответил — оставим прошлое и попробуем в следующий раз
