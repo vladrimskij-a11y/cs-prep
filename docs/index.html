@@ -812,6 +812,9 @@ a.ni { text-decoration: none; color: inherit; }
       (st.best_map ? it("лучшая карта", st.best_map) : "") + '</span>';
   }
 
+  // без знаков ударения (комбинируемые акценты), й и ё не трогаем
+  function plain(s) { return String(s || "").normalize("NFD").replace(/[\u0300\u0301]/g, "").normalize("NFC"); }
+
   function years(n) { n = Number(n); var d = n % 10, h = n % 100; return (h > 10 && h < 20) || d === 0 || d > 4 ? "лет" : d === 1 ? "год" : "года"; }
 
   function playersTab(m) {
@@ -828,11 +831,11 @@ a.ni { text-decoration: none; color: inherit; }
         }).join("");
         html += '<button class="pl" data-player="' + esc(p.nick) + '"><span class="nick">' + esc(p.nick) + '</span>' +
           '<span class="nb' + (n ? " has" : "") + '">' + (n ? n + " новост" + (n === 1 ? "ь" : n < 5 ? "и" : "ей") : "нет новостей") + '</span>' +
-          '<span class="rn">' + esc(flag(p.nationality)) + ' ' + esc(real || p.name_ru || "") + (real && p.name_ru ? ' <span class="pron">[' + esc(p.name_ru) + ']</span>' : '') + (p.age ? " · " + esc(p.age) + " " + years(p.age) : "") + '</span>' +
+          '<span class="rn">' + esc(flag(p.nationality)) + ' ' + esc(real || plain(p.name_ru) || "") + (real && p.name_ru ? ' <span class="pron">[' + esc(plain(p.name_ru)) + ']</span>' : '') + (p.age ? " · " + esc(p.age) + " " + years(p.age) : "") + '</span>' +
           (tags ? '<span class="rtags">' + tags + '</span>' : '') + pstat(t, p.nick) + '</button>';
       });
       (t.coach || []).forEach(function (c) {
-        html += '<div class="coach"><span><span class="lbl">Тренер</span><br><b>' + esc(c.nick) + '</b></span><span class="rn" style="font-size:12px;color:var(--muted);text-align:right;align-self:end">' + esc(flag(c.flag)) + ' ' + esc(c.name || c.name_ru || "") + (c.name && c.name_ru ? ' <span class="pron">[' + esc(c.name_ru) + ']</span>' : '') + (c.age ? ' · ' + esc(c.age) + ' ' + years(c.age) : '') + '</span></div>';
+        html += '<div class="coach"><span><span class="lbl">Тренер</span><br><b>' + esc(c.nick) + '</b></span><span class="rn" style="font-size:12px;color:var(--muted);text-align:right;align-self:end">' + esc(flag(c.flag)) + ' ' + esc(c.name || plain(c.name_ru) || "") + (c.name && c.name_ru ? ' <span class="pron">[' + esc(plain(c.name_ru)) + ']</span>' : '') + (c.age ? ' · ' + esc(c.age) + ' ' + years(c.age) : '') + '</span></div>';
       });
       html += '</div></div>';
     });
