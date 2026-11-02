@@ -248,6 +248,12 @@ a { color: inherit; }
 .ch { font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 4px; white-space: nowrap; background: var(--sunk); color: var(--muted); }
 .ch.hi { color: var(--win); } .ch.lo { color: var(--loss); }
 
+#tabbody.in-left { animation: tabInL .18s ease-out; }
+#tabbody.in-right { animation: tabInR .18s ease-out; }
+@keyframes tabInL { from { opacity: .3; transform: translateX(24px); } to { opacity: 1; transform: none; } }
+@keyframes tabInR { from { opacity: .3; transform: translateX(-24px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { #tabbody.in-left, #tabbody.in-right { animation: none; } }
+
 /* лента */
 .hometabs { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
 .feedch { margin-top: 10px; }
@@ -1021,8 +1027,38 @@ a.ni { text-decoration: none; color: inherit; }
     else if (state.tab === "players") html += playersTab(m);
     else html += newsTab(m);
     $app.innerHTML = html + '</div></div>';
+    if (state.slide) {
+      var tb = document.getElementById("tabbody");
+      tb.classList.add(state.slide === "left" ? "in-left" : "in-right");
+      state.slide = null;
+    }
     function tabBtn(id, label, c) { return '<button class="tab" role="tab" data-tab="' + id + '" aria-selected="' + (state.tab === id) + '">' + label + (c ? '<span class="c">' + c + '</span>' : '') + '</button>'; }
   }
+
+  // ---------- свайпы между вкладками матча
+  var TABS = ["stats", "players", "news"], sw = null;
+  document.addEventListener("touchstart", function (e) {
+    sw = null;
+    if (!state.openId || !state.details[state.openId] || !document.getElementById("tabbody") || state.reader || e.touches.length !== 1) return;
+    var x = e.touches[0].clientX;
+    if (x < 24 || x > window.innerWidth - 24) return;  // у края — системный жест «назад»
+    if (e.target.closest(".filt, .mapsel, [style*='overflow-x'], video, input, textarea")) return;  // там своя прокрутка
+    sw = { x: x, y: e.touches[0].clientY, t: Date.now() };
+  }, { passive: true });
+  document.addEventListener("touchend", function (e) {
+    if (!sw) return;
+    var dx = e.changedTouches[0].clientX - sw.x, dy = e.changedTouches[0].clientY - sw.y, dt = Date.now() - sw.t;
+    sw = null;
+    if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.8 || dt > 700) return;
+    var i = TABS.indexOf(state.tab) + (dx < 0 ? 1 : -1);
+    if (i < 0 || i >= TABS.length) return;
+    state.tab = TABS[i];
+    state.slide = dx < 0 ? "left" : "right";
+    var nav = document.querySelector(".tabs"), top = nav ? nav.getBoundingClientRect().top + window.scrollY - 8 : 0;
+    renderMatch(state.details[state.openId]);
+    if (window.scrollY > top) window.scrollTo(0, top);
+    try { TG && TG.HapticFeedback && TG.HapticFeedback.selectionChanged(); } catch (err) {}
+  }, { passive: true });
 
   // ---------- роутинг: "" турниры, #t-ID турнир, #mine мои матчи, #m-ID матч
   var depth = 0;
@@ -1105,7 +1141,7 @@ a.ni { text-decoration: none; color: inherit; }
     if (t.hasAttribute("data-open")) { go("#m-" + t.getAttribute("data-open")); return; }
     if (t.hasAttribute("data-tour")) { go("#t-" + t.getAttribute("data-tour")); window.scrollTo(0, 0); return; }
     if (t.id === "to-mine") { go("#mine"); return; }
-    if (t.hasAttribute("data-tab")) { state.tab = t.getAttribute("data-tab"); renderMatch(state.details[state.openId]); return; }
+    if (t.hasAttribute("data-tab")) { state.tab = t.getAttribute("data-tab"); state.slide = null; renderMatch(state.details[state.openId]); return; }
     if (t.hasAttribute("data-map")) { state.map = t.getAttribute("data-map"); keepFilterScroll(function () { renderMatch(state.details[state.openId]); }); return; }
     if (t.hasAttribute("data-nf")) { state.openNews = null; state.newsFilter = t.getAttribute("data-nf"); keepFilterScroll(function () { renderMatch(state.details[state.openId]); }); return; }
     if (t.hasAttribute("data-player")) { state.tab = "news"; state.newsFilter = t.getAttribute("data-player"); renderMatch(state.details[state.openId]); window.scrollTo(0, 0); return; }
