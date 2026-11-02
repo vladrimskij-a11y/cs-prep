@@ -258,6 +258,18 @@ html { overflow-anchor: none; }
 .mhead { flex: none; background: var(--bg); }
 .mhead > .pin { max-width: 640px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-top: env(safe-area-inset-top, 0px); }
 .mhead .tabs { position: static; }
+.fold { display: grid; transition: grid-template-rows .24s ease, opacity .2s ease; }
+.fold > * { min-height: 0; overflow: hidden; }
+.hero-wrap { grid-template-rows: 1fr; opacity: 1; }
+.mini-wrap { grid-template-rows: 0fr; opacity: 0; }
+.mhead.compact .hero-wrap { grid-template-rows: 0fr; opacity: 0; }
+.mhead.compact .mini-wrap { grid-template-rows: 1fr; opacity: 1; }
+.mhead.noanim .fold { transition: none; }
+.mini { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 10px; padding: 8px 2px 2px; }
+.mini .ma { font-family: var(--display); font-weight: 700; font-size: 17px; color: var(--ct); }
+.mini .mb { font-family: var(--display); font-weight: 700; font-size: 17px; color: var(--t); text-align: right; }
+.mini .mm { font-family: var(--mono); font-size: 12px; color: var(--muted); white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) { .fold { transition: none; } }
 .mviewport { flex: 1; min-height: 0; overflow: hidden; position: relative; }
 .mtrack { display: flex; height: 100%; will-change: transform; }
 .pane .nfilt { top: 0; }
@@ -1072,12 +1084,25 @@ a.ni { text-decoration: none; color: inherit; }
     var nCount = ((m.news && m.news.items) || []).length;
     function tabBtn(id, label, c) { return '<button class="tab" role="tab" data-tab="' + id + '" aria-selected="' + (state.tab === id) + '">' + label + (c ? '<span class="c">' + c + '</span>' : '') + '</button>'; }
     return '<div style="padding-top:12px">' + backBtn(m.tournament || "Назад") + '</div>' +
-      '<section class="hero"><div class="meta"><span class="pill ' + esc(m.tier) + '">' + esc((m.tier || "").toUpperCase()) + '</span><span>' + esc(m.tournament) + (m.stage ? " · " + esc(m.stage) : "") + '</span></div>' +
+      // тонкий версус — появляется, когда листаешь вниз
+      '<div class="fold mini-wrap"><div class="fi"><div class="mini"><span class="ma">' + esc(abbr(A)) + '</span><span class="mm">' + esc(hm(m.begin_at)) + ' · ' + esc(dm(m.begin_at)) + ' · BO' + esc(m.bo) + '</span><span class="mb">' + esc(abbr(B)) + '</span></div></div></div>' +
+      '<div class="fold hero-wrap"><div class="fi"><section class="hero"><div class="meta"><span class="pill ' + esc(m.tier) + '">' + esc((m.tier || "").toUpperCase()) + '</span><span>' + esc(m.tournament) + (m.stage ? " · " + esc(m.stage) : "") + '</span></div>' +
       '<div class="face"><div class="tm a"><span class="acr">' + esc(abbr(A)) + '</span><span class="full">' + esc(A.name) + '</span></div>' +
       '<div class="mid"><b>' + esc(hm(m.begin_at)) + '</b>' + esc(dm(m.begin_at)) + ' · BO' + esc(m.bo) + '</div>' +
       '<div class="tm b"><span class="acr">' + esc(abbr(B)) + '</span><span class="full">' + esc(B.name) + '</span></div></div>' +
-      '</section>' +
+      '</section></div></div>' +
       '<nav class="tabs" role="tablist">' + tabBtn("stats", "Статистика") + tabBtn("players", "Игроки") + tabBtn("news", "Новости", nCount) + '</nav>';
+  }
+  // полная карточка ↔ тонкий версус: по прокрутке открытой вкладки (с запасом, чтобы не дёргалось на границе)
+  function updateHead(anim) {
+    var h = document.querySelector(".mhead"), p = activePane();
+    if (!h || !p) return;
+    var on = h.classList.contains("compact"), y = p.scrollTop;
+    var want = on ? y > 12 : y > 70;
+    if (want === on) return;
+    if (!anim) h.classList.add("noanim");
+    h.classList.toggle("compact", want);
+    if (!anim) { void h.offsetHeight; h.classList.remove("noanim"); }
   }
   function paneHtml(m) { return '<div class="tabbody">' + tabBodyHtml(m) + '</div>'; }
   // подсветка вкладок в неподвижной шапке — вместе со свайпом
@@ -1116,8 +1141,9 @@ a.ni { text-decoration: none; color: inherit; }
     panes().forEach(function (p) {
       var k = p.getAttribute("data-key");
       if (state.scrolls[k]) p.scrollTop = state.scrolls[k];
-      p.addEventListener("scroll", function () { state.scrolls[k] = p.scrollTop; }, { passive: true });
+      p.addEventListener("scroll", function () { state.scrolls[k] = p.scrollTop; if (k === curKey()) updateHead(true); }, { passive: true });
     });
+    updateHead(false);
     var tbar = document.querySelector(".tabs");
     if (tbar) document.documentElement.style.setProperty("--tabs-h", tbar.offsetHeight + "px");
     try { TG && TG.disableVerticalSwipes && TG.disableVerticalSwipes(); } catch (e) {}
@@ -1127,7 +1153,7 @@ a.ni { text-decoration: none; color: inherit; }
     var keys = paneKeys(), i = keys.indexOf(k);
     if (i < 0) { setKey(k); renderMatch(state.details[state.openId]); return; }
     trackTo(i, true);
-    setKey(k); markTabs(k);
+    setKey(k); markTabs(k); updateHead(true);
     try { TG && TG.HapticFeedback && TG.HapticFeedback.selectionChanged(); } catch (err) {}
   }
 
@@ -1196,7 +1222,7 @@ a.ni { text-decoration: none; color: inherit; }
     var next = s0.i + (s0.dx < 0 ? 1 : -1);
     if (far && next >= 0 && next < s0.keys.length) {
       trackTo(next, true);
-      setKey(s0.keys[next]); markTabs(s0.keys[next]);
+      setKey(s0.keys[next]); markTabs(s0.keys[next]); updateHead(true);
       try { TG && TG.HapticFeedback && TG.HapticFeedback.selectionChanged(); } catch (err) {}
     } else { trackTo(s0.i, true); markTabs(s0.keys[s0.i]); }
   }
