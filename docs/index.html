@@ -585,12 +585,12 @@ a.ni { text-decoration: none; color: inherit; }
   function h2hBlock(m) {
     var h = m.h2h || [];
     var A = m.teams[0], B = m.teams[1];
-    if (!h.length) return '<div class="sec"><h3>Личные встречи</h3><div class="box note">За последние 2 года команды не встречались.</div></div>';
+    if (!h.length) return '<div class="sec"><h3>Личные встречи</h3><div class="box note">За последний год команды не встречались.</div></div>';
     var wa = h.filter(function (x) { return x.winner === 0; }).length, wb = h.filter(function (x) { return x.winner === 1; }).length;
     var mapsA = 0, mapsB = 0;
     h.forEach(function (x) { (x.maps || []).forEach(function (g) { if (g.winner === 0) mapsA++; if (g.winner === 1) mapsB++; }); });
     var tot = wa + wb || 1;
-    var html = '<div class="sec"><h3>Личные встречи <span>' + h.length + ' за 2 года</span></h3><div class="box">' +
+    var html = '<div class="sec"><h3>Личные встречи <span>' + h.length + ' за год</span></h3><div class="box">' +
       '<div class="tally"><div class="n a num">' + wa + '</div><div class="lbl">победы в сериях' + (mapsA + mapsB ? '<br><span class="num">' + mapsA + ':' + mapsB + '</span> по картам' : '') + '</div><div class="n b num">' + wb + '</div>' +
       '<div class="bar2"><i class="a" style="width:' + (100 * wa / tot) + '%"></i><i class="b" style="width:' + (100 * wb / tot) + '%"></i></div></div>' +
 '<div class="h2h">';

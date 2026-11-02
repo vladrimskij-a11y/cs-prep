@@ -800,7 +800,7 @@ def build_form(bid: int, hist: list[dict], n: int = 10) -> list[dict]:
     return res
 
 
-H2H_DAYS = 730
+H2H_DAYS = 365
 
 
 def bo3_h2h_matches(a: int, b: int) -> list[dict]:
