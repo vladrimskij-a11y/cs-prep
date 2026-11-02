@@ -1,5 +1,5 @@
 {
- "updated": "2026-11-02T19:12:08Z",
+ "updated": "2026-11-02T21:54:50Z",
  "tiers": [
   "s"
  ],
@@ -1441,12 +1441,13 @@
  "meta": {
   "panda_requests": 21,
   "bo3_requests": 65,
-  "liquipedia_requests": 0,
+  "liquipedia_requests": 1,
   "translations": 1,
   "warnings": [
-   "GigaChat: дневной лимит токенов исчерпан, остальное — завтра"
+   "GigaChat: дневной лимит токенов исчерпан, остальное — завтра",
+   "Liquipedia Natus Vincere: <HTTPError 429: 'Too Many Requests'>"
   ],
-  "hltv_requests": 2,
-  "dust2_requests": 38
+  "dust2_requests": 25,
+  "hltv_requests": 1
  }
 }
