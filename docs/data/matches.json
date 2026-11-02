@@ -1,5 +1,5 @@
 {
- "updated": "2026-11-02T03:21:48Z",
+ "updated": "2026-11-02T03:26:36Z",
  "tiers": [
   "a",
   "s"
@@ -1429,11 +1429,10 @@
   "liquipedia_requests": 0,
   "translations": 8,
   "warnings": [
-   "HLTV /matches/2399746/the-mongolz-vs-legacy-pgl-masters-bucharest-2026: <HTTPError 403: 'Forbidden'>",
    "GigaChat: URLError(TimeoutError('timed out'))"
   ],
-  "hltv_requests": 4,
-  "giga_calls": 7,
-  "giga_tokens": 3768
+  "giga_calls": 4,
+  "giga_tokens": 3505,
+  "hltv_requests": 1
  }
 }
