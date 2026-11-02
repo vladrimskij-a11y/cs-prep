@@ -1,4 +1,4 @@
-"""Проверка №5: HLTV — VRS Invites и стадии мейджора."""
+"""Проверка №6: HLTV VRS-прогноз участников мейджора (кто в очереди)."""
 import gzip, re, urllib.request, urllib.error, time
 out = []
 def get(url):
@@ -10,25 +10,15 @@ def get(url):
             return r.status, b.decode("utf-8", "replace")
     except urllib.error.HTTPError as e:
         return e.code, ""
-def clean(h): return re.sub(r"\s+", " ", re.sub(r'<img[^>]*>|<svg.*?</svg>', '', h, flags=re.S))
+def clean(h): return re.sub(r"\s+", " ", re.sub(r'<img[^>]*>|<svg.*?</svg>|<source[^>]*>', '', h, flags=re.S))
 st, h = get("https://www.hltv.org/valve-ranking/invites")
-out.append(f"=== invites: {st} len={len(h)}")
-i = h.find('class="contentCol"')
-body = clean(h[i:])
-for k in ["Stage", "stage", "invite", "Invite", "Next", "next", "Region", "Europe"]:
-    j = body.find(k)
-    out.append(f"--- [{k}] at {j}\n" + (body[max(0, j-300):j+3000] if j >= 0 else ""))
-st, ev = get("https://www.hltv.org/events")
-for slug in ["pgl-major-singapore-2026-stage-1", "pgl-major-singapore-2026-stage-2", "pgl-major-singapore-2026"]:
-    m = re.search(r'href="(/events/\d+/' + re.escape(slug) + r')"', ev)
-    if not m: out.append(f"no {slug}"); continue
+evs = re.findall(r'<a href="(/valve-ranking/teams/event/\d+)" class="ranking-vrs-event">.*?ranking-vrs-event-header">([^<]+)<', h, re.S)
+out.append(f"vrs events: {evs}")
+target = [e for e in evs if "Major" in e[1] or "Singapore" in e[1]]
+for href, name in target[:2]:
     time.sleep(3)
-    st, h = get("https://www.hltv.org" + m.group(1))
-    b = clean(h)
-    teams = re.findall(r'<div class="team-name"><a href="/team/\d+/[^"]+"><div class="text-container"><div class="text">([^<]+)</div>.*?<div class="sub-text event-text">(.*?)</div>', b)
-    out.append(f"=== {slug}: {st} teams={len(teams)} {teams[:40]}")
-    j = b.find("PrizeDistribution")
-    out.append("prize: " + (b[j:j+2500] if j >= 0 else ""))
-    j = b.find("qualif")
-    out.append("qualif ctx: " + (b[max(0,j-500):j+800] if j >= 0 else ""))
+    st, p = get("https://www.hltv.org" + href)
+    b = clean(p)
+    i = b.find('class="contentCol"')
+    out.append(f"=== {name} {href}: {st} len={len(p)}\n" + b[i:i+9000])
 open("probe/out.txt", "w").write("\n".join(out))
