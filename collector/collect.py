@@ -254,6 +254,44 @@ def fetch_upcoming() -> list[dict]:
     return res
 
 
+TOURS_MONTHS_AHEAD = 3
+
+
+def fetch_future_tournaments() -> list[dict]:
+    """Идущие и будущие турниры тир-1 на TOURS_MONTHS_AHEAD месяцев вперёд, сгруппированные по серии (событию)."""
+    end = NOW + timedelta(days=31 * TOURS_MONTHS_AHEAD)
+    stages: list[dict] = []
+    for path in ("/csgo/tournaments/running", "/csgo/tournaments/upcoming"):
+        for page in (1, 2, 3):
+            params = {"per_page": 100, "page": page, "sort": "begin_at"}
+            if path.endswith("upcoming"):
+                params["range[begin_at]"] = f"{iso(NOW - timedelta(days=1))},{iso(end)}"
+            try:
+                batch = panda(path, params)
+            except Exception as e:
+                warn(f"Турниры {path}: {e!r}")
+                break
+            stages += [t for t in batch if (t.get("tier") or "").lower() in TIERS]
+            if len(batch) < 100:
+                break
+    series: dict = {}
+    for t in stages:
+        se = t.get("serie") or {}
+        lg = t.get("league") or {}
+        sid = str(se.get("id") or t.get("serie_id") or t["id"])
+        name = " ".join(x for x in (lg.get("name"), se.get("full_name") or se.get("name")) if x).strip()
+        cur = series.setdefault(sid, {"id": sid, "name": name, "tier": (t.get("tier") or "").lower(), "image": lg.get("image_url"),
+                                      "begin": se.get("begin_at") or t.get("begin_at"), "end": se.get("end_at") or t.get("end_at"),
+                                      "prize": t.get("prizepool"), "matches": 0, "next": None, "live": 0})
+        for k, f in (("begin", min), ("end", max)):
+            vals = [x for x in (cur.get(k), t.get("begin_at" if k == "begin" else "end_at")) if x]
+            cur[k] = f(vals) if vals else None
+        if (t.get("tier") or "").lower() == "s":
+            cur["tier"] = "s"
+        cur["prize"] = cur.get("prize") or t.get("prizepool")
+    return list(series.values())
+
+
 _team_cache: dict[int, dict] = {}
 
 
@@ -2590,8 +2628,21 @@ def main() -> int:
             tr["prize"] = b["serie"]["prize"]
         if b.get("status") != "running" and (tr["next"] is None or (b["begin_at"] or "") < tr["next"]):
             tr["next"] = b["begin_at"]
-    tour_list = sorted(tours.values(), key=lambda x: (x["tier"] != "s", x["next"] or "9999"))
+    # турниры без матчей в ближайшую неделю — по расписанию турниров PandaScore на 3 месяца вперёд
+    for tr in fetch_future_tournaments():
+        cur = tours.get(tr["id"])
+        if cur:
+            cur["begin"] = min(x for x in (cur.get("begin"), tr["begin"]) if x) if (cur.get("begin") or tr["begin"]) else None
+            cur["end"] = max(x for x in (cur.get("end"), tr["end"]) if x) if (cur.get("end") or tr["end"]) else None
+            cur["prize"] = cur.get("prize") or tr.get("prize")
+        else:
+            tours[tr["id"]] = tr
+    tour_list = [t for t in tours.values() if not t.get("end") or (parse_iso(t["end"]) or NOW) >= NOW - timedelta(hours=12)]
+    tour_list.sort(key=lambda x: (x.get("begin") or x.get("next") or "9999"))
     for tr in tour_list:
+        b = parse_iso(tr.get("begin"))
+        if b and b - NOW > timedelta(days=21):
+            continue  # призовые и участники с HLTV — только для ближайших, чтобы лишний раз туда не ходить
         ex = tournament_extras(tr["name"])
         if ex:
             tr["hltv"] = ex
