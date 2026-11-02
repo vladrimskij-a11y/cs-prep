@@ -1,29 +1,30 @@
-"""Проверка №3: турниры на bo3.gg — призовые по местам, слоты, участники мейджора."""
-import gzip, json, urllib.parse, urllib.request, urllib.error
+"""Проверка №4: HLTV — призовые по местам, слоты, участники мейджора."""
+import gzip, re, urllib.request, urllib.error, time
 out = []
 def get(url):
-    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (compatible; cs-prep-bot/1.0)", "Accept-Encoding": "gzip", "Accept": "application/json"})
+    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Safari/537.36",
+                                               "Accept": "text/html", "Accept-Encoding": "gzip", "Accept-Language": "en-US,en;q=0.9"})
     try:
         with urllib.request.urlopen(req, timeout=40) as r:
             b = r.read(); b = gzip.decompress(b) if r.headers.get("Content-Encoding") == "gzip" else b
             return r.status, b.decode("utf-8", "replace")
     except urllib.error.HTTPError as e:
         return e.code, ""
-B = "https://api.bo3.gg/api/v1"
-st, b = get(B + "/tournaments?" + urllib.parse.urlencode({"page[limit]": 8, "sort": "start_date", "filter[tournaments.tier][eq]": "s", "filter[tournaments.status][in]": "upcoming,current"}))
-out.append(f"tournaments: {st}")
-ts = json.loads(b).get("results", []) if st == 200 else []
-for t in ts:
-    out.append(f"  {t.get('id')} {t.get('slug')} | {t.get('name')} | {t.get('start_date')} prize={t.get('prize')}")
-if ts:
-    out.append("keys: " + ", ".join(ts[0].keys()))
-want = [t for t in ts if "beijing" in (t.get("slug") or "")][:1] + [t for t in ts if "major" in (t.get("slug") or "") or "singapore" in (t.get("slug") or "")][:1]
-for t in want:
-    for nm, url in [("show", f"{B}/tournaments/{t['slug']}"),
-                    ("show with", f"{B}/tournaments/{t['slug']}?with=prize_distributions,tournament_teams,stages,teams"),
-                    ("prize_distributions", f"{B}/prize_distributions?filter[prize_distributions.tournament_id][eq]={t['id']}"),
-                    ("tournament_teams", f"{B}/tournament_teams?filter[tournament_teams.tournament_id][eq]={t['id']}&page[limit]=40"),
-                    ("stages", f"{B}/stages?filter[stages.tournament_id][eq]={t['id']}")]:
-        st, b = get(url)
-        out.append(f"=== {t['slug']} {nm}: {st}\n{b[:3000]}")
+st, h = get("https://www.hltv.org/events")
+out.append(f"events: {st} len={len(h)}")
+evs = re.findall(r'href="(/events/(\d+)/([^"]+))"', h)
+seen = []
+for href, i, slug in evs:
+    if slug not in [s for _, s in seen]:
+        seen.append((href, slug))
+out.append("events: " + " | ".join(s for _, s in seen[:40]))
+for key in ["beijing", "major"]:
+    m = next((href for href, slug in seen if key in slug and "2026" in slug), None)
+    if not m: continue
+    time.sleep(3)
+    st, h = get("https://www.hltv.org" + m)
+    out.append(f"=== {m}: {st} len={len(h)}")
+    for k in ["Prize distribution", "prize-distribution", "placement", "qualif", "Teams attending", "team-box", "Invited", "VRS", "Stage"]:
+        i = h.find(k)
+        out.append(f"--- [{k}] at {i}\n" + (re.sub(r"\s+", " ", h[max(0, i-200):i+2500]) if i >= 0 else ""))
 open("probe/out.txt", "w").write("\n".join(out))
