@@ -206,7 +206,8 @@ a { color: inherit; }
 .sect-title { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 600; margin: 18px 0 0; }
 
 /* роли */
-.rtags { grid-column: 1 / -1; display: flex; gap: 4px; flex-wrap: wrap; margin-top: 2px; }
+.nickline { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0; }
+.rtags { display: flex; gap: 4px; flex-wrap: wrap; }
 .rt { font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 4px; background: var(--sunk); color: var(--muted); }
 .rt.cap { background: var(--onair-soft); color: var(--onair); }
 .rt.awp { background: var(--t-soft); color: var(--t); }
@@ -830,10 +831,11 @@ a.ni { text-decoration: none; color: inherit; }
           var cls = x === "Капитан" ? "cap" : (x === "AWP" || /^Снайпер/.test(x)) ? "awp" : /^Рифл/.test(x) ? "rif" : "";
           return '<span class="rt ' + cls + '">' + esc(x) + '</span>';
         }).join("");
-        html += '<button class="pl" data-player="' + esc(p.nick) + '"><span class="nick">' + esc(p.nick) + '</span>' +
+        html += '<button class="pl" data-player="' + esc(p.nick) + '"><span class="nickline"><span class="nick">' + esc(p.nick) + '</span>' +
+          (tags ? '<span class="rtags">' + tags + '</span>' : '') + '</span>' +
           (n ? '<span class="nb" aria-label="' + n + ' новост' + (n === 1 ? "ь" : n < 5 ? "и" : "ей") + '">' + n + '</span>' : '') +
           '<span class="rn">' + esc(flag(p.nationality)) + ' ' + esc(real || plain(p.name_ru) || "") + (real && p.name_ru ? ' <span class="pron">[' + esc(plain(p.name_ru)) + ']</span>' : '') + (p.age ? " · " + esc(p.age) + " " + years(p.age) : "") + '</span>' +
-          (tags ? '<span class="rtags">' + tags + '</span>' : '') + pstat(t, p.nick) + '</button>';
+          pstat(t, p.nick) + '</button>';
       });
       (t.coach || []).forEach(function (c) {
         html += '<div class="coach"><span><span class="lbl">Тренер</span><br><b>' + esc(c.nick) + '</b></span><span class="rn" style="font-size:12px;color:var(--muted);text-align:right;align-self:end">' + esc(flag(c.flag)) + ' ' + esc(c.name || plain(c.name_ru) || "") + (c.name && c.name_ru ? ' <span class="pron">[' + esc(plain(c.name_ru)) + ']</span>' : '') + (c.age ? ' · ' + esc(c.age) + ' ' + years(c.age) : '') + '</span></div>';
