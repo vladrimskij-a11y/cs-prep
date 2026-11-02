@@ -1174,6 +1174,7 @@ a.ni { text-decoration: none; color: inherit; }
   // сосед рисуется сразу в том положении, где окажется после свайпа, — поэтому ничего не прыгает
   function mkGhost(el, html, shift) {  // shift — на сколько сосед будет прокручен иначе, чем текущая страница
     var g = document.createElement("div");
+    g._html = html;
     g.className = el.className + " swipe-ghost"; g.id = ""; g.innerHTML = html;
     if (getComputedStyle(el.parentNode).position === "static") el.parentNode.style.position = "relative";
     var er = el.getBoundingClientRect(), pr = el.parentNode.getBoundingClientRect();
@@ -1207,6 +1208,12 @@ a.ni { text-decoration: none; color: inherit; }
   }
   function fadeBelow(on) {
     belowMaps().forEach(function (n) { n.style.transition = "opacity .12s ease-out"; n.style.opacity = on ? "" : "0"; });
+  }
+  function fixChips() {  // выбранный фильтр — в видимой части строки фильтров
+    var f = document.querySelector(".filt"), sel = f && f.querySelector('[aria-pressed="true"]');
+    if (!sel) return;
+    var l = sel.offsetLeft, r = l + sel.offsetWidth;
+    if (l < f.scrollLeft) f.scrollLeft = l - 8; else if (r > f.scrollLeft + f.clientWidth) f.scrollLeft = r - f.clientWidth + 8;
   }
   function dropGhost(s0) { if (s0.g && s0.g.parentNode) s0.g.parentNode.removeChild(s0.g); s0.g = null; }
   document.addEventListener("touchstart", function (e) {
@@ -1268,6 +1275,25 @@ a.ni { text-decoration: none; color: inherit; }
       if (s0.tgt.map != null) state.map = s0.tgt.map;
       else if (s0.tgt.filter != null) { state.openNews = null; state.newsFilter = s0.tgt.filter; }
       else { state.tab = s0.tgt.tab; if (s0.tgt.tab === "news") { state.newsFilter = "all"; state.openNews = null; } }
+      if (s0.tgt.map == null && s0.target != null && Math.abs(window.scrollY - s0.target) > 1) {
+        // нужно прокрутить: на iPhone прокрутка и смена содержимого могут попасть в разные кадры — отсюда мигание.
+        // Поэтому на время прокрутки сосед замирает поверх экрана, а настоящая страница проявляется уже после.
+        var gr = s0.g.getBoundingClientRect();
+        document.body.appendChild(s0.g);
+        s0.g.style.position = "fixed"; s0.g.style.transition = "none"; s0.g.style.transform = "none";
+        s0.g.style.top = gr.top + "px"; s0.g.style.left = gr.left + "px"; s0.g.style.width = gr.width + "px"; s0.g.style.zIndex = "2";
+        s0.el.style.transition = "none"; s0.el.style.transform = ""; s0.el.style.visibility = "hidden";
+        s0.el.innerHTML = s0.g._html;
+        window.scrollTo(0, s0.target);
+        var g0 = s0.g, e0 = s0.el;
+        requestAnimationFrame(function () { requestAnimationFrame(function () {
+          e0.style.visibility = "";
+          if (g0.parentNode) g0.parentNode.removeChild(g0);
+        }); });
+        fixChips();
+        try { TG && TG.HapticFeedback && TG.HapticFeedback.selectionChanged(); } catch (err) {}
+        return;
+      }
       // въехавшая страница остаётся как есть: переносим её готовые элементы на место, без перерисовки — ничего не моргает
       var frag = document.createDocumentFragment();
       while (s0.g.firstChild) frag.appendChild(s0.g.firstChild);
@@ -1288,12 +1314,7 @@ a.ni { text-decoration: none; color: inherit; }
         try { TG && TG.HapticFeedback && TG.HapticFeedback.selectionChanged(); } catch (err) {}
         return;
       }
-      if (s0.target != null && Math.abs(window.scrollY - s0.target) > 1) window.scrollTo(0, s0.target);
-      var f = document.querySelector(".filt"), sel = f && f.querySelector('[aria-pressed="true"]');
-      if (sel) {
-        var l = sel.offsetLeft, r = l + sel.offsetWidth;
-        if (l < f.scrollLeft) f.scrollLeft = l - 8; else if (r > f.scrollLeft + f.clientWidth) f.scrollLeft = r - f.clientWidth + 8;
-      }
+      fixChips();
       try { TG && TG.HapticFeedback && TG.HapticFeedback.selectionChanged(); } catch (err) {}
     }
   }
