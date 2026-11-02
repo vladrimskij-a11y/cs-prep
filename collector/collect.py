@@ -1466,7 +1466,7 @@ def tournament_extras(name: str) -> dict | None:
             return None
         h = hltv_get(href)
         return {**parse_hltv_event(h), "hltv": HLTV + href} if h else None
-    return hltv_cached("event2:" + name, fn)
+    return hltv_cached("event3:" + name, fn)
 
 
 def parse_vrs_major(html: str) -> dict:
