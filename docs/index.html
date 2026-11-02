@@ -657,8 +657,9 @@ a.ni { text-decoration: none; color: inherit; }
     html += '<div class="recent2">';
     (V.teams || []).forEach(function (t, i) {
       if (!t || !t.matches) return;
-      function list(arr, n) { return (arr || []).slice(0, n).map(function (x) { return esc(x[0]) + ' <b>' + x[1] + '</b>'; }).join(", ") || "—"; }
-      html += '<div class="box ' + (i ? "b" : "a") + '"><div class="hd">' + esc(m.teams[i].name) + '<span>' + t.matches + ' матч.</span></div>' +
+      function list(arr, n) { return (arr || []).slice(0, n).map(function (x) { return esc(x[0]) + ' <b>' + x[1] + ' из ' + t.matches + '</b>'; }).join(", ") || "—"; }
+      var mw = t.matches % 10 === 1 && t.matches % 100 !== 11 ? "матча" : "матчей";
+      html += '<div class="box ' + (i ? "b" : "a") + '"><div class="hd">' + esc(m.teams[i].name) + '<span>по ' + t.matches + ' ' + mw + '</span></div>' +
         '<div class="vrow"><span>Пикает</span><span>' + list(t.picks, 4) + '</span></div>' +
         '<div class="vrow"><span>Первый бан</span><span>' + list(t.first_bans, 3) + '</span></div>' +
         '<div class="vrow"><span>Банит</span><span>' + list(t.bans, 4) + '</span></div></div>';
