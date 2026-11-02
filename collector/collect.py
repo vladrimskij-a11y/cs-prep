@@ -292,6 +292,37 @@ def fetch_future_tournaments() -> list[dict]:
     return list(series.values())
 
 
+def tour_norm(name: str) -> str:
+    n = (name or "").lower().replace("intel extreme masters", "iem").replace("esl pro league", "epl")
+    return " ".join(re.findall(r"[a-z0-9]+", n))
+
+
+def tour_same(a: str, b_norm: str) -> bool:
+    ta, tb = set(tour_norm(a).split()), set(b_norm.split())
+    return bool(ta) and len(ta & tb) / len(ta | tb) >= 0.6
+
+
+def fetch_bo3_tournaments() -> list[dict]:
+    """Ближайшие турниры тир-1 с bo3.gg — подстраховка, если PandaScore ещё не завёл турнир (например, мейджор)."""
+    end = iso(NOW + timedelta(days=31 * TOURS_MONTHS_AHEAD))
+    out = []
+    try:
+        j = bo3("/tournaments", {"page[limit]": 30, "sort": "start_date", "filter[tournaments.tier][in]": ",".join(sorted(TIERS)),
+                                 "filter[tournaments.status][in]": "upcoming,current"})
+    except Exception as e:
+        warn(f"bo3 турниры: {e!r}")
+        return out
+    for t in j.get("results") or []:
+        if (t.get("tier") or "").lower() not in TIERS or (t.get("start_date") or "") > end:
+            continue
+        name = (t.get("name") or "").replace("Intel Extreme Masters", "IEM")
+        out.append({"id": "bo3-" + str(t["id"]), "name": name, "tier": (t.get("tier") or "").lower(), "image": t.get("image_url"),
+                    "begin": (parse_iso(t.get("start_date")) and iso(parse_iso(t["start_date"]))),
+                    "end": (parse_iso(t.get("end_date")) and iso(parse_iso(t["end_date"]))),
+                    "prize": None, "prize_usd": t.get("prize"), "matches": 0, "next": None, "live": 0})
+    return out
+
+
 _team_cache: dict[int, dict] = {}
 
 
@@ -2696,8 +2727,13 @@ def main() -> int:
             tr["prize"] = b["serie"]["prize"]
         if b.get("status") != "running" and (tr["next"] is None or (b["begin_at"] or "") < tr["next"]):
             tr["next"] = b["begin_at"]
-    # турниры без матчей в ближайшую неделю — по расписанию турниров PandaScore на 3 месяца вперёд
-    for tr in fetch_future_tournaments():
+    # турниры без матчей в ближайшую неделю — по расписанию турниров PandaScore и bo3.gg на 3 месяца вперёд
+    future = fetch_future_tournaments()
+    have = {tour_norm(t["name"]) for t in list(tours.values()) + future}
+    for tr in fetch_bo3_tournaments():
+        if not any(tour_same(tr["name"], h) for h in have):
+            future.append(tr)
+    for tr in future:
         cur = tours.get(tr["id"])
         if cur:
             cur["begin"] = min(x for x in (cur.get("begin"), tr["begin"]) if x) if (cur.get("begin") or tr["begin"]) else None
