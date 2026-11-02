@@ -837,7 +837,8 @@ a.ni { text-decoration: none; color: inherit; }
         .map(function (x) { return x[0]; }).forEach(function (p) {
         var n = newsFor(m, p.nick).length;
         var real = [p.first_name, p.last_name].filter(Boolean).join(" ");
-        var tags = (p.tags || []).map(function (x) {
+        var tags = (p.tags || []).map(function (x) { return /^Рифлер/.test(x) ? "Рифлер" : x; })
+          .filter(function (x, i, arr) { return arr.indexOf(x) === i; }).map(function (x) {
           var cls = x === "Капитан" ? "cap" : (x === "AWP" || /^Снайпер/.test(x)) ? "awp" : /^Рифл/.test(x) ? "rif" : "";
           return '<span class="rt ' + cls + '">' + esc(x) + '</span>';
         }).join("");
