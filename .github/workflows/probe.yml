@@ -1,0 +1,19 @@
+name: Проверка источников
+on:
+  push:
+    paths: ["probe/probe.py"]
+permissions:
+  contents: write
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - run: python probe/probe.py
+      - run: |
+          git config user.name "cs-prep-bot"
+          git config user.email "cs-prep-bot@users.noreply.github.com"
+          git add probe/out.txt
+          git commit -m "Проверка источников: результат" || true
+          for i in 1 2 3; do git pull --rebase -q origin main && git push && break; sleep 5; done
