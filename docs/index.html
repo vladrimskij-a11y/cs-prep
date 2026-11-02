@@ -237,6 +237,17 @@ a { color: inherit; }
 .mj-name .ok { color: var(--win); font-weight: 700; }
 .mj-pts { font-weight: 700; font-size: 13px; }
 
+/* стадии мейджора */
+.mjs-h { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+.mjs-h b { font-size: 14px; } .mjs-h span { font-size: 12px; color: var(--muted); }
+.mjs-list { display: flex; flex-direction: column; }
+.mjs-t { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-top: 1px solid var(--line); min-width: 0; }
+.mjs-t:first-child { border-top: 0; }
+.mjs-n { font-weight: 600; flex: 1; min-width: 0; }
+.mjs-r { font-size: 12px; color: var(--muted); }
+.ch { font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 4px; white-space: nowrap; background: var(--sunk); color: var(--muted); }
+.ch.hi { color: var(--win); } .ch.lo { color: var(--loss); }
+
 /* лента */
 .hometabs { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
 .feedch { margin-top: 10px; }
@@ -566,9 +577,34 @@ a.ni { text-decoration: none; color: inherit; }
       '<div class="subhead"><h1>' + esc(t ? t.name : "Турнир") + '</h1><span class="upd">' +
       (t ? '<span class="pill ' + esc(t.tier) + '">' + esc((t.tier || "").toUpperCase()) + '</span>' + (t.begin ? esc(dm(t.begin) + (t.end ? " – " + dm(t.end) : "")) : "") + (t.prize_usd ? " · " + esc(usd(t.prize_usd)) : t.prize ? " · " + esc(prize(t.prize)) : "") : "") +
       '</span></div></header>';
-    html += ms.length ? byDays(ms, false) : '<div class="empty"><strong>Расписание пока не опубликовано</strong>Матчи появятся здесь, как только организаторы их объявят.</div>';
+    var mj = t && t.major ? majorBlock(t.major) : "";
+    if (ms.length) html += byDays(ms, false) + mj;
+    else html += mj + (mj ? '<div class="note" style="padding:12px 0 0">Расписание матчей пока не опубликовано — появится здесь, как только организаторы его объявят.</div>'
+      : '<div class="empty"><strong>Расписание пока не опубликовано</strong>Матчи появятся здесь, как только организаторы их объявят.</div>');
     if (t && t.hltv) html += prizeBlock(t.hltv);
     $app.innerHTML = html + '</div>';
+  }
+
+  function majorBlock(M) {
+    var STAGE_RU = { "Stage 3": "последняя стадия перед плей-офф", "Stage 2": "вторая стадия", "Stage 1": "первая стадия, с самого начала" };
+    var html = '<div class="sec"><h3>' + (M.final ? 'Кто с какой стадии' : 'Прогноз по стадиям') + ' <span>' +
+      (M.final ? 'приглашения от ' + esc(M.invite_date || "") : 'по рейтингу VRS' + (M.invite_date ? ', отсечка ' + esc(M.invite_date) : '')) + '</span></h3>';
+    if (!M.final) html += '<div class="note">Приглашения ещё не разосланы. Оценка — по отрыву в очках VRS от первой команды ниже: «уверенно» — 100+ очков, «вероятно» — 30–99, «на грани» — меньше 30.</div>';
+    (M.stages || []).forEach(function (st) {
+      html += '<div class="box mjs"><div class="mjs-h"><b>' + esc(st.stage) + '</b><span>' + esc(STAGE_RU[st.stage] || "") + ' · ' + st.teams.length + ' ' + plural(st.teams.length, "команда", "команды", "команд") + '</span></div><div class="mjs-list">';
+      st.teams.forEach(function (x) {
+        var rc = x.roster_change;
+        html += '<div class="mjs-t"><span class="mjs-n">' + esc(x.name) + '</span><span class="mjs-r">' + esc(x.region || "") + '</span>' +
+          (x.chance ? '<span class="ch ' + (x.chance === "уверенно" ? "hi" : x.chance === "вероятно" ? "mid" : "lo") + '">' + esc(x.chance) + '</span>' : '') +
+          (rc ? '<span class="ch lo">состав изменился</span>' : '') + '</div>';
+      });
+      html += '</div></div>';
+    });
+    if ((M.bubble || []).length) {
+      html += '<div class="box mjs"><div class="mjs-h"><b>Ближайшие за чертой</b><span>могут занять место при отказе или смене состава</span></div><div class="mjs-list">' +
+        M.bubble.map(function (x) { return '<div class="mjs-t"><span class="mjs-n">' + esc(x.name) + '</span><span class="mjs-r">' + esc(x.region || "") + '</span><span class="ch lo">−' + esc(x.gap) + ' очк.</span></div>'; }).join("") + '</div></div>';
+    }
+    return html + '</div>';
   }
 
   function placeRu(p) { return String(p || "").replace(/(st|nd|rd|th)$/i, "").replace(/-/, "–") + " место"; }
@@ -818,6 +854,7 @@ a.ni { text-decoration: none; color: inherit; }
   // без знаков ударения (комбинируемые акценты), й и ё не трогаем
   function plain(s) { return String(s || "").normalize("NFD").replace(/[\u0300\u0301]/g, "").normalize("NFC"); }
 
+  function plural(n, one, few, many) { n = Math.abs(Number(n)); var d = n % 10, h = n % 100; return h > 10 && h < 20 ? many : d === 1 ? one : d > 1 && d < 5 ? few : many; }
   function years(n) { n = Number(n); var d = n % 10, h = n % 100; return (h > 10 && h < 20) || d === 0 || d > 4 ? "лет" : d === 1 ? "год" : "года"; }
 
   function playersTab(m) {

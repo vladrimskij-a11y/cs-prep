@@ -1,0 +1,23 @@
+{
+  "event": "PGL Major Singapore 2026",
+  "final": true,
+  "invite_date": "2 ноября 2026",
+  "source": "https://www.hltv.org/news/45879/pgl-major-singapore-invites-set",
+  "stages": [
+    {"stage": "Stage 3", "teams": [
+      {"name": "MOUZ", "region": "Европа"}, {"name": "Aurora", "region": "Европа"}, {"name": "BetBoom", "region": "Европа"},
+      {"name": "Vitality", "region": "Европа"}, {"name": "Spirit", "region": "Европа"}, {"name": "Falcons", "region": "Европа"},
+      {"name": "FURIA", "region": "Америка"}, {"name": "Legacy", "region": "Америка"}]},
+    {"stage": "Stage 2", "teams": [
+      {"name": "FUT", "region": "Европа"}, {"name": "Natus Vincere", "region": "Европа"}, {"name": "1win", "region": "Европа"},
+      {"name": "Nemiga", "region": "Европа"}, {"name": "G2", "region": "Европа"}, {"name": "Astralis", "region": "Европа"},
+      {"name": "MIBR", "region": "Америка"}, {"name": "The MongolZ", "region": "Азия"}]},
+    {"stage": "Stage 1", "teams": [
+      {"name": "Ninjas in Pyjamas", "region": "Европа"}, {"name": "HEROIC", "region": "Европа"}, {"name": "Eternal Fire", "region": "Европа"},
+      {"name": "PARIVISION", "region": "Европа"}, {"name": "FaZe", "region": "Европа"}, {"name": "100 Thieves", "region": "Европа"},
+      {"name": "Liquid", "region": "Америка"}, {"name": "M80", "region": "Америка"}, {"name": "Imperial", "region": "Америка"},
+      {"name": "9z", "region": "Америка"}, {"name": "DENDELE", "region": "Америка"}, {"name": "Wildcard", "region": "Америка"},
+      {"name": "BC.Game", "region": "Азия"}, {"name": "FlyQuest", "region": "Азия"}, {"name": "Chinggis Warriors", "region": "Азия"},
+      {"name": "Lynn Vision", "region": "Азия"}]}
+  ]
+}

@@ -1614,6 +1614,63 @@ def build_major(rosters: dict) -> dict | None:
     return data
 
 
+REG_RU = {"Europe": "Европа", "Americas": "Америка", "Asia": "Азия"}
+
+
+def major_view(raw: dict | None) -> dict | None:
+    """Прогноз HLTV по VRS → стадии с оценкой, насколько надёжно команда держится в своей стадии."""
+    if not raw or not raw.get("regions"):
+        return None
+    order = ["Stage 3", "Stage 2", "Stage 1"]
+    stages = {k: [] for k in order}
+    bubble = []
+    for reg in raw["regions"]:
+        rname = REG_RU.get(reg.get("region"), reg.get("region"))
+        secs = reg.get("sections") or []
+        for i, sec in enumerate(secs):
+            m = re.search(r"stage[\s-]*([123])", (sec.get("key") or "") + " " + (sec.get("title") or ""), re.IGNORECASE)
+            below = next((x["teams"][0] for x in secs[i + 1:] if x.get("teams")), None)  # первая команда ниже этой стадии
+            for t in sec.get("teams") or []:
+                if m:
+                    gap = t["points"] - below["points"] if below else None
+                    chance = None if gap is None else "уверенно" if gap >= 100 else "вероятно" if gap >= 30 else "на грани"
+                    stages["Stage " + m.group(1)].append({"name": t["name"], "region": rname, "pos": t.get("pos"),
+                                                          "points": t.get("points"), "gap": gap, "chance": chance,
+                                                          "roster_change": t.get("roster_change")})
+                else:
+                    last = next((x["teams"][-1] for x in reversed(secs[:i]) if x.get("teams") and re.search(r"stage", (x.get("key") or "") + (x.get("title") or ""), re.I)), None)
+                    gap = last["points"] - t["points"] if last else None
+                    if gap is not None and gap <= 60 and len([b for b in bubble if b["region"] == rname]) < 3:
+                        bubble.append({"name": t["name"], "region": rname, "pos": t.get("pos"), "points": t.get("points"), "gap": gap})
+    if not any(stages.values()):
+        return None
+    return {"final": False, "invite_date": raw.get("invite_date"), "title": raw.get("title"),
+            "stages": [{"stage": k, "teams": stages[k]} for k in order if stages[k]], "bubble": bubble,
+            "source": "https://www.hltv.org/valve-ranking/invites"}
+
+
+def attach_major(tour_list: list, rosters: dict) -> None:
+    """Мейджор в нашем списке турниров → кто с какой стадии начинает (итог) или прогноз по VRS."""
+    majors = [t for t in tour_list if re.search(r"\bmajor\b", t.get("name") or "", re.IGNORECASE)]
+    if not majors:
+        return
+    manual = load_json(Path(__file__).with_name("major_manual.json"), None)
+    proj = None
+    for t in majors:
+        if manual and tour_same(t["name"], tour_norm(manual.get("event"))):
+            t["major"] = {k: manual[k] for k in ("final", "invite_date", "stages", "source") if k in manual}
+            continue
+        if proj is None:
+            try:
+                proj = major_view(build_major(rosters)) or {}
+            except Exception as e:
+                warn(f"Мейджор: {e!r}")
+                proj = {}
+        if proj:
+            t["major"] = proj  # прогноз VRS — для ближайшего мейджора без итоговых приглашений
+            break
+
+
 # ---------------------------------------------------------------- вето (пики и баны) с HLTV
 
 VETO_CACHE_F = CACHE / "hltv_vetoes.json"
@@ -2831,9 +2888,7 @@ def main() -> int:
                 if t.get("acronym"):
                     rosters[norm(t["acronym"])] = rosters[norm(t["name"])]
     try:
-        major = build_major(rosters) if os.environ.get("BUILD_MAJOR") == "1" else None  # раздел скрыт по просьбе пользователя
-        if major:
-            save_json(OUT / "major.json", {"updated": iso(NOW), **major})
+        attach_major(tour_list, rosters)
     except Exception as e:
         warn(f"Мейджор: {e!r}")
     save_json(OUT / "matches.json", {
