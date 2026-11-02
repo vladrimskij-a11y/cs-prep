@@ -147,7 +147,7 @@ DETAILS_CACHE_F = CACHE / "bo3_game_details_v2.json"  # раунды и стат
 TEAMS_CACHE_F = CACHE / "bo3_teams.json"     # PandaScore id → bo3 id
 TR_CACHE_F = CACHE / "translations.json"     # переводы заголовков
 ROSTER_CACHE_F = CACHE / "liquipedia_rosters_v3.json"  # тренер, роли, даты рождения с Liquipedia
-PRON_CACHE_F = CACHE / "pronunciation.json"       # имена и ники по-русски с ударением
+PRON_CACHE_F = CACHE / "pronunciation_v2.json"       # имена и ники по-русски с ударением
 games_cache: dict = load_json(GAMES_CACHE_F, {})
 details_cache: dict = load_json(DETAILS_CACHE_F, {})
 DETAILS_NEW_LIMIT = int(os.environ.get("DETAILS_NEW_LIMIT", "450"))  # новых карт с раундами за запуск
@@ -982,10 +982,11 @@ def build_player_stats(team: dict, bid: int | None, hist: list[dict]) -> list[di
 pron_cache: dict = load_json(PRON_CACHE_F, {})
 PRON_SYSTEM = """Ты помогаешь русскоязычному спортивному комментатору правильно произносить имена киберспортсменов CS2.
 Для каждого человека дай:
-- "name_ru": имя и фамилию по-русски так, как их принято произносить на родном языке человека (учитывай страну),
-  со знаком ударения (комбинируемый акут U+0301 после ударной гласной, например: Илья́ Оси́пов);
-- "nick_ru": как произносится ник по-русски, тоже с ударением (например m0NESY → мо́нэси, ZywOo → зы́ву). Если ник — обычное
-  английское слово, дай его привычное произношение.
+- "name_ru": имя и фамилию по-русски В ПОРЯДКЕ «Имя Фамилия» (сначала имя, потом фамилия, как во входных данных),
+  в той форме, как их принято передавать по-русски для этой страны (украинские имена — в русской традиции: Андрей Городенский,
+  Валерий Ваховский), ровно ОДНО ударение в каждом слове (знак U+0301 сразу после ударной гласной: Илья́ Оси́пов);
+- "nick_ru": как произносится ник по-русски кириллицей, ОБЯЗАТЕЛЬНО с одним ударением (m0NESY → мо́нэси, ZywOo → зы́ву,
+  w0nderful → ва́ндерфул). Цифры читай как буквы, если так принято (b1t → би́т). Если ник — обычное английское слово, дай привычное произношение.
 Ничего не выдумывай про людей, только произношение. Ответ строго JSON:
 {"people": [{"nick": "<ник как во входе>", "nick_ru": "...", "name_ru": "..."}]}"""
 
@@ -1002,9 +1003,12 @@ def add_pronunciation(people: list[dict]) -> None:
         else:
             todo.append((p, full))
     if todo and GIGA_KEY and not _giga["off"]:
-        lines = "\n".join(f"- ник: {p.get('nick')}; имя: {full or 'неизвестно'}; страна: {p.get('nationality') or p.get('flag') or '?'}"
-                          for p, full in todo)
-        res = parse_json_loose(giga_chat(PRON_SYSTEM, lines, 900))
+        def line(p, full):
+            fn, ln = p.get("first_name"), p.get("last_name")
+            who = f"имя: {fn}; фамилия: {ln}" if fn and ln else f"полное имя: {full or 'неизвестно'}"
+            return f"- ник: {p.get('nick')}; {who}; страна: {p.get('nationality') or p.get('flag') or '?'}"
+        lines = "\n".join(line(p, full) for p, full in todo)
+        res = parse_json_loose(giga_chat(PRON_SYSTEM, lines, 1200, model=os.environ.get("GIGACHAT_PRON_MODEL", "GigaChat-2-Max")))
         got = {norm(x.get("nick")): x for x in (res or {}).get("people") or [] if isinstance(x, dict)}
         for p, full in todo:
             x = got.get(norm(p.get("nick")))
@@ -1220,9 +1224,14 @@ _hltv_pages: dict = {}
 _hltv_last = [0.0]
 
 
+_hltv_blocked = [False]
+
+
 def hltv_get(path: str) -> str | None:
     if path in _hltv_pages:
         return _hltv_pages[path]
+    if _hltv_blocked[0]:
+        return None
     wait = 2.5 - (time.time() - _hltv_last[0])
     if wait > 0:
         time.sleep(wait)
@@ -1231,6 +1240,11 @@ def hltv_get(path: str) -> str | None:
     try:
         html = http_get(HLTV + path, {"User-Agent": HLTV_UA, "Accept": "text/html", "Accept-Language": "en-US,en;q=0.9"},
                         timeout=30).decode("utf-8", "replace")
+    except urllib.error.HTTPError as e:
+        if e.code in (403, 429, 503):
+            _hltv_blocked[0] = True  # HLTV просит остановиться — до следующего запуска не обращаемся
+        warn(f"HLTV {path}: {e!r}")
+        html = None
     except Exception as e:
         warn(f"HLTV {path}: {e!r}")
         html = None
@@ -1369,7 +1383,7 @@ def parse_vrs_major(html: str) -> dict:
 
 HLTV_STATS_CACHE_F = CACHE / "hltv_player_stats.json"
 hltv_stats_cache: dict = load_json(HLTV_STATS_CACHE_F, {})
-HLTV_STATS_LIMIT = int(os.environ.get("HLTV_STATS_LIMIT", "90"))
+HLTV_STATS_LIMIT = int(os.environ.get("HLTV_STATS_LIMIT", "0"))  # страницы статистики HLTV закрыты для ботов (403)
 _hltv_stats_new = [0]
 hltv_player_ids: dict = {}   # norm(ник) → {"id","slug"}
 
@@ -1464,7 +1478,9 @@ def parse_date(s: str | None) -> datetime | None:
 
 
 def strip_html(s: str) -> str:
+    import html as _html
     s = re.sub(r"<[^>]+>", " ", s or "")
+    s = _html.unescape(s)
     s = re.sub(r"&nbsp;|&#160;", " ", s)
     s = s.replace("&amp;", "&").replace("&quot;", '"').replace("&#39;", "'").replace("&lt;", "<").replace("&gt;", ">")
     return re.sub(r"\s+", " ", s).strip()
@@ -1780,7 +1796,7 @@ def giga_token() -> str | None:
     return _giga["token"]
 
 
-def giga_chat(system: str, user: str, max_tokens: int = 900) -> str | None:
+def giga_chat(system: str, user: str, max_tokens: int = 900, model: str | None = None) -> str | None:
     if not GIGA_KEY or _giga["off"]:
         return None
     if not giga_budget_ok("lite"):
@@ -1788,7 +1804,7 @@ def giga_chat(system: str, user: str, max_tokens: int = 900) -> str | None:
             warn("GigaChat: дневной лимит токенов исчерпан, остальное — завтра")
             _giga["warned_lite"] = True
         return None
-    body = json.dumps({"model": GIGA_MODEL, "temperature": 0.3, "max_tokens": max_tokens,
+    body = json.dumps({"model": model or GIGA_MODEL, "temperature": 0.3, "max_tokens": max_tokens,
                        "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}]}).encode()
     for attempt in range(3):
         try:
