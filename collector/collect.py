@@ -1326,6 +1326,8 @@ def tg_posts() -> list[dict]:
                 continue
             if is_live_noise((info.get("title") or "") + "\n" + (p["text"] or "") + "\n" + (info.get("ocr") or "")):
                 continue  # клатчи, квадро, счёт карт — трансляция, а не новость
+            if is_stale_preview(info.get("title"), p["date"]) or is_stale_preview((p["text"] or "").split("\n", 1)[0], p["date"]):
+                continue  # превью уже сыгранного матча
             body = p["text"] or info.get("ocr") or ""
             res.append({
                 "title": info["title"], "url": p["url"], "source": f"TG · {title}", "channel": ch,
@@ -1983,13 +1985,28 @@ LIVE_NOISE = re.compile(
     r"(?:перв|втор|трет)\w+ карт\w*|\bкарт[ау] (?:за|в пользу)|забира\w+ (?:карту|mirage|inferno|nuke|ancient|anubis|dust2|train|overpass|vertigo|cache)|"
     r"взял\w* (?:карту|mirage|inferno|nuke|ancient|anubis|dust2|train|overpass)|счёт по картам|\bmap ?[123]\b|"
     r"\b\d{1,2} ?[:\-–] ?\d{1,2}\b.{0,20}(?:раунд|по раундам|на карте)|по раундам|пистолет\w* раунд\w*|раунд\w* за \w+|"
-    r"десайдер\w*|решающ\w+ (?:карт\w*|ancient|mirage|inferno|nuke|anubis|dust2|train|overpass)|переводят на|сравнива\w+ сч|камбэк\w*|камбек\w*|камбечил\w*|\bэко\b|эко-раунд\w*|форс\w*|минус (?:три|четыре|пять)|\b(?:с|со) \d{1,2} ?[:\-–] ?\d{1,2}\b|сравнял\w* сч[её]т|приемк\w*|приёмк\w*",
+    r"в (?:одной )?карте от|десайдер\w*|решающ\w+ (?:карт\w*|ancient|mirage|inferno|nuke|anubis|dust2|train|overpass)|переводят на|сравнива\w+ сч|камбэк\w*|камбек\w*|камбечил\w*|\bэко\b|эко-раунд\w*|форс\w*|минус (?:три|четыре|пять)|\b(?:с|со) \d{1,2} ?[:\-–] ?\d{1,2}\b|сравнял\w* сч[её]т|приемк\w*|приёмк\w*",
     re.IGNORECASE)
 RESULT_ONLY = re.compile(r"(?:обыгра\w+|победил\w*|выигра\w+|проигра\w+|уступил\w*|разгроми\w+|вылете\w+)\b.{0,60}\b[0-3] ?[:\-–] ?[0-3]\b",
                          re.IGNORECASE)
 HAS_SUBSTANCE = re.compile(r"[«\"“].{8,}[»\"”]|интервью|заяв\w+|рассказ\w+|признал\w*|ответил\w*|высказал\w*|трансфер\w*|"
                            r"подписал\w*|покинул\w*|замен\w+|скамейк\w+|аренд\w+|контракт\w*|слух\w*|инсайд\w*|травм\w*",
                            re.IGNORECASE)
+
+
+# превью и анонсы конкретного матча («MOUZ vs. FURIA — скоро узнаем…», «Сегодня Falcons против NAVI», опросы «как думаете»):
+# актуальны только до матча — через 12 часов матч уже сыгран
+PREVIEW = re.compile(
+    r"\bvs\.?\s*$|^\W*карты матча|(?:\bvs\b|против|матч\w*).{0,80}(?:сегодня|скоро|узнаем|начина\w+|достойн\w+|будем смотреть|"
+    r"прогноз\w*|предстоящ\w+)|(?:сегодня|скоро|узнаем|начина\w+|будем смотреть).{0,80}(?:\bvs\b|против)|как думаете|кто (?:будет сильнее|пройд\w+|победит)",
+    re.IGNORECASE)
+
+
+def is_stale_preview(title: str, date) -> bool:
+    t = title or ""
+    if re.search(r"[«\"“].{8,}[»\"”]|интервью", t, re.IGNORECASE):
+        return False  # цитаты и интервью остаются — их можно рассказать и после матча
+    return bool(date and NOW - date > timedelta(hours=12) and PREVIEW.search(t))
 
 
 def is_live_noise(text: str) -> bool:
