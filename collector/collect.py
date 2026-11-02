@@ -2301,7 +2301,7 @@ def build_news(teams: list[dict]) -> dict:
 
 # ---------------------------------------------------------------- факты для эфира
 
-FACTS_CACHE_F = CACHE / "facts_v4.json"
+FACTS_CACHE_F = CACHE / "facts_v5.json"
 facts_cache: dict = load_json(FACTS_CACHE_F, {})
 FACTS_TTL_H = 6
 FACTS_SYSTEM = """Ты помогаешь русскоязычному комментатору CS2 подготовиться к матчу.
@@ -2459,6 +2459,23 @@ def _numbers(text: str) -> set:
     return set(re.findall(r"\d+(?:[.,]\d+)?", text or ""))
 
 
+# Слова, за которыми обычно прячется выдуманная «статистика»: числительные, серии, титулы, рекорды.
+RISKY_WORDS = re.compile(
+    r"\b(одн[аоиу]\w*|два|две|двух|тр[иёе]\w*|четыр\w*|пят\w*|шест\w*|сем[ьи]\w*|восьм\w*|девят\w*|десят\w*|"
+    r"дважды|трижды|впервые|никогда|подряд|серия|серию|титул\w*|чемпион\w*|трофе\w*|рекорд\w*|кубок\w*|"
+    r"побед\w* на турнир\w*|выиграл\w* турнир\w*|лучш\w* в истории)\b", re.IGNORECASE)
+
+
+def _risky_ok(text: str, source: str) -> bool:
+    """Каждое «рискованное» слово из факта должно встречаться в исходных данных (с точностью до окончания)."""
+    src = source.lower()
+    for m in RISKY_WORDS.finditer(text):
+        stem = m.group(0).lower()[:5]
+        if stem not in src:
+            return False
+    return True
+
+
 def build_facts(d: dict, prev: dict | None) -> list | None:
     key = str(d["id"])
     stats_facts = code_facts(d)
@@ -2480,6 +2497,8 @@ def build_facts(d: dict, prev: dict | None) -> list | None:
                 continue
             if not _numbers(f["text"]) <= allowed:
                 continue  # число, которого нет в данных, — модель что-то посчитала или придумала
+            if not _risky_ok(f["text"], data):
+                continue  # «три турнира подряд», «чемпион», «впервые» — только если это прямо есть в данных
             if re.search(r"нет новост|не поступал|не было новост", f["text"], re.IGNORECASE):
                 continue
             story.append({"tag": f.get("tag") or "Новости", "text": f["text"].strip()})
