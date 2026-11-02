@@ -1118,8 +1118,8 @@ a.ni { text-decoration: none; color: inherit; }
   function arrival(el, key) {
     state.scrolls = state.scrolls || {};
     var anchor = el.getBoundingClientRect().top + window.scrollY - stickFor(el);
-    if (window.scrollY <= anchor) return window.scrollY;
     var saved = state.scrolls[key];
+    if (window.scrollY < anchor - 2) return window.scrollY;  // шапка матча видна — на месте (к запомненному доедем плавно после)
     return Math.max(anchor, saved != null ? saved : anchor);
   }
   function remember() { state.scrolls = state.scrolls || {}; state.scrolls[viewKey(state.tab, state.newsFilter)] = window.scrollY; }
@@ -1208,6 +1208,12 @@ a.ni { text-decoration: none; color: inherit; }
   }
   function fadeBelow(on) {
     belowMaps().forEach(function (n) { n.style.transition = "opacity .12s ease-out"; n.style.opacity = on ? "" : "0"; });
+  }
+  function glideToSaved(key) {
+    var saved = (state.scrolls || {})[key];
+    if (saved != null && saved > window.scrollY + 4) {
+      try { window.scrollTo({ top: saved, behavior: "smooth" }); } catch (e) { window.scrollTo(0, saved); }
+    }
   }
   function fixChips() {  // выбранный фильтр — в видимой части строки фильтров
     var f = document.querySelector(".filt"), sel = f && f.querySelector('[aria-pressed="true"]');
@@ -1315,6 +1321,7 @@ a.ni { text-decoration: none; color: inherit; }
         return;
       }
       fixChips();
+      glideToSaved(viewKey(state.tab, state.newsFilter));
       try { TG && TG.HapticFeedback && TG.HapticFeedback.selectionChanged(); } catch (err) {}
     }
   }
@@ -1449,6 +1456,7 @@ a.ni { text-decoration: none; color: inherit; }
       var tb0 = document.getElementById("tabbody"), tgt0 = tb0 ? arrival(tb0, viewKey(nt, state.newsFilter)) : null;
       state.tab = nt; state.slide = null; renderMatch(state.details[state.openId]);
       if (tgt0 != null) window.scrollTo(0, tgt0);
+      glideToSaved(viewKey(nt, state.newsFilter));
       return;
     }
     if (t.hasAttribute("data-map")) { state.map = t.getAttribute("data-map"); keepFilterScroll(function () { renderMatch(state.details[state.openId]); }); return; }
