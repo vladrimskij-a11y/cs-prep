@@ -963,6 +963,38 @@ def build_sides(bids: list[int | None], hists: list[list[dict]]) -> dict:
     return res
 
 
+BO3_PLAYERS_F = CACHE / "bo3_players.json"
+bo3_players: dict = load_json(BO3_PLAYERS_F, {})   # id игрока bo3 → основной ник
+
+
+def bo3_player_nick(pid) -> str | None:
+    if not pid:
+        return None
+    k = str(pid)
+    if k in bo3_players:
+        return bo3_players[k]
+    try:
+        res = bo3("/players", {"filter[players.id][eq]": pid}).get("results") or []
+        nick = next((r.get("nickname") for r in res if str(r.get("id")) == k), None)
+    except Exception as e:
+        warn(f"bo3 игрок {pid}: {e!r}")
+        return None
+    bo3_players[k] = nick
+    return nick
+
+
+def match_roster(x: dict, roster: dict) -> str | None:
+    """Ключ игрока из состава для строки статистики: по нику в Steam, по частичному совпадению, по id игрока на bo3."""
+    k = norm(x.get("nick"))
+    if k in roster:
+        return k
+    for r in roster:
+        if len(r) >= 3 and (r in k or (len(k) >= 3 and k in r)):
+            return r
+    canon = norm(bo3_player_nick(x.get("pid")))
+    return canon if canon in roster else None
+
+
 def build_player_stats(team: dict, bid: int | None, hist: list[dict]) -> list[dict]:
     """Статистика игроков состава за STATS_WINDOW_DAYS по картам bo3.gg."""
     if not bid:
@@ -973,8 +1005,8 @@ def build_player_stats(team: dict, bid: int | None, hist: list[dict]) -> list[di
         for x in det.get("players") or []:
             if x.get("tid") != bid or not x.get("nick"):
                 continue
-            key = norm(x["nick"])
-            if roster and key not in roster:
+            key = match_roster(x, roster) if roster else norm(x["nick"])
+            if not key:
                 continue
             a = agg.setdefault(key, {"nick": roster.get(key, x["nick"]), "maps": 0, "k": 0, "d": 0, "adr": 0.0, "kast": 0.0,
                                      "r": 0.0, "fk": 0, "fd": 0, "cl": 0, "per_map": {}})
@@ -2624,6 +2656,7 @@ def main() -> int:
     prune_caches()
     save_json(GAMES_CACHE_F, games_cache)
     save_json(DETAILS_CACHE_F, details_cache)
+    save_json(BO3_PLAYERS_F, bo3_players)
     save_json(TEAMS_CACHE_F, teams_map)
     save_json(TR_CACHE_F, tr_cache)
     save_json(ROSTER_CACHE_F, roster_cache)
