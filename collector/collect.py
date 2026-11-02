@@ -54,7 +54,7 @@ MAPS_WINDOW_DAYS = 120
 # Ленты профильных сайтов. Любую можно убрать или добавить свою.
 # Новостные Telegram-каналы про CS (лента на главном экране + новости в карточках матчей).
 TG_NEWS_CHANNELS = ["cs3news", "retakenews", "raiznews", "newcsgo", "m0NESYGG"]
-TG_PAGES = 4                 # страниц по ~20 постов на канал за запуск
+TG_PAGES = 20                # до ~400 постов на канал: листаем назад, пока не дойдём до постов старше NEWS_DAYS
 
 RSS_FEEDS = [
     ("HLTV", "https://www.hltv.org/rss/news"),
