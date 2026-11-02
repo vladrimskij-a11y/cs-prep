@@ -254,9 +254,12 @@ a { color: inherit; }
 .in-right { animation: tabInR .14s ease-out; }
 html, body { overflow-x: clip; }  /* соседняя страница при свайпе не расширяет экран (иначе телефон на миг отдаляет страницу) */
 html { overflow-anchor: none; }
-#tabbody, #tabbody .news, #tabbody .recent2 { touch-action: pan-y; }
+.mshell { position: fixed; inset: 0; overflow: hidden; background: var(--bg); z-index: 1; }
+.mtrack { display: flex; height: 100%; will-change: transform; }
+.pane { flex: 0 0 100%; width: 100%; height: 100%; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; touch-action: pan-y; }
+.pane > .pin { max-width: 640px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-top: env(safe-area-inset-top, 0px); padding-bottom: calc(32px + env(safe-area-inset-bottom, 0px)); }
+.tabbody { display: flow-root; }
 .view.reader { touch-action: pan-y; }
-#tabbody { display: flow-root; min-height: calc(100vh - var(--tabs-h, 62px)); }  /* короткая вкладка не сдёргивает прокрутку при свайпе */  /* отступы внутри — копия-сосед при свайпе встаёт ровно туда же */
 .swipe-ghost { position: absolute; pointer-events: none; }
 @keyframes tabInL { from { opacity: .35; transform: translateX(40%); } to { opacity: 1; transform: none; } }
 @keyframes tabInR { from { opacity: .35; transform: translateX(-40%); } to { opacity: 1; transform: none; } }
@@ -1045,196 +1048,96 @@ a.ni { text-decoration: none; color: inherit; }
     return newsTab(m);
   }
 
+  // ---------- карточка матча: вкладки (и фильтры новостей) — отдельные страницы в ряд, у каждой своя прокрутка.
+  // Свайп двигает ряд, как галерею: ничего не подменяется и не прокручивается — поэтому нечему мигать.
+  function newsSteps() {
+    var m = state.details[state.openId], L = ["all"].concat((m.teams || []).map(function (t) { return t.name; }));
+    if (state.newsFilter && L.indexOf(state.newsFilter) < 0) L.push(state.newsFilter);  // личные новости игрока
+    return L;
+  }
+  function viewKey(tab, nf) { return tab === "news" ? "news:" + nf : tab; }
+  function paneKeys() { return ["stats", "players"].concat(newsSteps().map(function (f) { return "news:" + f; })); }
+  function curKey() { return viewKey(state.tab, state.newsFilter); }
+  function setKey(k) {
+    if (k.indexOf("news:") === 0) { state.tab = "news"; state.newsFilter = k.slice(5); } else state.tab = k;
+    state.openNews = null;
+  }
+  function paneHtml(m) {
+    var A = m.teams[0] || {}, B = m.teams[1] || {};
+    var nCount = ((m.news && m.news.items) || []).length;
+    function tabBtn(id, label, c) { return '<button class="tab" role="tab" data-tab="' + id + '" aria-selected="' + (state.tab === id) + '">' + label + (c ? '<span class="c">' + c + '</span>' : '') + '</button>'; }
+    return '<div style="padding-top:12px">' + backBtn(m.tournament || "Назад") + '</div>' +
+      '<section class="hero"><div class="meta"><span class="pill ' + esc(m.tier) + '">' + esc((m.tier || "").toUpperCase()) + '</span><span>' + esc(m.tournament) + (m.stage ? " · " + esc(m.stage) : "") + '</span></div>' +
+      '<div class="face"><div class="tm a"><span class="acr">' + esc(abbr(A)) + '</span><span class="full">' + esc(A.name) + '</span></div>' +
+      '<div class="mid"><b>' + esc(hm(m.begin_at)) + '</b>' + esc(dm(m.begin_at)) + ' · BO' + esc(m.bo) + '</div>' +
+      '<div class="tm b"><span class="acr">' + esc(abbr(B)) + '</span><span class="full">' + esc(B.name) + '</span></div></div>' +
+      '</section>' +
+      '<nav class="tabs" role="tablist">' + tabBtn("stats", "Статистика") + tabBtn("players", "Игроки") + tabBtn("news", "Новости", nCount) + '</nav>' +
+      '<div class="tabbody">' + tabBodyHtml(m) + '</div>';
+  }
+  function panes() { return [].slice.call(document.querySelectorAll(".mshell .pane")); }
+  function activePane() { return document.querySelector('.mshell .pane[data-key="' + (window.CSS && CSS.escape ? CSS.escape(curKey()) : curKey()) + '"]'); }
+  function paneW() { var sh = document.querySelector(".mshell"); return sh ? sh.clientWidth : window.innerWidth; }
+  function trackTo(i, anim) {
+    var tr = document.querySelector(".mtrack");
+    if (!tr) return;
+    tr.style.transition = anim ? "transform .24s cubic-bezier(.2,.7,.3,1)" : "none";
+    tr.style.transform = "translate3d(" + (-i * paneW()) + "px,0,0)";
+  }
   function renderMatch(m) {
     if (state.reader) {
       var n = ((m.news && m.news.items) || []).find(function (x) { return x.key === state.reader; });
       if (n) { $app.innerHTML = readerView(m, n); try { TG && TG.BackButton.show(); } catch (e) {} return; }
       state.reader = null;
     }
-    var A = m.teams[0] || {}, B = m.teams[1] || {}, on = mine.has(String(m.id));
-    var nCount = ((m.news && m.news.items) || []).length;
-    var html = '<div class="view"><div style="padding-top:12px">' + backBtn(m.tournament || "Назад") + '</div>' +
-      '<section class="hero"><div class="meta"><span class="pill ' + esc(m.tier) + '">' + esc((m.tier || "").toUpperCase()) + '</span><span>' + esc(m.tournament) + (m.stage ? " · " + esc(m.stage) : "") + '</span></div>' +
-      '<div class="face"><div class="tm a"><span class="acr">' + esc(abbr(A)) + '</span><span class="full">' + esc(A.name) + '</span></div>' +
-      '<div class="mid"><b>' + esc(hm(m.begin_at)) + '</b>' + esc(dm(m.begin_at)) + ' · BO' + esc(m.bo) + '</div>' +
-      '<div class="tm b"><span class="acr">' + esc(abbr(B)) + '</span><span class="full">' + esc(B.name) + '</span></div></div>' +
-      '</section>' +
-      '<nav class="tabs" role="tablist">' +
-      tabBtn("stats", "Статистика") + tabBtn("players", "Игроки") + tabBtn("news", "Новости", nCount) + '</nav><div id="tabbody">';
-    html += tabBodyHtml(m);
+    state.scrolls = state.scrolls || {};
+    panes().forEach(function (p) { state.scrolls[p.getAttribute("data-key")] = p.scrollTop; });
+    var keep = { tab: state.tab, nf: state.newsFilter, on: state.openNews };
+    var keys = paneKeys(), html = '<div class="mshell"><div class="mtrack">';
+    keys.forEach(function (k) {
+      setKey(k);
+      if (k === viewKey(keep.tab, keep.nf)) state.openNews = keep.on;
+      html += '<div class="pane" data-key="' + esc(k) + '"><div class="view pin">' + paneHtml(m) + '</div></div>';
+    });
+    state.tab = keep.tab; state.newsFilter = keep.nf; state.openNews = keep.on;
     $app.innerHTML = html + '</div></div>';
+    var idx = Math.max(0, keys.indexOf(curKey()));
+    trackTo(idx, false);
+    panes().forEach(function (p) {
+      var k = p.getAttribute("data-key");
+      if (state.scrolls[k]) p.scrollTop = state.scrolls[k];
+      p.addEventListener("scroll", function () { state.scrolls[k] = p.scrollTop; }, { passive: true });
+    });
     var tbar = document.querySelector(".tabs");
     if (tbar) document.documentElement.style.setProperty("--tabs-h", tbar.offsetHeight + "px");
-    if (state.slide) {
-      var tb = state.slideNews ? (document.querySelector("#tabbody .news") || document.getElementById("tabbody")) : document.getElementById("tabbody");
-      state.slideNews = false;
-      tb.classList.add(state.slide === "left" ? "in-left" : "in-right");
-      state.slide = null;
-    }
-    function tabBtn(id, label, c) { return '<button class="tab" role="tab" data-tab="' + id + '" aria-selected="' + (state.tab === id) + '">' + label + (c ? '<span class="c">' + c + '</span>' : '') + '</button>'; }
+    try { TG && TG.disableVerticalSwipes && TG.disableVerticalSwipes(); } catch (e) {}
+  }
+  // перейти на другую вкладку/фильтр (по нажатию) — ряд плавно едет туда
+  function goKey(k) {
+    var keys = paneKeys(), i = keys.indexOf(k);
+    if (i < 0) { setKey(k); renderMatch(state.details[state.openId]); return; }
+    trackTo(i, true);
+    setKey(k);
+    try { TG && TG.HapticFeedback && TG.HapticFeedback.selectionChanged(); } catch (err) {}
   }
 
-  // ---------- свайпы в матче, как лента: текущая страница уходит, соседняя едет следом за пальцем.
-  // На «Новостях» свайп листает фильтры (Все → команды), с «Все» вправо — назад на «Игроки».
-  var TABS = ["stats", "players", "news"], sw = null;
-  function newsSteps() {
-    var m = state.details[state.openId], L = ["all"].concat((m.teams || []).map(function (t) { return t.name; }));
-    if (L.indexOf(state.newsFilter) < 0) L.push(state.newsFilter);  // личные новости игрока — после команд
-    return L;
-  }
+  // ---------- свайпы в матче
   function mapNames() { var M = state.details[state.openId].maps; return M && M.table ? M.table.map(function (r) { return r.map; }) : []; }
-  function swipeTarget(dir, zone) {  // dir 1 — палец влево (вперёд), -1 — вправо (назад)
-    if (zone === "map") {  // в зоне «Последние игры на карте» листаем карты
-      var N = mapNames(), k = N.indexOf(state.map) + dir;
-      return k >= 0 && k < N.length ? { map: N[k] } : null;
-    }
-    if (state.tab === "news") {
-      var L = newsSteps(), j = L.indexOf(state.newsFilter) + dir;
-      if (j >= 0 && j < L.length) return { filter: L[j] };
-      if (j < 0) return { tab: "players" };
-      return null;
-    }
-    var i = TABS.indexOf(state.tab) + dir;
-    if (i < 0) return { back: true };  // со «Статистики» вправо — назад к турниру
-    return i < TABS.length ? { tab: TABS[i] } : null;
-  }
+  var sw = null;
   function swipeOk(e) {
-    if (!state.openId || !state.details[state.openId] || state.reader || e.touches.length !== 1) return false;
+    if (!state.openId || !document.querySelector(".mshell") || state.reader || e.touches.length !== 1) return false;
     var x = e.touches[0].clientX;
     if (x < 24 || x > window.innerWidth - 24) return false;  // у края — системный жест «назад»
     if (e.target.closest("video, input, textarea")) return false;
     var sc = e.target.closest(".filt, .mapsel, [style*='overflow-x']");
     return !(sc && sc.scrollWidth > sc.clientWidth + 2);  // своя прокрутка вбок — только если ей правда есть куда листать
   }
-  // страница-сосед: HTML той вкладки (или списка новостей с другим фильтром), не трогая текущий экран
-  // ---------- память прокрутки: у каждой вкладки (и каждого фильтра новостей) своё место
-  function viewKey(tab, nf) { return tab === "news" ? "news:" + nf : tab; }
-  function stickFor(el) {
-    var nav = document.querySelector(".tabs"), nf = el && el.classList.contains("news") ? document.querySelector(".nfilt") : null;
-    return (nav ? nav.offsetHeight : 0) + (nf ? nf.offsetHeight + 6 : 0);
-  }
-  // куда встать на новой вкладке: если шапка матча ещё видна — никуда (иначе дёрнется);
-  // если ушли вниз — на запомненное место этой вкладки, а впервые — на её начало под меню
-  function arrival(el, key) {
-    state.scrolls = state.scrolls || {};
-    var anchor = el.getBoundingClientRect().top + window.scrollY - stickFor(el);
-    var saved = state.scrolls[key];
-    if (window.scrollY < anchor - 2) return window.scrollY;  // шапка матча видна — на месте (к запомненному доедем плавно после)
-    return Math.max(anchor, saved != null ? saved : anchor);
-  }
-  function remember() { state.scrolls = state.scrolls || {}; state.scrolls[viewKey(state.tab, state.newsFilter)] = window.scrollY; }
-
-  function ghostFor(tgt) {
-    var m = state.details[state.openId], keep = { tab: state.tab, nf: state.newsFilter, on: state.openNews }, html, el;
-    if (tgt.map != null) {
-      var km = state.map; state.map = tgt.map;
-      try { html = mapsBlock(m); } finally { state.map = km; }
-      var tm = document.createElement("div"); tm.innerHTML = html;
-      var rc = tm.querySelector(".recent2"); html = rc ? rc.innerHTML : "";
-      el = document.querySelector("#tabbody .recent2");
-      if (!el) return null;
-      return mkGhost(el, html);
-    }
-    if (tgt.filter != null) { state.newsFilter = tgt.filter; state.openNews = null; }
-    else { state.tab = tgt.tab; if (tgt.tab === "news") { state.newsFilter = "all"; state.openNews = null; } }
-    try { html = tabBodyHtml(m); } finally { state.tab = keep.tab; state.newsFilter = keep.nf; state.openNews = keep.on; }
-    if (tgt.filter != null) {
-      var tmp = document.createElement("div"); tmp.innerHTML = html;
-      var list = tmp.querySelector(".news"); html = list ? list.innerHTML : "";
-      el = document.querySelector("#tabbody .news");
-    } else el = document.getElementById("tabbody");
-    if (!el) return null;
-    var key = tgt.filter != null ? viewKey("news", tgt.filter) : viewKey(tgt.tab, tgt.tab === "news" ? "all" : state.newsFilter);
-    state.scrolls = state.scrolls || {};
-    if (tgt.filter != null && state.scrolls[key] == null) return filterGhost(el, html);
-    var target = arrival(el, key);
-    var gg = mkGhost(el, html, window.scrollY - target);
-    gg.target = target;
-    return gg;
-  }
-  // другой фильтр новостей впервые: списки во многом общие — держим на экране ту же новость,
-  // что была сверху, на том же месте; так лента почти не меняется и ничего не прыгает
-  function filterGhost(el, html) {
-    var gg = mkGhost(el, html, 0), S = window.scrollY, stick = stickFor(el);
-    var anchor = el.getBoundingClientRect().top + S - stick;
-    if (S <= anchor) { gg.target = S; return gg; }
-    var cur = [].slice.call(el.querySelectorAll("[data-reader]")).find(function (x) { return x.getBoundingClientRect().bottom > stick + 8; });
-    var delta = 0;
-    if (cur) {
-      var k = cur.getAttribute("data-reader");
-      var same = [].slice.call(gg.g.querySelectorAll("[data-reader]")).find(function (x) { return x.getAttribute("data-reader") === k; });
-      if (same) delta = same.getBoundingClientRect().top - cur.getBoundingClientRect().top;
-    }
-    var maxAfter = document.documentElement.scrollHeight - el.offsetHeight + gg.g._fullH - window.innerHeight;
-    var target = Math.max(anchor, Math.min(S + delta, Math.max(anchor, maxAfter)));
-    gg.g.style.top = (parseFloat(gg.g.style.top) - (target - S)) + "px";
-    clipGhost(gg.g);
-    gg.target = target;
-    return gg;
-  }
-  // сосед рисуется сразу в том положении, где окажется после свайпа, — поэтому ничего не прыгает
-  function mkGhost(el, html, shift) {  // shift — на сколько сосед будет прокручен иначе, чем текущая страница
-    var g = document.createElement("div");
-    g._html = html;
-    g.className = el.className + " swipe-ghost"; g.id = ""; g.innerHTML = html;
-    if (getComputedStyle(el.parentNode).position === "static") el.parentNode.style.position = "relative";
-    var er = el.getBoundingClientRect(), pr = el.parentNode.getBoundingClientRect();
-    var vTop = er.top + (shift || 0);  // сосед показан ровно так, как встанет после свайпа
-    g.style.top = (vTop - pr.top - el.parentNode.clientTop) + "px"; 
-    g.style.left = (er.left - pr.left - el.parentNode.clientLeft) + "px"; g.style.width = el.offsetWidth + "px";
-    el.parentNode.appendChild(g);
-    g._fullH = g.offsetHeight;
-    clipGhost(g);
-    return { el: el, g: g };
-  }
-  // рисуем только то, что видно на экране: огромный слой телефон не успевает отрисовать — отсюда мигание
-  function clipGhost(g) {
-    var top = g.getBoundingClientRect().top;
-    g.style.height = Math.max(120, window.innerHeight - top + 40) + "px"; g.style.overflow = "hidden";
-  }
-  function place(s0, x, anim) {
-    var D = s0.el.offsetWidth + 24, t = anim ? "transform .2s cubic-bezier(.2,.7,.3,1)" : "none";
-    s0.el.style.transition = t; s0.el.style.transform = x ? "translateX(" + x + "px)" : "";
-    if (s0.g) { s0.g.style.transition = t; s0.g.style.transform = "translateX(" + (x + s0.dir * D) + "px)"; }
-  }
-  // подсветка верхнего меню — сразу, вместе со страницей, а не после перерисовки
-  function markSel(tgt) {
-    if (tgt && tgt.map != null || (!tgt && document.querySelector(".mapsel"))) {
-      var mp = tgt && tgt.map != null ? tgt.map : state.map;
-      document.querySelectorAll("[data-map]").forEach(function (b) { b.setAttribute("aria-pressed", String(b.getAttribute("data-map") === mp)); });
-      if (tgt && tgt.map != null) return;
-    }
-    var tab = tgt && tgt.tab ? tgt.tab : state.tab;
-    var nf = tgt ? (tgt.filter != null ? tgt.filter : (tgt.tab === "news" ? "all" : null)) : state.newsFilter;
-    document.querySelectorAll(".tabs [data-tab]").forEach(function (b) { b.setAttribute("aria-selected", String(b.getAttribute("data-tab") === tab)); });
-    if (tab === "news" && state.tab === "news") document.querySelectorAll("[data-nf]").forEach(function (b) { b.setAttribute("aria-pressed", String(b.getAttribute("data-nf") === nf)); });
-  }
-  function belowMaps() {
-    var rc = document.querySelector("#tabbody .recent2"), sec = rc && rc.closest(".sec"), out = [];
-    for (var n = sec && sec.nextElementSibling; n; n = n.nextElementSibling) out.push(n);
-    return out;
-  }
-  function fadeBelow(on) {
-    belowMaps().forEach(function (n) { n.style.transition = "opacity .12s ease-out"; n.style.opacity = on ? "" : "0"; });
-  }
-  function glideToSaved(key) {
-    var saved = (state.scrolls || {})[key];
-    if (saved != null && saved > window.scrollY + 4) {
-      try { window.scrollTo({ top: saved, behavior: "smooth" }); } catch (e) { window.scrollTo(0, saved); }
-    }
-  }
-  function fixChips() {  // выбранный фильтр — в видимой части строки фильтров
-    var f = document.querySelector(".filt"), sel = f && f.querySelector('[aria-pressed="true"]');
-    if (!sel) return;
-    var l = sel.offsetLeft, r = l + sel.offsetWidth;
-    if (l < f.scrollLeft) f.scrollLeft = l - 8; else if (r > f.scrollLeft + f.clientWidth) f.scrollLeft = r - f.clientWidth + 8;
-  }
-  function dropGhost(s0) { if (s0.g && s0.g.parentNode) s0.g.parentNode.removeChild(s0.g); s0.g = null; }
   document.addEventListener("touchstart", function (e) {
     sw = null;
-    if (!document.getElementById("tabbody") || !swipeOk(e)) return;
-    sw = { x: e.touches[0].clientX, y: e.touches[0].clientY, t: Date.now(), dx: 0, lock: null, dir: 0, el: null, g: null, tgt: null,
-           zone: state.tab === "stats" && e.target.closest(".recent2") ? "map" : null };
+    if (!swipeOk(e)) return;
+    var keys = paneKeys();
+    sw = { x: e.touches[0].clientX, y: e.touches[0].clientY, t: Date.now(), dx: 0, lock: null, keys: keys,
+           i: Math.max(0, keys.indexOf(curKey())), zone: state.tab === "stats" && e.target.closest(".recent2") ? "map" : null, dir: 0 };
   }, { passive: true });
   document.addEventListener("touchmove", function (e) {
     if (!sw || sw.lock === "v") return;
@@ -1244,33 +1147,33 @@ a.ni { text-decoration: none; color: inherit; }
       else if (Math.abs(dy) > 10) { sw.lock = "v"; return; }
       else return;
     }
-    var dir = dx < 0 ? 1 : -1;
-    if (dir !== sw.dir) {  // сменили направление — готовим другого соседа
-      dropGhost(sw);
-      if (sw.el) { sw.el.style.transform = ""; }
-      if (sw.marked) { markSel(null); sw.marked = false; }
-      sw.dir = dir; sw.tgt = swipeTarget(dir, sw.zone);
-      var gg = sw.tgt && !sw.tgt.back ? ghostFor(sw.tgt) : null;
-      sw.target = gg ? gg.target : null;
-      sw.el = gg ? gg.el : sw.tgt && sw.tgt.back ? document.querySelector(".view") : (sw.zone === "map" ? document.querySelector("#tabbody .recent2") : document.getElementById("tabbody")); sw.g = gg ? gg.g : null;
-      if (sw.zone === "map") fadeBelow(!sw.g);  // соседняя карта может быть выше/ниже — нижние блоки прячем, чтобы не наезжала
+    if (sw.zone === "map") { mapMove(sw, dx); return; }
+    var W = paneW(), next = sw.i + (dx < 0 ? 1 : -1);
+    if (next < 0) {  // со «Статистики» вправо — уходим к турниру: уезжает весь экран
+      sw.back = true; sw.dx = dx;
+      var sh = document.querySelector(".mshell");
+      sh.style.transition = "none"; sh.style.transform = "translate3d(" + Math.max(0, dx) + "px,0,0)";
+      sh.style.opacity = String(1 - Math.min(0.6, Math.max(0, dx) / W * 0.8));
+      return;
     }
-    sw.dx = sw.tgt ? dx : dx * 0.25;  // дальше некуда — тянется туго
-    place(sw, sw.dx, false);
-    if (sw.tgt && sw.tgt.back) sw.el.style.opacity = String(1 - Math.min(0.6, sw.dx / window.innerWidth * 0.8));
-    var past = sw.tgt && Math.abs(sw.dx) > (sw.el.offsetWidth + 24) / 2;  // соседа видно больше половины — подсвечиваем его
-    if (past !== sw.marked) { markSel(past ? sw.tgt : null); sw.marked = past; }
+    sw.back = false;
+    sw.dx = next >= sw.keys.length ? dx * 0.25 : dx;  // дальше вкладок нет — тянется туго
+    var tr = document.querySelector(".mtrack");
+    tr.style.transition = "none";
+    tr.style.transform = "translate3d(" + (-sw.i * W + sw.dx) + "px,0,0)";
   }, { passive: true });
   function swipeEnd() {
     if (!sw) return;
     var s0 = sw; sw = null;
-    if (s0.lock !== "h" || !s0.el) return;
-    var W = document.documentElement.clientWidth, v = Math.abs(s0.dx) / Math.max(1, Date.now() - s0.t);
-    if (s0.tgt && s0.tgt.back) {  // уход к турниру: экран уезжает вправо, турнир проявляется
-      var goB = s0.dx > W * 0.28 || (v > 0.45 && s0.dx > 40);
-      s0.el.style.transition = "transform .16s ease-out, opacity .16s ease-out";
-      if (!goB) { s0.el.style.transform = ""; s0.el.style.opacity = ""; return; }
-      s0.el.style.transform = "translateX(" + W + "px)"; s0.el.style.opacity = "0";
+    if (s0.lock !== "h") return;
+    if (s0.zone === "map") { mapEnd(s0); return; }
+    var W = paneW(), v = Math.abs(s0.dx) / Math.max(1, Date.now() - s0.t);
+    var far = Math.abs(s0.dx) > W * 0.22 || (v > 0.45 && Math.abs(s0.dx) > 35);
+    if (s0.back) {
+      var sh = document.querySelector(".mshell");
+      sh.style.transition = "transform .16s ease-out, opacity .16s ease-out";
+      if (!(far && s0.dx > 0)) { sh.style.transform = ""; sh.style.opacity = ""; return; }
+      sh.style.transform = "translate3d(" + W + "px,0,0)"; sh.style.opacity = "0";
       setTimeout(function () {
         goBack();
         var nv = document.querySelector(".view");
@@ -1278,76 +1181,98 @@ a.ni { text-decoration: none; color: inherit; }
       }, 150);
       return;
     }
-    var go = s0.tgt && s0.g && (Math.abs(s0.dx) > W * 0.22 || (v > 0.45 && Math.abs(s0.dx) > 35));
+    var next = s0.i + (s0.dx < 0 ? 1 : -1);
+    if (far && next >= 0 && next < s0.keys.length) {
+      trackTo(next, true);
+      setKey(s0.keys[next]);
+      try { TG && TG.HapticFeedback && TG.HapticFeedback.selectionChanged(); } catch (err) {}
+    } else trackTo(s0.i, true);
+  }
+  document.addEventListener("touchend", swipeEnd, { passive: true });
+  document.addEventListener("touchcancel", swipeEnd, { passive: true });
+
+  // ---------- «Последние игры на карте»: свайп по результатам листает карты (внутри страницы, без прокрутки)
+  function mapGhost(s0, mp) {
+    var pane = activePane(), el = pane && pane.querySelector(".recent2");
+    if (!el) return null;
+    var m = state.details[state.openId], km = state.map, html;
+    state.map = mp;
+    try { html = mapsBlock(m); } finally { state.map = km; }
+    var tmp = document.createElement("div"); tmp.innerHTML = html;
+    var rc = tmp.querySelector(".recent2");
+    var g = document.createElement("div");
+    g.className = el.className + " swipe-ghost"; g.innerHTML = rc ? rc.innerHTML : "";
+    var par = el.parentNode;
+    if (getComputedStyle(par).position === "static") par.style.position = "relative";
+    g.style.top = el.offsetTop + "px"; g.style.left = el.offsetLeft + "px"; g.style.width = el.offsetWidth + "px";
+    par.appendChild(g);
+    return { el: el, g: g };
+  }
+  function belowMaps() {
+    var pane = activePane(), rc = pane && pane.querySelector(".recent2"), sec = rc && rc.closest(".sec"), out = [];
+    for (var n = sec && sec.nextElementSibling; n; n = n.nextElementSibling) out.push(n);
+    return out;
+  }
+  function fadeBelow(on) { belowMaps().forEach(function (n) { n.style.transition = "opacity .12s ease-out"; n.style.opacity = on ? "" : "0"; }); }
+  function markMap(mp) { var pane = activePane(); if (pane) pane.querySelectorAll("[data-map]").forEach(function (b) { b.setAttribute("aria-pressed", String(b.getAttribute("data-map") === mp)); }); }
+  function mapMove(s0, dx) {
+    var dir = dx < 0 ? 1 : -1;
+    if (dir !== s0.dir) {
+      if (s0.g && s0.g.parentNode) s0.g.parentNode.removeChild(s0.g);
+      s0.dir = dir;
+      var N = mapNames(), k = N.indexOf(state.map) + dir;
+      s0.mp = k >= 0 && k < N.length ? N[k] : null;
+      var gg = s0.mp ? mapGhost(s0, s0.mp) : null;
+      var pane = activePane();
+      s0.el = gg ? gg.el : pane && pane.querySelector(".recent2"); s0.g = gg ? gg.g : null;
+      fadeBelow(!s0.g);
+    }
+    if (!s0.el) return;
+    s0.dx = s0.g ? dx : dx * 0.25;
+    var D = s0.el.offsetWidth + 24;
+    s0.el.style.transition = "none"; s0.el.style.transform = "translate3d(" + s0.dx + "px,0,0)";
+    if (s0.g) { s0.g.style.transition = "none"; s0.g.style.transform = "translate3d(" + (s0.dx + s0.dir * D) + "px,0,0)"; }
+    var past = !!s0.g && Math.abs(s0.dx) > D / 2;
+    if (past !== s0.marked) { markMap(past ? s0.mp : state.map); s0.marked = past; }
+  }
+  function mapEnd(s0) {
+    if (!s0.el) return;
+    var W = paneW(), v = Math.abs(s0.dx) / Math.max(1, Date.now() - s0.t), D = s0.el.offsetWidth + 24;
+    var go = s0.g && (Math.abs(s0.dx) > W * 0.22 || (v > 0.45 && Math.abs(s0.dx) > 35));
+    var t = "transform .2s cubic-bezier(.2,.7,.3,1)";
     if (!go) {
-      if (s0.marked) markSel(null);
-      if (s0.zone === "map") fadeBelow(true);
-      place(s0, 0, true);
-      setTimeout(function () { dropGhost(s0); s0.el.style.transition = ""; }, 210);
+      if (s0.marked) markMap(state.map);
+      fadeBelow(true);
+      s0.el.style.transition = t; s0.el.style.transform = "";
+      if (s0.g) { s0.g.style.transition = t; s0.g.style.transform = "translate3d(" + (s0.dir * D) + "px,0,0)"; }
+      setTimeout(function () { if (s0.g && s0.g.parentNode) s0.g.parentNode.removeChild(s0.g); }, 220);
       return;
     }
-    markSel(s0.tgt);
-    place(s0, -s0.dir * (s0.el.offsetWidth + 24), true);  // соседняя страница встаёт на место
-    // подменяем только когда сосед доехал до конца (иначе на финише всё сдвигается на пару пикселей — это и есть «моргание»)
-    var done = false, finish = function () {
+    markMap(s0.mp);
+    s0.el.style.transition = t; s0.el.style.transform = "translate3d(" + (-s0.dir * D) + "px,0,0)";
+    s0.g.style.transition = t; s0.g.style.transform = "translate3d(0,0,0)";
+    var done = false;
+    function fin() {
       if (done) return; done = true;
-      s0.g.removeEventListener("transitionend", onEnd);
-      requestAnimationFrame(commit);
-    }, onEnd = function (ev) { if (ev.target === s0.g && ev.propertyName === "transform") finish(); };
-    s0.g.addEventListener("transitionend", onEnd);
-    setTimeout(finish, 320);  // подстраховка, если событие не придёт
-    function commit() {
-      // если страница была прокручена вниз — встаём на начало новой, сразу под закреплённым меню
-      if (s0.tgt.map == null) remember();
-      if (s0.tgt.map != null) state.map = s0.tgt.map;
-      else if (s0.tgt.filter != null) { state.openNews = null; state.newsFilter = s0.tgt.filter; }
-      else { state.tab = s0.tgt.tab; if (s0.tgt.tab === "news") { state.newsFilter = "all"; state.openNews = null; } }
-      if (s0.tgt.map == null && s0.target != null && Math.abs(window.scrollY - s0.target) > 1) {
-        // нужно прокрутить: на iPhone прокрутка и смена содержимого могут попасть в разные кадры — отсюда мигание.
-        // Поэтому на время прокрутки сосед замирает поверх экрана, а настоящая страница проявляется уже после.
-        var gr = s0.g.getBoundingClientRect();
-        document.body.appendChild(s0.g);
-        s0.g.style.position = "fixed"; s0.g.style.transition = "none"; s0.g.style.transform = "none";
-        s0.g.style.top = gr.top + "px"; s0.g.style.left = gr.left + "px"; s0.g.style.width = gr.width + "px"; s0.g.style.zIndex = "2";
-        s0.el.style.transition = "none"; s0.el.style.transform = ""; s0.el.style.visibility = "hidden";
-        s0.el.innerHTML = s0.g._html;
-        window.scrollTo(0, s0.target);
-        var g0 = s0.g, e0 = s0.el;
-        requestAnimationFrame(function () { requestAnimationFrame(function () {
-          e0.style.visibility = "";
-          if (g0.parentNode) g0.parentNode.removeChild(g0);
-        }); });
-        fixChips();
-        try { TG && TG.HapticFeedback && TG.HapticFeedback.selectionChanged(); } catch (err) {}
-        return;
-      }
-      // въехавшая страница остаётся как есть: переносим её готовые элементы на место, без перерисовки — ничего не моргает
+      state.map = s0.mp;
       var frag = document.createDocumentFragment();
       while (s0.g.firstChild) frag.appendChild(s0.g.firstChild);
       s0.el.style.transition = "none"; s0.el.style.transform = "";
       s0.el.textContent = ""; s0.el.appendChild(frag);
-      dropGhost(s0);
-      if (s0.tgt.map != null) {
-        // стороны и пистолетки тоже про выбранную карту — обновляем этот блок (без картинок, не моргает)
-        var sd = document.querySelector("#tabbody .box.sides"), sec = sd && sd.closest(".sec");
-        if (sec) { var tmp = document.createElement("div"); tmp.innerHTML = sidesBlock(state.details[state.openId]); if (tmp.firstElementChild) sec.replaceWith(tmp.firstElementChild); }
-        // нижние блоки уже стоят на новом месте — проявляем их
-        belowMaps().forEach(function (n) { n.style.transition = "none"; n.style.opacity = "0"; });
-        requestAnimationFrame(function () { requestAnimationFrame(function () {
-          belowMaps().forEach(function (n) { n.style.transition = "opacity .18s ease-out"; n.style.opacity = ""; });
-        }); });
-        var ms = document.querySelector(".mapsel"), ch = ms && ms.querySelector('[aria-pressed="true"]');
-        if (ch) { var l0 = ch.offsetLeft, r0 = l0 + ch.offsetWidth; if (l0 < ms.scrollLeft) ms.scrollLeft = l0 - 8; else if (r0 > ms.scrollLeft + ms.clientWidth) ms.scrollLeft = r0 - ms.clientWidth + 8; }
-        try { TG && TG.HapticFeedback && TG.HapticFeedback.selectionChanged(); } catch (err) {}
-        return;
-      }
-      fixChips();
-      glideToSaved(viewKey(state.tab, state.newsFilter));
+      if (s0.g.parentNode) s0.g.parentNode.removeChild(s0.g);
+      var pane = activePane(), sd = pane && pane.querySelector(".box.sides"), sec = sd && sd.closest(".sec");
+      if (sec) { var tmp = document.createElement("div"); tmp.innerHTML = sidesBlock(state.details[state.openId]); if (tmp.firstElementChild) sec.replaceWith(tmp.firstElementChild); }
+      belowMaps().forEach(function (n) { n.style.transition = "none"; n.style.opacity = "0"; });
+      requestAnimationFrame(function () { requestAnimationFrame(function () {
+        belowMaps().forEach(function (n) { n.style.transition = "opacity .18s ease-out"; n.style.opacity = ""; });
+      }); });
+      var ms = pane && pane.querySelector(".mapsel"), ch = ms && ms.querySelector('[aria-pressed="true"]');
+      if (ch) { var l0 = ch.offsetLeft, r0 = l0 + ch.offsetWidth; if (l0 < ms.scrollLeft) ms.scrollLeft = l0 - 8; else if (r0 > ms.scrollLeft + ms.clientWidth) ms.scrollLeft = r0 - ms.clientWidth + 8; }
       try { TG && TG.HapticFeedback && TG.HapticFeedback.selectionChanged(); } catch (err) {}
     }
+    s0.g.addEventListener("transitionend", function (ev) { if (ev.target === s0.g) fin(); });
+    setTimeout(fin, 320);
   }
-  document.addEventListener("touchend", swipeEnd, { passive: true });
-  document.addEventListener("touchcancel", swipeEnd, { passive: true });
 
   // ---------- роутинг: "" турниры, #t-ID турнир, #mine мои матчи, #m-ID матч
   var depth = 0;
@@ -1385,9 +1310,8 @@ a.ni { text-decoration: none; color: inherit; }
     state.reader = null;
     var fs = state.filtScroll;
     renderMatch(state.details[state.openId]);
-    var f = document.querySelector(".filt");
+    var ap = activePane(), f = ap && ap.querySelector(".filt");
     if (f && fs != null) f.scrollLeft = fs;
-    window.scrollTo(0, state.readerScroll || 0);
   }
   function closeFeedReader() {
     state.feedRead = null;
@@ -1460,7 +1384,7 @@ a.ni { text-decoration: none; color: inherit; }
     if (t.hasAttribute("data-mreg")) { state.majorReg = t.getAttribute("data-mreg"); keepFilterScroll(renderMajor); return; }
     if (t.hasAttribute("data-feedch")) { state.feedCh = t.getAttribute("data-feedch"); keepFilterScroll(renderFeed); return; }
     if (t.hasAttribute("data-tg")) { if (TG) { e.preventDefault(); try { TG.openTelegramLink(t.getAttribute("data-tg")); } catch (x) { openLink(t.getAttribute("data-tg")); } } return; }
-    if (t.hasAttribute("data-reader")) { var ff = document.querySelector(".filt"); state.filtScroll = ff ? ff.scrollLeft : null; state.reader = t.getAttribute("data-reader"); state.readerScroll = window.scrollY; renderMatch(state.details[state.openId]); window.scrollTo(0, 0); return; }
+    if (t.hasAttribute("data-reader")) { var ap0 = activePane(), ff = ap0 && ap0.querySelector(".filt"); state.filtScroll = ff ? ff.scrollLeft : null; state.reader = t.getAttribute("data-reader"); state.readerScroll = window.scrollY; renderMatch(state.details[state.openId]); window.scrollTo(0, 0); return; }
     if (t.id === "close-reader") { closeReader(); return; }
     if (t.hasAttribute("data-news")) { var k = t.getAttribute("data-news"); state.openNews = state.openNews === k ? null : k; state.showOrig = null; renderMatch(state.details[state.openId]); var el = document.querySelector('[data-news="' + (window.CSS && CSS.escape ? CSS.escape(k) : k) + '"]'); if (el && state.openNews) el.scrollIntoView({ block: "nearest" }); return; }
     if (t.hasAttribute("data-orig")) { var k2 = t.getAttribute("data-orig"); state.showOrig = state.showOrig === k2 ? null : k2; renderMatch(state.details[state.openId]); return; }
@@ -1472,25 +1396,17 @@ a.ni { text-decoration: none; color: inherit; }
     if (t.id === "to-mine") { go("#mine"); return; }
     if (t.hasAttribute("data-tab")) {
       var nt = t.getAttribute("data-tab");
-      if (nt === state.tab) return;
-      remember();
-      var tb0 = document.getElementById("tabbody"), tgt0 = tb0 ? arrival(tb0, viewKey(nt, state.newsFilter)) : null;
-      state.tab = nt; state.slide = null; renderMatch(state.details[state.openId]);
-      if (tgt0 != null) window.scrollTo(0, tgt0);
-      glideToSaved(viewKey(nt, state.newsFilter));
+      goKey(nt === "news" ? viewKey("news", state.newsFilter || "all") : nt);
       return;
     }
     if (t.hasAttribute("data-map")) { state.map = t.getAttribute("data-map"); keepFilterScroll(function () { renderMatch(state.details[state.openId]); }); return; }
-    if (t.hasAttribute("data-nf")) {
-      var nnf = t.getAttribute("data-nf");
-      if (nnf === state.newsFilter) return;
-      remember();
-      var nl = document.querySelector("#tabbody .news"), tgt1 = nl ? arrival(nl, viewKey("news", nnf)) : null;
-      state.openNews = null; state.newsFilter = nnf; keepFilterScroll(function () { renderMatch(state.details[state.openId]); });
-      if (tgt1 != null) window.scrollTo(0, tgt1);
+    if (t.hasAttribute("data-nf")) { goKey(viewKey("news", t.getAttribute("data-nf"))); return; }
+    if (t.hasAttribute("data-player")) {
+      state.tab = "news"; state.newsFilter = t.getAttribute("data-player"); state.openNews = null;
+      state.scrolls = state.scrolls || {}; state.scrolls[curKey()] = 0;
+      renderMatch(state.details[state.openId]);
       return;
     }
-    if (t.hasAttribute("data-player")) { state.tab = "news"; state.newsFilter = t.getAttribute("data-player"); renderMatch(state.details[state.openId]); window.scrollTo(0, 0); return; }
     if (t.id === "back") { goBack(); return; }
   });
   $app.addEventListener("keydown", function (e) {
