@@ -1,5 +1,5 @@
 {
- "updated": "2026-11-02T03:14:17Z",
+ "updated": "2026-11-02T03:21:48Z",
  "tiers": [
   "a",
   "s"
@@ -601,6 +601,72 @@
        "nick": "Zero"
       }
      ]
+    },
+    "team_ids": {
+     "FURIA": {
+      "id": 8297,
+      "slug": "furia"
+     },
+     "MOUZ": {
+      "id": 4494,
+      "slug": "mouz"
+     },
+     "Aurora": {
+      "id": 11861,
+      "slug": "aurora"
+     },
+     "Falcons": {
+      "id": 11283,
+      "slug": "falcons"
+     },
+     "Legacy": {
+      "id": 12468,
+      "slug": "legacy"
+     },
+     "BETBOOM": {
+      "id": 12394,
+      "slug": "betboom"
+     },
+     "G2": {
+      "id": 5995,
+      "slug": "g2"
+     },
+     "Natus Vincere": {
+      "id": 4608,
+      "slug": "natus-vincere"
+     },
+     "PARIVISION": {
+      "id": 12467,
+      "slug": "parivision"
+     },
+     "9z": {
+      "id": 9996,
+      "slug": "9z"
+     },
+     "The MongolZ": {
+      "id": 6248,
+      "slug": "the-mongolz"
+     },
+     "FaZe": {
+      "id": 6667,
+      "slug": "faze"
+     },
+     "B8": {
+      "id": 11241,
+      "slug": "b8"
+     },
+     "Liquid": {
+      "id": 5973,
+      "slug": "liquid"
+     },
+     "HEROIC": {
+      "id": 7175,
+      "slug": "heroic"
+     },
+     "TYLOO": {
+      "id": 4863,
+      "slug": "tyloo"
+     }
     },
     "hltv": "https://www.hltv.org/events/8245/iem-beijing-2026"
    },
@@ -1361,13 +1427,13 @@
   "panda_requests": 21,
   "bo3_requests": 64,
   "liquipedia_requests": 0,
-  "translations": 10,
+  "translations": 8,
   "warnings": [
+   "HLTV /matches/2399746/the-mongolz-vs-legacy-pgl-masters-bucharest-2026: <HTTPError 403: 'Forbidden'>",
    "GigaChat: URLError(TimeoutError('timed out'))"
   ],
-  "giga_vision": 10,
-  "giga_calls": 67,
-  "giga_tokens": 21192,
-  "hltv_requests": 1
+  "hltv_requests": 4,
+  "giga_calls": 7,
+  "giga_tokens": 3768
  }
 }
