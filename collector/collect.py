@@ -913,7 +913,17 @@ def build_player_stats(team: dict, bid: int | None, hist: list[dict]) -> list[di
             "adr": round(a["adr"] / n, 1), "kast": round(100 * a["kast"] / n), "opening": a["fk"] - a["fd"],
             "clutches": a["cl"], "best_map": best[0][0] if best else None, "worst_map": best[-1][0] if len(best) > 1 else None,
         })
-    out.sort(key=lambda x: -x["rating"])
+    for x in out:
+        hs = hltv_player_stats(x["nick"])
+        x["hltv"] = hs
+    # игроки состава без карт на bo3, но со статистикой HLTV
+    have = {norm(x["nick"]) for x in out}
+    for p in team.get("players") or []:
+        if norm(p.get("nick")) not in have:
+            hs = hltv_player_stats(p.get("nick") or "")
+            if hs:
+                out.append({"nick": p["nick"], "hltv": hs, "best_map": None})
+    out.sort(key=lambda x: -((x.get("hltv") or {}).get("rating") or 0))
     return out
 
 
@@ -1235,6 +1245,15 @@ def parse_hltv_event(html: str) -> dict:
     teams = re.findall(r'<div class="team-name"><a href="/team/\d+/[^"]+"><div class="text-container"><div class="text">([^<]+)</div>'
                        r'.*?<div class="sub-text event-text">(.*?)</div>', b)
     res["teams"] = [{"name": strip_html(n), "how": strip_html(h)} for n, h in teams]
+    lineups = {}
+    for box in b.split('class="col standard-box team-box')[1:]:
+        tn = re.search(r'<div class="text">([^<]+)</div>', box)
+        if not tn:
+            continue
+        lu = box.split('class="lineup-box', 1)
+        pl = re.findall(r'<a href="/player/(\d+)/([^"]+)">([^<]+)</a>', lu[1] if len(lu) > 1 else "")
+        lineups[strip_html(tn.group(1))] = [{"id": int(i), "slug": sl, "nick": strip_html(nk)} for i, sl, nk in pl]
+    res["lineups"] = lineups
     return res
 
 
@@ -1271,7 +1290,7 @@ def tournament_extras(name: str) -> dict | None:
             return None
         h = hltv_get(href)
         return {**parse_hltv_event(h), "hltv": HLTV + href} if h else None
-    return hltv_cached("event:" + name, fn)
+    return hltv_cached("event2:" + name, fn)
 
 
 def parse_vrs_major(html: str) -> dict:
@@ -1296,6 +1315,49 @@ def parse_vrs_major(html: str) -> dict:
         regions.append({"region": rname, "sections": sections})
     m = re.search(r'regional-ranking-header-text">(.*?)<div', b)
     return {"title": strip_html(m.group(1)) if m else None, "regions": regions}
+
+
+HLTV_STATS_CACHE_F = CACHE / "hltv_player_stats.json"
+hltv_stats_cache: dict = load_json(HLTV_STATS_CACHE_F, {})
+HLTV_STATS_LIMIT = int(os.environ.get("HLTV_STATS_LIMIT", "90"))
+_hltv_stats_new = [0]
+hltv_player_ids: dict = {}   # norm(ник) → {"id","slug"}
+
+
+def _num_after(b: str, label: str) -> float | None:
+    i = b.find(label)
+    if i < 0:
+        return None
+    m = re.search(r">\s*(\d+(?:\.\d+)?)\s*%?\s*<", b[i:i + 600])
+    return float(m.group(1)) if m else None
+
+
+def hltv_player_stats(nick: str) -> dict | None:
+    """Rating 3.0, K/D, ADR, KAST игрока на HLTV за 3 месяца. Кэш на сутки."""
+    pid = hltv_player_ids.get(norm(nick))
+    if not pid:
+        return None
+    key = str(pid["id"])
+    c = hltv_stats_cache.get(key)
+    if c and (parse_iso(c.get("t")) or NOW) > NOW - timedelta(hours=24):
+        return c["data"]
+    if _hltv_stats_new[0] >= HLTV_STATS_LIMIT:
+        return c["data"] if c else None
+    _hltv_stats_new[0] += 1
+    start = (NOW - timedelta(days=90)).strftime("%Y-%m-%d")
+    end = NOW.strftime("%Y-%m-%d")
+    h = hltv_get(f"/stats/players/{pid['id']}/{pid['slug']}?startDate={start}&endDate={end}")
+    if not h:
+        return c["data"] if c else None
+    b = hclean(h)
+    data = {"rating": _num_after(b, "Rating 3.0"), "kd": _num_after(b, "K/D Ratio"),
+            "adr": _num_after(b, "ADR") or _num_after(b, "Damage / Round"), "kast": _num_after(b, "KAST"),
+            "url": HLTV + f"/stats/players/{pid['id']}/{pid['slug']}"}
+    if data["rating"] is None and data["kd"] is None:
+        warn(f"HLTV статистика {nick}: не нашёл цифры на странице")
+        return c["data"] if c else None
+    hltv_stats_cache[key] = {"t": iso(NOW), "data": data}
+    return data
 
 
 def build_major(rosters: dict) -> dict | None:
@@ -2025,6 +2087,17 @@ def main() -> int:
         print("Нет PANDASCORE_TOKEN. Добавь его в Settings → Secrets → Actions.", file=sys.stderr)
         return 1
     matches = fetch_upcoming()
+    # id игроков HLTV из составов на страницах ближайших турниров (нужны для Rating 3.0)
+    seen_tours = set()
+    for m in matches:
+        tname = tournament_label(m)
+        if tname in seen_tours:
+            continue
+        seen_tours.add(tname)
+        ex = tournament_extras(tname) or {}
+        for lineup in (ex.get("lineups") or {}).values():
+            for p in lineup:
+                hltv_player_ids[norm(p["nick"])] = {"id": p["id"], "slug": p["slug"]}
     listing = []
     keep_ids = set()
     for m in matches:
@@ -2059,6 +2132,7 @@ def main() -> int:
     save_json(TG_CACHE_F, tg_cache)
     save_json(PRON_CACHE_F, pron_cache)
     save_json(HLTV_CACHE_F, hltv_cache)
+    save_json(HLTV_STATS_CACHE_F, hltv_stats_cache)
     prune_caches()
     save_json(GAMES_CACHE_F, games_cache)
     save_json(DETAILS_CACHE_F, details_cache)

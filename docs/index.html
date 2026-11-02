@@ -705,10 +705,15 @@ a.ni { text-decoration: none; color: inherit; }
     var key = String(nick || "").toLowerCase().replace(/[^a-z0-9а-я]/g, "");
     var st = (t.stats || []).find(function (x) { return String(x.nick).toLowerCase().replace(/[^a-z0-9а-я]/g, "") === key; });
     if (!st) return "";
-    function it(label, v) { return v == null ? "" : '<span>' + label + ' <b>' + esc(v) + '</b></span>'; }
-    return '<span class="pstat">' + it("рейтинг", st.rating) + it("K/D", st.kd) + it("ADR", st.adr) + it("KAST", st.kast + "%") +
-      it("открытия", (st.opening > 0 ? "+" : "") + st.opening) + it("клатчи", st.clutches) +
-      (st.best_map ? it("лучшая", st.best_map) : "") + '<span>' + st.maps + ' карт за 3 мес.</span></span>';
+    var h = st.hltv || {};
+    function it(label, v, suf) { return v == null ? "" : '<span>' + label + ' <b>' + esc(v) + (suf || "") + '</b></span>'; }
+    var fx = function (v, d) { return v == null ? null : Number(v).toFixed(d); };
+    return '<span class="pstat">' +
+      it("Рейтинг 3.0", fx(h.rating, 2)) +
+      it("K/D", fx(h.kd != null ? h.kd : st.kd, 2)) +
+      it("ADR", fx(h.adr != null ? h.adr : st.adr, 1)) +
+      it("KAST", fx(h.kast != null ? h.kast : st.kast, 1), "%") +
+      (st.best_map ? it("лучшая карта", st.best_map) : "") + '</span>';
   }
 
   function years(n) { n = Number(n); var d = n % 10, h = n % 100; return (h > 10 && h < 20) || d === 0 || d > 4 ? "лет" : d === 1 ? "год" : "года"; }
