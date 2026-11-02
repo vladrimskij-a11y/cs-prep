@@ -1337,6 +1337,61 @@ def tg_text_preview(text: str, limit: int = 420) -> str:
     return t if len(t) <= limit else t[:limit].rsplit(" ", 1)[0] + "…"
 
 
+FEED_DEDUP_SYSTEM = """Ты редактор ленты новостей Counter-Strike 2 из нескольких Telegram-каналов. Каналы часто пишут об одном и том же событии разными словами.
+Тебе дают пронумерованные посты: время, канал, заголовок и начало текста.
+Найди группы постов, которые сообщают ОБ ОДНОМ И ТОМ ЖЕ событии (одна новость, одна цитата, один трансфер, один итог), даже если формулировки разные.
+Разные события про одну команду или игрока — не объединяй (например, «команда проиграла» и «команда сменила состав» — разные).
+Ответ строго JSON: {"groups": [[номера], [номера]]}. Только группы из двух и более постов."""
+
+
+def feed_dedupe(clusters: list[list[dict]]) -> list[list[dict]]:
+    """Второй проход по ленте: GigaChat склеивает одну новость из разных каналов. Окна по 40 постов с перекрытием."""
+    if not GIGA_KEY or _giga["off"] or len(clusters) < 2:
+        return clusters
+    clusters = sorted(clusters, key=lambda cl: max(x["date"] for x in cl), reverse=True)
+    parent = list(range(len(clusters)))
+
+    def find(i):
+        while parent[i] != i:
+            parent[i] = parent[parent[i]]
+            i = parent[i]
+        return i
+    W, STEP = 40, 30
+    for start in range(0, max(1, min(len(clusters), 110) - 10), STEP):  # свежие ~110 постов: дубли бывают рядом по времени
+        idx = list(range(start, min(len(clusters), start + W)))
+        if len(idx) < 2:
+            break
+        lines = []
+        for n, i in enumerate(idx):
+            p = clusters[i][0]
+            body = re.sub(r"\s+", " ", p.get("text") or "")
+            if body.startswith(p["title"][:40]):
+                body = body[len(p["title"]):].strip()
+            body = body[:140]
+            lines.append(f"{n + 1}. [{p['date'].strftime('%d.%m %H:%M')}, {p['channel']}] {p['title']} — {body}")
+        text = "\n".join(lines)
+        sig = hashlib.sha1(text.encode()).hexdigest()[:16]
+        res = (dedup_cache.get("feed:" + sig) or {}).get("res")
+        if res is None:
+            res = parse_json_loose(giga_chat(FEED_DEDUP_SYSTEM, text, 1200))
+            if res is None:
+                continue
+            dedup_cache["feed:" + sig] = {"res": res, "t": iso(NOW)}
+        for g in res.get("groups") or []:
+            ids = [idx[int(x) - 1] for x in g if str(x).isdigit() and 0 < int(x) <= len(idx)]
+            ids = [i for i in ids if abs((clusters[i][0]["date"] - clusters[ids[0]][0]["date"]).total_seconds()) < 48 * 3600] if ids else []
+            for i in ids[1:]:
+                parent[find(i)] = find(ids[0])
+    groups: dict = {}
+    for i in range(len(clusters)):
+        groups.setdefault(find(i), []).extend(clusters[i])
+    out = list(groups.values())
+    for cl in out:
+        cl.sort(key=src_rank)
+    out.sort(key=lambda cl: max(x["date"] for x in cl), reverse=True)
+    return out
+
+
 def build_feed() -> dict:
     """Лента на главном экране: посты каналов без повторов."""
     posts = [dict(p, about=["CS"]) for p in tg_posts()]
@@ -1344,6 +1399,7 @@ def build_feed() -> dict:
         p["key"] = "tg:" + p["url"].split("t.me/")[1]
         p["title_ru0"], p["lang0"] = None, "ru"
     clusters = dedupe_news(posts, [], same_who_required=False)
+    clusters = feed_dedupe(clusters)
     items = []
     for cl in clusters[:150]:
         it, others = cl[0], cl[1:]
@@ -1916,7 +1972,7 @@ LIVE_NOISE = re.compile(
     r"(?:перв|втор|трет)\w+ карт\w*|\bкарт[ау] (?:за|в пользу)|забира\w+ (?:карту|mirage|inferno|nuke|ancient|anubis|dust2|train|overpass|vertigo|cache)|"
     r"взял\w* (?:карту|mirage|inferno|nuke|ancient|anubis|dust2|train|overpass)|счёт по картам|\bmap ?[123]\b|"
     r"\b\d{1,2} ?[:\-–] ?\d{1,2}\b.{0,20}(?:раунд|по раундам|на карте)|по раундам|пистолет\w* раунд\w*|раунд\w* за \w+|"
-    r"камбэк\w*|камбек\w*|камбечил\w*|\bэко\b|эко-раунд\w*|форс\w*|минус (?:три|четыре|пять)|\b(?:с|со) \d{1,2} ?[:\-–] ?\d{1,2}\b|сравнял\w* сч[её]т|приемк\w*|приёмк\w*",
+    r"десайдер\w*|решающ\w+ (?:карт\w*|ancient|mirage|inferno|nuke|anubis|dust2|train|overpass)|переводят на|сравнива\w+ сч|камбэк\w*|камбек\w*|камбечил\w*|\bэко\b|эко-раунд\w*|форс\w*|минус (?:три|четыре|пять)|\b(?:с|со) \d{1,2} ?[:\-–] ?\d{1,2}\b|сравнял\w* сч[её]т|приемк\w*|приёмк\w*",
     re.IGNORECASE)
 RESULT_ONLY = re.compile(r"(?:обыгра\w+|победил\w*|выигра\w+|проигра\w+|уступил\w*|разгроми\w+|вылете\w+)\b.{0,60}\b[0-3] ?[:\-–] ?[0-3]\b",
                          re.IGNORECASE)
@@ -2205,6 +2261,7 @@ def giga_chat(system: str, user: str, max_tokens: int = 900, model: str | None =
             stats["giga_calls"] = stats.get("giga_calls", 0) + 1
             stats["giga_tokens"] = stats.get("giga_tokens", 0) + (j.get("usage") or {}).get("total_tokens", 0)
             giga_spend(giga_kind(model), (j.get("usage") or {}).get("total_tokens", 0))
+            _giga["fails"] = 0
             return j["choices"][0]["message"]["content"]
         except urllib.error.HTTPError as e:
             msg = e.read()[:200].decode("utf-8", "replace")
@@ -2223,7 +2280,9 @@ def giga_chat(system: str, user: str, max_tokens: int = 900, model: str | None =
             if attempt < 2:
                 time.sleep(3)
                 continue
-            _giga["off"] = True
+            _giga["fails"] = _giga.get("fails", 0) + 1
+            if _giga["fails"] >= 3:
+                _giga["off"] = True  # сервис недоступен — не тратим время до следующего прогона
             return None
     return None
 
