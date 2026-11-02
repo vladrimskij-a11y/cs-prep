@@ -1144,15 +1144,20 @@ a.ni { text-decoration: none; color: inherit; }
     place(s0, -s0.dir * (s0.el.offsetWidth + 24), true);  // соседняя страница встаёт на место
     setTimeout(function () {
       var nav = document.querySelector(".tabs"), top = nav ? nav.getBoundingClientRect().top + window.scrollY - 8 : 0;
-      if (s0.tgt.filter != null) {
-        state.openNews = null; state.newsFilter = s0.tgt.filter;
-        keepFilterScroll(function () { renderMatch(state.details[state.openId]); });
-      } else {
-        state.tab = s0.tgt.tab;
-        if (s0.tgt.tab === "news") { state.newsFilter = "all"; state.openNews = null; }
-        renderMatch(state.details[state.openId]);
-      }
+      if (s0.tgt.filter != null) { state.openNews = null; state.newsFilter = s0.tgt.filter; }
+      else { state.tab = s0.tgt.tab; if (s0.tgt.tab === "news") { state.newsFilter = "all"; state.openNews = null; } }
+      // въехавшая страница остаётся как есть: переносим её готовые элементы на место, без перерисовки — ничего не моргает
+      var frag = document.createDocumentFragment();
+      while (s0.g.firstChild) frag.appendChild(s0.g.firstChild);
+      s0.el.style.transition = "none"; s0.el.style.transform = "";
+      s0.el.textContent = ""; s0.el.appendChild(frag);
+      dropGhost(s0);
       if (window.scrollY > top) window.scrollTo(0, top);
+      var f = document.querySelector(".filt"), sel = f && f.querySelector('[aria-pressed="true"]');
+      if (sel) {
+        var l = sel.offsetLeft, r = l + sel.offsetWidth;
+        if (l < f.scrollLeft) f.scrollLeft = l - 8; else if (r > f.scrollLeft + f.clientWidth) f.scrollLeft = r - f.clientWidth + 8;
+      }
       try { TG && TG.HapticFeedback && TG.HapticFeedback.selectionChanged(); } catch (err) {}
     }, 200);
   }
