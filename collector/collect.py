@@ -143,7 +143,7 @@ def save_json(path: Path, data, pretty: bool = False) -> None:
 
 
 GAMES_CACHE_F = CACHE / "bo3_games_v2.json"   # карты по завершённым матчам bo3, как отдаёт bo3 (не меняются)
-DETAILS_CACHE_F = CACHE / "bo3_game_details.json"  # раунды и статистика игроков по каждой карте
+DETAILS_CACHE_F = CACHE / "bo3_game_details_v2.json"  # раунды и статистика игроков по каждой карте
 TEAMS_CACHE_F = CACHE / "bo3_teams.json"     # PandaScore id → bo3 id
 TR_CACHE_F = CACHE / "translations.json"     # переводы заголовков
 ROSTER_CACHE_F = CACHE / "liquipedia_rosters_v3.json"  # тренер, роли, даты рождения с Liquipedia
@@ -640,7 +640,7 @@ def game_detail(gid: int | None) -> dict | None:
         return None
     _details_new[0] += 1
     try:
-        g = bo3(f"/games/{gid}/rounds")
+        g = bo3(f"/games/{gid}")  # здесь и раунды, и какой клан какой команде принадлежит
         ps = bo3(f"/games/{gid}/players_stats")
     except Exception as e:
         warn(f"bo3 карта {gid}: {e!r}")
@@ -1641,7 +1641,7 @@ def gather_news(teams: list[dict]) -> list[dict]:
         if nick_only and len(nick_only) == len(about) and all(not distinctive_nick(a) for a in nick_only):
             # простой ник (Zero, Jee, Mercury): нужна команда, партнёр или явный CS рядом
             team_of = {e[0]: teams[e[3]] for e in entities}
-            ctx_ok = CS_STRICT.search(text) or any(x in src for x in ("hltv", "dust2"))
+            ctx_ok = any(x in src for x in ("hltv", "dust2")) or bool(it.get("tg"))
             for a in nick_only:
                 t = team_of.get(a) or {}
                 mates = [p.get("nick") for p in t.get("players") or [] if p.get("nick") and p.get("nick") != a]
