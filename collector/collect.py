@@ -2262,24 +2262,20 @@ def build_news(teams: list[dict]) -> dict:
 
 # ---------------------------------------------------------------- факты для эфира
 
-FACTS_CACHE_F = CACHE / "facts_v3.json"
+FACTS_CACHE_F = CACHE / "facts_v4.json"
 facts_cache: dict = load_json(FACTS_CACHE_F, {})
 FACTS_TTL_H = 6
 FACTS_SYSTEM = """Ты помогаешь русскоязычному комментатору CS2 подготовиться к матчу.
-Тебе дают данные о матче (JSON). Составь от 10 до 20 коротких фактов для эфира — интересных, конкретных, с цифрами.
-Если данных хватает — ближе к 20; меньше 10 не надо.
+Тебе дают сведения о матче (JSON): новости недели о командах и игроках, составы (имя, возраст, страна, роли), тренеры, личные встречи.
+Составь до 10 фактов-сюжетов для эфира — НЕ статистику (её посчитают отдельно).
+Темы по важности: 1) сюжеты из новостей (заявления, интервью, замены, аренды, переходы); 2) люди: кто капитан, кто AWP,
+кто в аренде, состав по странам, самые молодые и опытные; 3) тренеры; 4) последняя личная встреча как сюжет.
 Строгие правила:
-- Используй ТОЛЬКО цифры и сведения из данных. Ничего не добавляй от себя, не выдумывай рекорды, историю и титулы.
-- Каждый факт — одно предложение до 25 слов, по-русски, ники и названия команд латиницей как в данных.
-- Разные темы: личные встречи, форма, карты и стороны (CT/T, пистолетки), игроки (роли, возраст, K/D, ADR, KAST, лучшая карта),
-  тренеры, новости недели. Не повторяй одно и то же разными словами.
-- ПРИОРИТЕТ — факты вне статистики, их ставь первыми и делай большинство:
-  1) сюжеты из новостей недели (заявления, интервью, замены, аренды, переходы, конфликты, рекорды из новостей);
-  2) люди: возраст, национальности и состав по странам, роли (капитан, AWP), аренды и замены, тренеры;
-  3) история противостояния как сюжет (последняя встреча, где и с каким итогом, кто брал верх).
-  Статистику (карты, стороны, пистолетки, K/D, ADR, KAST, вето) — только после этого и не больше трети фактов.
-- "tag" — одно слово: Новости, Игроки, Тренеры, Встречи, Форма, Карты, Вето, Стороны.
-- Порядок в ответе = порядок важности для эфира.
+- Только то, что прямо есть в данных. Ничего не добавляй от себя: никаких титулов, рекордов, «выиграли N турниров», карьеры.
+- Не считай и не выводи числа сам. Числа (возраст, счёт, даты) переписывай точно как в данных.
+- Не пиши пустых фактов вроде «новостей нет».
+- Одно предложение до 25 слов, по-русски, ники и названия команд латиницей как в данных.
+- "tag" — одно слово: Новости, Игроки, Тренеры, Встречи.
 Ответ строго JSON: {"facts": [{"tag": "...", "text": "..."}]}"""
 
 
@@ -2313,20 +2309,147 @@ def facts_input(d: dict) -> dict:
     }
 
 
+def plural(n: int, one: str, few: str, many: str) -> str:
+    n = abs(int(n)); d, h = n % 10, n % 100
+    return one if d == 1 and h != 11 else few if 2 <= d <= 4 and not 12 <= h <= 14 else many
+
+
+COUNTRY_RU = {"UA": "Украина", "RU": "Россия", "BY": "Беларусь", "KZ": "Казахстан", "BR": "Бразилия", "AR": "Аргентина", "CL": "Чили",
+              "UY": "Уругвай", "DK": "Дания", "SE": "Швеция", "FI": "Финляндия", "NO": "Норвегия", "FR": "Франция", "DE": "Германия",
+              "PL": "Польша", "MN": "Монголия", "CN": "Китай", "US": "США", "CA": "Канада", "TR": "Турция", "BA": "Босния",
+              "RS": "Сербия", "LV": "Латвия", "LT": "Литва", "EE": "Эстония", "IL": "Израиль", "HU": "Венгрия", "CZ": "Чехия",
+              "SK": "Словакия", "PT": "Португалия", "ES": "Испания", "GB": "Великобритания", "AU": "Австралия"}
+
+
+def code_facts(d: dict) -> list[dict]:
+    """Факты с цифрами — считаются кодом из данных, без нейросети, поэтому всегда точные."""
+    out: list[dict] = []
+    teams = (d.get("teams") or [])[:2]
+    if len(teams) < 2:
+        return out
+    A, B = teams
+    nm = [A.get("name"), B.get("name")]
+    # личные встречи
+    h2h = d.get("h2h") or []
+    if h2h:
+        wa = sum(1 for h in h2h if h.get("winner") == 0); wb = sum(1 for h in h2h if h.get("winner") == 1)
+        last = h2h[0]
+        lw = nm[last["winner"]] if last.get("winner") in (0, 1) else None
+        out.append({"tag": "Встречи", "text": f"За год команды встречались {len(h2h)} {plural(len(h2h), 'раз', 'раза', 'раз')}: "
+                    f"{nm[0]} {wa}, {nm[1]} {wb} по сериям."})
+        if lw:
+            flip = lambda sc: sc if last["winner"] == 0 else ":".join(reversed(sc.split(":")))
+            maps = ", ".join(f"{g['map']} {flip(g['score'])}" for g in last.get("maps") or [] if g.get("map") and g.get("score"))
+            out.append({"tag": "Встречи", "text": f"Последняя встреча — {last.get('tournament')} ({(last.get('date') or '')[:10]}): "
+                        f"{lw} выиграли {max(last['score'])}:{min(last['score'])}" + (f" ({maps})." if maps else ".")})
+    # форма и серии
+    for t in teams:
+        f = t.get("form") or []
+        if not f:
+            continue
+        w = sum(1 for x in f if x.get("won"))
+        streak, kind = 0, f[0].get("won")
+        for x in f:
+            if x.get("won") == kind:
+                streak += 1
+            else:
+                break
+        txt = f"{t['name']}: {w} {plural(w, 'победа', 'победы', 'побед')} в последних {len(f)} сериях"
+        if streak >= 3:
+            txt += f", сейчас серия из {streak} {'побед' if kind else 'поражений'} подряд"
+        out.append({"tag": "Форма", "text": txt + "."})
+    # люди: возраст, страны, аренды
+    people = [(p, t["name"]) for t in teams for p in t.get("players") or [] if p.get("age")]
+    if people:
+        y = min(people, key=lambda x: x[0]["age"]); o = max(people, key=lambda x: x[0]["age"])
+        if y[0]["age"] != o[0]["age"]:
+            out.append({"tag": "Игроки", "text": f"Самый молодой в матче — {y[0]['nick']} ({y[1]}, {y[0]['age']} {plural(y[0]['age'], 'год', 'года', 'лет')}), "
+                        f"самый опытный — {o[0]['nick']} ({o[1]}, {o[0]['age']} {plural(o[0]['age'], 'год', 'года', 'лет')})."})
+    for t in teams:
+        loans = [p for p in t.get("players") or [] if any(str(x).startswith("В аренде") for x in p.get("tags") or [])]
+        for p in loans:
+            tag = next(x for x in p["tags"] if str(x).startswith("В аренде"))
+            out.append({"tag": "Игроки", "text": f"{p['nick']} играет за {t['name']} на правах аренды ({tag.lower()})."})
+        cs = [p.get("nationality") for p in t.get("players") or [] if p.get("nationality")]
+        if cs and len(set(cs)) == 1 and len(cs) >= 5:
+            out.append({"tag": "Игроки", "text": f"У {t['name']} весь состав из одной страны — {COUNTRY_RU.get(cs[0], cs[0])}."})
+    coaches = [(c, t["name"]) for t in teams for c in t.get("coach") or [] if c.get("age")]
+    if len(coaches) == 2:
+        out.append({"tag": "Тренеры", "text": f"Тренеры: {coaches[0][0]['nick']} ({coaches[0][1]}, {coaches[0][0]['age']}) "
+                    f"и {coaches[1][0]['nick']} ({coaches[1][1]}, {coaches[1][0]['age']})."})
+    # вето
+    v = d.get("veto") or {}
+    for i, t in enumerate(v.get("teams") or []):
+        if t and t.get("matches") and t.get("picks"):
+            mp, c = t["picks"][0]
+            txt = f"{nm[i]} чаще всего пикают {mp} — {c} раз за последние {t['matches']} матчей"
+            if t.get("first_bans"):
+                fb, fc = t["first_bans"][0]
+                txt += f"; первым баном обычно убирают {fb} ({fc})"
+            out.append({"tag": "Вето", "text": txt + "."})
+    # стороны и пистолетки
+    tot = (d.get("sides") or {}).get("total") or [None, None]
+    if all(tot):
+        out.append({"tag": "Стороны", "text": f"Пистолетки за 3 месяца: {nm[0]} {tot[0]['pistol']}% ({tot[0]['pistol_n'][0]} из {tot[0]['pistol_n'][1]}), "
+                    f"{nm[1]} {tot[1]['pistol']}% ({tot[1]['pistol_n'][0]} из {tot[1]['pistol_n'][1]})."})
+        for i in (0, 1):
+            ct, tt = tot[i].get("ct"), tot[i].get("t")
+            if ct is not None and tt is not None and abs(ct - tt) >= 6:
+                side = "защиту (CT)" if ct > tt else "атаку (T)"
+                out.append({"tag": "Стороны", "text": f"У {nm[i]} перекос в {side}: {ct}% раундов за CT против {tt}% за T."})
+    # карты
+    rows = (d.get("maps") or {}).get("table") or []
+    for i in (0, 1):
+        cand = [(r["map"], r["teams"][i]["won"], r["teams"][i]["played"]) for r in rows if r["teams"][i]["played"] >= 4]
+        if cand:
+            best = max(cand, key=lambda x: x[1] / x[2]); worst = min(cand, key=lambda x: x[1] / x[2])
+            txt = f"Лучшая карта {nm[i]} за 4 месяца — {best[0]} ({best[1]} из {best[2]})"
+            if worst[0] != best[0]:
+                txt += f", худшая — {worst[0]} ({worst[1]} из {worst[2]})"
+            out.append({"tag": "Карты", "text": txt + "."})
+    # игроки по статистике
+    for t in teams:
+        st = [x for x in t.get("stats") or [] if x.get("kd") and (x.get("maps") or 0) >= 8]
+        if st:
+            b = max(st, key=lambda x: x["kd"])
+            out.append({"tag": "Игроки", "text": f"Лучший K/D в {t['name']} за 3 месяца у {b['nick']} — {b['kd']} (ADR {b['adr']})."})
+    return out
+
+
+def _numbers(text: str) -> set:
+    return set(re.findall(r"\d+(?:[.,]\d+)?", text or ""))
+
+
 def build_facts(d: dict, prev: dict | None) -> list | None:
     key = str(d["id"])
+    stats_facts = code_facts(d)
     c = facts_cache.get(key)
+    story = None
     if c and (parse_iso(c.get("t")) or NOW) > NOW - timedelta(hours=FACTS_TTL_H):
-        return c["facts"]
-    if not GIGA_KEY or _giga["off"]:
-        return c["facts"] if c else None
-    data = json.dumps(facts_input(d), ensure_ascii=False)
-    res = parse_json_loose(giga_chat(FACTS_SYSTEM, data[:16000], 2800, model=os.environ.get("GIGACHAT_FACTS_MODEL", "GigaChat-2-Pro")))
-    facts = [f for f in (res or {}).get("facts") or [] if isinstance(f, dict) and f.get("text")][:20]
-    if not facts:
-        return c["facts"] if c else None
-    facts_cache[key] = {"t": iso(NOW), "facts": facts}
-    return facts
+        story = c["story"]
+    elif GIGA_KEY and not _giga["off"]:
+        inp = facts_input(d)
+        inp = {k: inp[k] for k in ("match", "team1", "team2", "h2h_year", "news_week") if k in inp}
+        for k in ("team1", "team2"):
+            inp[k] = {x: inp[k][x] for x in ("name", "coach", "players") if x in inp[k]}
+        data = json.dumps(inp, ensure_ascii=False)
+        res = parse_json_loose(giga_chat(FACTS_SYSTEM, data[:14000], 1800, model=os.environ.get("GIGACHAT_FACTS_MODEL", "GigaChat-2-Pro")))
+        allowed = _numbers(data)
+        story = []
+        for f in (res or {}).get("facts") or []:
+            if not isinstance(f, dict) or not f.get("text"):
+                continue
+            if not _numbers(f["text"]) <= allowed:
+                continue  # число, которого нет в данных, — модель что-то посчитала или придумала
+            if re.search(r"нет новост|не поступал|не было новост", f["text"], re.IGNORECASE):
+                continue
+            story.append({"tag": f.get("tag") or "Новости", "text": f["text"].strip()})
+        story = story[:10]
+        facts_cache[key] = {"t": iso(NOW), "story": story}
+    elif c:
+        story = c.get("story")
+    facts = (story or []) + stats_facts
+    return facts[:20] or None
 
 # ---------------------------------------------------------------- main
 
