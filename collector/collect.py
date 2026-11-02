@@ -1148,6 +1148,197 @@ def build_feed() -> dict:
     return {"updated": iso(NOW), "channels": [{"id": c, "title": _tg_titles.get(c, c)} for c in TG_NEWS_CHANNELS],
             "items": items}
 
+
+# ---------------------------------------------------------------- HLTV: призовые, слоты, мейджор
+
+HLTV = "https://www.hltv.org"
+HLTV_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Safari/537.36"
+HLTV_CACHE_F = CACHE / "hltv.json"
+hltv_cache: dict = load_json(HLTV_CACHE_F, {})
+HLTV_TTL_H = 6
+_hltv_pages: dict = {}
+_hltv_last = [0.0]
+
+
+def hltv_get(path: str) -> str | None:
+    if path in _hltv_pages:
+        return _hltv_pages[path]
+    wait = 2.5 - (time.time() - _hltv_last[0])
+    if wait > 0:
+        time.sleep(wait)
+    _hltv_last[0] = time.time()
+    stats["hltv_requests"] = stats.get("hltv_requests", 0) + 1
+    try:
+        html = http_get(HLTV + path, {"User-Agent": HLTV_UA, "Accept": "text/html", "Accept-Language": "en-US,en;q=0.9"},
+                        timeout=30).decode("utf-8", "replace")
+    except Exception as e:
+        warn(f"HLTV {path}: {e!r}")
+        html = None
+    _hltv_pages[path] = html
+    return html
+
+
+def hclean(h: str) -> str:
+    return re.sub(r"\s+", " ", re.sub(r"<img[^>]*>|<svg.*?</svg>|<source[^>]*>", "", h, flags=re.S))
+
+
+def hltv_events() -> dict:
+    """slug → путь страницы события."""
+    h = hltv_get("/events") or ""
+    out = {}
+    for href, slug in re.findall(r'href="(/events/\d+/([^"#?]+))"', h):
+        out.setdefault(slug, href)
+    return out
+
+
+def money(s: str | None) -> int | None:
+    if not s:
+        return None
+    d = re.sub(r"[^\d]", "", s)
+    return int(d) if d else None
+
+
+def parse_hltv_event(html: str) -> dict:
+    b = hclean(html)
+    res: dict = {}
+    m = re.search(r'class="prizepool text-ellipsis" title="([^"]+)"', b)
+    res["prize"] = money(m.group(1)) if m else None
+    m = re.search(r"Player Share:</div><div[^>]*>([^<]+)<", b)
+    res["player_share"] = money(m.group(1)) if m else None
+    m = re.search(r"Club Share:</div><div[^>]*>([^<]+)<", b)
+    res["club_share"] = money(m.group(1)) if m else None
+    places = []
+    i = b.find('id="PrizeDistribution"')
+    if i >= 0:
+        sec = b[i:i + 40000]
+        for pl in re.findall(r'<div class="placement">(.*?)</div></div>(?=<div class="col|</div></div>)', sec):
+            place = re.search(r'<div class="team">.*?</div><div>([^<]+)</div>', pl)
+            prizes = re.findall(r'<div class="prize[^"]*">(.*?)</div>', pl)
+            team = re.search(r'<div class="team">(.*?)</div>', pl)
+            tname = strip_html(team.group(1)) if team else ""
+            money_main = strip_html(prizes[0]) if prizes else ""
+            club = next((strip_html(x) for x in prizes if "Club share" in x), "")
+            spots = [strip_html(x) for x in re.findall(r'class="spot-prize">(.*?)</a>', pl)]
+            other = [strip_html(x) for x in prizes[1:] if x and "Club share" not in x and "spot-prize" not in x and strip_html(x)]
+            places.append({"place": place.group(1).strip() if place else "", "prize": money(money_main),
+                           "club": money(club), "spots": spots, "other": other, "team": tname or None})
+    # одинаковые места подряд (5-6th ×2) — схлопываем
+    merged = []
+    for p in places:
+        if merged and merged[-1]["place"] == p["place"] and merged[-1]["prize"] == p["prize"] and merged[-1]["spots"] == p["spots"]:
+            merged[-1]["count"] += 1
+            if p.get("team"):
+                merged[-1]["teams"].append(p["team"])
+            continue
+        merged.append({**p, "count": 1, "teams": [p["team"]] if p.get("team") else []})
+    res["places"] = merged
+    teams = re.findall(r'<div class="team-name"><a href="/team/\d+/[^"]+"><div class="text-container"><div class="text">([^<]+)</div>'
+                       r'.*?<div class="sub-text event-text">(.*?)</div>', b)
+    res["teams"] = [{"name": strip_html(n), "how": strip_html(h)} for n, h in teams]
+    return res
+
+
+def hltv_event_for(name: str, events: dict) -> str | None:
+    toks = [t for t in re.findall(r"[a-z0-9]+", name.lower()) if t not in ("the",)]
+    toks = ["iem" if t == "intel" else t for t in toks if t not in ("extreme", "masters")] if "intel" in toks else toks
+    best = None
+    for slug, href in events.items():
+        st = slug.split("-")
+        if all(t in st for t in toks) and (best is None or len(slug) < len(best[0])):
+            best = (slug, href)
+    return best[1] if best else None
+
+
+def hltv_cached(key: str, fn):
+    c = hltv_cache.get(key)
+    if c and (parse_iso(c.get("t")) or NOW) > NOW - timedelta(hours=HLTV_TTL_H):
+        return c["data"]
+    try:
+        data = fn()
+    except Exception as e:
+        warn(f"HLTV {key}: {e!r}")
+        data = None
+    if data:
+        hltv_cache[key] = {"t": iso(NOW), "data": data}
+        return data
+    return c["data"] if c else None
+
+
+def tournament_extras(name: str) -> dict | None:
+    def fn():
+        href = hltv_event_for(name, hltv_events())
+        if not href:
+            return None
+        h = hltv_get(href)
+        return {**parse_hltv_event(h), "hltv": HLTV + href} if h else None
+    return hltv_cached("event:" + name, fn)
+
+
+def parse_vrs_major(html: str) -> dict:
+    """Прогноз HLTV по приглашениям на мейджор: регион → секции (Stage 3/2/1, дальше очередь) → команды."""
+    b = hclean(html)
+    regions = []
+    parts = re.split(r'<div class="valve-ranking-region-header">', b)[1:]
+    for part in parts:
+        rname = strip_html(part.split("<span", 1)[0])
+        sections = []
+        for sp in re.split(r'<div class="valve-ranking-region-spot ', part)[1:]:
+            cls = sp.split('"', 1)[0]
+            head = re.search(r'valve-ranking-region-spot-header">(.*?)<div class="spot-divider"', sp)
+            title = strip_html(head.group(1)) if head else cls
+            teams = []
+            for pos, nm, pts, players in re.findall(
+                    r'<span class="position[^"]*">#(\d+)</span>.*?<span class="name">([^<]+)</span><span class="points">\((\d+)'
+                    r'.*?<div class="playersLine ">(.*?)</div></div></div>', sp):
+                teams.append({"pos": int(pos), "name": strip_html(nm), "points": int(pts),
+                              "roster": [strip_html(x) for x in re.findall(r"<span>([^<]+)</span>", players)]})
+            sections.append({"key": cls.strip(), "title": title, "teams": teams})
+        regions.append({"region": rname, "sections": sections})
+    m = re.search(r'regional-ranking-header-text">(.*?)<div', b)
+    return {"title": strip_html(m.group(1)) if m else None, "regions": regions}
+
+
+def build_major(rosters: dict) -> dict | None:
+    def fn():
+        inv = hltv_get("/valve-ranking/invites") or ""
+        evs = re.findall(r'<a href="(/valve-ranking/teams/event/\d+)" class="ranking-vrs-event">.*?ranking-vrs-event-header">([^<]+)<'
+                         r'.*?ranking-vrs-event-date">([^<]+)<', inv, re.S)
+        maj = next(((h, n, d) for h, n, d in evs if "major" in n.lower()), None)
+        if not maj:
+            return None
+        page = hltv_get(maj[0])
+        if not page:
+            return None
+        data = parse_vrs_major(page)
+        data["invite_date"] = maj[2].strip()
+        events = hltv_events()
+        base = next((s for s in events if "major" in s and re.search(r"20\d\d$", s)), None)
+        stages = {}
+        if base:
+            for key, slug in (("stage1", base + "-stage-1"), ("stage2", base + "-stage-2"), ("main", base)):
+                if slug in events:
+                    h = hltv_get(events[slug])
+                    if h:
+                        ev = parse_hltv_event(h)
+                        stages[key] = {"teams": ev["teams"], "places": ev["places"], "prize": ev.get("prize"), "url": HLTV + events[slug]}
+            data["event"] = base
+        data["stages"] = stages
+        return data
+    data = hltv_cached("major", fn)
+    if not data:
+        return None
+    # смена состава после снимка: сравниваем с актуальными составами, которые у нас есть
+    for reg in data.get("regions") or []:
+        for sec in reg["sections"]:
+            for t in sec["teams"]:
+                cur = rosters.get(norm(t["name"]))
+                if cur:
+                    old = {norm(x): x for x in t["roster"]}
+                    new = {norm(x): x for x in cur}
+                    out_, in_ = [old[k] for k in old if k not in new], [new[k] for k in new if k not in old]
+                    t["roster_change"] = {"out": out_, "in": in_} if out_ or in_ else None
+    return data
+
 # ---------------------------------------------------------------- новости
 
 def parse_date(s: str | None) -> datetime | None:
@@ -1867,6 +2058,7 @@ def main() -> int:
         del tg_cache[k]
     save_json(TG_CACHE_F, tg_cache)
     save_json(PRON_CACHE_F, pron_cache)
+    save_json(HLTV_CACHE_F, hltv_cache)
     prune_caches()
     save_json(GAMES_CACHE_F, games_cache)
     save_json(DETAILS_CACHE_F, details_cache)
@@ -1895,6 +2087,25 @@ def main() -> int:
         if b.get("status") != "running" and (tr["next"] is None or (b["begin_at"] or "") < tr["next"]):
             tr["next"] = b["begin_at"]
     tour_list = sorted(tours.values(), key=lambda x: (x["tier"] != "s", x["next"] or "9999"))
+    for tr in tour_list:
+        ex = tournament_extras(tr["name"])
+        if ex:
+            tr["hltv"] = ex
+            if ex.get("prize"):
+                tr["prize_usd"] = ex["prize"]
+    rosters = {}
+    for f in (OUT / "match").glob("*.json"):
+        for t in (load_json(f, {}) or {}).get("teams") or []:
+            if t.get("players"):
+                rosters[norm(t["name"])] = [p["nick"] for p in t["players"]]
+                if t.get("acronym"):
+                    rosters[norm(t["acronym"])] = rosters[norm(t["name"])]
+    try:
+        major = build_major(rosters)
+        if major:
+            save_json(OUT / "major.json", {"updated": iso(NOW), **major})
+    except Exception as e:
+        warn(f"Мейджор: {e!r}")
     save_json(OUT / "matches.json", {
         "updated": iso(NOW),
         "tiers": sorted(TIERS),

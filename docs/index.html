@@ -211,8 +211,28 @@ a { color: inherit; }
 .coach .lbl { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 600; }
 .coach b { font-size: 15px; }
 
+/* призовые */
+.prz-share { padding: 10px 12px 2px; font-size: 12px; color: var(--muted); }
+.prz-row { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; padding: 8px 12px; border-top: 1px solid var(--line); align-items: baseline; }
+.prz-row:first-child { border-top: 0; }
+.prz-pl { font-weight: 600; } .prz-pl small { color: var(--muted); font-weight: 500; }
+.prz-money { text-align: right; font-weight: 700; display: flex; flex-direction: column; align-items: flex-end; }
+.prz-money small { font-weight: 500; font-size: 11px; color: var(--muted); }
+.prz-spot { grid-column: 1 / -1; font-size: 12px; color: var(--ct); font-weight: 600; }
+.prz-team { grid-column: 1 / -1; font-size: 12px; color: var(--muted); }
+/* мейджор */
+.mj-row { display: grid; grid-template-columns: 40px 1fr auto; gap: 10px; padding: 9px 12px; border-top: 1px solid var(--line); align-items: start; }
+.mj-row:first-child { border-top: 0; }
+.mj-row.wait { opacity: .75; }
+.mj-pos { color: var(--muted); font-size: 13px; padding-top: 1px; }
+.mj-name { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.mj-name small { font-size: 12px; color: var(--muted); }
+.mj-name small.warn { color: var(--loss); font-weight: 600; }
+.mj-name .ok { color: var(--win); font-weight: 700; }
+.mj-pts { font-weight: 700; font-size: 13px; }
+
 /* лента */
-.hometabs { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+.hometabs { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 4px; }
 .feedch { margin-top: 10px; }
 .feed .sect-title { margin-top: 14px; }
 .fi { text-decoration: none; color: inherit; }
@@ -380,6 +400,7 @@ a.ni { text-decoration: none; color: inherit; }
   }
 
   // ---------- списки
+  function usd(n) { return n == null ? "" : "$" + Number(n).toLocaleString("ru-RU"); }
   function prize(p) {
     if (!p) return "";
     var m = /^(\d+)\s*(.*)$/.exec(String(p).trim());
@@ -418,7 +439,8 @@ a.ni { text-decoration: none; color: inherit; }
     return '<div class="view"><header class="top"><div class="brand"><h1>CS<b>·</b>Prep</h1>' +
       '<span class="upd">обновлено ' + esc(ago(L.updated)) + ' · время МСК</span></div>' +
       '<div class="hometabs" role="tablist"><button class="tab" data-home="tours" aria-selected="' + (active === "tours") + '">Турниры</button>' +
-      '<button class="tab" data-home="feed" aria-selected="' + (active === "feed") + '">Лента</button></div></header>';
+      '<button class="tab" data-home="feed" aria-selected="' + (active === "feed") + '">Лента</button>' +
+      '<button class="tab" data-home="major" aria-selected="' + (active === "major") + '">Мейджор</button></div></header>';
   }
 
   function getFeed() {
@@ -466,7 +488,7 @@ a.ni { text-decoration: none; color: inherit; }
       var next = t.live ? '<span class="live">● LIVE ' + t.live + '</span>' : (t.next ? 'ближайший <b>' + esc(dayKey(t.next) === today ? "сегодня " + hm(t.next) : dm(t.next) + " " + hm(t.next)) + '</b>' : '');
       html += '<button class="tour-card' + (todayN ? " today" : "") + '" data-tour="' + esc(t.id) + '">' +
         '<span class="tn">' + esc(t.name) + '</span><span class="pill go ' + esc(t.tier) + '">' + esc((t.tier || "?").toUpperCase()) + '</span>' +
-        '<span class="tm2">' + [dates && esc(dates), t.prize && esc(prize(t.prize)), (todayN ? '<b>сегодня ' + todayN + '</b>' : ms.length + ' матч.'), next].filter(Boolean).join(' · ') + '</span></button>';
+        '<span class="tm2">' + [dates && esc(dates), (t.prize_usd || t.prize) && '<b>' + esc(t.prize_usd ? usd(t.prize_usd) : prize(t.prize)) + '</b>', (todayN ? '<b>сегодня ' + todayN + '</b>' : ms.length + ' матч.'), next].filter(Boolean).join(' · ') + '</span></button>';
     });
     $app.innerHTML = html + '</div></div>';
   }
@@ -479,6 +501,73 @@ a.ni { text-decoration: none; color: inherit; }
       (t ? '<span class="pill ' + esc(t.tier) + '">' + esc((t.tier || "").toUpperCase()) + '</span>' + (t.begin ? esc(dm(t.begin) + (t.end ? " – " + dm(t.end) : "")) : "") + (t.prize ? " · " + esc(prize(t.prize)) : "") : "") +
       '</span></div></header>';
     html += ms.length ? byDays(ms, false) : '<div class="empty"><strong>Матчей нет</strong></div>';
+    if (t && t.hltv) html += prizeBlock(t.hltv);
+    $app.innerHTML = html + '</div>';
+  }
+
+  function placeRu(p) { return String(p || "").replace(/(st|nd|rd|th)$/i, "").replace(/-/, "–") + " место"; }
+
+  function prizeBlock(h) {
+    var html = '<div class="sec"><h3>Призовые и слоты <span>' + esc(usd(h.prize)) + '</span></h3><div class="box prz">';
+    if (h.player_share || h.club_share) html += '<div class="prz-share">игрокам ' + esc(usd(h.player_share)) + ' · клубам ' + esc(usd(h.club_share)) + '</div>';
+    (h.places || []).forEach(function (p) {
+      html += '<div class="prz-row"><span class="prz-pl">' + esc(placeRu(p.place)) + (p.count > 1 ? ' <small>×' + p.count + '</small>' : '') + '</span>' +
+        '<span class="prz-money num">' + (p.prize ? esc(usd(p.prize)) : '') + (p.club ? '<small>+ клубу ' + esc(usd(p.club)) + '</small>' : '') + '</span>' +
+        ((p.spots || []).length ? '<span class="prz-spot">→ ' + esc(p.spots.join(", ")) + '</span>' : '') +
+        ((p.teams || []).length ? '<span class="prz-team">' + esc(p.teams.join(", ")) + '</span>' : '') + '</div>';
+    });
+    html += '</div></div>';
+    if ((h.teams || []).length) {
+      html += '<div class="sec"><h3>Участники <span>как попали</span></h3><div class="box">' + h.teams.map(function (t) {
+        return '<div class="prz-row"><span class="prz-pl">' + esc(t.name) + '</span><span class="prz-spot" style="grid-column:auto">' + esc(howRu(t.how)) + '</span></div>';
+      }).join("") + '</div></div>';
+    }
+    return html;
+  }
+  function howRu(s) {
+    return String(s || "").replace(/^VRS \(Global\)/, "по рейтингу VRS (мир)").replace(/^VRS \(Europe\)/, "по рейтингу VRS (Европа)")
+      .replace(/^VRS \(Americas\)/, "по рейтингу VRS (Америка)").replace(/^VRS \(Asia\)/, "по рейтингу VRS (Азия)")
+      .replace(/Closed Qualifier/, "закрытая квалификация").replace(/Open Qualifier/, "открытая квалификация").replace(/^Invited$/, "приглашение");
+  }
+
+  // ---------- мейджор
+  function getMajor() {
+    if (state.major) return Promise.resolve(state.major);
+    if (DEMO) return Promise.resolve(DEMO.major || null);
+    return fetch("data/major.json" + bust()).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then(function (j) { state.major = j; return j; });
+  }
+  var REG_RU = { Europe: "Европа", Americas: "Америка", Asia: "Азия" };
+  function renderMajor() {
+    var html = homeHeader("major");
+    var M = state.major;
+    if (!M) { $app.innerHTML = html + '<div class="empty">Загружаю…</div></div>'; return; }
+    var main = (M.stages || {}).main || {};
+    var confirmed = {};
+    ["stage1", "stage2", "main"].forEach(function (k) { ((M.stages || {})[k] || { teams: [] }).teams.forEach(function (t) { confirmed[t.name.toLowerCase()] = k; }); });
+    html += '<div class="subhead" style="margin-top:12px"><h1>' + esc((M.title || "Мейджор").replace(/ ranking on .*/, "")) + '</h1>' +
+      '<span class="upd">приглашения по рейтингу VRS на ' + esc(M.invite_date || "") + (main.prize ? ' · ' + esc(usd(main.prize)) : '') + '</span></div>' +
+      '<div class="note" style="padding:8px 0 0">Stage 3 — сильнейшие, сразу в последнюю стадию перед плей-офф; Stage 2 и Stage 1 — раньше, через швейцарскую систему. Приглашение получает состав, а не клуб.</div>';
+    var reg = state.majorReg || ((M.regions || [])[0] || {}).region;
+    html += '<div class="filt" style="margin-top:10px">' + (M.regions || []).map(function (r) {
+      return '<button class="chip" data-mreg="' + esc(r.region) + '" aria-pressed="' + (r.region === reg) + '">' + esc(REG_RU[r.region] || r.region) + '</button>';
+    }).join("") + '</div>';
+    var R = (M.regions || []).find(function (r) { return r.region === reg; });
+    (R ? R.sections : []).forEach(function (sec) {
+      var isStage = /stage/i.test(sec.key);
+      var title = isStage ? sec.title : (sec.title && !/^[a-z-]+$/.test(sec.title) ? sec.title : "Ближайшие в очереди");
+      html += '<div class="sec"><h3>' + esc(title.replace("Stage", "Stage")) + ' <span>' + sec.teams.length + ' ' + (isStage ? "мест" : "команд") + '</span></h3><div class="box mj">';
+      sec.teams.forEach(function (t) {
+        var rc = t.roster_change;
+        html += '<div class="mj-row' + (isStage ? '' : ' wait') + '"><span class="mj-pos num">#' + t.pos + '</span><span class="mj-name"><b>' + esc(t.name) + '</b>' +
+          (confirmed[t.name.toLowerCase()] ? ' <span class="ok">✓</span>' : '') +
+          '<small>' + esc((t.roster || []).join(", ")) + '</small>' +
+          (rc ? '<small class="warn">состав изменился: ' + (rc.out.length ? '−' + esc(rc.out.join(", −")) : '') + (rc["in"].length ? ' +' + esc(rc["in"].join(", +")) : '') + '</small>' : '') +
+          '</span><span class="mj-pts num">' + t.points + '</span></div>';
+      });
+      html += '</div></div>';
+    });
+    html += '<div class="note" style="padding:12px 0">✓ — команда уже в списке участников стадии на HLTV. Если команда откажется или потеряет приглашение из-за смены состава, место переходит следующей в очереди своего региона.</div>';
     $app.innerHTML = html + '</div>';
   }
 
@@ -732,7 +821,7 @@ a.ni { text-decoration: none; color: inherit; }
   function route() {
     var h = location.hash.replace("#", "");
     var mt = /^m-(\d+)$/.exec(h), tt = /^t-([\w-]+)$/.exec(h);
-    try { TG && (h && h !== "feed" ? TG.BackButton.show() : TG.BackButton.hide()); } catch (e) {}
+    try { TG && (h && h !== "feed" && h !== "major" ? TG.BackButton.show() : TG.BackButton.hide()); } catch (e) {}
     if (!state.list) return;
     if (mt) {
       var id = mt[1];
@@ -746,11 +835,13 @@ a.ni { text-decoration: none; color: inherit; }
     state.openId = null;
     if (tt) { state.view = "tour:" + tt[1]; renderTour(tt[1]); }
     else if (h === "mine") { state.view = "mine"; renderMine(); }
+    else if (h === "major") { state.view = "major"; renderMajor(); getMajor().then(function () { if (state.view === "major") renderMajor(); }).catch(function () { if (state.view === "major") $app.innerHTML = homeHeader("major") + '<div class="empty"><strong>Данные по мейджору ещё не собраны</strong>Появятся после ближайшего обновления.</div></div>'; }); }
     else if (h === "feed") { state.view = "feed"; renderFeed(); getFeed().then(function () { if (state.view === "feed") renderFeed(); }).catch(function () { if (state.view === "feed") $app.innerHTML = homeHeader("feed") + '<div class="empty"><strong>Лента пока не собрана</strong>Появится после ближайшего обновления данных.</div></div>'; }); }
     else { state.view = "home"; renderHome(); }
   }
   function rerenderList() {
     if (state.view === "feed") renderFeed();
+    else if (state.view === "major") renderMajor();
     else if (state.view === "mine") renderMine();
     else if (state.view && state.view.indexOf("tour:") === 0) renderTour(state.view.slice(5));
     else renderHome();
@@ -775,9 +866,10 @@ a.ni { text-decoration: none; color: inherit; }
 
   // ---------- клики
   $app.addEventListener("click", function (e) {
-    var t = e.target.closest("[data-home],[data-feedch],[data-tg],[data-reader],#close-reader,[data-mine],[data-open],[data-tour],[data-tab],[data-map],[data-nf],[data-player],[data-link],[data-news],[data-orig],[data-read],#back,#to-mine");
+    var t = e.target.closest("[data-mreg],[data-home],[data-feedch],[data-tg],[data-reader],#close-reader,[data-mine],[data-open],[data-tour],[data-tab],[data-map],[data-nf],[data-player],[data-link],[data-news],[data-orig],[data-read],#back,#to-mine");
     if (!t) return;
-    if (t.hasAttribute("data-home")) { var hv = t.getAttribute("data-home"); if (hv === "feed") { location.hash = "feed"; } else if (location.hash) { location.hash = ""; } return; }
+    if (t.hasAttribute("data-home")) { var hv = t.getAttribute("data-home"); if (hv === "feed" || hv === "major") { location.hash = hv; } else if (location.hash) { location.hash = ""; } return; }
+    if (t.hasAttribute("data-mreg")) { state.majorReg = t.getAttribute("data-mreg"); renderMajor(); return; }
     if (t.hasAttribute("data-feedch")) { state.feedCh = t.getAttribute("data-feedch"); renderFeed(); return; }
     if (t.hasAttribute("data-tg")) { if (TG) { e.preventDefault(); try { TG.openTelegramLink(t.getAttribute("data-tg")); } catch (x) { openLink(t.getAttribute("data-tg")); } } return; }
     if (t.hasAttribute("data-reader")) { state.reader = t.getAttribute("data-reader"); state.readerScroll = window.scrollY; renderMatch(state.details[state.openId]); window.scrollTo(0, 0); return; }
