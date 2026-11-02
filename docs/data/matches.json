@@ -1,5 +1,5 @@
 {
- "updated": "2026-11-02T01:24:28Z",
+ "updated": "2026-11-02T02:21:53Z",
  "tiers": [
   "a",
   "s"
@@ -14,8 +14,8 @@
    "end": "2026-11-08T12:30:00Z",
    "prize": "1,250,000 United States Dollar",
    "matches": 30,
-   "next": "2026-11-02T02:00:00Z",
-   "live": 0,
+   "next": "2026-11-02T04:30:00Z",
+   "live": 2,
    "hltv": {
     "prize": 1250000,
     "player_share": 300000,
@@ -609,9 +609,46 @@
  ],
  "matches": [
   {
+   "id": 1761567,
+   "begin_at": "2026-11-02T02:05:41Z",
+   "status": "running",
+   "bo": 3,
+   "name": "Upper Bracket Quarterfinal 1: LGC vs MGLZ",
+   "tournament": "IEM Beijing 2026",
+   "stage": "Group A · Upper Bracket Quarterfinal 1",
+   "tier": "s",
+   "serie": {
+    "id": 11136,
+    "begin": "2026-11-02T02:00:00Z",
+    "end": "2026-11-08T12:30:00Z",
+    "image": null,
+    "prize": null
+   },
+   "teams": [
+    {
+     "id": 133708,
+     "name": "Legacy",
+     "acronym": "LGC",
+     "slug": "legacy-48cb0f61-07e7-4b0d-85a0-5f837e29c807",
+     "image": "https://cdn-api.pandascore.co/images/team/image/133708/593px_legacy_allmode.png",
+     "location": "BR"
+    },
+    {
+     "id": 3272,
+     "name": "TheMongolz",
+     "acronym": "MGLZ",
+     "slug": "themongolz",
+     "image": "https://cdn-api.pandascore.co/images/team/image/3272/702px_the_mongol_z_2024_03_allmode.png",
+     "location": "MN"
+    }
+   ],
+   "stream": "https://www.twitch.tv/cs2_paragon_ru",
+   "has_detail": true
+  },
+  {
    "id": 1761571,
-   "begin_at": "2026-11-02T02:00:00Z",
-   "status": "not_started",
+   "begin_at": "2026-11-02T02:08:09Z",
+   "status": "running",
    "bo": 3,
    "name": "Upper Bracket Quarterfinal 2: HERO vs B8",
    "tournament": "IEM Beijing 2026",
@@ -643,43 +680,6 @@
     }
    ],
    "stream": "https://www.twitch.tv/Mikotohero",
-   "has_detail": true
-  },
-  {
-   "id": 1761567,
-   "begin_at": "2026-11-02T02:00:00Z",
-   "status": "not_started",
-   "bo": 3,
-   "name": "Upper Bracket Quarterfinal 1: LGC vs MGLZ",
-   "tournament": "IEM Beijing 2026",
-   "stage": "Group A · Upper Bracket Quarterfinal 1",
-   "tier": "s",
-   "serie": {
-    "id": 11136,
-    "begin": "2026-11-02T02:00:00Z",
-    "end": "2026-11-08T12:30:00Z",
-    "image": null,
-    "prize": null
-   },
-   "teams": [
-    {
-     "id": 133708,
-     "name": "Legacy",
-     "acronym": "LGC",
-     "slug": "legacy-48cb0f61-07e7-4b0d-85a0-5f837e29c807",
-     "image": "https://cdn-api.pandascore.co/images/team/image/133708/593px_legacy_allmode.png",
-     "location": "BR"
-    },
-    {
-     "id": 3272,
-     "name": "TheMongolz",
-     "acronym": "MGLZ",
-     "slug": "themongolz",
-     "image": "https://cdn-api.pandascore.co/images/team/image/3272/702px_the_mongol_z_2024_03_allmode.png",
-     "location": "MN"
-    }
-   ],
-   "stream": "https://www.twitch.tv/keliencs",
    "has_detail": true
   },
   {
@@ -716,7 +716,7 @@
      "location": "DE"
     }
    ],
-   "stream": "https://www.twitch.tv/keliencs",
+   "stream": "https://www.twitch.tv/cs2_paragon_ru",
    "has_detail": true
   },
   {
@@ -1347,54 +1347,14 @@
  ],
  "meta": {
   "panda_requests": 19,
-  "bo3_requests": 932,
-  "liquipedia_requests": 36,
-  "translations": 26,
+  "bo3_requests": 530,
+  "liquipedia_requests": 0,
+  "translations": 3,
   "warnings": [
-   "HLTV /stats/players/21163/susp?startDate=2026-08-04&endDate=2026-11-02: <HTTPError 403: 'Forbidden'>",
-   "HLTV /stats/players/21983/chr1zn?startDate=2026-08-04&endDate=2026-11-02: <HTTPError 403: 'Forbidden'>",
-   "HLTV /stats/players/20119/nilo?startDate=2026-08-04&endDate=2026-11-02: <HTTPError 403: 'Forbidden'>",
-   "HLTV /stats/players/13666/brollan?startDate=2026-08-04&endDate=2026-11-02: <HTTPError 403: 'Forbidden'>",
-   "HLTV /stats/players/22842/kensizor?startDate=2026-08-04&endDate=2026-11-02: <HTTPError 403: 'Forbidden'>",
-   "HLTV /stats/players/20112/alex666?startDate=2026-08-04&endDate=2026-11-02: <HTTPError 403: 'Forbidden'>",
-   "HLTV /stats/players/23643/esenthial?startDate=2026-08-04&endDate=2026-11-02: <HTTPError 403: 'Forbidden'>",
-   "HLTV /stats/players/25619/s1zzi?startDate=2026-08-04&endDate=2026-11-02: <HTTPError 403: 'Forbidden'>",
-   "HLTV /stats/players/21708/npl?startDate=2026-08-04&endDate=2026-11-02: <HTTPError 403: 'Forbidden'>",
-   "Лента HLTV: HTTP Error 403: Forbidden",
-   "GigaChat: URLError(TimeoutError('timed out'))",
-   "GigaChat загрузка картинки: <HTTPError 504: 'Gateway Time-out'>",
-   "HLTV /stats/players/19045/latto?startDate=2026-08-04&endDate=2026-11-02: <HTTPError 403: 'Forbidden'>",
-   "HLTV /stats/players/12521/art?startDate=2026-08-04&endDate=2026-11-02: <HTTPError 403: 'Forbidden'>",
-   "HLTV /stats/players/19869/try?startDate=2026-08-04&endDate=2026-11-02: <HTTPError 403: 'Forbidden'>",
-   "HLTV /stats/players/15698/dumau?startDate=2026-08-04&endDate=2026-11-02: <HTTPError 403: 'Forbidden'>",
-   "HLTV /stats/players/22182/ksloks?startDate=2026-08-04&endDate=2026-11-02: <HTTPError 403: 'Forbidden'>",
-   "HLTV /stats/players/23402/cobrazera?startDate=2026-08-04&endDate=2026-11-02: <HTTPError 403: 'Forbidden'>",
-   "HLTV /stats/players/20194/blitz?startDate=2026-08-04&endDate=2026-11-02: <HTTPError 403: 'Forbidden'>",
-   "HLTV /stats/players/21809/910?startDate=2026-08-04&endDate=2026-11-02: <HTTPError 403: 'Forbidden'>",
-   "HLTV /stats/players/15072/nin9?startDate=2026-08-04&endDate=2026-11-02: <HTTPError 403: 'Forbidden'>",
-   "GigaChat: URLError(TimeoutError('timed out'))",
-   "HLTV /stats/players/8528/hobbit?startDate=2026-08-04&endDate=2026-11-02: <HTTPError 403: 'Forbidden'>",
-   "HLTV /stats/players/13776/jame?startDate=2026-08-04&endDate=2026-11-02: <HTTPError 403: 'Forbidden'>",
-   "HLTV /stats/players/22471/xielo?startDate=2026-08-04&endDate=2026-11-02: <HTTPError 403: 'Forbidden'>",
-   "HLTV /stats/players/23685/zweih?startDate=2026-08-04&endDate=2026-11-02: <HTTPError 403: 'Forbidden'>",
-   "HLTV /stats/players/12732/fl1t?startDate=2026-08-04&endDate=2026-11-02: <HTTPError 403: 'Forbidden'>",
-   "HLTV /stats/players/21062/matys?startDate=2026-08-04&endDate=2026-11-02: <HTTPError 403: 'Forbidden'>",
-   "HLTV /stats/players/20447/heavygod?startDate=2026-08-04&endDate=2026-11-02: <HTTPError 403: 'Forbidden'>",
-   "HLTV /stats/players/20425/r1nkle?startDate=2026-08-04&endDate=2026-11-02: <HTTPError 403: 'Forbidden'>",
-   "HLTV /stats/players/3972/hunter?startDate=2026-08-04&endDate=2026-11-02: <HTTPError 403: 'Forbidden'>",
-   "HLTV /stats/players/9436/nertz?startDate=2026-08-04&endDate=2026-11-02: <HTTPError 403: 'Forbidden'>",
-   "HLTV /stats/players/7938/xantares?startDate=2026-08-04&endDate=2026-11-02: <HTTPError 403: 'Forbidden'>",
-   "HLTV /stats/players/21243/wicadia?startDate=2026-08-04&endDate=2026-11-02: <HTTPError 403: 'Forbidden'>",
-   "HLTV /stats/players/19677/kyxsan?startDate=2026-08-04&endDate=2026-11-02: <HTTPError 403: 'Forbidden'>",
-   "HLTV /stats/players/8574/woxic?startDate=2026-08-04&endDate=2026-11-02: <HTTPError 403: 'Forbidden'>",
-   "HLTV /stats/players/18850/jimpphat?startDate=2026-08-04&endDate=2026-11-02: <HTTPError 403: 'Forbidden'>",
-   "HLTV /stats/players/24203/jorko?startDate=2026-08-04&endDate=2026-11-02: <HTTPError 403: 'Forbidden'>",
-   "HLTV /stats/players/11630/jt?startDate=2026-08-04&endDate=2026-11-02: <HTTPError 403: 'Forbidden'>",
-   "HLTV /stats/players/8520/naf?startDate=2026-08-04&endDate=2026-11-02: <HTTPError 403: 'Forbidden'>"
+   "GigaChat: URLError(TimeoutError('timed out'))"
   ],
-  "hltv_requests": 81,
-  "giga_calls": 95,
-  "giga_tokens": 37299,
-  "giga_vision": 17
+  "giga_calls": 103,
+  "giga_tokens": 53720,
+  "giga_vision": 7
  }
 }
