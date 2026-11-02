@@ -1582,7 +1582,7 @@ def build_major(rosters: dict) -> dict | None:
 
 VETO_CACHE_F = CACHE / "hltv_vetoes.json"
 veto_cache: dict = load_json(VETO_CACHE_F, {})   # "match:<id>" → вето навсегда; "results:<team>" → список матчей на 12 ч
-VETO_NEW_LIMIT = int(os.environ.get("VETO_NEW_LIMIT", "25"))
+VETO_NEW_LIMIT = int(os.environ.get("VETO_NEW_LIMIT", "0"))  # страницы матчей HLTV закрыты для ботов (403) — выключено
 VETO_MATCHES = 15
 _veto_new = [0]
 hltv_team_ids: dict = {}   # norm(название) → {"id","slug","name"}
@@ -1645,6 +1645,8 @@ def hltv_veto(match: dict) -> dict | None:
 
 def build_veto(teams: list[dict]) -> dict | None:
     """По каждой команде: что пикает, что банит первым и вообще, по последним матчам; плюс вероятный маппул."""
+    if VETO_NEW_LIMIT <= 0 and not any(k.startswith("match:") for k in veto_cache):
+        return None
     res = []
     for t in teams:
         ht = hltv_team_for(t)
