@@ -1,5 +1,5 @@
 {
- "updated": "2026-11-02T06:05:06Z",
+ "updated": "2026-11-02T06:16:22Z",
  "tiers": [
   "a",
   "s"
@@ -1774,14 +1774,14 @@
   "panda_requests": 19,
   "bo3_requests": 57,
   "liquipedia_requests": 0,
-  "translations": 7,
+  "translations": 10,
   "warnings": [
    "GigaChat: URLError(TimeoutError('timed out'))",
    "GigaChat: дневной лимит токенов исчерпан, остальное — завтра"
   ],
-  "dust2_requests": 38,
-  "giga_calls": 8,
-  "giga_tokens": 4171,
+  "dust2_requests": 25,
+  "giga_calls": 9,
+  "giga_tokens": 4931,
   "hltv_requests": 2
  }
 }
