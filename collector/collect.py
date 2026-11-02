@@ -983,7 +983,37 @@ def bo3_player_nick(pid) -> str | None:
     return nick
 
 
-def match_roster(x: dict, roster: dict) -> str | None:
+_bo3_team_players: dict = {}
+
+
+def bo3_team_players(bid: int, hist: list[dict]) -> dict:
+    """id игрока bo3 → ник по составу команды на bo3.gg (запрос команды вместе с игроками)."""
+    if bid in _bo3_team_players:
+        return _bo3_team_players[bid]
+    slug = None
+    for m in hist[:10]:
+        for side in ("team1", "team2"):
+            t = m.get(side) or {}
+            if t.get("id") == bid and t.get("slug"):
+                slug = t["slug"]
+                break
+        if slug:
+            break
+    res = {}
+    if slug:
+        try:
+            for t in bo3("/teams", {"filter[teams.slug][eq]": slug, "with": "players"}).get("results") or []:
+                if t.get("id") == bid:
+                    for p in t.get("players") or []:
+                        if p.get("id") and p.get("nickname"):
+                            res[str(p["id"])] = p["nickname"]
+        except Exception as e:
+            warn(f"bo3 состав {slug}: {e!r}")
+    _bo3_team_players[bid] = res
+    return res
+
+
+def match_roster(x: dict, roster: dict, team_ids: dict | None = None) -> str | None:
     """Ключ игрока из состава для строки статистики: по нику в Steam, по частичному совпадению, по id игрока на bo3."""
     k = norm(x.get("nick"))
     if k in roster:
@@ -991,8 +1021,14 @@ def match_roster(x: dict, roster: dict) -> str | None:
     for r in roster:
         if len(r) >= 3 and (r in k or (len(k) >= 3 and k in r)):
             return r
-    canon = norm(bo3_player_nick(x.get("pid")))
-    return canon if canon in roster else None
+    canon = norm((team_ids or {}).get(str(x.get("pid"))) or "")
+    if canon in roster:
+        return canon
+    import difflib
+    best = max(roster, key=lambda r: difflib.SequenceMatcher(None, r, k).ratio(), default=None)
+    if best and difflib.SequenceMatcher(None, best, k).ratio() >= 0.8:
+        return best  # опечатки в нике Steam: Martineez → Martinez
+    return None
 
 
 def build_player_stats(team: dict, bid: int | None, hist: list[dict]) -> list[dict]:
@@ -1000,12 +1036,13 @@ def build_player_stats(team: dict, bid: int | None, hist: list[dict]) -> list[di
     if not bid:
         return []
     roster = {norm(p.get("nick")): p.get("nick") for p in team.get("players") or []}
+    team_ids = bo3_team_players(bid, hist)
     agg: dict = {}
     for m, g, det in team_games(bid, hist):
         for x in det.get("players") or []:
             if x.get("tid") != bid or not x.get("nick"):
                 continue
-            key = match_roster(x, roster) if roster else norm(x["nick"])
+            key = match_roster(x, roster, team_ids) if roster else norm(x["nick"])
             if not key:
                 continue
             a = agg.setdefault(key, {"nick": roster.get(key, x["nick"]), "maps": 0, "k": 0, "d": 0, "adr": 0.0, "kast": 0.0,
