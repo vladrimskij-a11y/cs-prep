@@ -1090,7 +1090,7 @@ def giga_upload(data: bytes, name: str = "image.jpg") -> str | None:
 
 def giga_read_image(url: str) -> str | None:
     """Текст с картинки поста (новостные карточки) через GigaChat с распознаванием изображений."""
-    if not GIGA_KEY or _giga["off"]:
+    if not GIGA_KEY or _giga["off"] or not giga_budget_ok("max"):
         return None
     try:
         img = http_get(url, {"Accept": "image/*"}, timeout=25)
@@ -1111,6 +1111,7 @@ def giga_read_image(url: str) -> str | None:
         with urllib.request.urlopen(req, timeout=90, context=giga_ctx()) as r:
             j = json.loads(r.read())
         stats["giga_vision"] = stats.get("giga_vision", 0) + 1
+        giga_spend("max", (j.get("usage") or {}).get("total_tokens", 0))
         txt = j["choices"][0]["message"]["content"].strip()
         return None if txt.upper().startswith("НЕТ") else txt
     except Exception as e:
@@ -1730,6 +1731,24 @@ GIGA_MODEL = os.environ.get("GIGACHAT_MODEL", "GigaChat-2")
 GIGA_CA_URL = "https://gu-st.ru/content/lending/russian_trusted_root_ca_pem.crt"
 _giga = {"token": None, "exp": 0.0, "ctx": None, "off": False}
 
+# Дневные лимиты токенов, чтобы бесплатного пакета хватило на год:
+# базовая модель 250 млн/год → 500 тыс./день, Max (картинки) 25 млн/год → 50 тыс./день.
+GIGA_DAY_LIMIT = {"lite": int(os.environ.get("GIGA_DAY_LITE", "500000")), "max": int(os.environ.get("GIGA_DAY_MAX", "50000"))}
+GIGA_USAGE_F = CACHE / "giga_usage.json"
+giga_usage: dict = load_json(GIGA_USAGE_F, {})
+
+
+def giga_budget_ok(kind: str) -> bool:
+    day = NOW.strftime("%Y-%m-%d")
+    used = (giga_usage.get(day) or {}).get(kind, 0)
+    return used < GIGA_DAY_LIMIT[kind]
+
+
+def giga_spend(kind: str, tokens: int) -> None:
+    day = NOW.strftime("%Y-%m-%d")
+    d = giga_usage.setdefault(day, {})
+    d[kind] = d.get(kind, 0) + int(tokens or 0)
+
 
 def giga_ctx():
     if _giga["ctx"] is None:
@@ -1764,6 +1783,11 @@ def giga_token() -> str | None:
 def giga_chat(system: str, user: str, max_tokens: int = 900) -> str | None:
     if not GIGA_KEY or _giga["off"]:
         return None
+    if not giga_budget_ok("lite"):
+        if not _giga.get("warned_lite"):
+            warn("GigaChat: дневной лимит токенов исчерпан, остальное — завтра")
+            _giga["warned_lite"] = True
+        return None
     body = json.dumps({"model": GIGA_MODEL, "temperature": 0.3, "max_tokens": max_tokens,
                        "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}]}).encode()
     for attempt in range(3):
@@ -1775,6 +1799,7 @@ def giga_chat(system: str, user: str, max_tokens: int = 900) -> str | None:
                 j = json.loads(r.read())
             stats["giga_calls"] = stats.get("giga_calls", 0) + 1
             stats["giga_tokens"] = stats.get("giga_tokens", 0) + (j.get("usage") or {}).get("total_tokens", 0)
+            giga_spend("lite", (j.get("usage") or {}).get("total_tokens", 0))
             return j["choices"][0]["message"]["content"]
         except urllib.error.HTTPError as e:
             msg = e.read()[:200].decode("utf-8", "replace")
@@ -2181,6 +2206,9 @@ def main() -> int:
     save_json(TG_CACHE_F, tg_cache)
     save_json(PRON_CACHE_F, pron_cache)
     save_json(HLTV_CACHE_F, hltv_cache)
+    for k in [k for k in giga_usage if k < (NOW - timedelta(days=40)).strftime("%Y-%m-%d")]:
+        del giga_usage[k]
+    save_json(GIGA_USAGE_F, giga_usage)
     save_json(HLTV_STATS_CACHE_F, hltv_stats_cache)
     prune_caches()
     save_json(GAMES_CACHE_F, games_cache)
