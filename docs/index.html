@@ -254,10 +254,15 @@ a { color: inherit; }
 .in-right { animation: tabInR .14s ease-out; }
 html, body { overflow-x: clip; }  /* соседняя страница при свайпе не расширяет экран (иначе телефон на миг отдаляет страницу) */
 html { overflow-anchor: none; }
-.mshell { position: fixed; inset: 0; overflow: hidden; background: var(--bg); z-index: 1; }
+.mshell { position: fixed; inset: 0; overflow: hidden; background: var(--bg); z-index: 1; display: flex; flex-direction: column; }
+.mhead { flex: none; background: var(--bg); }
+.mhead > .pin { max-width: 640px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-top: env(safe-area-inset-top, 0px); }
+.mhead .tabs { position: static; }
+.mviewport { flex: 1; min-height: 0; overflow: hidden; position: relative; }
 .mtrack { display: flex; height: 100%; will-change: transform; }
+.pane .nfilt { top: 0; }
 .pane { flex: 0 0 100%; width: 100%; height: 100%; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; touch-action: pan-y; }
-.pane > .pin { max-width: 640px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-top: env(safe-area-inset-top, 0px); padding-bottom: calc(32px + env(safe-area-inset-bottom, 0px)); }
+.pane > .pin { max-width: 640px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-bottom: calc(32px + env(safe-area-inset-bottom, 0px)); }
 .tabbody { display: flow-root; }
 .view.reader { touch-action: pan-y; }
 .swipe-ghost { position: absolute; pointer-events: none; }
@@ -1062,7 +1067,7 @@ a.ni { text-decoration: none; color: inherit; }
     if (k.indexOf("news:") === 0) { state.tab = "news"; state.newsFilter = k.slice(5); } else state.tab = k;
     state.openNews = null;
   }
-  function paneHtml(m) {
+  function headHtml(m) {
     var A = m.teams[0] || {}, B = m.teams[1] || {};
     var nCount = ((m.news && m.news.items) || []).length;
     function tabBtn(id, label, c) { return '<button class="tab" role="tab" data-tab="' + id + '" aria-selected="' + (state.tab === id) + '">' + label + (c ? '<span class="c">' + c + '</span>' : '') + '</button>'; }
@@ -1072,12 +1077,17 @@ a.ni { text-decoration: none; color: inherit; }
       '<div class="mid"><b>' + esc(hm(m.begin_at)) + '</b>' + esc(dm(m.begin_at)) + ' · BO' + esc(m.bo) + '</div>' +
       '<div class="tm b"><span class="acr">' + esc(abbr(B)) + '</span><span class="full">' + esc(B.name) + '</span></div></div>' +
       '</section>' +
-      '<nav class="tabs" role="tablist">' + tabBtn("stats", "Статистика") + tabBtn("players", "Игроки") + tabBtn("news", "Новости", nCount) + '</nav>' +
-      '<div class="tabbody">' + tabBodyHtml(m) + '</div>';
+      '<nav class="tabs" role="tablist">' + tabBtn("stats", "Статистика") + tabBtn("players", "Игроки") + tabBtn("news", "Новости", nCount) + '</nav>';
+  }
+  function paneHtml(m) { return '<div class="tabbody">' + tabBodyHtml(m) + '</div>'; }
+  // подсветка вкладок в неподвижной шапке — вместе со свайпом
+  function markTabs(key) {
+    var tab = key.indexOf("news:") === 0 ? "news" : key;
+    document.querySelectorAll(".mhead [data-tab]").forEach(function (b) { b.setAttribute("aria-selected", String(b.getAttribute("data-tab") === tab)); });
   }
   function panes() { return [].slice.call(document.querySelectorAll(".mshell .pane")); }
   function activePane() { return document.querySelector('.mshell .pane[data-key="' + (window.CSS && CSS.escape ? CSS.escape(curKey()) : curKey()) + '"]'); }
-  function paneW() { var sh = document.querySelector(".mshell"); return sh ? sh.clientWidth : window.innerWidth; }
+  function paneW() { var sh = document.querySelector(".mviewport"); return sh ? sh.clientWidth : window.innerWidth; }
   function trackTo(i, anim) {
     var tr = document.querySelector(".mtrack");
     if (!tr) return;
@@ -1085,22 +1095,22 @@ a.ni { text-decoration: none; color: inherit; }
     tr.style.transform = "translate3d(" + (-i * paneW()) + "px,0,0)";
   }
   function renderMatch(m) {
+    state.scrolls = state.scrolls || {};
+    panes().forEach(function (p) { state.scrolls[p.getAttribute("data-key")] = p.scrollTop; });  // запомнить, где стоит каждая вкладка
     if (state.reader) {
       var n = ((m.news && m.news.items) || []).find(function (x) { return x.key === state.reader; });
       if (n) { $app.innerHTML = readerView(m, n); try { TG && TG.BackButton.show(); } catch (e) {} return; }
       state.reader = null;
     }
-    state.scrolls = state.scrolls || {};
-    panes().forEach(function (p) { state.scrolls[p.getAttribute("data-key")] = p.scrollTop; });
     var keep = { tab: state.tab, nf: state.newsFilter, on: state.openNews };
-    var keys = paneKeys(), html = '<div class="mshell"><div class="mtrack">';
+    var keys = paneKeys(), html = '<div class="mshell"><div class="mhead"><div class="pin view">' + headHtml(m) + '</div></div><div class="mviewport"><div class="mtrack">';
     keys.forEach(function (k) {
       setKey(k);
       if (k === viewKey(keep.tab, keep.nf)) state.openNews = keep.on;
       html += '<div class="pane" data-key="' + esc(k) + '"><div class="view pin">' + paneHtml(m) + '</div></div>';
     });
     state.tab = keep.tab; state.newsFilter = keep.nf; state.openNews = keep.on;
-    $app.innerHTML = html + '</div></div>';
+    $app.innerHTML = html + '</div></div></div>';
     var idx = Math.max(0, keys.indexOf(curKey()));
     trackTo(idx, false);
     panes().forEach(function (p) {
@@ -1117,7 +1127,7 @@ a.ni { text-decoration: none; color: inherit; }
     var keys = paneKeys(), i = keys.indexOf(k);
     if (i < 0) { setKey(k); renderMatch(state.details[state.openId]); return; }
     trackTo(i, true);
-    setKey(k);
+    setKey(k); markTabs(k);
     try { TG && TG.HapticFeedback && TG.HapticFeedback.selectionChanged(); } catch (err) {}
   }
 
@@ -1161,6 +1171,8 @@ a.ni { text-decoration: none; color: inherit; }
     var tr = document.querySelector(".mtrack");
     tr.style.transition = "none";
     tr.style.transform = "translate3d(" + (-sw.i * W + sw.dx) + "px,0,0)";
+    var past = next >= 0 && next < sw.keys.length && Math.abs(sw.dx) > W / 2;
+    if (past !== sw.marked) { markTabs(past ? sw.keys[next] : sw.keys[sw.i]); sw.marked = past; }
   }, { passive: true });
   function swipeEnd() {
     if (!sw) return;
@@ -1184,9 +1196,9 @@ a.ni { text-decoration: none; color: inherit; }
     var next = s0.i + (s0.dx < 0 ? 1 : -1);
     if (far && next >= 0 && next < s0.keys.length) {
       trackTo(next, true);
-      setKey(s0.keys[next]);
+      setKey(s0.keys[next]); markTabs(s0.keys[next]);
       try { TG && TG.HapticFeedback && TG.HapticFeedback.selectionChanged(); } catch (err) {}
-    } else trackTo(s0.i, true);
+    } else { trackTo(s0.i, true); markTabs(s0.keys[s0.i]); }
   }
   document.addEventListener("touchend", swipeEnd, { passive: true });
   document.addEventListener("touchcancel", swipeEnd, { passive: true });
