@@ -2333,12 +2333,13 @@ def build_news(teams: list[dict]) -> dict:
 
 # ---------------------------------------------------------------- факты для эфира
 
-FACTS_CACHE_F = CACHE / "facts_v5.json"
+FACTS_CACHE_F = CACHE / "facts_v6.json"
 facts_cache: dict = load_json(FACTS_CACHE_F, {})
 FACTS_TTL_H = 6
 FACTS_SYSTEM = """Ты помогаешь русскоязычному комментатору CS2 подготовиться к матчу.
 Тебе дают сведения о матче (JSON): новости недели о командах и игроках, составы (имя, возраст, страна, роли), тренеры, личные встречи.
-Составь до 10 фактов-сюжетов для эфира — НЕ статистику (её посчитают отдельно).
+Составь до 15 фактов-сюжетов для эфира — НЕ статистику. Главное — новости недели: каждую важную новость про игроков и команды
+превращай в отдельный факт (заявления, интервью, замены, аренды, переходы, слухи, конфликты, травмы, стримы).
 Темы по важности: 1) сюжеты из новостей (заявления, интервью, замены, аренды, переходы); 2) люди: кто капитан, кто AWP,
 кто в аренде, состав по странам, самые молодые и опытные; 3) тренеры; 4) последняя личная встреча как сюжет.
 Строгие правила:
@@ -2393,97 +2394,72 @@ COUNTRY_RU = {"UA": "Украина", "RU": "Россия", "BY": "Белару�
 
 
 def code_facts(d: dict) -> list[dict]:
-    """Факты с цифрами — считаются кодом из данных, без нейросети, поэтому всегда точные."""
+    """Факты с цифрами — считает код (всегда точно). Только яркие: обычную статистику не добавляем."""
     out: list[dict] = []
     teams = (d.get("teams") or [])[:2]
     if len(teams) < 2:
         return out
     A, B = teams
     nm = [A.get("name"), B.get("name")]
-    # личные встречи
+    # последняя личная встреча — как сюжет; доминирование — если одна команда выиграла все (3+)
     h2h = d.get("h2h") or []
     if h2h:
-        wa = sum(1 for h in h2h if h.get("winner") == 0); wb = sum(1 for h in h2h if h.get("winner") == 1)
         last = h2h[0]
-        lw = nm[last["winner"]] if last.get("winner") in (0, 1) else None
-        out.append({"tag": "Встречи", "text": f"За год команды встречались {len(h2h)} {plural(len(h2h), 'раз', 'раза', 'раз')}: "
-                    f"{nm[0]} {wa}, {nm[1]} {wb} по сериям."})
-        if lw:
-            flip = lambda sc: sc if last["winner"] == 0 else ":".join(reversed(sc.split(":")))
-            maps = ", ".join(f"{g['map']} {flip(g['score'])}" for g in last.get("maps") or [] if g.get("map") and g.get("score"))
+        if last.get("winner") in (0, 1) and last.get("score"):
+            lw = nm[last["winner"]]
             out.append({"tag": "Встречи", "text": f"Последняя встреча — {last.get('tournament')} ({(last.get('date') or '')[:10]}): "
-                        f"{lw} выиграли {max(last['score'])}:{min(last['score'])}" + (f" ({maps})." if maps else ".")})
-    # форма и серии
+                        f"{lw} выиграли {max(last['score'])}:{min(last['score'])}."})
+        wa = sum(1 for h in h2h if h.get("winner") == 0); wb = sum(1 for h in h2h if h.get("winner") == 1)
+        if len(h2h) >= 3 and (wa == 0 or wb == 0):
+            dom = nm[0] if wb == 0 else nm[1]
+            out.append({"tag": "Встречи", "text": f"{dom} выиграли все {len(h2h)} личные встречи за последний год."})
+    # длинные серии
     for t in teams:
         f = t.get("form") or []
         if not f:
             continue
-        w = sum(1 for x in f if x.get("won"))
         streak, kind = 0, f[0].get("won")
         for x in f:
             if x.get("won") == kind:
                 streak += 1
             else:
                 break
-        txt = f"{t['name']}: {w} {plural(w, 'победа', 'победы', 'побед')} в последних {len(f)} сериях"
-        if streak >= 3:
-            txt += f", сейчас серия из {streak} {'побед' if kind else 'поражений'} подряд"
-        out.append({"tag": "Форма", "text": txt + "."})
-    # люди: возраст, страны, аренды
-    people = [(p, t["name"]) for t in teams for p in t.get("players") or [] if p.get("age")]
-    if people:
-        y = min(people, key=lambda x: x[0]["age"]); o = max(people, key=lambda x: x[0]["age"])
-        if y[0]["age"] != o[0]["age"]:
-            out.append({"tag": "Игроки", "text": f"Самый молодой в матче — {y[0]['nick']} ({y[1]}, {y[0]['age']} {plural(y[0]['age'], 'год', 'года', 'лет')}), "
-                        f"самый опытный — {o[0]['nick']} ({o[1]}, {o[0]['age']} {plural(o[0]['age'], 'год', 'года', 'лет')})."})
+        if streak >= 5:
+            out.append({"tag": "Форма", "text": f"{t['name']} идут на серии из {streak} {'побед' if kind else 'поражений'} подряд."})
+    # люди: аренды, весь состав из одной страны, экстремальный возраст
     for t in teams:
-        loans = [p for p in t.get("players") or [] if any(str(x).startswith("В аренде") for x in p.get("tags") or [])]
-        for p in loans:
-            tag = next(x for x in p["tags"] if str(x).startswith("В аренде"))
-            out.append({"tag": "Игроки", "text": f"{p['nick']} играет за {t['name']} на правах аренды ({tag.lower()})."})
+        for p in t.get("players") or []:
+            tag = next((x for x in p.get("tags") or [] if str(x).startswith("В аренде")), None)
+            if tag:
+                out.append({"tag": "Игроки", "text": f"{p['nick']} играет за {t['name']} на правах аренды ({tag.lower()})."})
         cs = [p.get("nationality") for p in t.get("players") or [] if p.get("nationality")]
         if cs and len(set(cs)) == 1 and len(cs) >= 5:
             out.append({"tag": "Игроки", "text": f"У {t['name']} весь состав из одной страны — {COUNTRY_RU.get(cs[0], cs[0])}."})
-    coaches = [(c, t["name"]) for t in teams for c in t.get("coach") or [] if c.get("age")]
-    if len(coaches) == 2:
-        out.append({"tag": "Тренеры", "text": f"Тренеры: {coaches[0][0]['nick']} ({coaches[0][1]}, {coaches[0][0]['age']}) "
-                    f"и {coaches[1][0]['nick']} ({coaches[1][1]}, {coaches[1][0]['age']})."})
-    # вето
-    v = d.get("veto") or {}
-    for i, t in enumerate(v.get("teams") or []):
-        if t and t.get("matches") and t.get("picks"):
-            mp, c = t["picks"][0]
-            txt = f"{nm[i]} чаще всего пикают {mp} — {c} раз за последние {t['matches']} матчей"
-            if t.get("first_bans"):
-                fb, fc = t["first_bans"][0]
-                txt += f"; первым баном обычно убирают {fb} ({fc})"
-            out.append({"tag": "Вето", "text": txt + "."})
-    # стороны и пистолетки
+    people = [(p, t["name"]) for t in teams for p in t.get("players") or [] if p.get("age")]
+    if people:
+        y = min(people, key=lambda x: x[0]["age"]); o = max(people, key=lambda x: x[0]["age"])
+        if y[0]["age"] <= 17:
+            out.append({"tag": "Игроки", "text": f"{y[0]['nick']} ({y[1]}) — самый молодой в матче: {y[0]['age']} {plural(y[0]['age'], 'год', 'года', 'лет')}."})
+        if o[0]["age"] >= 33:
+            out.append({"tag": "Игроки", "text": f"{o[0]['nick']} ({o[1]}) — самый опытный в матче: {o[0]['age']} {plural(o[0]['age'], 'год', 'года', 'лет')}."})
+    # яркая статистика
     tot = (d.get("sides") or {}).get("total") or [None, None]
-    if all(tot):
-        out.append({"tag": "Стороны", "text": f"Пистолетки за 3 месяца: {nm[0]} {tot[0]['pistol']}% ({tot[0]['pistol_n'][0]} из {tot[0]['pistol_n'][1]}), "
-                    f"{nm[1]} {tot[1]['pistol']}% ({tot[1]['pistol_n'][0]} из {tot[1]['pistol_n'][1]})."})
-        for i in (0, 1):
-            ct, tt = tot[i].get("ct"), tot[i].get("t")
-            if ct is not None and tt is not None and abs(ct - tt) >= 6:
-                side = "защиту (CT)" if ct > tt else "атаку (T)"
-                out.append({"tag": "Стороны", "text": f"У {nm[i]} перекос в {side}: {ct}% раундов за CT против {tt}% за T."})
-    # карты
-    rows = (d.get("maps") or {}).get("table") or []
     for i in (0, 1):
-        cand = [(r["map"], r["teams"][i]["won"], r["teams"][i]["played"]) for r in rows if r["teams"][i]["played"] >= 4]
-        if cand:
-            best = max(cand, key=lambda x: x[1] / x[2]); worst = min(cand, key=lambda x: x[1] / x[2])
-            txt = f"Лучшая карта {nm[i]} за 4 месяца — {best[0]} ({best[1]} из {best[2]})"
-            if worst[0] != best[0]:
-                txt += f", худшая — {worst[0]} ({worst[1]} из {worst[2]})"
-            out.append({"tag": "Карты", "text": txt + "."})
-    # игроки по статистике
-    for t in teams:
-        st = [x for x in t.get("stats") or [] if x.get("kd") and (x.get("maps") or 0) >= 8]
-        if st:
-            b = max(st, key=lambda x: x["kd"])
-            out.append({"tag": "Игроки", "text": f"Лучший K/D в {t['name']} за 3 месяца у {b['nick']} — {b['kd']} (ADR {b['adr']})."})
+        x = tot[i]
+        if not x:
+            continue
+        pn = x.get("pistol_n") or [0, 0]
+        if x.get("pistol") is not None and pn[1] >= 30 and (x["pistol"] >= 60 or x["pistol"] <= 40):
+            out.append({"tag": "Стороны", "text": f"{nm[i]} выигрывают {x['pistol']}% пистолеток за 3 месяца ({pn[0]} из {pn[1]})."})
+        ct, tt = x.get("ct"), x.get("t")
+        if ct is not None and tt is not None and abs(ct - tt) >= 10:
+            out.append({"tag": "Стороны", "text": f"У {nm[i]} сильный перекос в {'защиту' if ct > tt else 'атаку'}: "
+                        f"{ct}% раундов за CT против {tt}% за T."})
+    for r in (d.get("maps") or {}).get("table") or []:
+        for i in (0, 1):
+            w, pl = r["teams"][i]["won"], r["teams"][i]["played"]
+            if pl >= 8 and w / pl >= 0.8:
+                out.append({"tag": "Карты", "text": f"{nm[i]} на {r['map']}: {w} побед из {pl} за 4 месяца."})
     return out
 
 
@@ -2534,7 +2510,7 @@ def build_facts(d: dict, prev: dict | None) -> list | None:
             if re.search(r"нет новост|не поступал|не было новост", f["text"], re.IGNORECASE):
                 continue
             story.append({"tag": f.get("tag") or "Новости", "text": f["text"].strip()})
-        story = story[:10]
+        story = story[:15]
         facts_cache[key] = {"t": iso(NOW), "story": story}
     elif c:
         story = c.get("story")
