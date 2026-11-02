@@ -146,7 +146,7 @@ GAMES_CACHE_F = CACHE / "bo3_games_v2.json"   # карты по завершён
 DETAILS_CACHE_F = CACHE / "bo3_game_details.json"  # раунды и статистика игроков по каждой карте
 TEAMS_CACHE_F = CACHE / "bo3_teams.json"     # PandaScore id → bo3 id
 TR_CACHE_F = CACHE / "translations.json"     # переводы заголовков
-ROSTER_CACHE_F = CACHE / "liquipedia_rosters_v2.json"  # тренер, роли, даты рождения с Liquipedia
+ROSTER_CACHE_F = CACHE / "liquipedia_rosters_v3.json"  # тренер, роли, даты рождения с Liquipedia
 PRON_CACHE_F = CACHE / "pronunciation.json"       # имена и ники по-русски с ударением
 games_cache: dict = load_json(GAMES_CACHE_F, {})
 details_cache: dict = load_json(DETAILS_CACHE_F, {})
@@ -351,9 +351,38 @@ def lp_param(line: str, key: str) -> str | None:
     return m.group(1).strip() if m and m.group(1).strip() else None
 
 
+def infobox(wikitext: str) -> str:
+    """Текст инфобокса игрока: от «{{Infobox player» до его закрывающих скобок (с учётом вложенных шаблонов)."""
+    i = wikitext.find("{{Infobox")
+    if i < 0:
+        return wikitext[:6000]
+    depth, j = 0, i
+    while j < len(wikitext) - 1:
+        two = wikitext[j:j + 2]
+        if two == "{{":
+            depth += 1
+            j += 2
+            continue
+        if two == "}}":
+            depth -= 1
+            j += 2
+            if depth == 0:
+                return wikitext[i:j]
+            continue
+        j += 1
+    return wikitext[i:i + 8000]
+
+
+def infobox_team(wikitext: str) -> str | None:
+    """Команда игрока по инфобоксу (|team=…) — для аренды это клуб, которому принадлежит контракт."""
+    m = re.search(r"\|\s*team\s*=\s*([^\n|}]*)", infobox(wikitext))
+    v = m.group(1).strip() if m else ""
+    return v or None
+
+
 def player_roles(wikitext: str) -> tuple[list[str], bool]:
     """Текущие роли из инфобокса игрока (roles=igl,entry / role=…). Возвращает (роли, igl)."""
-    box = wikitext[: wikitext.find("\n}}") + 3] if "\n}}" in wikitext else wikitext[:4000]
+    box = infobox(wikitext)
     raw: list[str] = []
     for m in re.finditer(r"\|\s*roles?\d?\s*=\s*([^\n|}]*)", box, re.IGNORECASE):
         raw += [x.strip().lower() for x in re.split(r"[,/;]", m.group(1)) if x.strip()]
@@ -367,9 +396,9 @@ def player_roles(wikitext: str) -> tuple[list[str], bool]:
     rifle = rifle_kind is not None or any(re.search(r"rifl", r) for r in raw)
     res = []
     if awp and rifle:
-        res.append("Рифл + AWP")
+        res.append("Рифл + AWPer")
     elif awp:
-        res.append("Снайпер")
+        res.append("Снайпер (AWPer)")
     elif rifle:
         res.append("Рифлер" + (f" · {rifle_kind}" if rifle_kind else ""))
     return res, igl
@@ -377,7 +406,7 @@ def player_roles(wikitext: str) -> tuple[list[str], bool]:
 
 def birth_date(wikitext: str) -> str | None:
     """Дата рождения из инфобокса: |birth_date={{Birth date and age|2005|5|1}} или |birth_date=2005-05-01."""
-    m = re.search(r"\|\s*birth_date\s*=\s*([^\n]*)", wikitext[:6000])
+    m = re.search(r"\|\s*birth_date\s*=\s*([^\n]*)", infobox(wikitext))
     if not m:
         return None
     v = m.group(1)
@@ -441,11 +470,18 @@ def lp_roster(t: dict) -> dict | None:
                     "igl": lp_param(line, "igl") == "y",
                     "coach": "coach" in role,
                     "note": None if "coach" in role or not role else role,
+                    "loan_from": lp_param(line, "team"),
                 })
             players = [p for p in people if not p["coach"]]
             ppages = lp_pages([p["page"] for p in people]) if people else {}
             for p in people:
                 p["birth"] = birth_date(ppages.get(p["page"], ""))
+                if p.get("note") and "loan" in p["note"]:
+                    owner = p.get("loan_from") or infobox_team(ppages.get(p["page"], ""))
+                    if owner and norm(owner) not in (norm(t.get("name")), norm(t.get("acronym"))):
+                        p["loan_from"] = owner
+                    else:
+                        p["loan_from"] = None
             any_igl = any(p["igl"] for p in players)
             for p in players:
                 roles, igl = player_roles(ppages.get(p["page"], ""))
@@ -454,7 +490,7 @@ def lp_roster(t: dict) -> dict | None:
                     p["igl"] = True  # в составе капитан не отмечен — берём со страницы игрока
             data = {
                 "coach": [{"nick": p["nick"], "name": p["name"], "flag": p["flag"], "birth": p["birth"]} for p in people if p["coach"]],
-                "players": [{k: p[k] for k in ("nick", "name", "flag", "igl", "roles", "note", "birth")} for p in players],
+                "players": [{k: p.get(k) for k in ("nick", "name", "flag", "igl", "roles", "note", "birth", "loan_from")} for p in players],
             }
     except Exception as e:
         warn(f"Liquipedia {t.get('name')}: {e!r}")
@@ -473,7 +509,11 @@ def merge_roster(panda_players: list[dict], lp: dict | None) -> tuple[list[dict]
         pp = by_nick.get(norm(lp_p["nick"]), {})
         tags = list(dict.fromkeys((["Капитан"] if lp_p.get("igl") else []) + list(lp_p.get("roles") or [])))
         if lp_p.get("note") and lp_p["note"] not in ("player",):
-            tags.append({"stand-in": "Замена", "loan": "В аренде", "inactive": "Неактивен"}.get(lp_p["note"], lp_p["note"]))
+            note = lp_p["note"]
+            if "loan" in note:
+                tags.append("В аренде из " + lp_p["loan_from"] if lp_p.get("loan_from") else "В аренде")
+            else:
+                tags.append({"stand-in": "Замена", "inactive": "Неактивен"}.get(note, note))
         first, last = pp.get("first_name"), pp.get("last_name")
         if not (first or last) and lp_p.get("name"):
             first, last = lp_p["name"], None
