@@ -1,4 +1,4 @@
-# CS Prep
+# RIMACS
 
 Telegram Mini App для подготовки комментатора к матчам CS2 тир-1.
 
