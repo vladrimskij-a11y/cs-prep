@@ -1233,7 +1233,15 @@ a.ni { text-decoration: none; color: inherit; }
     }
     markSel(s0.tgt);
     place(s0, -s0.dir * (s0.el.offsetWidth + 24), true);  // соседняя страница встаёт на место
-    setTimeout(function () {
+    // подменяем только когда сосед доехал до конца (иначе на финише всё сдвигается на пару пикселей — это и есть «моргание»)
+    var done = false, finish = function () {
+      if (done) return; done = true;
+      s0.g.removeEventListener("transitionend", onEnd);
+      requestAnimationFrame(commit);
+    }, onEnd = function (ev) { if (ev.target === s0.g && ev.propertyName === "transform") finish(); };
+    s0.g.addEventListener("transitionend", onEnd);
+    setTimeout(finish, 320);  // подстраховка, если событие не придёт
+    function commit() {
       // если страница была прокручена вниз — встаём на начало новой, сразу под закреплённым меню
       if (s0.tgt.map == null) remember();
       if (s0.tgt.map != null) state.map = s0.tgt.map;
@@ -1266,7 +1274,7 @@ a.ni { text-decoration: none; color: inherit; }
         if (l < f.scrollLeft) f.scrollLeft = l - 8; else if (r > f.scrollLeft + f.clientWidth) f.scrollLeft = r - f.clientWidth + 8;
       }
       try { TG && TG.HapticFeedback && TG.HapticFeedback.selectionChanged(); } catch (err) {}
-    }, 200);
+    }
   }
   document.addEventListener("touchend", swipeEnd, { passive: true });
   document.addEventListener("touchcancel", swipeEnd, { passive: true });
