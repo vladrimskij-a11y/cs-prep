@@ -1,1 +1,5 @@
-search: 429 []
+=== https://www.dust2.us/matches/2367883/betboom-vs-b8: 200 len=142686 veto_at=-1 lines=[]
+=== https://www.dust2.us/results?team=4608: 200 len=1230822 veto_at=-1 lines=[]
+=== https://www.dust2.dk/matches/2367883/betboom-vs-b8: 404 len=0 veto_at=-1 lines=[]
+=== https://bo3.gg/matches/heroic-vs-b8-02-11-2026: 200 len=13150 veto_at=-1 lines=[]
+=== https://escorenews.com/en/csgo/matches: 403 len=0 veto_at=-1 lines=[]
