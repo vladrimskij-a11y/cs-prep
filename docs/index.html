@@ -810,8 +810,7 @@ a.ni { text-decoration: none; color: inherit; }
       it("Рейтинг 3.0", fx(h.rating, 2)) +
       it("K/D", fx(h.kd != null ? h.kd : st.kd, 2)) +
       it("ADR", fx(h.adr != null ? h.adr : st.adr, 1)) +
-      it("KAST", fx(h.kast != null ? h.kast : st.kast, 1), "%") +
-      (st.best_map ? it("лучшая карта", st.best_map) : "") + '</span>';
+      it("KAST", fx(h.kast != null ? h.kast : st.kast, 1), "%") + '</span>';
   }
 
   // без знаков ударения (комбинируемые акценты), й и ё не трогаем
