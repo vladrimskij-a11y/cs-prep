@@ -138,11 +138,15 @@ def save_json(path: Path, data, pretty: bool = False) -> None:
     path.write_text(txt, "utf-8")
 
 
-GAMES_CACHE_F = CACHE / "bo3_games_raw.json"  # карты по завершённым матчам bo3, как отдаёт bo3 (не меняются)
+GAMES_CACHE_F = CACHE / "bo3_games_v2.json"   # карты по завершённым матчам bo3, как отдаёт bo3 (не меняются)
+DETAILS_CACHE_F = CACHE / "bo3_game_details.json"  # раунды и статистика игроков по каждой карте
 TEAMS_CACHE_F = CACHE / "bo3_teams.json"     # PandaScore id → bo3 id
 TR_CACHE_F = CACHE / "translations.json"     # переводы заголовков
 ROSTER_CACHE_F = CACHE / "liquipedia_rosters.json"  # тренер и роли игроков с Liquipedia
 games_cache: dict = load_json(GAMES_CACHE_F, {})
+details_cache: dict = load_json(DETAILS_CACHE_F, {})
+DETAILS_NEW_LIMIT = int(os.environ.get("DETAILS_NEW_LIMIT", "450"))  # новых карт с раундами за запуск
+_details_new = [0]
 teams_map: dict = load_json(TEAMS_CACHE_F, {})
 tr_cache: dict = load_json(TR_CACHE_F, {})
 roster_cache: dict = load_json(ROSTER_CACHE_F, {})
@@ -543,12 +547,50 @@ def bo3_games(m: dict) -> list[dict]:
     for g in sorted(games, key=lambda g: g.get("number") or 0):
         if g.get("status") != "finished":
             continue
-        res.append({"map": map_title(g.get("map_name")), "n": g.get("number"),
+        res.append({"id": g.get("id"), "map": map_title(g.get("map_name")), "n": g.get("number"),
                     "wn": g.get("winner_clan_name"), "ln": g.get("loser_clan_name"),
                     "ws": g.get("winner_clan_score"), "ls": g.get("loser_clan_score")})
     if m.get("status") == "finished":
         games_cache[key] = res
     return res
+
+
+def game_detail(gid: int | None) -> dict | None:
+    """Раунды (кто выиграл, за какую сторону) и статистика игроков на карте. Кэш навсегда."""
+    if not gid:
+        return None
+    key = str(gid)
+    if key in details_cache:
+        return details_cache[key]
+    if _details_new[0] >= DETAILS_NEW_LIMIT:
+        return None
+    _details_new[0] += 1
+    try:
+        g = bo3(f"/games/{gid}/rounds")
+        ps = bo3(f"/games/{gid}/players_stats")
+    except Exception as e:
+        warn(f"bo3 карта {gid}: {e!r}")
+        return None
+    wtc, ltc = g.get("winner_team_clan") or {}, g.get("loser_team_clan") or {}
+    clan2team = {wtc.get("clan_name"): wtc.get("team_id"), ltc.get("clan_name"): ltc.get("team_id")}
+    rounds = []
+    for r in sorted(g.get("game_rounds") or [], key=lambda r: r.get("round_number") or 0):
+        tid = clan2team.get(r.get("winner_clan_name"))
+        rounds.append([r.get("round_number"), tid, (r.get("winner_clan_side") or "")[:2]])
+    players = []
+    for x in ps if isinstance(ps, list) else []:
+        sp = x.get("steam_profile") or {}
+        players.append({
+            "tid": (x.get("team_clan") or {}).get("team_id") or clan2team.get(x.get("clan_name")),
+            "nick": sp.get("nickname"), "pid": sp.get("player_id"),
+            "k": x.get("kills"), "d": x.get("death"), "a": x.get("assists"), "adr": x.get("adr"),
+            "kast": x.get("kast"), "r": x.get("player_rating"), "fk": x.get("first_kills"), "fd": x.get("first_death"),
+            "cl": x.get("clutches"), "hs": x.get("headshots"),
+        })
+    d = {"wt": wtc.get("team_id"), "lt": ltc.get("team_id"), "rounds": rounds, "players": players}
+    if g.get("status") == "finished":
+        details_cache[key] = d
+    return d
 
 
 # Все известные названия команды: официальное, аббревиатура, слаг — с PandaScore и bo3.
@@ -592,6 +634,11 @@ def map_results(m: dict, bid: int) -> list[dict]:
     theirs -= ours
     out = []
     for g in games:
+        det = details_cache.get(str(g.get("id"))) if g.get("id") else None
+        if det and det.get("wt"):
+            won = det["wt"] == bid
+            out.append({"map": g["map"], "won": won, "ws": g["ws"], "ls": g["ls"]})
+            continue
         votes = set()
         if clan_is(g["wn"], ours): votes.add(True)
         if clan_is(g["ln"], ours): votes.add(False)
@@ -703,6 +750,97 @@ def build_maps(bids: list[int | None], hists: list[list[dict]], max_matches: int
         recent[name].sort(key=lambda r: r["date"] or "", reverse=True)
     rows = sorted(table.values(), key=lambda r: -(r["teams"][0]["played"] + r["teams"][1]["played"]))
     return {"available": bool(rows), "window_days": MAPS_WINDOW_DAYS, "table": rows, "recent": recent}
+
+
+STATS_WINDOW_DAYS = 90
+
+
+def team_games(bid: int, hist: list[dict], max_matches: int = 30):
+    """Карты команды за STATS_WINDOW_DAYS: (матч, карта, детали)."""
+    since = NOW - timedelta(days=STATS_WINDOW_DAYS)
+    for m in hist[:max_matches]:
+        d = parse_iso(m.get("start_date"))
+        if d and d < since:
+            break
+        for g in bo3_games(m):
+            det = game_detail(g.get("id"))
+            if det:
+                yield m, g, det
+
+
+def build_sides(bids: list[int | None], hists: list[list[dict]]) -> dict:
+    """По каждой карте и в целом: % выигранных раундов за CT и T, % пистолеток (раунды 1 и 13)."""
+    res: dict = {"window_days": STATS_WINDOW_DAYS, "maps": {}, "total": [None, None]}
+    for idx, (bid, hist) in enumerate(zip(bids, hists)):
+        if not bid:
+            continue
+        agg: dict = {}
+        for m, g, det in team_games(bid, hist):
+            if not det.get("rounds"):
+                continue
+            for key in (g.get("map") or "?", "__all"):
+                a = agg.setdefault(key, {"ct": [0, 0], "t": [0, 0], "pistol": [0, 0], "maps": 0})
+                a["maps"] += 1
+                for n, tid, side in det["rounds"]:
+                    if not side or tid is None:
+                        continue
+                    ours = tid == bid
+                    my_side = side if ours else ("T" if side == "CT" else "CT")
+                    k = "ct" if my_side == "CT" else "t"
+                    a[k][1] += 1
+                    a[k][0] += int(ours)
+                    if n in (1, 13):
+                        a["pistol"][1] += 1
+                        a["pistol"][0] += int(ours)
+        for key, a in agg.items():
+            pct = {k: (round(100 * a[k][0] / a[k][1]) if a[k][1] else None) for k in ("ct", "t", "pistol")}
+            row = {**pct, "maps": a["maps"], "pistol_n": a["pistol"]}
+            if key == "__all":
+                res["total"][idx] = row
+            else:
+                res["maps"].setdefault(key, [None, None])[idx] = row
+    return res
+
+
+def build_player_stats(team: dict, bid: int | None, hist: list[dict]) -> list[dict]:
+    """Статистика игроков состава за STATS_WINDOW_DAYS по картам bo3.gg."""
+    if not bid:
+        return []
+    roster = {norm(p.get("nick")): p.get("nick") for p in team.get("players") or []}
+    agg: dict = {}
+    for m, g, det in team_games(bid, hist):
+        for x in det.get("players") or []:
+            if x.get("tid") != bid or not x.get("nick"):
+                continue
+            key = norm(x["nick"])
+            if roster and key not in roster:
+                continue
+            a = agg.setdefault(key, {"nick": roster.get(key, x["nick"]), "maps": 0, "k": 0, "d": 0, "adr": 0.0, "kast": 0.0,
+                                     "r": 0.0, "fk": 0, "fd": 0, "cl": 0, "per_map": {}})
+            a["maps"] += 1
+            a["k"] += x.get("k") or 0
+            a["d"] += x.get("d") or 0
+            a["adr"] += x.get("adr") or 0
+            a["kast"] += x.get("kast") or 0
+            a["r"] += x.get("r") or 0
+            a["fk"] += x.get("fk") or 0
+            a["fd"] += x.get("fd") or 0
+            a["cl"] += x.get("cl") or 0
+            pm = a["per_map"].setdefault(g.get("map") or "?", [0, 0.0])
+            pm[0] += 1
+            pm[1] += x.get("r") or 0
+    out = []
+    for a in agg.values():
+        n = a["maps"] or 1
+        best = sorted(((mp, v[1] / v[0], v[0]) for mp, v in a["per_map"].items() if v[0] >= 3), key=lambda t: -t[1])
+        out.append({
+            "nick": a["nick"], "maps": a["maps"],
+            "rating": round(a["r"] / n, 2), "kd": round(a["k"] / a["d"], 2) if a["d"] else None,
+            "adr": round(a["adr"] / n, 1), "kast": round(100 * a["kast"] / n), "opening": a["fk"] - a["fd"],
+            "clutches": a["cl"], "best_map": best[0][0] if best else None, "worst_map": best[-1][0] if len(best) > 1 else None,
+        })
+    out.sort(key=lambda x: -x["rating"])
+    return out
 
 
 # ---------------------------------------------------------------- новости
@@ -1358,6 +1496,9 @@ def build_detail(m: dict, prev: dict | None) -> dict:
     else:
         detail["h2h"] = []
     detail["maps"] = build_maps(bids, hists)
+    detail["sides"] = build_sides(bids, hists)
+    for t, bid, hist in zip(teams, bids, hists):
+        t["stats"] = build_player_stats(t, bid, hist)
     begin = parse_iso(brief["begin_at"])
     soon = begin is not None and begin - NOW <= timedelta(hours=DETAIL_HOURS)
     if soon or not (prev and prev.get("news")):
@@ -1408,6 +1549,7 @@ def main() -> int:
 
     prune_caches()
     save_json(GAMES_CACHE_F, games_cache)
+    save_json(DETAILS_CACHE_F, details_cache)
     save_json(TEAMS_CACHE_F, teams_map)
     save_json(TR_CACHE_F, tr_cache)
     save_json(ROSTER_CACHE_F, roster_cache)

@@ -227,6 +227,21 @@ button.ni { width: 100%; text-align: left; }
 .also a { display: flex; flex-direction: column; gap: 2px; padding: 8px 0; border-bottom: 1px solid var(--line); text-decoration: none; color: inherit; font-size: 13px; }
 .also a b { font-size: 12px; color: var(--ct); }
 
+/* стороны */
+.sides { padding: 4px 0 8px; }
+.sd-head, .sd-row { display: grid; grid-template-columns: 1.4fr 1fr 1fr 1.3fr; gap: 8px; padding: 6px 12px; align-items: baseline; }
+.sd-head { font-size: 11px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .06em; }
+.sd-row { border-top: 1px solid var(--line); font-size: 15px; font-weight: 700; }
+.sd-row .sd-t { font-family: var(--display); font-size: 14px; display: flex; flex-direction: column; }
+.sd-row.a .sd-t { color: var(--ct); } .sd-row.b .sd-t { color: var(--t); }
+.sd-row small { font-family: var(--body); font-size: 11px; color: var(--muted); font-weight: 500; margin-left: 4px; }
+.sd-row .sd-t small { margin-left: 0; }
+.sd-row .good { color: var(--win); } .sd-row .bad { color: var(--loss); }
+.sd-all { padding: 0 12px 6px; font-size: 12px; color: var(--muted); }
+.sd-all span { font-weight: 600; }
+.pstat { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12px; color: var(--muted); margin-top: 4px; }
+.pstat b { color: var(--fg); font-family: var(--mono); font-weight: 700; }
+
 /* группы по турнирам */
 .grp { display: flex; flex-direction: column; }
 .grp .gh { padding: 8px 12px 4px; font-size: 11px; font-weight: 600; color: var(--muted); border-top: 1px solid var(--line); display: flex; justify-content: space-between; gap: 8px; }
@@ -491,7 +506,24 @@ a.ni { text-decoration: none; color: inherit; }
       });
       html += '</div>';
     });
+    html += '</div></div>' + sidesBlock(m);
+    return html;
+  }
+
+  function sidesBlock(m) {
+    var S = m.sides;
+    if (!S) return "";
+    var rows = (S.maps || {})[state.map] || [null, null];
+    var html = '<div class="sec"><h3>Стороны и пистолетки <span>' + esc(state.map) + ' · за ' + Math.round(S.window_days / 30) + ' мес.</span></h3><div class="box sides">' +
+      '<div class="sd-head"><span></span><span>CT</span><span>T</span><span>Пистолетки</span></div>';
+    [0, 1].forEach(function (i) {
+      var r = rows[i], tot = (S.total || [])[i];
+      html += '<div class="sd-row ' + (i ? "b" : "a") + '"><span class="sd-t">' + esc(abbr(m.teams[i])) + '<small>' + (r ? r.maps + ' карт' : 'не играли') + '</small></span>' +
+        cell(r && r.ct) + cell(r && r.t) + '<span class="num">' + (r && r.pistol != null ? r.pistol + '%<small>' + r.pistol_n[0] + '/' + r.pistol_n[1] + '</small>' : '—') + '</span></div>';
+      if (tot) html += '<div class="sd-all"><span>все карты:</span> CT ' + (tot.ct != null ? tot.ct + '%' : '—') + ' · T ' + (tot.t != null ? tot.t + '%' : '—') + ' · пистолетки ' + (tot.pistol != null ? tot.pistol + '%' : '—') + '</div>';
+    });
     return html + '</div></div>';
+    function cell(v) { return '<span class="num' + (v != null && v >= 55 ? ' good' : v != null && v <= 45 ? ' bad' : '') + '">' + (v != null ? v + '%' : '—') + '</span>'; }
   }
 
   // подряд идущие записи одного турнира — под одним заголовком
@@ -531,6 +563,16 @@ a.ni { text-decoration: none; color: inherit; }
     return items.filter(function (n) { return (n.about || []).indexOf(who) >= 0; });
   }
 
+  function pstat(t, nick) {
+    var key = String(nick || "").toLowerCase().replace(/[^a-z0-9а-я]/g, "");
+    var st = (t.stats || []).find(function (x) { return String(x.nick).toLowerCase().replace(/[^a-z0-9а-я]/g, "") === key; });
+    if (!st) return "";
+    function it(label, v) { return v == null ? "" : '<span>' + label + ' <b>' + esc(v) + '</b></span>'; }
+    return '<span class="pstat">' + it("рейтинг", st.rating) + it("K/D", st.kd) + it("ADR", st.adr) + it("KAST", st.kast + "%") +
+      it("открытия", (st.opening > 0 ? "+" : "") + st.opening) + it("клатчи", st.clutches) +
+      (st.best_map ? it("лучшая", st.best_map) : "") + '<span>' + st.maps + ' карт за 3 мес.</span></span>';
+  }
+
   function playersTab(m) {
     var html = "";
     m.teams.forEach(function (t, i) {
@@ -546,7 +588,7 @@ a.ni { text-decoration: none; color: inherit; }
         html += '<button class="pl" data-player="' + esc(p.nick) + '"><span class="nick">' + esc(p.nick) + '</span>' +
           '<span class="nb' + (n ? " has" : "") + '">' + (n ? n + " новост" + (n === 1 ? "ь" : n < 5 ? "и" : "ей") : "нет новостей") + '</span>' +
           '<span class="rn">' + esc(flag(p.nationality)) + ' ' + esc(real) + (p.age ? " · " + esc(p.age) + " лет" : "") + '</span>' +
-          (tags ? '<span class="rtags">' + tags + '</span>' : '') + '</button>';
+          (tags ? '<span class="rtags">' + tags + '</span>' : '') + pstat(t, p.nick) + '</button>';
       });
       (t.coach || []).forEach(function (c) {
         html += '<div class="coach"><span><span class="lbl">Тренер</span><br><b>' + esc(c.nick) + '</b></span><span class="rn" style="font-size:12px;color:var(--muted);text-align:right;align-self:end">' + esc(flag(c.flag)) + ' ' + esc(c.name || "") + '</span></div>';
