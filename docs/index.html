@@ -271,6 +271,13 @@ a { color: inherit; }
 .rd blockquote { margin: 0; padding: 10px 14px; border-left: 3px solid var(--t); background: var(--t-soft); border-radius: 0 8px 8px 0; font-size: 15px; line-height: 1.5; }
 .rd blockquote cite { display: block; font-style: normal; font-size: 12px; color: var(--muted); margin-top: 4px; }
 .rd .readbtn { align-self: flex-start; margin-top: 4px; }
+.vid { display: block; position: relative; border-radius: 10px; overflow: hidden; background: #000; }
+.vid video { display: block; width: 100%; height: auto; max-height: 70vh; background: #000; }
+.vid.vtg { text-decoration: none; background: var(--sunk); min-height: 64px; }
+.vid.vtg img { border-radius: 0; opacity: .75; }
+.vplay { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); padding: 9px 14px; border-radius: 8px; background: var(--fg); color: var(--bg); font-weight: 600; font-size: 14px; white-space: nowrap; }
+.thumb { position: relative; flex: none; display: block; }
+.thumb .play { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 28px; height: 28px; border-radius: 50%; background: rgba(0,0,0,.6); color: #fff; font-size: 11px; font-style: normal; display: grid; place-items: center; }
 button.ni { width: 100%; text-align: left; }
 .also { display: flex; flex-direction: column; gap: 0; border-top: 1px solid var(--line); padding-top: 10px; margin-top: 4px; }
 .also a { display: flex; flex-direction: column; gap: 2px; padding: 8px 0; border-bottom: 1px solid var(--line); text-decoration: none; color: inherit; font-size: 13px; }
@@ -483,10 +490,31 @@ a.ni { text-decoration: none; color: inherit; }
       .then(function (f) { state.feed = f; return f; });
   }
 
+  // картинка или видео поста: видео играет прямо здесь; если ссылка устарела — кнопка «Смотреть в Telegram»
+  function media(img, video, url) {
+    if (video && /^https?:/.test(video)) {
+      return '<div class="vid"><video controls playsinline preload="metadata"' + (img ? ' poster="' + esc(img) + '"' : '') + ' src="' + esc(video) + '" data-fallback="' + esc(url || "") + '"></video></div>';
+    }
+    if (video) {
+      return '<a class="vid vtg" href="' + esc(url) + '" data-tg="' + esc(url) + '" target="_blank" rel="noopener">' +
+        (img ? '<img src="' + esc(img) + '" alt="" loading="lazy" onerror="this.remove()">' : '') + '<span class="vplay">▶ Смотреть видео в Telegram</span></a>';
+    }
+    return img ? '<img src="' + esc(img) + '" alt="" loading="lazy" onerror="this.remove()">' : '';
+  }
+  document.addEventListener("error", function (e) {
+    var v = e.target && e.target.tagName === "VIDEO" ? e.target : null;
+    if (!v || !v.parentNode) return;
+    var u = v.getAttribute("data-fallback"), poster = v.getAttribute("poster");
+    var a = document.createElement("a");
+    a.className = "vid vtg"; a.href = u; a.target = "_blank"; a.rel = "noopener"; a.setAttribute("data-tg", u);
+    a.innerHTML = (poster ? '<img src="' + esc(poster) + '" alt="" onerror="this.remove()">' : '') + '<span class="vplay">▶ Смотреть видео в Telegram</span>';
+    v.parentNode.replaceWith(a);
+  }, true);
+
   function feedReader(n) {
     var html = '<div class="view reader"><div style="padding-top:12px">' + (TG ? '' : '<button class="back" id="close-freader">' + ARROW + 'Лента</button>') + '</div>' +
       '<article class="rd"><div class="rd-meta"><b>' + esc(n.channel_title) + '</b> · ' + esc(dmy(n.date)) + ' ' + esc(hm(n.date)) + '</div>' +
-      (n.photo ? '<img src="' + esc(n.photo) + '" alt="" loading="lazy" onerror="this.remove()">' : '') +
+      media(n.photo, n.video, n.url) +
       String(n.full || n.text || n.title).split(/\n+/).filter(Boolean).map(function (p) { return '<p>' + esc(p) + '</p>'; }).join("") +
       '<a class="readbtn" href="' + esc(n.url) + '" data-tg="' + esc(n.url) + '" target="_blank" rel="noopener">Открыть в Telegram</a>';
     if ((n.also || []).length) {
@@ -519,7 +547,7 @@ a.ni { text-decoration: none; color: inherit; }
       html += '<button class="box ni fi" data-fread="' + esc(n.key) + '">' +
         '<span class="src"><span><b class="chn">' + esc(n.channel_title) + '</b> · ' + esc(hm(n.date)) + '</span>' +
         ((n.also || []).length ? '<span>ещё в ' + n.also.length + ' ' + (n.also.length === 1 ? "канале" : "каналах") + '</span>' : '') + '</span>' +
-        '<span class="fi-body">' + (n.photo ? '<img src="' + esc(n.photo) + '" alt="" loading="lazy" onerror="this.remove()">' : '') +
+        '<span class="fi-body">' + (n.photo ? '<span class="thumb"><img src="' + esc(n.photo) + '" alt="" loading="lazy" onerror="this.parentNode.remove()">' + (n.video ? '<i class="play" aria-label="видео">▶</i>' : '') + '</span>' : '') +
         '<span><h4>' + esc(n.title) + '</h4>' + (n.text && n.text !== n.title ? '<p>' + esc(n.text) + '</p>' : '') + '</span></span></button>';
     });
     $app.innerHTML = html + '</div></div>';
@@ -839,7 +867,9 @@ a.ni { text-decoration: none; color: inherit; }
   function newsFor(m, who) {
     var items = (m.news && m.news.items) || [];
     if (who === "all") return items;
-    return items.filter(function (n) { return (n.about || []).indexOf(who) >= 0; });
+    var team = (m.teams || []).find(function (t) { return t.name === who; });
+    var names = team ? [team.name].concat((team.players || []).map(function (p) { return p.nick; }), (team.coach || []).map(function (c) { return c.nick; })) : [who];
+    return items.filter(function (n) { return (n.about || []).some(function (a) { return names.indexOf(a) >= 0; }); });
   }
 
   function pstat(t, nick) {
@@ -904,7 +934,7 @@ a.ni { text-decoration: none; color: inherit; }
     var who = state.newsFilter;
     var opts = [["all", "Все"]];
     m.teams.forEach(function (t) { opts.push([t.name, t.name]); });
-    m.teams.forEach(function (t) { (t.players || []).forEach(function (p) { if (newsFor(m, p.nick).length) opts.push([p.nick, p.nick]); }); });
+    if (who !== "all" && !m.teams.some(function (t) { return t.name === who; })) opts.push([who, who]);  // пришли из карточки игрока
     var html = '<div class="sec"><div class="filt" role="group" aria-label="О ком">' + opts.map(function (o) {
       return '<button class="chip" data-nf="' + esc(o[0]) + '" aria-pressed="' + (who === o[0]) + '">' + esc(o[1]) + '<span class="c">' + newsFor(m, o[0]).length + '</span></button>';
     }).join("") + '</div>';
@@ -934,7 +964,7 @@ a.ni { text-decoration: none; color: inherit; }
       '<h1>' + esc(n.title_ru || n.title) + '</h1>' +
       (n.title_ru && n.title_ru !== n.title ? '<div class="rd-orig">' + esc(n.title) + '</div>' : '') +
       (n.lang_ru ? '<div class="rd-tr">Пересказ переведён с ' + esc(n.lang_ru) + '</div>' : '') +
-      (n.image ? '<img src="' + esc(n.image) + '" alt="" loading="lazy" onerror="this.remove()">' : '');
+      media(n.image, n.video, n.url);
     if (paras.length) {
       html += paras.map(function (p) { return '<p>' + esc(p) + '</p>'; }).join("");
       (n.quotes || []).forEach(function (q) {

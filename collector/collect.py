@@ -26,6 +26,7 @@ from __future__ import annotations
 import email.utils
 import gzip
 import hashlib
+import html as _html
 import json
 import os
 import re
@@ -1198,9 +1199,12 @@ def tg_fetch_channel(ch: str) -> tuple[str, list[dict]]:
                 text = strip_html(text).replace(" ZZBRZZ ", "\n").replace("ZZBRZZ", "\n").strip()
             photos = re.findall(r"tgme_widget_message_photo_wrap[^>]*background-image:url\('([^']+)'\)", b)
             vthumb = re.findall(r"tgme_widget_message_video_thumb[^>]*background-image:url\('([^']+)'\)", b)
+            vsrc = re.search(r'<video[^>]+src="([^"]+)"', b)
+            has_video = bool(vsrc or vthumb or "tgme_widget_message_video_player" in b)
             d = parse_iso(tm.group(1))
             page.append({"channel": ch, "id": int(pm.group(2)), "date": d, "text": text,
-                         "photo": (photos or vthumb or [None])[0], "url": f"https://t.me/{ch}/{pm.group(2)}"})
+                         "photo": (photos or vthumb or [None])[0], "url": f"https://t.me/{ch}/{pm.group(2)}",
+                         "video": _html.unescape(vsrc.group(1)) if vsrc else ("tg" if has_video else None)})
         if not page:
             break
         posts += page
@@ -1325,7 +1329,7 @@ def tg_posts() -> list[dict]:
             body = p["text"] or info.get("ocr") or ""
             res.append({
                 "title": info["title"], "url": p["url"], "source": f"TG · {title}", "channel": ch,
-                "date": p["date"], "snippet": body[:400], "text": body, "photo": p.get("photo"), "tg": True,
+                "date": p["date"], "snippet": body[:400], "text": body, "photo": p.get("photo"), "video": p.get("video"), "tg": True,
             })
     res.sort(key=lambda x: x["date"], reverse=True)
     _tg_all = res
@@ -1405,7 +1409,7 @@ def build_feed() -> dict:
         it, others = cl[0], cl[1:]
         items.append({
             "key": it["key"], "title": it["title"], "text": tg_text_preview(it["text"]), "full": tg_text_preview(it["text"], 3000),
-            "photo": it.get("photo"),
+            "photo": it.get("photo"), "video": it.get("video"),
             "channel": it["channel"], "channel_title": _tg_titles.get(it["channel"], it["channel"]),
             "url": it["url"], "date": iso(it["date"]),
             "also": [{"channel": o["channel"], "channel_title": _tg_titles.get(o["channel"], o["channel"]), "url": o["url"]}
@@ -1967,7 +1971,7 @@ CS_STRICT = re.compile(r"\bCS ?2\b|\bCS:?GO\b|\bCS\b|Counter[- ]Strike|\bКС ?2
                        r"|\bBLAST\b|мейджор\w*|\bAWP\b|авп\w*", re.IGNORECASE)
 # Посты «во время матча»: моменты, ход игры, голый счёт — это трансляция, а не новость.
 LIVE_NOISE = re.compile(
-    r"клатч\w*|clutch|квадр\w*|\bквад\w*|\bэйс\w*|\bace\b|\b[345]k\b|\b1 ?(?:в|v|vs|на) ?[2-5]\b|хайлайт\w*|highlight|"
+    r"клатч\w*|clutch|квадр\w*|\bквад\w*|\bэйс\w*|\bace\b|\b[345]k\b|\b[12] ?(?:в|v|vs|на) ?[2-5]\b|ситуаци\w+ \d ?(?:в|v|на) ?\d|хайлайт\w*|highlight|"
     r"\bмомент\w*|\bклип\w*|\bclip\b|прямо сейчас|\blive\b|\bлайв\b|идёт матч|идет матч|"
     r"(?:перв|втор|трет)\w+ карт\w*|\bкарт[ау] (?:за|в пользу)|забира\w+ (?:карту|mirage|inferno|nuke|ancient|anubis|dust2|train|overpass|vertigo|cache)|"
     r"взял\w* (?:карту|mirage|inferno|nuke|ancient|anubis|dust2|train|overpass)|счёт по картам|\bmap ?[123]\b|"
@@ -2358,7 +2362,7 @@ def summarize_article(it: dict, url: str) -> dict:
 def article_info(it: dict) -> dict:
     """Ссылка на оригинал, пересказ, цитаты. Всё кэшируется по новости."""
     if it.get("tg"):
-        return {"url": it["url"], "summary_ru": tg_text_preview(it.get("text") or ""), "image": it.get("photo"), "lang": "ru"}
+        return {"url": it["url"], "summary_ru": tg_text_preview(it.get("text") or ""), "image": it.get("photo"), "video": it.get("video"), "lang": "ru"}
     k = it["key"]
     info = dict(art_cache.get(k) or {})
     url = info.get("url") or (it["url"] if "news.google.com" not in (it["url"] or "") else None)
@@ -2485,7 +2489,7 @@ def gather_news(teams: list[dict]) -> list[dict]:
             "lang_ru": LANG_RU.get(lang or "", lang) if lang and lang != "ru" else None,
             "summary_ru": art.get("summary_ru"),
             "quotes": art.get("quotes") or [],
-            "image": art.get("image"),
+            "image": art.get("image"), "video": art.get("video"),
             "kind": classify(it["title"]),
             "about": about,
             "source": it["source"],
