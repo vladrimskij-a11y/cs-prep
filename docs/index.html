@@ -255,6 +255,7 @@ a { color: inherit; }
 html, body { overflow-x: clip; }  /* соседняя страница при свайпе не расширяет экран (иначе телефон на миг отдаляет страницу) */
 html { overflow-anchor: none; }
 #tabbody, #tabbody .news, #tabbody .recent2 { touch-action: pan-y; }
+.view.reader { touch-action: pan-y; }
 #tabbody { display: flow-root; min-height: calc(100vh - var(--tabs-h, 62px)); }  /* короткая вкладка не сдёргивает прокрутку при свайпе */  /* отступы внутри — копия-сосед при свайпе встаёт ровно туда же */
 .swipe-ghost { position: absolute; pointer-events: none; }
 @keyframes tabInL { from { opacity: .35; transform: translateX(40%); } to { opacity: 1; transform: none; } }
@@ -1327,6 +1328,46 @@ a.ni { text-decoration: none; color: inherit; }
       location.hash = m ? "t-" + tourOf(m) : "";
     } else location.hash = "";
   }
+  // ---------- открытая новость: свайп вправо — назад к списку, на то же место
+  var rs = null;
+  document.addEventListener("touchstart", function (e) {
+    rs = null;
+    var v = document.querySelector(".view.reader");
+    if (!v || !(state.reader || state.feedRead) || e.touches.length !== 1 || e.target.closest("video")) return;
+    rs = { x: e.touches[0].clientX, y: e.touches[0].clientY, t: Date.now(), dx: 0, lock: null, v: v };
+  }, { passive: true });
+  document.addEventListener("touchmove", function (e) {
+    if (!rs || rs.lock === "v") return;
+    var dx = e.touches[0].clientX - rs.x, dy = e.touches[0].clientY - rs.y;
+    if (!rs.lock) {
+      if (dx > 10 && dx > Math.abs(dy) * 1.5) rs.lock = "h";
+      else if (Math.abs(dy) > 10 || dx < -10) { rs.lock = "v"; return; }
+      else return;
+    }
+    rs.dx = Math.max(0, dx);
+    rs.v.style.transition = "none";
+    rs.v.style.transform = "translateX(" + rs.dx + "px)";
+    rs.v.style.opacity = String(1 - Math.min(0.6, rs.dx / window.innerWidth * 0.8));
+  }, { passive: true });
+  function readerSwipeEnd() {
+    if (!rs) return;
+    var r0 = rs; rs = null;
+    if (r0.lock !== "h") return;
+    var W = document.documentElement.clientWidth, v = r0.dx / Math.max(1, Date.now() - r0.t);
+    r0.v.style.transition = "transform .16s ease-out, opacity .16s ease-out";
+    if (r0.dx > W * 0.28 || (v > 0.45 && r0.dx > 40)) {
+      r0.v.style.transform = "translateX(" + W + "px)"; r0.v.style.opacity = "0";
+      setTimeout(function () {
+        goBack();  // список откроется на том же месте, откуда открывали новость
+        var nv = document.querySelector(".view");
+        if (nv) { nv.style.opacity = "0"; requestAnimationFrame(function () { nv.style.transition = "opacity .14s ease-out"; nv.style.opacity = ""; }); }
+        try { TG && TG.HapticFeedback && TG.HapticFeedback.impactOccurred("light"); } catch (err) {}
+      }, 150);
+    } else { r0.v.style.transform = ""; r0.v.style.opacity = ""; }
+  }
+  document.addEventListener("touchend", readerSwipeEnd, { passive: true });
+  document.addEventListener("touchcancel", readerSwipeEnd, { passive: true });
+
   if (TG) { try { TG.BackButton.onClick(goBack); } catch (e) {} }
   window.addEventListener("hashchange", route);
 
