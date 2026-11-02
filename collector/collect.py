@@ -2810,6 +2810,10 @@ def build_facts(d: dict, prev: dict | None) -> list | None:
             facts_cache[key] = {"t": iso(NOW), "story": story}
     elif c:
         story = c.get("story")
+    items15 = ((d.get("news") or {}).get("items") or [])[:15]
+    for f in story or []:
+        if not f.get("src"):
+            f["src"] = fact_source(f, items15)  # старые факты из кэша — тоже со ссылкой на новость
     facts, seen = [], []
     for f in (story or []) + stats_facts:
         tok = title_tokens(f["text"])

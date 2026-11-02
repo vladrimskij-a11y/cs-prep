@@ -747,13 +747,36 @@ a.ni { text-decoration: none; color: inherit; }
     return html + '</div></div>';
   }
 
+  // новость-источник факта: по ключу от сборщика, а для старых фактов — по совпадению слов
+  var STAT_TAGS = { "Форма": 1, "Игроки": 1, "Стороны": 1, "Карты": 1, "Встречи": 1, "Пистолетки": 1, "Маппул": 1 };
+  function ftok(t) {
+    return (String(t || "").toLowerCase().match(/[a-zа-яё0-9]+/g) || []).filter(function (w) { return w.length >= 3; }).map(function (w) { return w.slice(0, 5); });
+  }
+  function factSrc(m, f) {
+    var items = (m.news && m.news.items) || [];
+    if (f.src && items.some(function (x) { return x.key === f.src; })) return f.src;
+    if (STAT_TAGS[f.tag]) return null;
+    var ft = ftok(f.text), set = {};
+    ft.forEach(function (w) { set[w] = 1; });
+    var n = Object.keys(set).length, best = null, score = 0;
+    if (n < 2) return null;
+    items.forEach(function (x) {
+      var seen = {}, hit = 0;
+      ftok((x.title_ru || x.title || "") + " " + (x.summary_ru || "").slice(0, 300)).forEach(function (w) { if (set[w] && !seen[w]) { seen[w] = 1; hit++; } });
+      var sc = hit / n;
+      if (hit >= 2 && sc > score) { score = sc; best = x.key; }
+    });
+    return score >= 0.45 ? best : null;
+  }
+
   function factsBlock(m) {
     var F = m.facts || [];
     if (!F.length) return "";
     var shown = state.factsAll ? F : F.slice(0, 10);
     var html = '<div class="sec"><h3>Факты для эфира <span>по данным матча</span></h3><div class="box facts">';
     shown.forEach(function (f) {
-      var hasSrc = f.src && ((m.news && m.news.items) || []).some(function (x) { return x.key === f.src; });
+      var src = factSrc(m, f), hasSrc = !!src;
+      f = { tag: f.tag, text: f.text, src: src };
       html += hasSrc
         ? '<button class="fact link" data-reader="' + esc(f.src) + '"><span class="ftag">' + esc(f.tag || "") + '</span><span>' + esc(f.text) + ' <span class="fgo">›</span></span></button>'
         : '<div class="fact"><span class="ftag">' + esc(f.tag || "") + '</span><span>' + esc(f.text) + '</span></div>';
