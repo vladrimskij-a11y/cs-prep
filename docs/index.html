@@ -248,10 +248,12 @@ a { color: inherit; }
 .ch { font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 4px; white-space: nowrap; background: var(--sunk); color: var(--muted); }
 .ch.hi { color: var(--win); } .ch.lo { color: var(--loss); }
 
-#tabbody.in-left { animation: tabInL .18s ease-out; }
-#tabbody.in-right { animation: tabInR .18s ease-out; }
-@keyframes tabInL { from { opacity: .3; transform: translateX(24px); } to { opacity: 1; transform: none; } }
-@keyframes tabInR { from { opacity: .3; transform: translateX(-24px); } to { opacity: 1; transform: none; } }
+#tabbody.in-left { animation: tabInL .2s ease-out; }
+#tabbody.in-right { animation: tabInR .2s ease-out; }
+html { overflow-x: clip; }
+#tabbody { touch-action: pan-y; will-change: transform; }
+@keyframes tabInL { from { opacity: .2; transform: translateX(60%); } to { opacity: 1; transform: none; } }
+@keyframes tabInR { from { opacity: .2; transform: translateX(-60%); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { #tabbody.in-left, #tabbody.in-right { animation: none; } }
 
 /* лента */
@@ -1035,30 +1037,55 @@ a.ni { text-decoration: none; color: inherit; }
     function tabBtn(id, label, c) { return '<button class="tab" role="tab" data-tab="' + id + '" aria-selected="' + (state.tab === id) + '">' + label + (c ? '<span class="c">' + c + '</span>' : '') + '</button>'; }
   }
 
-  // ---------- свайпы между вкладками матча
+  // ---------- свайпы между вкладками матча: содержимое едет за пальцем
   var TABS = ["stats", "players", "news"], sw = null;
+  function swipeOk(e) {
+    if (!state.openId || !state.details[state.openId] || state.reader || e.touches.length !== 1) return false;
+    var x = e.touches[0].clientX;
+    if (x < 24 || x > window.innerWidth - 24) return false;  // у края — системный жест «назад»
+    return !e.target.closest(".filt, .mapsel, [style*='overflow-x'], video, input, textarea");  // там своя прокрутка
+  }
   document.addEventListener("touchstart", function (e) {
     sw = null;
-    if (!state.openId || !state.details[state.openId] || !document.getElementById("tabbody") || state.reader || e.touches.length !== 1) return;
-    var x = e.touches[0].clientX;
-    if (x < 24 || x > window.innerWidth - 24) return;  // у края — системный жест «назад»
-    if (e.target.closest(".filt, .mapsel, [style*='overflow-x'], video, input, textarea")) return;  // там своя прокрутка
-    sw = { x: x, y: e.touches[0].clientY, t: Date.now() };
+    var tb = document.getElementById("tabbody");
+    if (!tb || !swipeOk(e)) return;
+    sw = { x: e.touches[0].clientX, y: e.touches[0].clientY, t: Date.now(), dx: 0, lock: null, tb: tb, i: TABS.indexOf(state.tab) };
   }, { passive: true });
-  document.addEventListener("touchend", function (e) {
+  document.addEventListener("touchmove", function (e) {
+    if (!sw || sw.lock === "v") return;
+    var dx = e.touches[0].clientX - sw.x, dy = e.touches[0].clientY - sw.y;
+    if (!sw.lock) {
+      if (Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy) * 1.5) sw.lock = "h";
+      else if (Math.abs(dy) > 10) { sw.lock = "v"; return; }
+      else return;
+    }
+    var edge = (dx > 0 && sw.i === 0) || (dx < 0 && sw.i === TABS.length - 1);
+    sw.dx = edge ? dx * 0.25 : dx;  // дальше вкладок нет — тянется туго
+    sw.tb.style.transition = "none";
+    sw.tb.style.transform = "translateX(" + sw.dx + "px)";
+    sw.tb.style.opacity = String(1 - Math.min(0.5, Math.abs(sw.dx) / window.innerWidth * 0.6));
+  }, { passive: true });
+  function swipeEnd() {
     if (!sw) return;
-    var dx = e.changedTouches[0].clientX - sw.x, dy = e.changedTouches[0].clientY - sw.y, dt = Date.now() - sw.t;
-    sw = null;
-    if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.8 || dt > 700) return;
-    var i = TABS.indexOf(state.tab) + (dx < 0 ? 1 : -1);
-    if (i < 0 || i >= TABS.length) return;
-    state.tab = TABS[i];
-    state.slide = dx < 0 ? "left" : "right";
-    var nav = document.querySelector(".tabs"), top = nav ? nav.getBoundingClientRect().top + window.scrollY - 8 : 0;
-    renderMatch(state.details[state.openId]);
-    if (window.scrollY > top) window.scrollTo(0, top);
-    try { TG && TG.HapticFeedback && TG.HapticFeedback.selectionChanged(); } catch (err) {}
-  }, { passive: true });
+    var s0 = sw; sw = null;
+    if (s0.lock !== "h") return;
+    var W = window.innerWidth, dir = s0.dx < 0 ? 1 : -1, v = Math.abs(s0.dx) / Math.max(1, Date.now() - s0.t);
+    var next = s0.i + dir, go = next >= 0 && next < TABS.length && (Math.abs(s0.dx) > W * 0.25 || (v > 0.5 && Math.abs(s0.dx) > 40));
+    s0.tb.style.transition = "transform .16s ease-out, opacity .16s ease-out";
+    if (!go) { s0.tb.style.transform = ""; s0.tb.style.opacity = ""; return; }
+    s0.tb.style.transform = "translateX(" + (-dir * W) + "px)";
+    s0.tb.style.opacity = "0";
+    setTimeout(function () {
+      var nav = document.querySelector(".tabs"), top = nav ? nav.getBoundingClientRect().top + window.scrollY - 8 : 0;
+      state.tab = TABS[next];
+      state.slide = dir > 0 ? "left" : "right";
+      renderMatch(state.details[state.openId]);
+      if (window.scrollY > top) window.scrollTo(0, top);
+      try { TG && TG.HapticFeedback && TG.HapticFeedback.selectionChanged(); } catch (err) {}
+    }, 150);
+  }
+  document.addEventListener("touchend", swipeEnd, { passive: true });
+  document.addEventListener("touchcancel", swipeEnd, { passive: true });
 
   // ---------- роутинг: "" турниры, #t-ID турнир, #mine мои матчи, #m-ID матч
   var depth = 0;
