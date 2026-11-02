@@ -111,6 +111,7 @@ a { color: inherit; }
 .tabs { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 4; background: var(--bg); display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; padding-block: 12px 8px; }
 .tab { padding: 9px 4px; border-radius: 8px; font-weight: 600; font-size: 14px; color: var(--muted); background: var(--sunk); }
 .tab[aria-selected="true"] { background: var(--fg); color: var(--bg); }
+.tab, .chip { transition: background-color .12s, color .12s, border-color .12s; }
 .tab .c { font-family: var(--mono); font-size: 11px; opacity: .7; margin-left: 2px; }
 
 .sec { display: flex; flex-direction: column; gap: 10px; margin-top: 14px; }
@@ -1091,6 +1092,13 @@ a.ni { text-decoration: none; color: inherit; }
     s0.el.style.transition = t; s0.el.style.transform = x ? "translateX(" + x + "px)" : "";
     if (s0.g) { s0.g.style.transition = t; s0.g.style.transform = "translateX(" + (x + s0.dir * D) + "px)"; }
   }
+  // подсветка верхнего меню — сразу, вместе со страницей, а не после перерисовки
+  function markSel(tgt) {
+    var tab = tgt && tgt.tab ? tgt.tab : state.tab;
+    var nf = tgt ? (tgt.filter != null ? tgt.filter : (tgt.tab === "news" ? "all" : null)) : state.newsFilter;
+    document.querySelectorAll(".tabs [data-tab]").forEach(function (b) { b.setAttribute("aria-selected", String(b.getAttribute("data-tab") === tab)); });
+    if (tab === "news" && state.tab === "news") document.querySelectorAll("[data-nf]").forEach(function (b) { b.setAttribute("aria-pressed", String(b.getAttribute("data-nf") === nf)); });
+  }
   function dropGhost(s0) { if (s0.g && s0.g.parentNode) s0.g.parentNode.removeChild(s0.g); s0.g = null; }
   document.addEventListener("touchstart", function (e) {
     sw = null;
@@ -1109,12 +1117,15 @@ a.ni { text-decoration: none; color: inherit; }
     if (dir !== sw.dir) {  // сменили направление — готовим другого соседа
       dropGhost(sw);
       if (sw.el) { sw.el.style.transform = ""; }
+      if (sw.marked) { markSel(null); sw.marked = false; }
       sw.dir = dir; sw.tgt = swipeTarget(dir);
       var gg = sw.tgt ? ghostFor(sw.tgt) : null;
       sw.el = gg ? gg.el : document.getElementById("tabbody"); sw.g = gg ? gg.g : null;
     }
     sw.dx = sw.tgt ? dx : dx * 0.25;  // дальше некуда — тянется туго
     place(sw, sw.dx, false);
+    var past = sw.tgt && Math.abs(sw.dx) > (sw.el.offsetWidth + 24) / 2;  // соседа видно больше половины — подсвечиваем его
+    if (past !== sw.marked) { markSel(past ? sw.tgt : null); sw.marked = past; }
   }, { passive: true });
   function swipeEnd() {
     if (!sw) return;
@@ -1123,10 +1134,12 @@ a.ni { text-decoration: none; color: inherit; }
     var W = document.documentElement.clientWidth, v = Math.abs(s0.dx) / Math.max(1, Date.now() - s0.t);
     var go = s0.tgt && s0.g && (Math.abs(s0.dx) > W * 0.22 || (v > 0.45 && Math.abs(s0.dx) > 35));
     if (!go) {
+      if (s0.marked) markSel(null);
       place(s0, 0, true);
       setTimeout(function () { dropGhost(s0); s0.el.style.transition = ""; }, 210);
       return;
     }
+    markSel(s0.tgt);
     place(s0, -s0.dir * (s0.el.offsetWidth + 24), true);  // соседняя страница встаёт на место
     setTimeout(function () {
       var nav = document.querySelector(".tabs"), top = nav ? nav.getBoundingClientRect().top + window.scrollY - 8 : 0;
