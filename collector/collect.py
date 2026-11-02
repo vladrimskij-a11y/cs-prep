@@ -15,7 +15,7 @@
 
 Переменные окружения:
   PANDASCORE_TOKEN  — токен PandaScore (обязателен)
-  TIERS             — уровни турниров, по умолчанию "s,a"
+  TIERS             — уровни турниров, по умолчанию "s" (только тир-1)
   DAYS_AHEAD        — на сколько дней вперёд показывать матчи (7)
   DETAIL_HOURS      — для матчей в ближайшие N часов собирать подробности (72)
   NEWS_DAYS         — глубина новостей в днях (7)
@@ -45,7 +45,7 @@ CACHE = ROOT / "cache"
 PANDA = "https://api.pandascore.co"
 BO3 = "https://api.bo3.gg/api/v1"
 TOKEN = os.environ.get("PANDASCORE_TOKEN", "").strip()
-TIERS = {t.strip().lower() for t in os.environ.get("TIERS", "s,a").split(",") if t.strip()}
+TIERS = {t.strip().lower() for t in os.environ.get("TIERS", "s").split(",") if t.strip()}
 DAYS_AHEAD = int(os.environ.get("DAYS_AHEAD", "7"))
 DETAIL_HOURS = int(os.environ.get("DETAIL_HOURS", "72"))
 NEWS_DAYS = int(os.environ.get("NEWS_DAYS", "7"))
