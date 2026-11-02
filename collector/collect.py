@@ -1124,7 +1124,8 @@ def giga_read_image(url: str) -> str | None:
 
 
 TG_SYSTEM = """Ты редактор новостей о Counter-Strike 2. Тебе дают пост из Telegram-канала (текст и, если был, текст с картинки).
-Определи, новость ли это про киберспорт CS2 (не реклама, не ставки/промокоды/казино, не розыгрыш, не мем без новости, не другая игра).
+Определи, новость ли это про киберспорт CS2 (не реклама, не ставки/промокоды/казино, не розыгрыш, не мем без новости, не другая игра,
+не расписание и не анонс/напоминание о матчах — «сегодня играют…», «когда матчи», «стартует турнир», превью и прогнозы — это НЕ новость).
 Если да — дай короткий заголовок по-русски (до 100 символов), ники и названия команд латиницей как в оригинале.
 Ответ строго JSON: {"news": true|false, "title": "<заголовок>"}"""
 
@@ -1136,7 +1137,8 @@ def tg_process(post: dict) -> dict:
         return c
     text = post["text"] or ""
     info: dict = {"t": iso(NOW)}
-    ad = re.search(r"промокод|реклама|#ad\b|erid|казино|casino|ставк\w*|букмекер|розыгрыш|giveaway|подпишись", text, re.IGNORECASE)
+    ad = re.search(r"промокод|реклама|#ad\b|erid|казино|casino|ставк\w*|букмекер|розыгрыш|giveaway|подпишись", text, re.IGNORECASE) \
+        or SPAM.search(text[:200])
     if post.get("photo") and len(text) < 60 and _tg_giga[0] < TG_GIGA_LIMIT:
         _tg_giga[0] += 1
         info["ocr"] = giga_read_image(post["photo"])
@@ -1175,7 +1177,7 @@ def tg_posts() -> list[dict]:
         _tg_titles[ch] = title
         for p in posts:
             info = tg_process(p)
-            if not info.get("news"):
+            if not info.get("news") or SPAM.search(info.get("title") or "") or SPAM.search((p["text"] or "")[:200]):
                 continue
             body = p["text"] or info.get("ocr") or ""
             res.append({
@@ -1555,7 +1557,10 @@ CS_STRICT = re.compile(r"\bCS ?2\b|\bCS:?GO\b|\bCS\b|Counter[- ]Strike|\bКС ?2
 NON_CS_SOURCES = re.compile(r"dota|dota2\.ru|valorant|lol|mlbb", re.IGNORECASE)
 SPAM = re.compile(
     r"prediction|predictions|прогноз|ставк|коэффициент|\bodds\b|betting|букмекер|live stream|how to watch|где смотреть"
-    r"|расписание|schedule|^Матч .+ · |\bvs\.? .+ \d{1,2} (ноября|октября|декабря)",
+    r"|смотреть онлайн|прямая трансляция|live score|в режиме live|результаты? (матча )?онлайн|счёт онлайн|счет онлайн"
+    r"|расписани\w*|schedule|когда игра\w*|когда (пройд|начн|смотреть)\w*|анонс\w*|превью|preview|match ?up|head to head"
+    r"|^Матч\b|^Match\b|^Live:|\bvs\.? .+ \d{1,2} (ноября|октября|декабря|november|october|december)"
+    r"|сегодня игра\w*|today'?s matches|матчи дня|день \d+ ?[:—-]|day \d+ (schedule|preview)",
     re.IGNORECASE)
 COMMON_WORDS = {"try", "zone", "ice", "fire", "max", "flash", "ace", "one", "jack", "king", "magic", "hero", "legacy",
                 "spirit", "liquid", "heroic", "complexity", "falcons", "aurora", "monte", "rare", "nemiga", "apeks",
@@ -2066,7 +2071,8 @@ def src_rank(it: dict) -> tuple:
 
 DEDUP_SYSTEM = """Ты редактор новостей о Counter-Strike 2. Тебе дают пронумерованный список заголовков (уже по-русски) и составы двух команд.
 1) В "drop" перечисли номера заголовков, которые НЕ про киберспорт Counter-Strike и не про этих игроков/команды
-   (другие игры, кино, музыка, однофамильцы, составы клубов в Dota/Valorant и т.п.).
+   (другие игры, кино, музыка, однофамильцы, составы клубов в Dota/Valorant и т.п.), А ТАКЖЕ расписания, анонсы и превью матчей,
+   страницы «матч X — Y, дата и время», «где смотреть», онлайн-результаты и прогнозы на ставки — это не новости.
 2) В "groups" перечисли группы номеров, которые рассказывают ОДНУ И ТУ ЖЕ новость (одно событие), даже если формулировки и языки разные.
    Разные события про одного игрока — это разные новости, их не объединяй.
 Ответ строго JSON: {"drop": [номера], "groups": [[номера], [номера]]}"""
