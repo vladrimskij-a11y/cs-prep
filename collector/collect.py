@@ -800,8 +800,31 @@ def build_form(bid: int, hist: list[dict], n: int = 10) -> list[dict]:
     return res
 
 
+H2H_DAYS = 730
+
+
+def bo3_h2h_matches(a: int, b: int) -> list[dict]:
+    """Все завершённые матчи между двумя командами — точным запросом (обе расстановки team1/team2)."""
+    res = {}
+    for t1, t2 in ((a, b), (b, a)):
+        try:
+            j = bo3("/matches", {"page[limit]": 50, "sort": "-start_date",
+                                 "filter[matches.status][in]": "finished",
+                                 "filter[matches.team1_id][eq]": t1, "filter[matches.team2_id][eq]": t2,
+                                 "with": "teams,tournament"})
+            for m in j.get("results") or []:
+                if {m.get("team1_id"), m.get("team2_id")} == {a, b}:
+                    res[m["id"]] = m
+        except Exception as e:
+            warn(f"bo3 личные встречи {a}/{b}: {e!r}")
+    return sorted(res.values(), key=lambda m: m.get("start_date") or "", reverse=True)
+
+
 def build_h2h(a: int, b: int, hist_a: list[dict]) -> list[dict]:
-    since = NOW - timedelta(days=365)
+    since = NOW - timedelta(days=H2H_DAYS)
+    exact = bo3_h2h_matches(a, b)
+    if exact:
+        hist_a = exact
     res = []
     for m in hist_a:
         if {m.get("team1_id"), m.get("team2_id")} != {a, b}:
