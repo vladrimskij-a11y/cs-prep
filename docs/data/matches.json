@@ -1,5 +1,5 @@
 {
- "updated": "2026-11-02T00:19:37Z",
+ "updated": "2026-11-02T00:30:46Z",
  "tiers": [
   "a",
   "s"
@@ -758,11 +758,16 @@
  ],
  "meta": {
   "panda_requests": 19,
-  "bo3_requests": 386,
+  "bo3_requests": 32,
   "liquipedia_requests": 0,
-  "translations": 0,
+  "translations": 17,
   "warnings": [
-   "Google News: слишком часто, остальные ссылки раскроются в следующий запуск"
-  ]
+   "GigaChat: URLError(TimeoutError('timed out'))",
+   "Google News: слишком часто, остальные ссылки раскроются в следующий запуск",
+   "GigaChat: HTTP 500 {\"status\":500,\"message\":\"Internal Server Error\"}\n",
+   "GigaChat: HTTP 500 {\"status\":500,\"message\":\"Internal Server Error\"}\n"
+  ],
+  "giga_calls": 43,
+  "giga_tokens": 27497
  }
 }
