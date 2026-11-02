@@ -1,5 +1,5 @@
 {
- "updated": "2026-11-02T07:27:36Z",
+ "updated": "2026-11-02T07:36:58Z",
  "tiers": [
   "s"
  ],
@@ -1398,11 +1398,12 @@
    "GigaChat: URLError(TimeoutError('timed out'))",
    "GigaChat: дневной лимит токенов исчерпан, остальное — завтра",
    "Перевод: <HTTPError 429: 'Too Many Requests'>",
+   "Перевод: <HTTPError 429: 'Too Many Requests'>",
    "Перевод: <HTTPError 429: 'Too Many Requests'>"
   ],
   "dust2_requests": 25,
-  "giga_calls": 64,
-  "giga_tokens": 40966,
+  "giga_calls": 73,
+  "giga_tokens": 49888,
   "hltv_requests": 1
  }
 }
