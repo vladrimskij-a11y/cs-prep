@@ -956,7 +956,6 @@ a.ni { text-decoration: none; color: inherit; }
         }).join("");
         html += '<button class="pl" data-player="' + esc(p.nick) + '"><span class="nickline"><span class="nick">' + esc(p.nick) + '</span>' +
           (tags ? '<span class="rtags">' + tags + '</span>' : '') + '</span>' +
-          (n ? '<span class="nb" aria-label="' + n + ' новост' + (n === 1 ? "ь" : n < 5 ? "и" : "ей") + '">' + n + '</span>' : '') +
           '<span class="rn">' + esc(flag(p.nationality)) + ' ' + esc(real || plain(p.name_ru) || "") + (real && p.name_ru ? ' <span class="pron">[' + esc(plain(p.name_ru)) + ']</span>' : '') + (p.age ? " · " + esc(p.age) + " " + years(p.age) : "") + '</span>' +
           pstat(t, p.nick) + '</button>';
       });
@@ -1096,7 +1095,8 @@ a.ni { text-decoration: none; color: inherit; }
       return null;
     }
     var i = TABS.indexOf(state.tab) + dir;
-    return i >= 0 && i < TABS.length ? { tab: TABS[i] } : null;
+    if (i < 0) return { back: true };  // со «Статистики» вправо — назад к турниру
+    return i < TABS.length ? { tab: TABS[i] } : null;
   }
   function swipeOk(e) {
     if (!state.openId || !state.details[state.openId] || state.reader || e.touches.length !== 1) return false;
@@ -1165,9 +1165,10 @@ a.ni { text-decoration: none; color: inherit; }
       var same = [].slice.call(gg.g.querySelectorAll("[data-reader]")).find(function (x) { return x.getAttribute("data-reader") === k; });
       if (same) delta = same.getBoundingClientRect().top - cur.getBoundingClientRect().top;
     }
-    var maxAfter = document.documentElement.scrollHeight - el.offsetHeight + gg.g.offsetHeight - window.innerHeight;
+    var maxAfter = document.documentElement.scrollHeight - el.offsetHeight + gg.g._fullH - window.innerHeight;
     var target = Math.max(anchor, Math.min(S + delta, Math.max(anchor, maxAfter)));
     gg.g.style.top = (parseFloat(gg.g.style.top) - (target - S)) + "px";
+    clipGhost(gg.g);
     gg.target = target;
     return gg;
   }
@@ -1182,7 +1183,14 @@ a.ni { text-decoration: none; color: inherit; }
     g.style.top = (vTop - pr.top - el.parentNode.clientTop) + "px"; 
     g.style.left = (er.left - pr.left - el.parentNode.clientLeft) + "px"; g.style.width = el.offsetWidth + "px";
     el.parentNode.appendChild(g);
+    g._fullH = g.offsetHeight;
+    clipGhost(g);
     return { el: el, g: g };
+  }
+  // рисуем только то, что видно на экране: огромный слой телефон не успевает отрисовать — отсюда мигание
+  function clipGhost(g) {
+    var top = g.getBoundingClientRect().top;
+    g.style.height = Math.max(120, window.innerHeight - top + 40) + "px"; g.style.overflow = "hidden";
   }
   function place(s0, x, anim) {
     var D = s0.el.offsetWidth + 24, t = anim ? "transform .2s cubic-bezier(.2,.7,.3,1)" : "none";
@@ -1242,13 +1250,14 @@ a.ni { text-decoration: none; color: inherit; }
       if (sw.el) { sw.el.style.transform = ""; }
       if (sw.marked) { markSel(null); sw.marked = false; }
       sw.dir = dir; sw.tgt = swipeTarget(dir, sw.zone);
-      var gg = sw.tgt ? ghostFor(sw.tgt) : null;
+      var gg = sw.tgt && !sw.tgt.back ? ghostFor(sw.tgt) : null;
       sw.target = gg ? gg.target : null;
-      sw.el = gg ? gg.el : (sw.zone === "map" ? document.querySelector("#tabbody .recent2") : document.getElementById("tabbody")); sw.g = gg ? gg.g : null;
+      sw.el = gg ? gg.el : sw.tgt && sw.tgt.back ? document.querySelector(".view") : (sw.zone === "map" ? document.querySelector("#tabbody .recent2") : document.getElementById("tabbody")); sw.g = gg ? gg.g : null;
       if (sw.zone === "map") fadeBelow(!sw.g);  // соседняя карта может быть выше/ниже — нижние блоки прячем, чтобы не наезжала
     }
     sw.dx = sw.tgt ? dx : dx * 0.25;  // дальше некуда — тянется туго
     place(sw, sw.dx, false);
+    if (sw.tgt && sw.tgt.back) sw.el.style.opacity = String(1 - Math.min(0.6, sw.dx / window.innerWidth * 0.8));
     var past = sw.tgt && Math.abs(sw.dx) > (sw.el.offsetWidth + 24) / 2;  // соседа видно больше половины — подсвечиваем его
     if (past !== sw.marked) { markSel(past ? sw.tgt : null); sw.marked = past; }
   }, { passive: true });
@@ -1257,6 +1266,18 @@ a.ni { text-decoration: none; color: inherit; }
     var s0 = sw; sw = null;
     if (s0.lock !== "h" || !s0.el) return;
     var W = document.documentElement.clientWidth, v = Math.abs(s0.dx) / Math.max(1, Date.now() - s0.t);
+    if (s0.tgt && s0.tgt.back) {  // уход к турниру: экран уезжает вправо, турнир проявляется
+      var goB = s0.dx > W * 0.28 || (v > 0.45 && s0.dx > 40);
+      s0.el.style.transition = "transform .16s ease-out, opacity .16s ease-out";
+      if (!goB) { s0.el.style.transform = ""; s0.el.style.opacity = ""; return; }
+      s0.el.style.transform = "translateX(" + W + "px)"; s0.el.style.opacity = "0";
+      setTimeout(function () {
+        goBack();
+        var nv = document.querySelector(".view");
+        if (nv) { nv.style.opacity = "0"; requestAnimationFrame(function () { nv.style.transition = "opacity .14s ease-out"; nv.style.opacity = ""; }); }
+      }, 150);
+      return;
+    }
     var go = s0.tgt && s0.g && (Math.abs(s0.dx) > W * 0.22 || (v > 0.45 && Math.abs(s0.dx) > 35));
     if (!go) {
       if (s0.marked) markSel(null);
