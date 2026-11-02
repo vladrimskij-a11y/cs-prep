@@ -1145,8 +1145,29 @@ a.ni { text-decoration: none; color: inherit; }
     } else el = document.getElementById("tabbody");
     if (!el) return null;
     var key = tgt.filter != null ? viewKey("news", tgt.filter) : viewKey(tgt.tab, tgt.tab === "news" ? "all" : state.newsFilter);
+    state.scrolls = state.scrolls || {};
+    if (tgt.filter != null && state.scrolls[key] == null) return filterGhost(el, html);
     var target = arrival(el, key);
     var gg = mkGhost(el, html, window.scrollY - target);
+    gg.target = target;
+    return gg;
+  }
+  // другой фильтр новостей впервые: списки во многом общие — держим на экране ту же новость,
+  // что была сверху, на том же месте; так лента почти не меняется и ничего не прыгает
+  function filterGhost(el, html) {
+    var gg = mkGhost(el, html, 0), S = window.scrollY, stick = stickFor(el);
+    var anchor = el.getBoundingClientRect().top + S - stick;
+    if (S <= anchor) { gg.target = S; return gg; }
+    var cur = [].slice.call(el.querySelectorAll("[data-reader]")).find(function (x) { return x.getBoundingClientRect().bottom > stick + 8; });
+    var delta = 0;
+    if (cur) {
+      var k = cur.getAttribute("data-reader");
+      var same = [].slice.call(gg.g.querySelectorAll("[data-reader]")).find(function (x) { return x.getAttribute("data-reader") === k; });
+      if (same) delta = same.getBoundingClientRect().top - cur.getBoundingClientRect().top;
+    }
+    var maxAfter = document.documentElement.scrollHeight - el.offsetHeight + gg.g.offsetHeight - window.innerHeight;
+    var target = Math.max(anchor, Math.min(S + delta, Math.max(anchor, maxAfter)));
+    gg.g.style.top = (parseFloat(gg.g.style.top) - (target - S)) + "px";
     gg.target = target;
     return gg;
   }
