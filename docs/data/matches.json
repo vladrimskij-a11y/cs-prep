@@ -1,5 +1,5 @@
 {
- "updated": "2026-11-02T13:26:33Z",
+ "updated": "2026-11-02T16:15:50Z",
  "tiers": [
   "s"
  ],
@@ -12,9 +12,9 @@
    "begin": "2026-11-02T02:00:00Z",
    "end": "2026-11-08T12:30:00Z",
    "prize": "1,250,000 United States Dollar",
-   "matches": 23,
+   "matches": 22,
    "next": "2026-11-03T02:00:00Z",
-   "live": 1,
+   "live": 0,
    "hltv": {
     "prize": 1250000,
     "player_share": 300000,
@@ -862,43 +862,6 @@
  ],
  "matches": [
   {
-   "id": 1761573,
-   "begin_at": "2026-11-02T11:50:40Z",
-   "status": "running",
-   "bo": 3,
-   "name": "Upper Bracket Quarterfinal 4: NAVI vs FAL",
-   "tournament": "IEM Beijing 2026",
-   "stage": "Group A · Upper Bracket Quarterfinal 4",
-   "tier": "s",
-   "serie": {
-    "id": 11136,
-    "begin": "2026-11-02T02:00:00Z",
-    "end": "2026-11-08T12:30:00Z",
-    "image": null,
-    "prize": null
-   },
-   "teams": [
-    {
-     "id": 3216,
-     "name": "Natus Vincere",
-     "acronym": "NAVI",
-     "slug": "natus-vincere-cs-go",
-     "image": "https://cdn-api.pandascore.co/images/team/image/3216/1022px_natus_vincere_2021_lightmode.png",
-     "location": "UA"
-    },
-    {
-     "id": 130564,
-     "name": "Team Falcons",
-     "acronym": "FAL",
-     "slug": "falcons-esports",
-     "image": "https://cdn-api.pandascore.co/images/team/image/130564/team_falconslogo_square.png",
-     "location": "SA"
-    }
-   ],
-   "stream": "https://www.twitch.tv/bysl4m",
-   "has_detail": true
-  },
-  {
    "id": 1781473,
    "begin_at": "2026-11-03T02:00:00Z",
    "status": "not_started",
@@ -1051,7 +1014,7 @@
    "begin_at": "2026-11-03T07:00:00Z",
    "status": "not_started",
    "bo": 3,
-   "name": "Lower Bracket Quarterfinal 2: FaZe vs TBD",
+   "name": "Lower Bracket Quarterfinal 2: FaZe vs FAL",
    "tournament": "IEM Beijing 2026",
    "stage": "Group A · Lower Bracket Quarterfinal 2",
    "tier": "s",
@@ -1070,10 +1033,18 @@
      "slug": "faze",
      "image": "https://cdn-api.pandascore.co/images/team/image/3212/285px_fa_ze_esports_october_2025_lightmode.png",
      "location": "US"
+    },
+    {
+     "id": 130564,
+     "name": "Team Falcons",
+     "acronym": "FAL",
+     "slug": "falcons-esports",
+     "image": "https://cdn-api.pandascore.co/images/team/image/130564/team_falconslogo_square.png",
+     "location": "SA"
     }
    ],
    "stream": "https://www.twitch.tv/ESLCS",
-   "has_detail": false
+   "has_detail": true
   },
   {
    "id": 1781461,
@@ -1154,7 +1125,7 @@
    "begin_at": "2026-11-03T09:30:00Z",
    "status": "not_started",
    "bo": 3,
-   "name": "Upper Bracket Semifinal 2: FURIA vs TBD",
+   "name": "Upper Bracket Semifinal 2: FURIA vs NAVI",
    "tournament": "IEM Beijing 2026",
    "stage": "Group A · Upper Bracket Semifinal 2",
    "tier": "s",
@@ -1173,10 +1144,18 @@
      "slug": "furia",
      "image": "https://cdn-api.pandascore.co/images/team/image/124530/8297.png",
      "location": "BR"
+    },
+    {
+     "id": 3216,
+     "name": "Natus Vincere",
+     "acronym": "NAVI",
+     "slug": "natus-vincere-cs-go",
+     "image": "https://cdn-api.pandascore.co/images/team/image/3216/1022px_natus_vincere_2021_lightmode.png",
+     "location": "UA"
     }
    ],
    "stream": "https://www.twitch.tv/ESLCS",
-   "has_detail": false
+   "has_detail": true
   },
   {
    "id": 1781467,
@@ -1460,18 +1439,16 @@
   }
  ],
  "meta": {
-  "panda_requests": 19,
-  "bo3_requests": 70,
-  "liquipedia_requests": 1,
-  "translations": 0,
+  "panda_requests": 21,
+  "bo3_requests": 82,
+  "liquipedia_requests": 2,
+  "translations": 1,
   "warnings": [
-   "Liquipedia Natus Vincere: <HTTPError 429: 'Too Many Requests'>",
-   "GigaChat: дневной лимит токенов исчерпан, остальное — завтра",
-   "GigaChat: URLError(TimeoutError('timed out'))"
+   "GigaChat: дневной лимит токенов исчерпан, остальное — завтра"
   ],
-  "dust2_requests": 25,
-  "giga_calls": 2,
-  "giga_tokens": 2844,
+  "dust2_requests": 26,
+  "giga_calls": 1,
+  "giga_tokens": 2211,
   "hltv_requests": 1
  }
 }
