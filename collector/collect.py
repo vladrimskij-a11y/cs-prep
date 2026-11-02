@@ -1754,7 +1754,8 @@ _giga = {"token": None, "exp": 0.0, "ctx": None, "off": False}
 
 # Дневные лимиты токенов, чтобы бесплатного пакета хватило на год:
 # базовая модель 250 млн/год → 500 тыс./день, Max (картинки) 25 млн/год → 50 тыс./день.
-GIGA_DAY_LIMIT = {"lite": int(os.environ.get("GIGA_DAY_LITE", "500000")), "max": int(os.environ.get("GIGA_DAY_MAX", "50000"))}
+GIGA_DAY_LIMIT = {"lite": int(os.environ.get("GIGA_DAY_LITE", "500000")), "max": int(os.environ.get("GIGA_DAY_MAX", "50000")),
+                  "pro": int(os.environ.get("GIGA_DAY_PRO", "100000"))}
 GIGA_USAGE_F = CACHE / "giga_usage.json"
 giga_usage: dict = load_json(GIGA_USAGE_F, {})
 
@@ -1801,10 +1802,15 @@ def giga_token() -> str | None:
     return _giga["token"]
 
 
+def giga_kind(model: str | None) -> str:
+    m = (model or GIGA_MODEL).lower()
+    return "max" if "max" in m else "pro" if "pro" in m else "lite"
+
+
 def giga_chat(system: str, user: str, max_tokens: int = 900, model: str | None = None) -> str | None:
     if not GIGA_KEY or _giga["off"]:
         return None
-    if not giga_budget_ok("lite"):
+    if not giga_budget_ok(giga_kind(model)):
         if not _giga.get("warned_lite"):
             warn("GigaChat: дневной лимит токенов исчерпан, остальное — завтра")
             _giga["warned_lite"] = True
@@ -1820,7 +1826,7 @@ def giga_chat(system: str, user: str, max_tokens: int = 900, model: str | None =
                 j = json.loads(r.read())
             stats["giga_calls"] = stats.get("giga_calls", 0) + 1
             stats["giga_tokens"] = stats.get("giga_tokens", 0) + (j.get("usage") or {}).get("total_tokens", 0)
-            giga_spend("lite", (j.get("usage") or {}).get("total_tokens", 0))
+            giga_spend(giga_kind(model), (j.get("usage") or {}).get("total_tokens", 0))
             return j["choices"][0]["message"]["content"]
         except urllib.error.HTTPError as e:
             msg = e.read()[:200].decode("utf-8", "replace")
@@ -2134,6 +2140,66 @@ def build_news(teams: list[dict]) -> dict:
     return {"updated": iso(NOW), "days": NEWS_DAYS, "items": gather_news(teams)}
 
 
+
+# ---------------------------------------------------------------- факты для эфира
+
+FACTS_CACHE_F = CACHE / "facts.json"
+facts_cache: dict = load_json(FACTS_CACHE_F, {})
+FACTS_TTL_H = 6
+FACTS_SYSTEM = """Ты помогаешь русскоязычному комментатору CS2 подготовиться к матчу.
+Тебе дают данные о матче (JSON). Составь 12 коротких фактов для эфира — интересных, конкретных, с цифрами.
+Строгие правила:
+- Используй ТОЛЬКО цифры и сведения из данных. Ничего не добавляй от себя, не выдумывай рекорды, историю и титулы.
+- Каждый факт — одно предложение до 25 слов, по-русски, ники и названия команд латиницей как в данных.
+- Разные темы: личные встречи, форма, карты и стороны (CT/T, пистолетки), игроки (роли, возраст, K/D, ADR, KAST, лучшая карта),
+  тренеры, новости недели. Не повторяй одно и то же разными словами.
+- Сначала самые яркие и полезные для эфира факты.
+- "tag" — одно слово: Встречи, Форма, Карты, Стороны, Игроки, Тренеры, Новости.
+Ответ строго JSON: {"facts": [{"tag": "...", "text": "..."}]}"""
+
+
+def facts_input(d: dict) -> dict:
+    A, B = (d.get("teams") or [{}, {}])[:2]
+    def team(t):
+        return {
+            "name": t.get("name"),
+            "coach": [{"nick": c.get("nick"), "age": c.get("age")} for c in t.get("coach") or []],
+            "players": [{"nick": p.get("nick"), "age": p.get("age"), "roles": p.get("tags")} for p in t.get("players") or []],
+            "player_stats_3m": [{k: x.get(k) for k in ("nick", "kd", "adr", "kast", "best_map", "maps")} for x in t.get("stats") or []],
+            "last10": [{"vs": f.get("opponent_name"), "score": f"{f.get('score')}:{f.get('opp_score')}", "won": f.get("won"),
+                        "tournament": f.get("tournament"), "date": (f.get("date") or "")[:10]} for f in t.get("form") or []],
+        }
+    maps = d.get("maps") or {}
+    sides = d.get("sides") or {}
+    return {
+        "match": {"tournament": d.get("tournament"), "stage": d.get("stage"), "bo": d.get("bo"), "date": (d.get("begin_at") or "")[:10]},
+        "team1": team(A), "team2": team(B),
+        "h2h_year": [{"date": (h.get("date") or "")[:10], "tournament": h.get("tournament"), "score": h.get("score"),
+                      "maps": [f"{g.get('map')} {g.get('score') or ''} ({['team1', 'team2'][g['winner']] if g.get('winner') in (0, 1) else '?'})"
+                               for g in h.get("maps") or []]} for h in d.get("h2h") or []],
+        "map_winrates_4m": [{"map": r["map"], "team1": f"{r['teams'][0]['won']}/{r['teams'][0]['played']}",
+                             "team2": f"{r['teams'][1]['won']}/{r['teams'][1]['played']}"} for r in maps.get("table") or []],
+        "sides_3m_total": {"team1": (sides.get("total") or [None, None])[0], "team2": (sides.get("total") or [None, None])[1]},
+        "sides_3m_by_map": sides.get("maps"),
+        "news_week": [{"about": n.get("about"), "title": n.get("title_ru") or n.get("title")} for n in ((d.get("news") or {}).get("items") or [])[:10]],
+    }
+
+
+def build_facts(d: dict, prev: dict | None) -> list | None:
+    key = str(d["id"])
+    c = facts_cache.get(key)
+    if c and (parse_iso(c.get("t")) or NOW) > NOW - timedelta(hours=FACTS_TTL_H):
+        return c["facts"]
+    if not GIGA_KEY or _giga["off"]:
+        return c["facts"] if c else None
+    data = json.dumps(facts_input(d), ensure_ascii=False)
+    res = parse_json_loose(giga_chat(FACTS_SYSTEM, data[:14000], 1500, model=os.environ.get("GIGACHAT_FACTS_MODEL", "GigaChat-2-Pro")))
+    facts = [f for f in (res or {}).get("facts") or [] if isinstance(f, dict) and f.get("text")][:12]
+    if not facts:
+        return c["facts"] if c else None
+    facts_cache[key] = {"t": iso(NOW), "facts": facts}
+    return facts
+
 # ---------------------------------------------------------------- main
 
 def build_detail(m: dict, prev: dict | None) -> dict:
@@ -2168,6 +2234,10 @@ def build_detail(m: dict, prev: dict | None) -> dict:
         detail["news"] = build_news(teams)
     else:
         detail["news"] = prev["news"]
+    try:
+        detail["facts"] = build_facts(detail, prev)
+    except Exception as e:
+        warn(f"Факты: {e!r}")
     return detail
 
 
@@ -2229,6 +2299,7 @@ def main() -> int:
         del tg_cache[k]
     save_json(TG_CACHE_F, tg_cache)
     save_json(PRON_CACHE_F, pron_cache)
+    save_json(FACTS_CACHE_F, facts_cache)
     save_json(HLTV_CACHE_F, hltv_cache)
     for k in [k for k in giga_usage if k < (NOW - timedelta(days=40)).strftime("%Y-%m-%d")]:
         del giga_usage[k]

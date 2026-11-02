@@ -274,6 +274,13 @@ button.ni { width: 100%; text-align: left; }
 .pstat { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12px; color: var(--muted); margin-top: 4px; }
 .pstat b { color: var(--fg); font-family: var(--mono); font-weight: 700; }
 
+/* факты */
+.facts { display: flex; flex-direction: column; }
+.fact { display: grid; grid-template-columns: 74px 1fr; gap: 10px; padding: 10px 12px; border-top: 1px solid var(--line); font-size: 14px; line-height: 1.45; }
+.fact:first-child { border-top: 0; }
+.ftag { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; padding-top: 2px; }
+.fmore { padding: 10px 12px; border-top: 1px solid var(--line); color: var(--ct); font-weight: 600; font-size: 13px; text-align: left; }
+
 /* группы по турнирам */
 .grp { display: flex; flex-direction: column; }
 .grp .gh { padding: 8px 12px 4px; font-size: 11px; font-weight: 600; color: var(--muted); border-top: 1px solid var(--line); display: flex; justify-content: space-between; gap: 8px; }
@@ -582,6 +589,18 @@ a.ni { text-decoration: none; color: inherit; }
   function backBtn(label) { return TG ? '' : '<button class="back" id="back">' + ARROW + esc(label) + '</button>'; }
 
   // ---------- карточка матча
+  function factsBlock(m) {
+    var F = m.facts || [];
+    if (!F.length) return "";
+    var shown = state.factsAll ? F : F.slice(0, 8);
+    var html = '<div class="sec"><h3>Факты для эфира <span>по данным матча</span></h3><div class="box facts">';
+    shown.forEach(function (f) {
+      html += '<div class="fact"><span class="ftag">' + esc(f.tag || "") + '</span><span>' + esc(f.text) + '</span></div>';
+    });
+    if (F.length > 8) html += '<button class="fmore" id="facts-more">' + (state.factsAll ? "Свернуть" : "Показать ещё " + (F.length - 8)) + '</button>';
+    return html + '</div></div>';
+  }
+
   function h2hBlock(m) {
     var h = m.h2h || [];
     var A = m.teams[0], B = m.teams[1];
@@ -831,7 +850,7 @@ a.ni { text-decoration: none; color: inherit; }
       '</section>' +
       '<nav class="tabs" role="tablist">' +
       tabBtn("stats", "Статистика") + tabBtn("players", "Игроки") + tabBtn("news", "Новости", nCount) + '</nav><div id="tabbody">';
-    if (state.tab === "stats") html += h2hBlock(m) + mapsBlock(m) + formBlock(m);
+    if (state.tab === "stats") html += factsBlock(m) + h2hBlock(m) + mapsBlock(m) + formBlock(m);
     else if (state.tab === "players") html += playersTab(m);
     else html += newsTab(m);
     $app.innerHTML = html + '</div></div>';
@@ -891,9 +910,10 @@ a.ni { text-decoration: none; color: inherit; }
 
   // ---------- клики
   $app.addEventListener("click", function (e) {
-    var t = e.target.closest("[data-mreg],[data-home],[data-feedch],[data-tg],[data-reader],#close-reader,[data-mine],[data-open],[data-tour],[data-tab],[data-map],[data-nf],[data-player],[data-link],[data-news],[data-orig],[data-read],#back,#to-mine");
+    var t = e.target.closest("#facts-more,[data-mreg],[data-home],[data-feedch],[data-tg],[data-reader],#close-reader,[data-mine],[data-open],[data-tour],[data-tab],[data-map],[data-nf],[data-player],[data-link],[data-news],[data-orig],[data-read],#back,#to-mine");
     if (!t) return;
     if (t.hasAttribute("data-home")) { var hv = t.getAttribute("data-home"); if (hv === "feed" || hv === "major") { location.hash = hv; } else if (location.hash) { location.hash = ""; } return; }
+    if (t.id === "facts-more") { state.factsAll = !state.factsAll; renderMatch(state.details[state.openId]); return; }
     if (t.hasAttribute("data-mreg")) { state.majorReg = t.getAttribute("data-mreg"); keepFilterScroll(renderMajor); return; }
     if (t.hasAttribute("data-feedch")) { state.feedCh = t.getAttribute("data-feedch"); keepFilterScroll(renderFeed); return; }
     if (t.hasAttribute("data-tg")) { if (TG) { e.preventDefault(); try { TG.openTelegramLink(t.getAttribute("data-tg")); } catch (x) { openLink(t.getAttribute("data-tg")); } } return; }
