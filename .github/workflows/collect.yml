@@ -56,7 +56,9 @@ jobs:
           git add docs/data
           git diff --cached --quiet || git commit -m "Данные: $(date -u +'%Y-%m-%d %H:%M') UTC"
           for i in 1 2 3; do
-            git pull --rebase --autostash -q origin main && git push && exit 0
+            # при столкновении данных оставляем свежие (наши)
+            git pull --rebase --autostash -X theirs -q origin main && git push && exit 0
+            git rebase --abort 2>/dev/null || true
             sleep 5
           done
           exit 1
