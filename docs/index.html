@@ -239,7 +239,7 @@ a { color: inherit; }
 .hometabs { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
 .feedch { margin-top: 10px; }
 .feed .sect-title { margin-top: 14px; }
-.fi { text-decoration: none; color: inherit; }
+.fi { text-decoration: none; color: inherit; width: 100%; text-align: left; }
 .fi .chn { color: var(--fg); font-weight: 600; }
 .fi-body { display: flex; gap: 10px; align-items: flex-start; }
 .fi-body img { width: 84px; height: 84px; object-fit: cover; border-radius: 8px; flex: none; background: var(--sunk); }
@@ -467,9 +467,28 @@ a.ni { text-decoration: none; color: inherit; }
       .then(function (f) { state.feed = f; return f; });
   }
 
+  function feedReader(n) {
+    var html = '<div class="view reader"><div style="padding-top:12px">' + (TG ? '' : '<button class="back" id="close-freader">' + ARROW + 'Лента</button>') + '</div>' +
+      '<article class="rd"><div class="rd-meta"><b>' + esc(n.channel_title) + '</b> · ' + esc(dmy(n.date)) + ' ' + esc(hm(n.date)) + '</div>' +
+      (n.photo ? '<img src="' + esc(n.photo) + '" alt="" loading="lazy" onerror="this.remove()">' : '') +
+      String(n.full || n.text || n.title).split(/\n+/).filter(Boolean).map(function (p) { return '<p>' + esc(p) + '</p>'; }).join("") +
+      '<a class="readbtn" href="' + esc(n.url) + '" data-tg="' + esc(n.url) + '" target="_blank" rel="noopener">Открыть в Telegram</a>';
+    if ((n.also || []).length) {
+      html += '<div class="also"><div class="rd-meta">Также в каналах</div>' + n.also.map(function (a) {
+        return '<a href="' + esc(a.url) + '" data-tg="' + esc(a.url) + '" target="_blank" rel="noopener"><b>' + esc(a.channel_title) + '</b></a>';
+      }).join("") + '</div>';
+    }
+    return html + '</article></div>';
+  }
+
   function renderFeed() {
     var html = homeHeader("feed");
     var F = state.feed;
+    if (F && state.feedRead) {
+      var it = (F.items || []).find(function (x) { return x.key === state.feedRead; });
+      if (it) { $app.innerHTML = feedReader(it); try { TG && TG.BackButton.show(); } catch (e) {} return; }
+      state.feedRead = null;
+    }
     if (!F) { $app.innerHTML = html + '<div class="empty">Загружаю ленту…</div></div>'; return; }
     var ch = state.feedCh || "all";
     var items = (F.items || []).filter(function (n) { return ch === "all" || n.channel === ch || (n.also || []).some(function (a) { return a.channel === ch; }); });
@@ -481,11 +500,11 @@ a.ni { text-decoration: none; color: inherit; }
     items.forEach(function (n) {
       var k = dayKey(n.date);
       if (k !== cur) { cur = k; html += '<h2 class="sect-title">' + esc(dayTitle(n.date)) + '</h2>'; }
-      html += '<a class="box ni fi" href="' + esc(n.url) + '" data-tg="' + esc(n.url) + '" target="_blank" rel="noopener">' +
+      html += '<button class="box ni fi" data-fread="' + esc(n.key) + '">' +
         '<span class="src"><span><b class="chn">' + esc(n.channel_title) + '</b> · ' + esc(hm(n.date)) + '</span>' +
         ((n.also || []).length ? '<span>ещё в ' + n.also.length + ' ' + (n.also.length === 1 ? "канале" : "каналах") + '</span>' : '') + '</span>' +
         '<span class="fi-body">' + (n.photo ? '<img src="' + esc(n.photo) + '" alt="" loading="lazy" onerror="this.remove()">' : '') +
-        '<span><h4>' + esc(n.title) + '</h4>' + (n.text && n.text !== n.title ? '<p>' + esc(n.text) + '</p>' : '') + '</span></span></a>';
+        '<span><h4>' + esc(n.title) + '</h4>' + (n.text && n.text !== n.title ? '<p>' + esc(n.text) + '</p>' : '') + '</span></span></button>';
     });
     $app.innerHTML = html + '</div></div>';
   }
@@ -955,7 +974,15 @@ a.ni { text-decoration: none; color: inherit; }
     if (f && fs != null) f.scrollLeft = fs;
     window.scrollTo(0, state.readerScroll || 0);
   }
+  function closeFeedReader() {
+    state.feedRead = null;
+    renderFeed();
+    try { TG && TG.BackButton.hide(); } catch (e) {}
+    window.scrollTo(0, state.feedScroll || 0);
+    var fc = document.querySelector(".feedch"); if (fc) fc.scrollLeft = state.feedChScroll || 0;
+  }
   function goBack() {
+    if (state.feedRead) { closeFeedReader(); return; }
     if (state.reader) { closeReader(); return; }
     if (depth > 0) { depth--; history.back(); return; }
     var h = location.hash.replace("#", "");
@@ -969,9 +996,11 @@ a.ni { text-decoration: none; color: inherit; }
 
   // ---------- клики
   $app.addEventListener("click", function (e) {
-    var t = e.target.closest("#facts-more,[data-mreg],[data-home],[data-feedch],[data-tg],[data-reader],#close-reader,[data-mine],[data-open],[data-tour],[data-tab],[data-map],[data-nf],[data-player],[data-link],[data-news],[data-orig],[data-read],#back,#to-mine");
+    var t = e.target.closest("[data-fread],#close-freader,#facts-more,[data-mreg],[data-home],[data-feedch],[data-tg],[data-reader],#close-reader,[data-mine],[data-open],[data-tour],[data-tab],[data-map],[data-nf],[data-player],[data-link],[data-news],[data-orig],[data-read],#back,#to-mine");
     if (!t) return;
     if (t.hasAttribute("data-home")) { var hv = t.getAttribute("data-home"); if (hv === "feed" || hv === "major") { location.hash = hv; } else if (location.hash) { location.hash = ""; } return; }
+    if (t.hasAttribute("data-fread")) { state.feedRead = t.getAttribute("data-fread"); state.feedScroll = window.scrollY; var fc = document.querySelector(".feedch"); state.feedChScroll = fc ? fc.scrollLeft : 0; renderFeed(); window.scrollTo(0, 0); return; }
+    if (t.id === "close-freader") { closeFeedReader(); return; }
     if (t.id === "facts-more") { state.factsAll = !state.factsAll; renderMatch(state.details[state.openId]); return; }
     if (t.hasAttribute("data-mreg")) { state.majorReg = t.getAttribute("data-mreg"); keepFilterScroll(renderMajor); return; }
     if (t.hasAttribute("data-feedch")) { state.feedCh = t.getAttribute("data-feedch"); keepFilterScroll(renderFeed); return; }

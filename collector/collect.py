@@ -1243,7 +1243,8 @@ def build_feed() -> dict:
     for cl in clusters[:150]:
         it, others = cl[0], cl[1:]
         items.append({
-            "key": it["key"], "title": it["title"], "text": tg_text_preview(it["text"]), "photo": it.get("photo"),
+            "key": it["key"], "title": it["title"], "text": tg_text_preview(it["text"]), "full": tg_text_preview(it["text"], 3000),
+            "photo": it.get("photo"),
             "channel": it["channel"], "channel_title": _tg_titles.get(it["channel"], it["channel"]),
             "url": it["url"], "date": iso(it["date"]),
             "also": [{"channel": o["channel"], "channel_title": _tg_titles.get(o["channel"], o["channel"]), "url": o["url"]}
