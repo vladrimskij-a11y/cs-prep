@@ -824,7 +824,17 @@ a.ni { text-decoration: none; color: inherit; }
     m.teams.forEach(function (t, i) {
       html += '<div class="sec"><div class="box roster ' + (i ? "b" : "a") + '"><div class="hd">' + esc(t.name) + '<span class="num">' + esc(flag(t.location)) + '</span></div>';
       if (!(t.players || []).length) html += '<div class="note">Состав не указан.</div>';
-      (t.players || []).forEach(function (p) {
+      // порядок: капитан, снайпер (AWP), гибрид, остальные — внутри групп как на Liquipedia
+      function prank(p) {
+        var tg = p.tags || [];
+        if (tg.indexOf("Капитан") >= 0) return 0;
+        if (tg.some(function (x) { return x === "AWP" || /^Снайпер/.test(x); })) return 1;
+        if (tg.some(function (x) { return /AWP/.test(x); })) return 2;
+        return 3;
+      }
+      (t.players || []).map(function (p, i) { return [p, i]; })
+        .sort(function (a, b) { return prank(a[0]) - prank(b[0]) || a[1] - b[1]; })
+        .map(function (x) { return x[0]; }).forEach(function (p) {
         var n = newsFor(m, p.nick).length;
         var real = [p.first_name, p.last_name].filter(Boolean).join(" ");
         var tags = (p.tags || []).map(function (x) {
