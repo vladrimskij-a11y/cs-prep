@@ -619,12 +619,12 @@ a.ni { text-decoration: none; color: inherit; }
   function factsBlock(m) {
     var F = m.facts || [];
     if (!F.length) return "";
-    var shown = state.factsAll ? F : F.slice(0, 8);
+    var shown = state.factsAll ? F : F.slice(0, 10);
     var html = '<div class="sec"><h3>Факты для эфира <span>по данным матча</span></h3><div class="box facts">';
     shown.forEach(function (f) {
       html += '<div class="fact"><span class="ftag">' + esc(f.tag || "") + '</span><span>' + esc(f.text) + '</span></div>';
     });
-    if (F.length > 8) html += '<button class="fmore" id="facts-more">' + (state.factsAll ? "Свернуть" : "Показать ещё " + (F.length - 8)) + '</button>';
+    if (F.length > 10) html += '<button class="fmore" id="facts-more">' + (state.factsAll ? "Свернуть" : "Показать ещё " + (F.length - 10)) + '</button>';
     return html + '</div></div>';
   }
 

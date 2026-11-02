@@ -2262,18 +2262,19 @@ def build_news(teams: list[dict]) -> dict:
 
 # ---------------------------------------------------------------- факты для эфира
 
-FACTS_CACHE_F = CACHE / "facts.json"
+FACTS_CACHE_F = CACHE / "facts_v2.json"
 facts_cache: dict = load_json(FACTS_CACHE_F, {})
 FACTS_TTL_H = 6
 FACTS_SYSTEM = """Ты помогаешь русскоязычному комментатору CS2 подготовиться к матчу.
-Тебе дают данные о матче (JSON). Составь 12 коротких фактов для эфира — интересных, конкретных, с цифрами.
+Тебе дают данные о матче (JSON). Составь от 10 до 20 коротких фактов для эфира — интересных, конкретных, с цифрами.
+Если данных хватает — ближе к 20; меньше 10 не надо.
 Строгие правила:
 - Используй ТОЛЬКО цифры и сведения из данных. Ничего не добавляй от себя, не выдумывай рекорды, историю и титулы.
 - Каждый факт — одно предложение до 25 слов, по-русски, ники и названия команд латиницей как в данных.
 - Разные темы: личные встречи, форма, карты и стороны (CT/T, пистолетки), игроки (роли, возраст, K/D, ADR, KAST, лучшая карта),
   тренеры, новости недели. Не повторяй одно и то же разными словами.
 - Сначала самые яркие и полезные для эфира факты.
-- "tag" — одно слово: Встречи, Форма, Карты, Стороны, Игроки, Тренеры, Новости.
+- "tag" — одно слово: Встречи, Форма, Карты, Вето, Стороны, Игроки, Тренеры, Новости.
 Ответ строго JSON: {"facts": [{"tag": "...", "text": "..."}]}"""
 
 
@@ -2313,8 +2314,8 @@ def build_facts(d: dict, prev: dict | None) -> list | None:
     if not GIGA_KEY or _giga["off"]:
         return c["facts"] if c else None
     data = json.dumps(facts_input(d), ensure_ascii=False)
-    res = parse_json_loose(giga_chat(FACTS_SYSTEM, data[:14000], 1500, model=os.environ.get("GIGACHAT_FACTS_MODEL", "GigaChat-2-Pro")))
-    facts = [f for f in (res or {}).get("facts") or [] if isinstance(f, dict) and f.get("text")][:12]
+    res = parse_json_loose(giga_chat(FACTS_SYSTEM, data[:16000], 2800, model=os.environ.get("GIGACHAT_FACTS_MODEL", "GigaChat-2-Pro")))
+    facts = [f for f in (res or {}).get("facts") or [] if isinstance(f, dict) and f.get("text")][:20]
     if not facts:
         return c["facts"] if c else None
     facts_cache[key] = {"t": iso(NOW), "facts": facts}
