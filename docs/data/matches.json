@@ -1,5 +1,5 @@
 {
- "updated": "2026-11-02T02:21:53Z",
+ "updated": "2026-11-02T02:46:05Z",
  "tiers": [
   "a",
   "s"
@@ -605,6 +605,18 @@
     "hltv": "https://www.hltv.org/events/8245/iem-beijing-2026"
    },
    "prize_usd": 1250000
+  },
+  {
+   "id": "11137",
+   "name": "BLAST Rivals Fall 2026",
+   "tier": "s",
+   "image": null,
+   "begin": "2026-11-11T02:00:00Z",
+   "end": "2026-11-15T12:00:00Z",
+   "prize": "1,000,000 United States Dollar",
+   "matches": 0,
+   "next": null,
+   "live": 0
   }
  ],
  "matches": [
@@ -1346,15 +1358,16 @@
   }
  ],
  "meta": {
-  "panda_requests": 19,
-  "bo3_requests": 530,
+  "panda_requests": 21,
+  "bo3_requests": 48,
   "liquipedia_requests": 0,
-  "translations": 3,
+  "translations": 4,
   "warnings": [
    "GigaChat: URLError(TimeoutError('timed out'))"
   ],
-  "giga_calls": 103,
-  "giga_tokens": 53720,
-  "giga_vision": 7
+  "giga_calls": 86,
+  "giga_tokens": 26249,
+  "giga_vision": 8,
+  "hltv_requests": 1
  }
 }
