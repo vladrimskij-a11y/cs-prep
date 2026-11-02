@@ -1104,6 +1104,23 @@ a.ni { text-decoration: none; color: inherit; }
     return !(sc && sc.scrollWidth > sc.clientWidth + 2);  // своя прокрутка вбок — только если ей правда есть куда листать
   }
   // страница-сосед: HTML той вкладки (или списка новостей с другим фильтром), не трогая текущий экран
+  // ---------- память прокрутки: у каждой вкладки (и каждого фильтра новостей) своё место
+  function viewKey(tab, nf) { return tab === "news" ? "news:" + nf : tab; }
+  function stickFor(el) {
+    var nav = document.querySelector(".tabs"), nf = el && el.classList.contains("news") ? document.querySelector(".nfilt") : null;
+    return (nav ? nav.offsetHeight : 0) + (nf ? nf.offsetHeight + 6 : 0);
+  }
+  // куда встать на новой вкладке: если шапка матча ещё видна — никуда (иначе дёрнется);
+  // если ушли вниз — на запомненное место этой вкладки, а впервые — на её начало под меню
+  function arrival(el, key) {
+    state.scrolls = state.scrolls || {};
+    var anchor = el.getBoundingClientRect().top + window.scrollY - stickFor(el);
+    if (window.scrollY <= anchor) return window.scrollY;
+    var saved = state.scrolls[key];
+    return Math.max(anchor, saved != null ? saved : anchor);
+  }
+  function remember() { state.scrolls = state.scrolls || {}; state.scrolls[viewKey(state.tab, state.newsFilter)] = window.scrollY; }
+
   function ghostFor(tgt) {
     var m = state.details[state.openId], keep = { tab: state.tab, nf: state.newsFilter, on: state.openNews }, html, el;
     if (tgt.map != null) {
@@ -1124,21 +1141,19 @@ a.ni { text-decoration: none; color: inherit; }
       el = document.querySelector("#tabbody .news");
     } else el = document.getElementById("tabbody");
     if (!el) return null;
-    return mkGhost(el, html, true);
+    var key = tgt.filter != null ? viewKey("news", tgt.filter) : viewKey(tgt.tab, tgt.tab === "news" ? "all" : state.newsFilter);
+    var target = arrival(el, key);
+    var gg = mkGhost(el, html, window.scrollY - target);
+    gg.target = target;
+    return gg;
   }
-  // pin: страница прокручена вниз — соседа показываем с его начала, сразу под закреплённым меню
-  // (после свайпа прокрутка встанет ровно туда же, поэтому ничего не прыгает)
-  function mkGhost(el, html, pin) {
+  // сосед рисуется сразу в том положении, где окажется после свайпа, — поэтому ничего не прыгает
+  function mkGhost(el, html, shift) {  // shift — на сколько сосед будет прокручен иначе, чем текущая страница
     var g = document.createElement("div");
     g.className = el.className + " swipe-ghost"; g.id = ""; g.innerHTML = html;
     if (getComputedStyle(el.parentNode).position === "static") el.parentNode.style.position = "relative";
     var er = el.getBoundingClientRect(), pr = el.parentNode.getBoundingClientRect();
-    var vTop = er.top;  // где начнётся сосед на экране
-    if (pin) {
-      var nav = document.querySelector(".tabs"), nf = el.classList.contains("news") ? document.querySelector(".nfilt") : null;
-      var stick = (nav ? nav.offsetHeight : 0) + (nf ? nf.offsetHeight + 6 : 0);
-      if (vTop < stick) vTop = stick;  // начало страницы ушло под меню — показываем соседа с начала
-    }
+    var vTop = er.top + (shift || 0);  // сосед показан ровно так, как встанет после свайпа
     g.style.top = (vTop - pr.top - el.parentNode.clientTop) + "px"; 
     g.style.left = (er.left - pr.left - el.parentNode.clientLeft) + "px"; g.style.width = el.offsetWidth + "px";
     el.parentNode.appendChild(g);
@@ -1191,6 +1206,7 @@ a.ni { text-decoration: none; color: inherit; }
       if (sw.marked) { markSel(null); sw.marked = false; }
       sw.dir = dir; sw.tgt = swipeTarget(dir, sw.zone);
       var gg = sw.tgt ? ghostFor(sw.tgt) : null;
+      sw.target = gg ? gg.target : null;
       sw.el = gg ? gg.el : (sw.zone === "map" ? document.querySelector("#tabbody .recent2") : document.getElementById("tabbody")); sw.g = gg ? gg.g : null;
       if (sw.zone === "map") fadeBelow(!sw.g);  // соседняя карта может быть выше/ниже — нижние блоки прячем, чтобы не наезжала
     }
@@ -1216,9 +1232,7 @@ a.ni { text-decoration: none; color: inherit; }
     place(s0, -s0.dir * (s0.el.offsetWidth + 24), true);  // соседняя страница встаёт на место
     setTimeout(function () {
       // если страница была прокручена вниз — встаём на начало новой, сразу под закреплённым меню
-      var nav = document.querySelector(".tabs"), nf = document.querySelector(".nfilt");
-      var stick = (nav ? nav.offsetHeight : 0) + (s0.tgt.filter != null && nf ? nf.offsetHeight : 0);
-      var top = s0.el.getBoundingClientRect().top + window.scrollY - stick - (s0.tgt.filter != null ? 6 : 0);
+      if (s0.tgt.map == null) remember();
       if (s0.tgt.map != null) state.map = s0.tgt.map;
       else if (s0.tgt.filter != null) { state.openNews = null; state.newsFilter = s0.tgt.filter; }
       else { state.tab = s0.tgt.tab; if (s0.tgt.tab === "news") { state.newsFilter = "all"; state.openNews = null; } }
@@ -1242,7 +1256,7 @@ a.ni { text-decoration: none; color: inherit; }
         try { TG && TG.HapticFeedback && TG.HapticFeedback.selectionChanged(); } catch (err) {}
         return;
       }
-      if (window.scrollY > top) window.scrollTo(0, top);
+      if (s0.target != null && Math.abs(window.scrollY - s0.target) > 1) window.scrollTo(0, s0.target);
       var f = document.querySelector(".filt"), sel = f && f.querySelector('[aria-pressed="true"]');
       if (sel) {
         var l = sel.offsetLeft, r = l + sel.offsetWidth;
@@ -1263,7 +1277,7 @@ a.ni { text-decoration: none; color: inherit; }
     if (!state.list) return;
     if (mt) {
       var id = mt[1];
-      if (state.openId !== id) { state.openId = id; state.reader = null; state.tab = "stats"; state.newsFilter = "all"; state.map = null; window.scrollTo(0, 0); }
+      if (state.openId !== id) { state.openId = id; state.reader = null; state.tab = "stats"; state.newsFilter = "all"; state.map = null; state.scrolls = {}; window.scrollTo(0, 0); }
       $app.innerHTML = '<div class="empty">Загружаю матч…</div>';
       getDetail(id).then(renderMatch).catch(function () {
         $app.innerHTML = '<div class="empty"><strong>Подробностей пока нет</strong>Карточки собираются за 3 дня до матча. <button class="chip" id="back" style="margin-top:8px">Назад</button></div>';
@@ -1335,9 +1349,25 @@ a.ni { text-decoration: none; color: inherit; }
     if (t.hasAttribute("data-open")) { go("#m-" + t.getAttribute("data-open")); return; }
     if (t.hasAttribute("data-tour")) { go("#t-" + t.getAttribute("data-tour")); window.scrollTo(0, 0); return; }
     if (t.id === "to-mine") { go("#mine"); return; }
-    if (t.hasAttribute("data-tab")) { state.tab = t.getAttribute("data-tab"); state.slide = null; renderMatch(state.details[state.openId]); return; }
+    if (t.hasAttribute("data-tab")) {
+      var nt = t.getAttribute("data-tab");
+      if (nt === state.tab) return;
+      remember();
+      var tb0 = document.getElementById("tabbody"), tgt0 = tb0 ? arrival(tb0, viewKey(nt, state.newsFilter)) : null;
+      state.tab = nt; state.slide = null; renderMatch(state.details[state.openId]);
+      if (tgt0 != null) window.scrollTo(0, tgt0);
+      return;
+    }
     if (t.hasAttribute("data-map")) { state.map = t.getAttribute("data-map"); keepFilterScroll(function () { renderMatch(state.details[state.openId]); }); return; }
-    if (t.hasAttribute("data-nf")) { state.openNews = null; state.newsFilter = t.getAttribute("data-nf"); keepFilterScroll(function () { renderMatch(state.details[state.openId]); }); return; }
+    if (t.hasAttribute("data-nf")) {
+      var nnf = t.getAttribute("data-nf");
+      if (nnf === state.newsFilter) return;
+      remember();
+      var nl = document.querySelector("#tabbody .news"), tgt1 = nl ? arrival(nl, viewKey("news", nnf)) : null;
+      state.openNews = null; state.newsFilter = nnf; keepFilterScroll(function () { renderMatch(state.details[state.openId]); });
+      if (tgt1 != null) window.scrollTo(0, tgt1);
+      return;
+    }
     if (t.hasAttribute("data-player")) { state.tab = "news"; state.newsFilter = t.getAttribute("data-player"); renderMatch(state.details[state.openId]); window.scrollTo(0, 0); return; }
     if (t.id === "back") { goBack(); return; }
   });
