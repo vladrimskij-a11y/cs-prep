@@ -2463,21 +2463,21 @@ def build_news(teams: list[dict]) -> dict:
 
 # ---------------------------------------------------------------- факты для эфира
 
-FACTS_CACHE_F = CACHE / "facts_v6.json"
+FACTS_CACHE_F = CACHE / "facts_v7.json"
 facts_cache: dict = load_json(FACTS_CACHE_F, {})
 FACTS_TTL_H = 6
 FACTS_SYSTEM = """Ты помогаешь русскоязычному комментатору CS2 подготовиться к матчу.
-Тебе дают сведения о матче (JSON): новости недели о командах и игроках, составы (имя, возраст, страна, роли), тренеры, личные встречи.
-Составь до 15 фактов-сюжетов для эфира — НЕ статистику. Главное — новости недели: каждую важную новость про игроков и команды
-превращай в отдельный факт (заявления, интервью, замены, аренды, переходы, слухи, конфликты, травмы, стримы).
-Темы по важности: 1) сюжеты из новостей (заявления, интервью, замены, аренды, переходы); 2) люди: кто капитан, кто AWP,
-кто в аренде, состав по странам, самые молодые и опытные; 3) тренеры; 4) последняя личная встреча как сюжет.
+Тебе дают новости недели о командах и игроках матча (из Telegram-каналов) и список ников.
+Составь до 15 фактов для эфира ТОЛЬКО из этих новостей: цитаты и заявления, интервью, трансферы и замены, слухи, конфликты,
+травмы, достижения и интересные особенности из новостей. Каждая важная новость — отдельный факт.
 Строгие правила:
-- Только то, что прямо есть в данных. Ничего не добавляй от себя: никаких титулов, рекордов, «выиграли N турниров», карьеры.
-- Не считай и не выводи числа сам. Числа (возраст, счёт, даты) переписывай точно как в данных.
-- Не пиши пустых фактов вроде «новостей нет».
+- Только то, что прямо написано в новостях. Ничего не добавляй от себя.
+- НЕ пиши общих сведений о составе (кто капитан, кто AWP, кто в аренде, возраст, страна) и о прошлых встречах команд —
+  это и так видно в приложении. Такое можно только если это само по себе новость недели (например, «X стал капитаном»).
+- Числа (счёт, места, даты) переписывай точно как в новостях, не считай сам.
+- Если новостей нет — верни пустой список, не выдумывай.
 - Одно предложение до 25 слов, по-русски, ники и названия команд латиницей как в данных.
-- "tag" — одно слово: Новости, Игроки, Тренеры, Встречи.
+- "tag": Новости, Цитата, Трансфер или Слухи.
 Ответ строго JSON: {"facts": [{"tag": "...", "text": "..."}]}"""
 
 
@@ -2534,11 +2534,6 @@ def code_facts(d: dict) -> list[dict]:
     # последняя личная встреча — как сюжет; доминирование — если одна команда выиграла все (3+)
     h2h = d.get("h2h") or []
     if h2h:
-        last = h2h[0]
-        if last.get("winner") in (0, 1) and last.get("score"):
-            lw = nm[last["winner"]]
-            out.append({"tag": "Встречи", "text": f"Последняя встреча — {last.get('tournament')} ({(last.get('date') or '')[:10]}): "
-                        f"{lw} выиграли {max(last['score'])}:{min(last['score'])}."})
         wa = sum(1 for h in h2h if h.get("winner") == 0); wb = sum(1 for h in h2h if h.get("winner") == 1)
         if len(h2h) >= 3 and (wa == 0 or wb == 0):
             dom = nm[0] if wb == 0 else nm[1]
@@ -2558,10 +2553,6 @@ def code_facts(d: dict) -> list[dict]:
             out.append({"tag": "Форма", "text": f"{t['name']} идут на серии из {streak} {'побед' if kind else 'поражений'} подряд."})
     # люди: аренды, весь состав из одной страны, экстремальный возраст
     for t in teams:
-        for p in t.get("players") or []:
-            tag = next((x for x in p.get("tags") or [] if str(x).startswith("В аренде")), None)
-            if tag:
-                out.append({"tag": "Игроки", "text": f"{p['nick']} играет за {t['name']} на правах аренды ({tag.lower()})."})
         cs = [p.get("nationality") for p in t.get("players") or [] if p.get("nationality")]
         if cs and len(set(cs)) == 1 and len(cs) >= 5:
             out.append({"tag": "Игроки", "text": f"У {t['name']} весь состав из одной страны — {COUNTRY_RU.get(cs[0], cs[0])}."})
@@ -2623,11 +2614,14 @@ def build_facts(d: dict, prev: dict | None) -> list | None:
         story = c["story"]
     elif GIGA_KEY and not _giga["off"]:
         inp = facts_input(d)
-        inp = {k: inp[k] for k in ("match", "team1", "team2", "h2h_year", "news_week") if k in inp}
-        for k in ("team1", "team2"):
-            inp[k] = {x: inp[k][x] for x in ("name", "coach", "players") if x in inp[k]}
-        data = json.dumps(inp, ensure_ascii=False)
-        res = parse_json_loose(giga_chat(FACTS_SYSTEM, data[:14000], 1800, model=os.environ.get("GIGACHAT_FACTS_MODEL", "GigaChat-2-Pro")))
+        if not inp.get("news_week"):
+            inp = None
+        else:
+            inp = {"match": inp.get("match"), "news_week": inp["news_week"],
+                   "teams": [{"name": inp[k]["name"], "nicks": [p["nick"] for p in inp[k].get("players") or []]}
+                             for k in ("team1", "team2") if k in inp]}
+        data = json.dumps(inp, ensure_ascii=False) if inp else ""
+        res = parse_json_loose(giga_chat(FACTS_SYSTEM, data[:14000], 1800, model=os.environ.get("GIGACHAT_FACTS_MODEL", "GigaChat-2-Pro"))) if inp else {"facts": []}
         allowed = _numbers(data)
         story = []
         for f in (res or {}).get("facts") or []:
@@ -2639,12 +2633,21 @@ def build_facts(d: dict, prev: dict | None) -> list | None:
                 continue  # «три турнира подряд», «чемпион», «впервые» — только если это прямо есть в данных
             if re.search(r"нет новост|не поступал|не было новост", f["text"], re.IGNORECASE):
                 continue
+            if re.search(r"капитан\w* (команды|является)|является капитан|на позиции AWP|позицию AWP|играет на AWP|в аренде из|"
+                         r"последн\w+ (личн\w+ )?встреч", f["text"], re.IGNORECASE) and not re.search(r"стал|назнач|перешёл|перешел|подписал", f["text"], re.IGNORECASE):
+                continue  # это видно в профилях и в блоке встреч
             story.append({"tag": f.get("tag") or "Новости", "text": f["text"].strip()})
         story = story[:15]
         facts_cache[key] = {"t": iso(NOW), "story": story}
     elif c:
         story = c.get("story")
-    facts = (story or []) + stats_facts
+    facts, seen = [], []
+    for f in (story or []) + stats_facts:
+        tok = title_tokens(f["text"])
+        if any(len(tok & o) / max(1, len(tok | o)) >= 0.5 for o in seen):
+            continue  # тот же смысл уже есть
+        seen.append(tok)
+        facts.append(f)
     return facts[:20] or None
 
 # ---------------------------------------------------------------- main
