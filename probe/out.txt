@@ -1,9 +1,0 @@
-search: 429 <!DOCTYPE HTML><title>Rate Limited - Liquipedia</title><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><style type=text/css>body{margin:40px auto;max-width:700px;line-height:1.6;font-size:18px;color:#444;padding:0 10px}h1{line-height:1.2}.reason{display:none}</st
-Intel Extreme Masters/2026/Beijing: 429 <!DOCTYPE HTML><title>Rate Limited - Liquipedia</title><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><style type=text/css>body{margin:40px auto;max-width:700px;l JSONDecodeError('Expecting value: line 1 column 1 (char 0)')
-=== bo3 show-match games,teams: 200 keys=['id', 'slug', 'status', 'parsed_status', 'winner_team_id', 'loser_team_id', 'tournament_id', 'team1_score', 'team2_score', 'bo_type', 'start_date', 'end_date', 'stage_id', 'maps_score', 'tier', 'tier_rank', 'position', 'live_coverage', 'live_coverage_advantage', 'live_coverage_source', 'discipline_id', 'prev_match1_winner', 'prev_match2_winner', 'game_version', 'team1_new_participant', 'team2_new_participant', 'team1', 'team2', 'team1_id', 'team2_id', 'bet_updates', 'vods', 'tournament', 'streams', 'games', 'match_maps', 'round', 'stage', 'comments']
-   maps_score = [false, true, true]
-   match_maps = []
-=== bo3 show-match: 200 keys=['id', 'slug', 'status', 'parsed_status', 'winner_team_id', 'loser_team_id', 'tournament_id', 'team1_score', 'team2_score', 'bo_type', 'start_date', 'end_date', 'stage_id', 'maps_score', 'tier', 'tier_rank', 'position', 'live_coverage', 'live_coverage_advantage', 'live_coverage_source', 'discipline_id', 'prev_match1_winner', 'prev_match2_winner', 'game_version', 'team1_new_participant', 'team2_new_participant', 'team1', 'team2', 'team1_id', 'team2_id', 'bet_updates', 'vods', 'tournament', 'streams', 'match_maps', 'round', 'stage', 'comments']
-   maps_score = [false, true, true]
-   match_maps = []
-=== bo3 by id: 404 keys=['status', 'message']

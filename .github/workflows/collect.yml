@@ -18,7 +18,7 @@ concurrency:
 jobs:
   collect:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
 
@@ -26,9 +26,13 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Установить библиотеку для чтения статей
+        run: pip install --quiet trafilatura
+
       - name: Собрать матчи, статистику и новости
         env:
           PANDASCORE_TOKEN: ${{ secrets.PANDASCORE_TOKEN }}
+          GIGACHAT_KEY: ${{ secrets.GIGACHAT_KEY }}
         run: python collector/collect.py
 
       - name: Сохранить данные

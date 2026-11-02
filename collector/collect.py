@@ -52,8 +52,8 @@ NEWS_DAYS = int(os.environ.get("NEWS_DAYS", "7"))
 MAPS_WINDOW_DAYS = 120
 
 # Ленты профильных сайтов. Любую можно убрать или добавить свою.
-# Только русскоязычные источники.
 RSS_FEEDS = [
+    ("HLTV", "https://www.hltv.org/rss/news"),
     ("Cybersport.ru", "https://www.cybersport.ru/rss/materials"),
 ]
 
@@ -951,64 +951,166 @@ def _meta(html: str, *names: str) -> str | None:
     return None
 
 
-def article_lead(url: str) -> dict:
-    """Описание статьи, которое сайт сам отдаёт для превью (og:description), и картинка."""
+# ---------------------------------------------------------------- GigaChat
+
+GIGA_KEY = os.environ.get("GIGACHAT_KEY", "").strip()
+GIGA_MODEL = os.environ.get("GIGACHAT_MODEL", "GigaChat-2")
+GIGA_CA_URL = "https://gu-st.ru/content/lending/russian_trusted_root_ca_pem.crt"
+_giga = {"token": None, "exp": 0.0, "ctx": None, "off": False}
+
+
+def giga_ctx():
+    if _giga["ctx"] is None:
+        import ssl
+        ctx = ssl.create_default_context()
+        ca_file = CACHE / "russian_trusted_root_ca.pem"
+        try:
+            if not ca_file.exists():
+                ca_file.write_bytes(http_get(GIGA_CA_URL, timeout=20))
+            ctx.load_verify_locations(cadata=ca_file.read_text())
+        except Exception as e:
+            warn(f"GigaChat сертификат: {e!r}")
+        _giga["ctx"] = ctx
+    return _giga["ctx"]
+
+
+def giga_token() -> str | None:
+    if _giga["token"] and time.time() < _giga["exp"] - 60:
+        return _giga["token"]
+    import uuid
+    req = urllib.request.Request("https://ngw.devices.sberbank.ru:9443/api/v2/oauth", data=b"scope=GIGACHAT_API_PERS",
+                                 method="POST", headers={"Authorization": f"Basic {GIGA_KEY}", "RqUID": str(uuid.uuid4()),
+                                                         "Content-Type": "application/x-www-form-urlencoded",
+                                                         "Accept": "application/json"})
+    with urllib.request.urlopen(req, timeout=30, context=giga_ctx()) as r:
+        j = json.loads(r.read())
+    _giga["token"] = j["access_token"]
+    _giga["exp"] = (j.get("expires_at") or 0) / 1000 or time.time() + 1500
+    return _giga["token"]
+
+
+def giga_chat(system: str, user: str, max_tokens: int = 900) -> str | None:
+    if not GIGA_KEY or _giga["off"]:
+        return None
+    body = json.dumps({"model": GIGA_MODEL, "temperature": 0.3, "max_tokens": max_tokens,
+                       "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}]}).encode()
+    for attempt in range(3):
+        try:
+            req = urllib.request.Request("https://gigachat.devices.sberbank.ru/api/v1/chat/completions", data=body,
+                                         method="POST", headers={"Authorization": f"Bearer {giga_token()}",
+                                                                 "Content-Type": "application/json", "Accept": "application/json"})
+            with urllib.request.urlopen(req, timeout=90, context=giga_ctx()) as r:
+                j = json.loads(r.read())
+            stats["giga_calls"] = stats.get("giga_calls", 0) + 1
+            stats["giga_tokens"] = stats.get("giga_tokens", 0) + (j.get("usage") or {}).get("total_tokens", 0)
+            return j["choices"][0]["message"]["content"]
+        except urllib.error.HTTPError as e:
+            msg = e.read()[:200].decode("utf-8", "replace")
+            if e.code == 401:
+                _giga["token"] = None
+                continue
+            if e.code == 429 and attempt < 2:
+                time.sleep(10 * (attempt + 1))
+                continue
+            if e.code == 402:
+                _giga["off"] = True  # закончился бесплатный пакет
+            warn(f"GigaChat: HTTP {e.code} {msg}")
+            return None
+        except Exception as e:
+            warn(f"GigaChat: {e!r}")
+            if attempt < 2:
+                time.sleep(3)
+                continue
+            _giga["off"] = True
+            return None
+    return None
+
+
+def parse_json_loose(txt: str | None) -> dict | None:
+    if not txt:
+        return None
+    t = re.sub(r"^```(?:json)?|```$", "", txt.strip(), flags=re.MULTILINE).strip()
+    i, j = t.find("{"), t.rfind("}")
+    if i < 0 or j < i:
+        return None
     try:
-        raw = http_get(url, {"Accept": "text/html,application/xhtml+xml"}, timeout=20)[:600_000]
-        html = raw.decode("utf-8", "replace")
-    except Exception as e:
-        return {"error": str(e)[:80]}
-    lead = _meta(html, "og:description", "twitter:description", "description")
-    if lead and len(lead) < 60:
-        lead = None
-    if not lead:
-        for m in re.finditer(r"<p[^>]*>(.*?)</p>", html, re.IGNORECASE | re.DOTALL):
-            t = strip_html(m.group(1))
-            if len(t) > 80:
-                lead = t
-                break
-    if lead and len(lead) > 600:
-        lead = lead[:600].rsplit(" ", 1)[0] + "…"
-    return {"lead": lead, "image": _meta(html, "og:image", "twitter:image")}
+        return json.loads(t[i:j + 1])
+    except Exception:
+        return None
 
 
-def resolve_link(it: dict) -> dict:
-    """Настоящая ссылка на статью вместо ссылки Google News (для встроенного браузера Telegram)."""
-    k = it["key"]
-    if k in art_cache and art_cache[k].get("url"):
-        return art_cache[k]
-    if "news.google.com" not in (it["url"] or ""):
-        return {"url": it["url"]}
-    if _art_new[0] >= ART_NEW_LIMIT:
-        return {}
-    _art_new[0] += 1
-    real = gnews_decode(it["url"])
-    time.sleep(2)
-    info = {"url": real, "t": iso(NOW)} if real else {}
-    if real:
-        art_cache[k] = info
+# ---------------------------------------------------------------- статья: текст и пересказ
+
+ART_TEXT_LIMIT = 7000        # сколько символов статьи отдаём нейросети
+ART_SUMMARY_LIMIT = int(os.environ.get("ART_SUMMARY_LIMIT", "45"))  # новых пересказов за запуск
+_art_sum = [0]
+
+
+def article_text(url: str) -> tuple[str | None, str | None]:
+    """Основной текст статьи и картинка."""
+    try:
+        html = http_get(url, {"Accept": "text/html,application/xhtml+xml"}, timeout=25)[:1_500_000].decode("utf-8", "replace")
+    except Exception:
+        return None, None
+    image = _meta(html, "og:image", "twitter:image")
+    text = None
+    try:
+        import trafilatura  # ставится в GitHub Actions
+        text = trafilatura.extract(html, include_comments=False, include_tables=False, favor_precision=True)
+    except Exception:
+        text = None
+    if not text:
+        paras = [strip_html(m.group(1)) for m in re.finditer(r"<p[^>]*>(.*?)</p>", html, re.IGNORECASE | re.DOTALL)]
+        text = "\n".join(p for p in paras if len(p) > 60)
+    return (text.strip() or None) if text else None, image
+
+
+SUM_SYSTEM = """Ты редактор русскоязычного киберспортивного издания про Counter-Strike 2.
+Тебе дают статью (на любом языке). Перескажи её по-русски СВОИМИ СЛОВАМИ для комментатора, который готовится к матчу.
+Правила:
+- Не переводи текст подряд и не копируй предложения: только пересказ сути, 4–8 предложений, нейтрально.
+- Сохрани важные факты: кто, что сказал или сделал, цифры, турниры, составы.
+- Ники игроков и названия команд оставляй латиницей как в оригинале.
+- Можно привести не больше 2 коротких цитат (каждая до 15 слов) — самые яркие высказывания, переведённые на русский.
+- Ничего не выдумывай. Если в тексте нет статьи (ошибка, реклама, пусто) — верни "ok": false.
+Ответ строго в JSON без пояснений:
+{"ok": true, "lang": "<код языка оригинала: ru/en/pt/...>", "title_ru": "<заголовок по-русски>",
+ "summary_ru": "<пересказ>", "quotes": [{"ru": "<цитата по-русски>", "who": "<кто сказал>"}]}"""
+
+
+def summarize_article(it: dict, url: str) -> dict:
+    text, image = article_text(url)
+    info: dict = {"image": image}
+    if not text or len(text) < 200:
+        return info
+    text = text[:ART_TEXT_LIMIT]
+    _art_sum[0] += 1
+    res = parse_json_loose(giga_chat(SUM_SYSTEM, f"Источник: {it['source']}\nЗаголовок: {it['title']}\n\nТекст статьи:\n{text}"))
+    if res and res.get("ok") and res.get("summary_ru"):
+        quotes = [q for q in (res.get("quotes") or []) if isinstance(q, dict) and q.get("ru") and len(q["ru"].split()) <= 20][:2]
+        info.update({"title_ru": res.get("title_ru"), "summary_ru": res["summary_ru"].strip(), "quotes": quotes,
+                     "lang": (res.get("lang") or "").lower()[:5] or None})
     return info
 
 
-def enrich_article(it: dict) -> dict:
+def article_info(it: dict) -> dict:
+    """Ссылка на оригинал, пересказ, цитаты. Всё кэшируется по новости."""
     k = it["key"]
-    if k in art_cache:
-        return art_cache[k]
-    if _art_new[0] >= ART_NEW_LIMIT:
-        return {}
-    _art_new[0] += 1
-    real = gnews_decode(it["url"]) if "news.google.com" in (it["url"] or "") else it["url"]
-    info: dict = {"url": real}
-    if real:
-        info.update(article_lead(real))
-        time.sleep(0.3)
-    if not info.get("lead") and it.get("snippet") and norm(it["snippet"]) != norm(it["title"]) and len(it["snippet"]) > 60:
-        info["lead"] = it["snippet"][:600]
-    if info.get("lead"):
-        ru, lang = translate_ex(info["lead"])
-        info["lead_ru"], info["lead_lang"] = ru, lang
-    info["t"] = iso(NOW)
-    art_cache[k] = info
+    info = dict(art_cache.get(k) or {})
+    url = info.get("url") or (it["url"] if "news.google.com" not in (it["url"] or "") else None)
+    if not url and _art_new[0] < ART_NEW_LIMIT:
+        _art_new[0] += 1
+        url = gnews_decode(it["url"])
+        time.sleep(2)
+    if url:
+        info["url"] = url
+    tried = info.get("sum_tried")
+    if url and GIGA_KEY and not tried and not _giga["off"] and _art_sum[0] < ART_SUMMARY_LIMIT:
+        info.update(summarize_article(it, url))
+        info["sum_tried"] = True
+    if info:
+        info["t"] = info.get("t") or iso(NOW)
+        art_cache[k] = info
     return info
 
 
@@ -1029,10 +1131,12 @@ def gather_news(teams: list[dict]) -> list[dict]:
     pool: list[dict] = []
     cs = '(CS2 OR "Counter-Strike")'
     for t in teams:
-        pool += google_news(f'"{t["name"]}" {cs}', "ru")
+        for lang in ("ru", "en"):
+            pool += google_news(f'"{t["name"]}" {cs}', lang)
         for p in t.get("players") or []:
             if p.get("nick") and len(p["nick"]) >= 2:
-                pool += google_news(f'"{p["nick"]}" {cs}', "ru")
+                for lang in ("ru", "en"):
+                    pool += google_news(f'"{p["nick"]}" {cs}', lang)
     for source, url in RSS_FEEDS:
         pool += fetch_feed(url, source)
 
@@ -1042,8 +1146,6 @@ def gather_news(teams: list[dict]) -> list[dict]:
         title, text = it["title"], f"{it['title']} {it['snippet']}"
         if SPAM.search(title):
             continue
-        if not has_cyrillic(title):
-            continue  # только новости на русском
         if (OTHER_GAMES.search(text) or NON_CS_SOURCES.search(it["source"] or "")) and not CS_STRICT.search(title):
             continue
         src = (it["source"] or "").lower()
@@ -1062,7 +1164,8 @@ def gather_news(teams: list[dict]) -> list[dict]:
         if not about:
             continue
         only_teams = all(a in team_names for a in about)
-        if only_teams and not CS_STRICT.search(text):
+        cs_only_src = any(x in src for x in ("hltv", "dust2"))
+        if only_teams and not (CS_STRICT.search(text) or cs_only_src):
             continue
         if not (cs_src or CS_CONTEXT.search(text) or not only_teams):
             continue
@@ -1078,10 +1181,20 @@ def gather_news(teams: list[dict]) -> list[dict]:
     items = sorted(found.values(), key=lambda i: i["date"], reverse=True)[:60]
     out = []
     for it in items:
-        art = resolve_link(it)
+        art = article_info(it)
+        t_ru, t_lang = translate_ex(it["title"])
+        lang = art.get("lang") or t_lang
+        if lang == "ru":
+            t_ru = None
         out.append({
             "key": it["key"],
             "title": it["title"],
+            "title_ru": art.get("title_ru") if lang != "ru" and art.get("title_ru") else t_ru,
+            "lang": lang,
+            "lang_ru": LANG_RU.get(lang or "", lang) if lang and lang != "ru" else None,
+            "summary_ru": art.get("summary_ru"),
+            "quotes": art.get("quotes") or [],
+            "image": art.get("image"),
             "kind": classify(it["title"]),
             "about": it["about"],
             "source": it["source"],

@@ -210,6 +210,20 @@ a { color: inherit; }
 .coach .lbl { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 600; }
 .coach b { font-size: 15px; }
 
+/* читалка новости */
+.rd { display: flex; flex-direction: column; gap: 12px; margin-top: 4px; max-width: 65ch; }
+.rd h1 { font-family: var(--display); font-weight: 600; font-size: 20px; line-height: 1.3; margin: 0; text-wrap: balance; }
+.rd-meta, .rd-orig, .rd-tr, .rd-note { font-size: 12px; color: var(--muted); }
+.rd-orig { font-style: italic; }
+.rd-tr { color: var(--ct); font-weight: 600; }
+.rd img { border-radius: 10px; width: 100%; max-height: 240px; object-fit: cover; background: var(--sunk); }
+.rd p { margin: 0; font-size: 16px; line-height: 1.6; }
+.rd .rd-empty { color: var(--muted); font-size: 14px; }
+.rd blockquote { margin: 0; padding: 10px 14px; border-left: 3px solid var(--t); background: var(--t-soft); border-radius: 0 8px 8px 0; font-size: 15px; line-height: 1.5; }
+.rd blockquote cite { display: block; font-style: normal; font-size: 12px; color: var(--muted); margin-top: 4px; }
+.rd .readbtn { align-self: flex-start; margin-top: 4px; }
+button.ni { width: 100%; text-align: left; }
+
 /* группы по турнирам */
 .grp { display: flex; flex-direction: column; }
 .grp .gh { padding: 8px 12px 4px; font-size: 11px; font-weight: 600; color: var(--muted); border-top: 1px solid var(--line); display: flex; justify-content: space-between; gap: 8px; }
@@ -554,17 +568,44 @@ a.ni { text-decoration: none; color: inherit; }
     var teamA = m.teams[0] && m.teams[0].players ? m.teams[0].players.map(function (p) { return p.nick; }).concat([m.teams[0].name]) : [];
     items.forEach(function (n) {
       var whoHtml = (n.about || []).map(function (a) { return '<span class="who" style="color:var(--' + (teamA.indexOf(a) >= 0 ? "ct" : "t") + ')">' + esc(a) + '</span>'; }).join(" ");
-      html += '<a class="box ni" href="' + esc(n.url) + '" data-read="' + esc(n.url) + '" target="_blank" rel="noopener">' +
+      html += '<button class="box ni" data-reader="' + esc(n.key) + '">' +
         '<span class="tags">' + (n.kind ? '<span class="kind k-' + esc(n.kind) + '">' + esc(n.kind) + '</span>' : '') + whoHtml + '</span>' +
         '<h4>' + esc(n.title_ru || n.title) + '</h4>' +
-        '<span class="src"><span>' + esc(n.source) + ' · ' + esc(ago(n.date)) + '</span><span class="open">Читать ›</span></span></a>';
+        '<span class="src"><span>' + esc(n.source) + ' · ' + esc(ago(n.date)) + (n.lang_ru ? ' · с ' + esc(n.lang_ru) : '') + '</span>' +
+        (n.summary_ru ? '<span class="open">Читать ›</span>' : '<span class="open">Оригинал ›</span>') + '</span></button>';
     });
     html += '</div>';
     if (N.updated) html += '<div class="upd" style="text-align:center">Новости собраны ' + esc(ago(N.updated)) + '</div>';
     return html + '</div>';
   }
 
+  function readerView(m, n) {
+    var paras = String(n.summary_ru || "").split(/\n+/).filter(Boolean);
+    var html = '<div class="view reader"><div style="padding-top:12px">' + (TG ? '' : '<button class="back" id="close-reader">' + ARROW + 'Новости</button>') + '</div>' +
+      '<article class="rd"><div class="rd-meta">' + esc(n.source) + ' · ' + esc(dmy(n.date)) + ' ' + esc(hm(n.date)) + '</div>' +
+      '<h1>' + esc(n.title_ru || n.title) + '</h1>' +
+      (n.title_ru && n.title_ru !== n.title ? '<div class="rd-orig">' + esc(n.title) + '</div>' : '') +
+      (n.lang_ru ? '<div class="rd-tr">Пересказ переведён с ' + esc(n.lang_ru) + '</div>' : '') +
+      (n.image ? '<img src="' + esc(n.image) + '" alt="" loading="lazy" onerror="this.remove()">' : '');
+    if (paras.length) {
+      html += paras.map(function (p) { return '<p>' + esc(p) + '</p>'; }).join("");
+      (n.quotes || []).forEach(function (q) {
+        html += '<blockquote>«' + esc(String(q.ru).replace(/^[«"]|[»"]$/g, "")) + '»' + (q.who ? '<cite>' + esc(q.who) + '</cite>' : '') + '</blockquote>';
+      });
+      html += '<div class="rd-note">Краткий пересказ статьи. Полный текст — по кнопке ниже.</div>';
+    } else {
+      html += '<p class="rd-empty">Пересказа этой статьи пока нет: сайт не отдал текст или он ещё в очереди. Можно открыть оригинал.</p>';
+    }
+    html += (n.url ? '<a class="readbtn" href="' + esc(n.url) + '" data-read="' + esc(n.url) + '" target="_blank" rel="noopener">Открыть оригинал</a>' : '') + '</article></div>';
+    return html;
+  }
+
   function renderMatch(m) {
+    if (state.reader) {
+      var n = ((m.news && m.news.items) || []).find(function (x) { return x.key === state.reader; });
+      if (n) { $app.innerHTML = readerView(m, n); try { TG && TG.BackButton.show(); } catch (e) {} return; }
+      state.reader = null;
+    }
     var A = m.teams[0] || {}, B = m.teams[1] || {}, on = mine.has(String(m.id));
     var nCount = ((m.news && m.news.items) || []).length;
     var html = '<div class="view"><div style="padding-top:12px">' + backBtn(m.tournament || "Назад") + '</div>' +
@@ -591,7 +632,7 @@ a.ni { text-decoration: none; color: inherit; }
     if (!state.list) return;
     if (mt) {
       var id = mt[1];
-      if (state.openId !== id) { state.openId = id; state.tab = "stats"; state.newsFilter = "all"; state.map = null; window.scrollTo(0, 0); }
+      if (state.openId !== id) { state.openId = id; state.reader = null; state.tab = "stats"; state.newsFilter = "all"; state.map = null; window.scrollTo(0, 0); }
       $app.innerHTML = '<div class="empty">Загружаю матч…</div>';
       getDetail(id).then(renderMatch).catch(function () {
         $app.innerHTML = '<div class="empty"><strong>Подробностей пока нет</strong>Карточки собираются за 3 дня до матча. <button class="chip" id="back" style="margin-top:8px">Назад</button></div>';
@@ -609,7 +650,13 @@ a.ni { text-decoration: none; color: inherit; }
     else renderHome();
   }
   function go(hash) { if (location.hash === hash) route(); else { depth++; location.hash = hash; } }
+  function closeReader() {
+    state.reader = null;
+    renderMatch(state.details[state.openId]);
+    window.scrollTo(0, state.readerScroll || 0);
+  }
   function goBack() {
+    if (state.reader) { closeReader(); return; }
     if (depth > 0) { depth--; history.back(); return; }
     var h = location.hash.replace("#", "");
     if (/^m-/.test(h)) {
@@ -622,8 +669,10 @@ a.ni { text-decoration: none; color: inherit; }
 
   // ---------- клики
   $app.addEventListener("click", function (e) {
-    var t = e.target.closest("[data-mine],[data-open],[data-tour],[data-tab],[data-map],[data-nf],[data-player],[data-link],[data-news],[data-orig],[data-read],#back,#to-mine");
+    var t = e.target.closest("[data-reader],#close-reader,[data-mine],[data-open],[data-tour],[data-tab],[data-map],[data-nf],[data-player],[data-link],[data-news],[data-orig],[data-read],#back,#to-mine");
     if (!t) return;
+    if (t.hasAttribute("data-reader")) { state.reader = t.getAttribute("data-reader"); state.readerScroll = window.scrollY; renderMatch(state.details[state.openId]); window.scrollTo(0, 0); return; }
+    if (t.id === "close-reader") { closeReader(); return; }
     if (t.hasAttribute("data-news")) { var k = t.getAttribute("data-news"); state.openNews = state.openNews === k ? null : k; state.showOrig = null; renderMatch(state.details[state.openId]); var el = document.querySelector('[data-news="' + (window.CSS && CSS.escape ? CSS.escape(k) : k) + '"]'); if (el && state.openNews) el.scrollIntoView({ block: "nearest" }); return; }
     if (t.hasAttribute("data-orig")) { var k2 = t.getAttribute("data-orig"); state.showOrig = state.showOrig === k2 ? null : k2; renderMatch(state.details[state.openId]); return; }
     if (t.hasAttribute("data-read")) { if (TG) { e.preventDefault(); try { TG.openLink(t.getAttribute("data-read"), { try_instant_view: true }); } catch (x) { openLink(t.getAttribute("data-read")); } } return; }
