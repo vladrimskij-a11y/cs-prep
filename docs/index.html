@@ -252,6 +252,7 @@ a { color: inherit; }
 .in-right { animation: tabInR .14s ease-out; }
 html { overflow-x: clip; }
 #tabbody, #tabbody .news { touch-action: pan-y; }
+.swipe-ghost { position: absolute; pointer-events: none; }
 @keyframes tabInL { from { opacity: .35; transform: translateX(40%); } to { opacity: 1; transform: none; } }
 @keyframes tabInR { from { opacity: .35; transform: translateX(-40%); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .in-left, .in-right { animation: none; } }
@@ -1009,6 +1010,12 @@ a.ni { text-decoration: none; color: inherit; }
     });
   }
 
+  function tabBodyHtml(m) {
+    if (state.tab === "stats") return factsBlock(m) + h2hBlock(m) + vetoBlock(m) + mapsBlock(m) + formBlock(m);
+    if (state.tab === "players") return playersTab(m);
+    return newsTab(m);
+  }
+
   function renderMatch(m) {
     if (state.reader) {
       var n = ((m.news && m.news.items) || []).find(function (x) { return x.key === state.reader; });
@@ -1025,9 +1032,7 @@ a.ni { text-decoration: none; color: inherit; }
       '</section>' +
       '<nav class="tabs" role="tablist">' +
       tabBtn("stats", "Статистика") + tabBtn("players", "Игроки") + tabBtn("news", "Новости", nCount) + '</nav><div id="tabbody">';
-    if (state.tab === "stats") html += factsBlock(m) + h2hBlock(m) + vetoBlock(m) + mapsBlock(m) + formBlock(m);
-    else if (state.tab === "players") html += playersTab(m);
-    else html += newsTab(m);
+    html += tabBodyHtml(m);
     $app.innerHTML = html + '</div></div>';
     if (state.slide) {
       var tb = state.slideNews ? (document.querySelector("#tabbody .news") || document.getElementById("tabbody")) : document.getElementById("tabbody");
@@ -1038,15 +1043,15 @@ a.ni { text-decoration: none; color: inherit; }
     function tabBtn(id, label, c) { return '<button class="tab" role="tab" data-tab="' + id + '" aria-selected="' + (state.tab === id) + '">' + label + (c ? '<span class="c">' + c + '</span>' : '') + '</button>'; }
   }
 
-  // ---------- свайпы в матче: вкладки, а на «Новостях» — ещё и фильтры (Все → команды)
+  // ---------- свайпы в матче, как лента: текущая страница уходит, соседняя едет следом за пальцем.
+  // На «Новостях» свайп листает фильтры (Все → команды), с «Все» вправо — назад на «Игроки».
   var TABS = ["stats", "players", "news"], sw = null;
   function newsSteps() {
     var m = state.details[state.openId], L = ["all"].concat((m.teams || []).map(function (t) { return t.name; }));
     if (L.indexOf(state.newsFilter) < 0) L.push(state.newsFilter);  // личные новости игрока — после команд
     return L;
   }
-  // куда ведёт свайп: dir 1 — палец влево (вперёд), -1 — вправо (назад); null — дальше некуда
-  function swipeTarget(dir) {
+  function swipeTarget(dir) {  // dir 1 — палец влево (вперёд), -1 — вправо (назад)
     if (state.tab === "news") {
       var L = newsSteps(), j = L.indexOf(state.newsFilter) + dir;
       if (j >= 0 && j < L.length) return { filter: L[j] };
@@ -1062,14 +1067,35 @@ a.ni { text-decoration: none; color: inherit; }
     if (x < 24 || x > window.innerWidth - 24) return false;  // у края — системный жест «назад»
     return !e.target.closest(".filt, .mapsel, [style*='overflow-x'], video, input, textarea");  // там своя прокрутка
   }
-  function swipeBody() {
-    return state.tab === "news" ? (document.querySelector("#tabbody .news") || document.getElementById("tabbody")) : document.getElementById("tabbody");
+  // страница-сосед: HTML той вкладки (или списка новостей с другим фильтром), не трогая текущий экран
+  function ghostFor(tgt) {
+    var m = state.details[state.openId], keep = { tab: state.tab, nf: state.newsFilter, on: state.openNews }, html, el;
+    if (tgt.filter != null) { state.newsFilter = tgt.filter; state.openNews = null; }
+    else { state.tab = tgt.tab; if (tgt.tab === "news") { state.newsFilter = "all"; state.openNews = null; } }
+    try { html = tabBodyHtml(m); } finally { state.tab = keep.tab; state.newsFilter = keep.nf; state.openNews = keep.on; }
+    if (tgt.filter != null) {
+      var tmp = document.createElement("div"); tmp.innerHTML = html;
+      var list = tmp.querySelector(".news"); html = list ? list.innerHTML : "";
+      el = document.querySelector("#tabbody .news");
+    } else el = document.getElementById("tabbody");
+    if (!el) return null;
+    var g = document.createElement("div");
+    g.className = el.className + " swipe-ghost"; g.id = ""; g.innerHTML = html;
+    if (getComputedStyle(el.parentNode).position === "static") el.parentNode.style.position = "relative";
+    g.style.top = el.offsetTop + "px"; g.style.left = el.offsetLeft + "px"; g.style.width = el.offsetWidth + "px";
+    el.parentNode.appendChild(g);
+    return { el: el, g: g };
   }
+  function place(s0, x, anim) {
+    var D = s0.el.offsetWidth + 24, t = anim ? "transform .2s cubic-bezier(.2,.7,.3,1)" : "none";
+    s0.el.style.transition = t; s0.el.style.transform = x ? "translateX(" + x + "px)" : "";
+    if (s0.g) { s0.g.style.transition = t; s0.g.style.transform = "translateX(" + (x + s0.dir * D) + "px)"; }
+  }
+  function dropGhost(s0) { if (s0.g && s0.g.parentNode) s0.g.parentNode.removeChild(s0.g); s0.g = null; }
   document.addEventListener("touchstart", function (e) {
     sw = null;
-    var tb = document.getElementById("tabbody");
-    if (!tb || !swipeOk(e)) return;
-    sw = { x: e.touches[0].clientX, y: e.touches[0].clientY, t: Date.now(), dx: 0, lock: null, el: null };
+    if (!document.getElementById("tabbody") || !swipeOk(e)) return;
+    sw = { x: e.touches[0].clientX, y: e.touches[0].clientY, t: Date.now(), dx: 0, lock: null, dir: 0, el: null, g: null, tgt: null };
   }, { passive: true });
   document.addEventListener("touchmove", function (e) {
     if (!sw || sw.lock === "v") return;
@@ -1079,39 +1105,42 @@ a.ni { text-decoration: none; color: inherit; }
       else if (Math.abs(dy) > 10) { sw.lock = "v"; return; }
       else return;
     }
-    var tgt = swipeTarget(dx < 0 ? 1 : -1);
-    // на новостях фильтр меняет только список; переход на «Игроки» — вся вкладка
-    sw.el = tgt && tgt.filter != null ? swipeBody() : document.getElementById("tabbody");
-    sw.dx = tgt ? dx : dx * 0.25;  // дальше некуда — тянется туго
-    sw.el.style.transition = "none";
-    sw.el.style.transform = "translateX(" + sw.dx + "px)";
-    sw.el.style.opacity = String(1 - Math.min(0.5, Math.abs(sw.dx) / window.innerWidth * 0.6));
+    var dir = dx < 0 ? 1 : -1;
+    if (dir !== sw.dir) {  // сменили направление — готовим другого соседа
+      dropGhost(sw);
+      if (sw.el) { sw.el.style.transform = ""; }
+      sw.dir = dir; sw.tgt = swipeTarget(dir);
+      var gg = sw.tgt ? ghostFor(sw.tgt) : null;
+      sw.el = gg ? gg.el : document.getElementById("tabbody"); sw.g = gg ? gg.g : null;
+    }
+    sw.dx = sw.tgt ? dx : dx * 0.25;  // дальше некуда — тянется туго
+    place(sw, sw.dx, false);
   }, { passive: true });
   function swipeEnd() {
     if (!sw) return;
     var s0 = sw; sw = null;
     if (s0.lock !== "h" || !s0.el) return;
-    var W = window.innerWidth, dir = s0.dx < 0 ? 1 : -1, v = Math.abs(s0.dx) / Math.max(1, Date.now() - s0.t);
-    var tgt = swipeTarget(dir);
-    var go = tgt && (Math.abs(s0.dx) > W * 0.22 || (v > 0.45 && Math.abs(s0.dx) > 35));
+    var W = document.documentElement.clientWidth, v = Math.abs(s0.dx) / Math.max(1, Date.now() - s0.t);
+    var go = s0.tgt && s0.g && (Math.abs(s0.dx) > W * 0.22 || (v > 0.45 && Math.abs(s0.dx) > 35));
     if (!go) {
-      s0.el.style.transition = "transform .16s ease-out, opacity .16s ease-out";
-      s0.el.style.transform = ""; s0.el.style.opacity = "";
+      place(s0, 0, true);
+      setTimeout(function () { dropGhost(s0); s0.el.style.transition = ""; }, 210);
       return;
     }
-    // сразу показываем новую страницу — без паузы на уход старой
-    var nav = document.querySelector(".tabs"), top = nav ? nav.getBoundingClientRect().top + window.scrollY - 8 : 0;
-    state.slide = dir > 0 ? "left" : "right";
-    if (tgt.filter != null) {
-      state.openNews = null; state.newsFilter = tgt.filter; state.slideNews = true;
-      keepFilterScroll(function () { renderMatch(state.details[state.openId]); });
-    } else {
-      state.tab = tgt.tab;
-      if (tgt.tab === "news") { state.newsFilter = "all"; state.openNews = null; }
-      renderMatch(state.details[state.openId]);
-    }
-    if (window.scrollY > top) window.scrollTo(0, top);
-    try { TG && TG.HapticFeedback && TG.HapticFeedback.selectionChanged(); } catch (err) {}
+    place(s0, -s0.dir * (s0.el.offsetWidth + 24), true);  // соседняя страница встаёт на место
+    setTimeout(function () {
+      var nav = document.querySelector(".tabs"), top = nav ? nav.getBoundingClientRect().top + window.scrollY - 8 : 0;
+      if (s0.tgt.filter != null) {
+        state.openNews = null; state.newsFilter = s0.tgt.filter;
+        keepFilterScroll(function () { renderMatch(state.details[state.openId]); });
+      } else {
+        state.tab = s0.tgt.tab;
+        if (s0.tgt.tab === "news") { state.newsFilter = "all"; state.openNews = null; }
+        renderMatch(state.details[state.openId]);
+      }
+      if (window.scrollY > top) window.scrollTo(0, top);
+      try { TG && TG.HapticFeedback && TG.HapticFeedback.selectionChanged(); } catch (err) {}
+    }, 200);
   }
   document.addEventListener("touchend", swipeEnd, { passive: true });
   document.addEventListener("touchcancel", swipeEnd, { passive: true });
