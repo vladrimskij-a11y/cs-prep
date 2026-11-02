@@ -294,8 +294,19 @@ ROSTER_TTL_DAYS = 3
 _lp_last = [0.0]
 
 
+_lp_blocked = [False]
+# старые сохранённые составы — запасной вариант, если Liquipedia не отвечает
+_roster_fallback: dict = {}
+for _f in ("liquipedia_rosters_v2.json", "liquipedia_rosters.json"):
+    for _k, _v in load_json(CACHE / _f, {}).items():
+        if _v.get("data") and _k not in _roster_fallback:
+            _roster_fallback[_k] = _v
+
+
 def lp_pages(titles: list[str]) -> dict[str, str]:
     """Вики-текст страниц Liquipedia: {запрошенное название: текст}. Не чаще запроса в 2,5 с (правила Liquipedia)."""
+    if _lp_blocked[0]:
+        raise RuntimeError("Liquipedia ограничила запросы в этом запуске")
     wait = 2.5 - (time.time() - _lp_last[0])
     if wait > 0:
         time.sleep(wait)
@@ -304,7 +315,12 @@ def lp_pages(titles: list[str]) -> dict[str, str]:
     url = LP_API + "?" + urllib.parse.urlencode({
         "action": "query", "prop": "revisions", "rvprop": "content", "rvslots": "main",
         "titles": "|".join(titles), "redirects": 1, "format": "json"})
-    data = json.loads(http_get(url, {"User-Agent": LP_UA, "Accept": "application/json"}))
+    try:
+        data = json.loads(http_get(url, {"User-Agent": LP_UA, "Accept": "application/json"}))
+    except urllib.error.HTTPError as e:
+        if e.code == 429:
+            _lp_blocked[0] = True  # больше не стучимся до следующего запуска
+        raise
     q = data.get("query") or {}
     alias = {}
     for k in ("normalized", "redirects"):
@@ -329,6 +345,8 @@ def lp_pages(titles: list[str]) -> dict[str, str]:
 
 def lp_search(name: str) -> str | None:
     """Поиск страницы команды по названию (The Mongolz → The MongolZ, 9z → 9z Team)."""
+    if _lp_blocked[0]:
+        return None
     wait = 2.5 - (time.time() - _lp_last[0])
     if wait > 0:
         time.sleep(wait)
@@ -494,7 +512,10 @@ def lp_roster(t: dict) -> dict | None:
             }
     except Exception as e:
         warn(f"Liquipedia {t.get('name')}: {e!r}")
-        return cached.get("data") if cached else None
+        if cached:
+            return cached.get("data")
+        fb = _roster_fallback.get(key)
+        return fb.get("data") if fb else None
     roster_cache[key] = {"t": iso(NOW), "data": data}
     return data
 
