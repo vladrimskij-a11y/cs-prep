@@ -2347,7 +2347,7 @@ def main() -> int:
                 if t.get("acronym"):
                     rosters[norm(t["acronym"])] = rosters[norm(t["name"])]
     try:
-        major = build_major(rosters)
+        major = build_major(rosters) if os.environ.get("BUILD_MAJOR") == "1" else None  # раздел скрыт по просьбе пользователя
         if major:
             save_json(OUT / "major.json", {"updated": iso(NOW), **major})
     except Exception as e:

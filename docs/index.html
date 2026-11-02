@@ -232,7 +232,7 @@ a { color: inherit; }
 .mj-pts { font-weight: 700; font-size: 13px; }
 
 /* лента */
-.hometabs { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 4px; }
+.hometabs { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
 .feedch { margin-top: 10px; }
 .feed .sect-title { margin-top: 14px; }
 .fi { text-decoration: none; color: inherit; }
@@ -446,8 +446,7 @@ a.ni { text-decoration: none; color: inherit; }
     return '<div class="view"><header class="top"><div class="brand"><h1>CS<b>·</b>Prep</h1>' +
       '<span class="upd">обновлено ' + esc(ago(L.updated)) + ' · время МСК</span></div>' +
       '<div class="hometabs" role="tablist"><button class="tab" data-home="tours" aria-selected="' + (active === "tours") + '">Турниры</button>' +
-      '<button class="tab" data-home="feed" aria-selected="' + (active === "feed") + '">Лента</button>' +
-      '<button class="tab" data-home="major" aria-selected="' + (active === "major") + '">Мейджор</button></div></header>';
+      '<button class="tab" data-home="feed" aria-selected="' + (active === "feed") + '">Лента</button></div></header>';
   }
 
   function getFeed() {
@@ -876,7 +875,8 @@ a.ni { text-decoration: none; color: inherit; }
     state.openId = null;
     if (tt) { state.view = "tour:" + tt[1]; renderTour(tt[1]); }
     else if (h === "mine") { state.view = "mine"; renderMine(); }
-    else if (h === "major") { state.view = "major"; renderMajor(); getMajor().then(function () { if (state.view === "major") renderMajor(); }).catch(function () { if (state.view === "major") $app.innerHTML = homeHeader("major") + '<div class="empty"><strong>Данные по мейджору ещё не собраны</strong>Появятся после ближайшего обновления.</div></div>'; }); }
+    else if (h === "major") { location.hash = ""; return; }
+    else if (h === "major-disabled") { state.view = "major"; renderMajor(); getMajor().then(function () { if (state.view === "major") renderMajor(); }).catch(function () { if (state.view === "major") $app.innerHTML = homeHeader("major") + '<div class="empty"><strong>Данные по мейджору ещё не собраны</strong>Появятся после ближайшего обновления.</div></div>'; }); }
     else if (h === "feed") { state.view = "feed"; renderFeed(); getFeed().then(function () { if (state.view === "feed") renderFeed(); }).catch(function () { if (state.view === "feed") $app.innerHTML = homeHeader("feed") + '<div class="empty"><strong>Лента пока не собрана</strong>Появится после ближайшего обновления данных.</div></div>'; }); }
     else { state.view = "home"; renderHome(); }
   }
