@@ -1150,6 +1150,14 @@ a.ni { text-decoration: none; color: inherit; }
     document.querySelectorAll(".tabs [data-tab]").forEach(function (b) { b.setAttribute("aria-selected", String(b.getAttribute("data-tab") === tab)); });
     if (tab === "news" && state.tab === "news") document.querySelectorAll("[data-nf]").forEach(function (b) { b.setAttribute("aria-pressed", String(b.getAttribute("data-nf") === nf)); });
   }
+  function belowMaps() {
+    var rc = document.querySelector("#tabbody .recent2"), sec = rc && rc.closest(".sec"), out = [];
+    for (var n = sec && sec.nextElementSibling; n; n = n.nextElementSibling) out.push(n);
+    return out;
+  }
+  function fadeBelow(on) {
+    belowMaps().forEach(function (n) { n.style.transition = "opacity .12s ease-out"; n.style.opacity = on ? "" : "0"; });
+  }
   function dropGhost(s0) { if (s0.g && s0.g.parentNode) s0.g.parentNode.removeChild(s0.g); s0.g = null; }
   document.addEventListener("touchstart", function (e) {
     sw = null;
@@ -1173,6 +1181,7 @@ a.ni { text-decoration: none; color: inherit; }
       sw.dir = dir; sw.tgt = swipeTarget(dir, sw.zone);
       var gg = sw.tgt ? ghostFor(sw.tgt) : null;
       sw.el = gg ? gg.el : (sw.zone === "map" ? document.querySelector("#tabbody .recent2") : document.getElementById("tabbody")); sw.g = gg ? gg.g : null;
+      if (sw.zone === "map") fadeBelow(!sw.g);  // соседняя карта может быть выше/ниже — нижние блоки прячем, чтобы не наезжала
     }
     sw.dx = sw.tgt ? dx : dx * 0.25;  // дальше некуда — тянется туго
     place(sw, sw.dx, false);
@@ -1187,6 +1196,7 @@ a.ni { text-decoration: none; color: inherit; }
     var go = s0.tgt && s0.g && (Math.abs(s0.dx) > W * 0.22 || (v > 0.45 && Math.abs(s0.dx) > 35));
     if (!go) {
       if (s0.marked) markSel(null);
+      if (s0.zone === "map") fadeBelow(true);
       place(s0, 0, true);
       setTimeout(function () { dropGhost(s0); s0.el.style.transition = ""; }, 210);
       return;
@@ -1211,6 +1221,11 @@ a.ni { text-decoration: none; color: inherit; }
         // стороны и пистолетки тоже про выбранную карту — обновляем этот блок (без картинок, не моргает)
         var sd = document.querySelector("#tabbody .box.sides"), sec = sd && sd.closest(".sec");
         if (sec) { var tmp = document.createElement("div"); tmp.innerHTML = sidesBlock(state.details[state.openId]); if (tmp.firstElementChild) sec.replaceWith(tmp.firstElementChild); }
+        // нижние блоки уже стоят на новом месте — проявляем их
+        belowMaps().forEach(function (n) { n.style.transition = "none"; n.style.opacity = "0"; });
+        requestAnimationFrame(function () { requestAnimationFrame(function () {
+          belowMaps().forEach(function (n) { n.style.transition = "opacity .18s ease-out"; n.style.opacity = ""; });
+        }); });
         var ms = document.querySelector(".mapsel"), ch = ms && ms.querySelector('[aria-pressed="true"]');
         if (ch) { var l0 = ch.offsetLeft, r0 = l0 + ch.offsetWidth; if (l0 < ms.scrollLeft) ms.scrollLeft = l0 - 8; else if (r0 > ms.scrollLeft + ms.clientWidth) ms.scrollLeft = r0 - ms.clientWidth + 8; }
         try { TG && TG.HapticFeedback && TG.HapticFeedback.selectionChanged(); } catch (err) {}
