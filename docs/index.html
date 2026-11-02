@@ -274,6 +274,13 @@ button.ni { width: 100%; text-align: left; }
 .pstat { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12px; color: var(--muted); margin-top: 4px; }
 .pstat b { color: var(--fg); font-family: var(--mono); font-weight: 700; }
 
+/* вето */
+.vpool { padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; }
+.vpool .lbl { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; }
+.vrow { display: grid; grid-template-columns: 92px 1fr; gap: 8px; padding: 6px 12px; border-top: 1px solid var(--line); font-size: 13px; }
+.vrow span:first-child { color: var(--muted); font-size: 12px; }
+.vrow b { font-family: var(--mono); }
+
 /* факты */
 .facts { display: flex; flex-direction: column; }
 .fact { display: grid; grid-template-columns: 74px 1fr; gap: 10px; padding: 10px 12px; border-top: 1px solid var(--line); font-size: 14px; line-height: 1.45; }
@@ -588,6 +595,27 @@ a.ni { text-decoration: none; color: inherit; }
   function backBtn(label) { return TG ? '' : '<button class="back" id="back">' + ARROW + esc(label) + '</button>'; }
 
   // ---------- карточка матча
+  function vetoBlock(m) {
+    var V = m.veto;
+    if (!V || !(V.teams || []).some(function (t) { return t && t.matches; })) return "";
+    var html = '<div class="sec"><h3>Вето <span>по последним матчам</span></h3>';
+    if ((V.likely_pool || []).length) {
+      html += '<div class="box vpool"><span class="lbl">Вероятный маппул</span><div class="maps">' + V.likely_pool.map(function (p) {
+        return '<span class="mp ' + (p.by === 0 ? "a" : p.by === 1 ? "b" : "n") + '">' + esc(p.map) + (p.by == null ? ' · десайдер' : ' · пик ' + esc(abbr(m.teams[p.by]))) + '</span>';
+      }).join("") + '</div></div>';
+    }
+    html += '<div class="recent2">';
+    (V.teams || []).forEach(function (t, i) {
+      if (!t || !t.matches) return;
+      function list(arr, n) { return (arr || []).slice(0, n).map(function (x) { return esc(x[0]) + ' <b>' + x[1] + '</b>'; }).join(", ") || "—"; }
+      html += '<div class="box ' + (i ? "b" : "a") + '"><div class="hd">' + esc(m.teams[i].name) + '<span>' + t.matches + ' матч.</span></div>' +
+        '<div class="vrow"><span>Пикает</span><span>' + list(t.picks, 4) + '</span></div>' +
+        '<div class="vrow"><span>Первый бан</span><span>' + list(t.first_bans, 3) + '</span></div>' +
+        '<div class="vrow"><span>Банит</span><span>' + list(t.bans, 4) + '</span></div></div>';
+    });
+    return html + '</div></div>';
+  }
+
   function factsBlock(m) {
     var F = m.facts || [];
     if (!F.length) return "";
@@ -849,7 +877,7 @@ a.ni { text-decoration: none; color: inherit; }
       '</section>' +
       '<nav class="tabs" role="tablist">' +
       tabBtn("stats", "Статистика") + tabBtn("players", "Игроки") + tabBtn("news", "Новости", nCount) + '</nav><div id="tabbody">';
-    if (state.tab === "stats") html += factsBlock(m) + h2hBlock(m) + mapsBlock(m) + formBlock(m);
+    if (state.tab === "stats") html += factsBlock(m) + h2hBlock(m) + vetoBlock(m) + mapsBlock(m) + formBlock(m);
     else if (state.tab === "players") html += playersTab(m);
     else html += newsTab(m);
     $app.innerHTML = html + '</div></div>';

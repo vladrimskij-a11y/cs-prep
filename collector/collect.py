@@ -1320,6 +1320,8 @@ def parse_hltv_event(html: str) -> dict:
         pl = re.findall(r'<a href="/player/(\d+)/([^"]+)">([^<]+)</a>', lu[1] if len(lu) > 1 else "")
         lineups[strip_html(tn.group(1))] = [{"id": int(i), "slug": sl, "nick": strip_html(nk)} for i, sl, nk in pl]
     res["lineups"] = lineups
+    res["team_ids"] = {strip_html(n): {"id": int(i), "slug": sl} for i, sl, n in
+                       re.findall(r'<div class="team-name"><a href="/team/(\d+)/([^"]+)"><div class="text-container"><div class="text">([^<]+)</div>', b)}
     return res
 
 
@@ -1466,6 +1468,123 @@ def build_major(rosters: dict) -> dict | None:
                     out_, in_ = [old[k] for k in old if k not in new], [new[k] for k in new if k not in old]
                     t["roster_change"] = {"out": out_, "in": in_} if out_ or in_ else None
     return data
+
+
+# ---------------------------------------------------------------- вето (пики и баны) с HLTV
+
+VETO_CACHE_F = CACHE / "hltv_vetoes.json"
+veto_cache: dict = load_json(VETO_CACHE_F, {})   # "match:<id>" → вето навсегда; "results:<team>" → список матчей на 12 ч
+VETO_NEW_LIMIT = int(os.environ.get("VETO_NEW_LIMIT", "25"))
+VETO_MATCHES = 15
+_veto_new = [0]
+hltv_team_ids: dict = {}   # norm(название) → {"id","slug","name"}
+
+
+def hltv_team_for(t: dict) -> dict | None:
+    for k in (t.get("name"), t.get("acronym"), re.sub(r"(?<=[a-z])(?=[A-Z])", " ", t.get("name") or "")):
+        x = hltv_team_ids.get(norm(k))
+        if x:
+            return x
+    n = norm(t.get("name"))
+    for k, v in hltv_team_ids.items():
+        if n and (n in k or k in n) and min(len(n), len(k)) >= 3:
+            return v
+    return None
+
+
+def hltv_team_matches(team: dict) -> list[dict]:
+    key = f"results:{team['id']}"
+    c = veto_cache.get(key)
+    if c and (parse_iso(c.get("t")) or NOW) > NOW - timedelta(hours=12):
+        return c["data"]
+    h = hltv_get(f"/results?team={team['id']}")
+    if not h:
+        return c["data"] if c else []
+    out = []
+    for mid, slug in re.findall(r'<a href="/matches/(\d+)/([^"]+)" class="a-reset">', h):
+        if mid not in [x["id"] for x in out]:
+            out.append({"id": mid, "slug": slug})
+        if len(out) >= VETO_MATCHES:
+            break
+    veto_cache[key] = {"t": iso(NOW), "data": out}
+    return out
+
+
+def hltv_veto(match: dict) -> dict | None:
+    key = f"match:{match['id']}"
+    if key in veto_cache:
+        return veto_cache[key]
+    if _veto_new[0] >= VETO_NEW_LIMIT:
+        return None
+    _veto_new[0] += 1
+    h = hltv_get(f"/matches/{match['id']}/{match['slug']}")
+    if not h:
+        return None
+    b = hclean(h)
+    steps = []
+    for box in re.findall(r'<div class="standard-box veto-box">(.*?)</div></div>', b):
+        for n, who, act, mp in re.findall(r"(\d)\. (.+?) (removed|picked) ([A-Za-z0-9]+)", strip_html(box.replace("</div>", "\n"))):
+            steps.append({"n": int(n), "team": who.strip(), "act": "ban" if act == "removed" else "pick", "map": mp})
+        for n, mp in re.findall(r"(\d)\. ([A-Za-z0-9]+) was left over", strip_html(box.replace("</div>", "\n"))):
+            steps.append({"n": int(n), "team": None, "act": "decider", "map": mp})
+    dm = re.search(r'data-unix="(\d+)"', b)
+    ev = re.search(r'<div class="event text-ellipsis"><a [^>]*>([^<]+)</a>', b)
+    d = {"date": iso(datetime.fromtimestamp(int(dm.group(1)) / 1000, tz=timezone.utc)) if dm else None,
+         "event": strip_html(ev.group(1)) if ev else None, "steps": sorted(steps, key=lambda x: x["n"])}
+    veto_cache[key] = d   # вето сыгранного матча не меняется — храним навсегда
+    return d
+
+
+def build_veto(teams: list[dict]) -> dict | None:
+    """По каждой команде: что пикает, что банит первым и вообще, по последним матчам; плюс вероятный маппул."""
+    res = []
+    for t in teams:
+        ht = hltv_team_for(t)
+        if not ht:
+            res.append(None)
+            continue
+        picks, bans, first_bans, n, deciders = {}, {}, {}, 0, {}
+        for mt in hltv_team_matches(ht):
+            v = hltv_veto(mt)
+            if not v or not v.get("steps"):
+                continue
+            mine = [s for s in v["steps"] if s["team"] and norm(s["team"]) == norm(ht["name"])]
+            if not mine:
+                continue
+            n += 1
+            for s in v["steps"]:
+                if s["act"] == "decider":
+                    deciders[s["map"]] = deciders.get(s["map"], 0) + 1
+            for i, s in enumerate(mine):
+                tgt = picks if s["act"] == "pick" else bans
+                tgt[s["map"]] = tgt.get(s["map"], 0) + 1
+                if s["act"] == "ban" and i == 0:
+                    first_bans[s["map"]] = first_bans.get(s["map"], 0) + 1
+        top = lambda d: sorted(d.items(), key=lambda x: -x[1])
+        res.append({"team": ht["name"], "matches": n, "picks": top(picks), "bans": top(bans), "first_bans": top(first_bans),
+                    "deciders": top(deciders)})
+    if not any(res):
+        return None
+    # вероятный маппул: что каждая пикает чаще всего и при этом соперник это не банит постоянно
+    pool = []
+    if all(res):
+        for i, r in enumerate(res):
+            opp = res[1 - i]
+            ob = dict(opp["bans"])
+            for mp, c in r["picks"]:
+                if ob.get(mp, 0) < max(2, opp["matches"] // 2) and mp not in [p["map"] for p in pool]:
+                    pool.append({"map": mp, "by": i, "picks": c})
+                    break
+        all_bans = {}
+        for r in res:
+            for mp, c in r["bans"]:
+                all_bans[mp] = all_bans.get(mp, 0) + c
+        picked = {p["map"] for p in pool}
+        maps_seen = {mp for r in res for mp, _ in r["picks"] + r["bans"] + r.get("deciders", [])}
+        decider = sorted((mp for mp in maps_seen if mp not in picked), key=lambda mp: all_bans.get(mp, 0))
+        if decider:
+            pool.append({"map": decider[0], "by": None})
+    return {"teams": res, "likely_pool": pool}
 
 # ---------------------------------------------------------------- новости
 
@@ -2181,6 +2300,7 @@ def facts_input(d: dict) -> dict:
                              "team2": f"{r['teams'][1]['won']}/{r['teams'][1]['played']}"} for r in maps.get("table") or []],
         "sides_3m_total": {"team1": (sides.get("total") or [None, None])[0], "team2": (sides.get("total") or [None, None])[1]},
         "sides_3m_by_map": sides.get("maps"),
+        "veto_last_matches": d.get("veto"),
         "news_week": [{"about": n.get("about"), "title": n.get("title_ru") or n.get("title")} for n in ((d.get("news") or {}).get("items") or [])[:10]],
     }
 
@@ -2226,6 +2346,10 @@ def build_detail(m: dict, prev: dict | None) -> dict:
         detail["h2h"] = []
     detail["maps"] = build_maps(bids, hists)
     detail["sides"] = build_sides(bids, hists)
+    try:
+        detail["veto"] = build_veto(teams)
+    except Exception as e:
+        warn(f"Вето: {e!r}")
     for t, bid, hist in zip(teams, bids, hists):
         t["stats"] = build_player_stats(t, bid, hist)
     begin = parse_iso(brief["begin_at"])
@@ -2266,6 +2390,8 @@ def main() -> int:
         for lineup in (ex.get("lineups") or {}).values():
             for p in lineup:
                 hltv_player_ids[norm(p["nick"])] = {"id": p["id"], "slug": p["slug"]}
+        for tn, ti in (ex.get("team_ids") or {}).items():
+            hltv_team_ids[norm(tn)] = {**ti, "name": tn}
     listing = []
     keep_ids = set()
     for m in matches:
@@ -2301,6 +2427,7 @@ def main() -> int:
     save_json(PRON_CACHE_F, pron_cache)
     save_json(FACTS_CACHE_F, facts_cache)
     save_json(HLTV_CACHE_F, hltv_cache)
+    save_json(VETO_CACHE_F, veto_cache)
     for k in [k for k in giga_usage if k < (NOW - timedelta(days=40)).strftime("%Y-%m-%d")]:
         del giga_usage[k]
     save_json(GIGA_USAGE_F, giga_usage)
