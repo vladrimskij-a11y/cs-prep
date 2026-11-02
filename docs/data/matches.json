@@ -1,5 +1,5 @@
 {
- "updated": "2026-11-02T05:58:43Z",
+ "updated": "2026-11-02T06:05:06Z",
  "tiers": [
   "a",
   "s"
@@ -13,9 +13,9 @@
    "begin": "2026-11-02T02:00:00Z",
    "end": "2026-11-08T12:30:00Z",
    "prize": "1,250,000 United States Dollar",
-   "matches": 28,
+   "matches": 27,
    "next": "2026-11-02T07:00:00Z",
-   "live": 2,
+   "live": 1,
    "hltv": {
     "prize": 1250000,
     "player_share": 300000,
@@ -1093,43 +1093,6 @@
  ],
  "matches": [
   {
-   "id": 1761577,
-   "begin_at": "2026-11-02T04:38:35Z",
-   "status": "running",
-   "bo": 3,
-   "name": "Upper Bracket Quarterfinal 3: AUR vs TL",
-   "tournament": "IEM Beijing 2026",
-   "stage": "Group B · Upper Bracket Quarterfinal 3",
-   "tier": "s",
-   "serie": {
-    "id": 11136,
-    "begin": "2026-11-02T02:00:00Z",
-    "end": "2026-11-08T12:30:00Z",
-    "image": null,
-    "prize": null
-   },
-   "teams": [
-    {
-     "id": 131505,
-     "name": "Aurora Gaming",
-     "acronym": "AUR",
-     "slug": "aurora-gaming",
-     "image": "https://cdn-api.pandascore.co/images/team/image/131505/600px_aurora_gaming_2025_allmode.png",
-     "location": "RU"
-    },
-    {
-     "id": 3213,
-     "name": "Liquid",
-     "acronym": "TL",
-     "slug": "liquid-cs-go",
-     "image": "https://cdn-api.pandascore.co/images/team/image/3213/463px_team_liquid_2024_full_lightmode.png",
-     "location": "US"
-    }
-   ],
-   "stream": "https://www.twitch.tv/eslcsb",
-   "has_detail": true
-  },
-  {
    "id": 1761578,
    "begin_at": "2026-11-02T05:31:03Z",
    "status": "running",
@@ -1513,7 +1476,7 @@
    "begin_at": "2026-11-04T02:00:00Z",
    "status": "not_started",
    "bo": 3,
-   "name": "Upper Bracket Semifinal 2: TBD vs TBD",
+   "name": "Upper Bracket Semifinal 2: TL vs TBD",
    "tournament": "IEM Beijing 2026",
    "stage": "Group B · Upper Bracket Semifinal 2",
    "tier": "s",
@@ -1524,7 +1487,16 @@
     "image": null,
     "prize": null
    },
-   "teams": [],
+   "teams": [
+    {
+     "id": 3213,
+     "name": "Liquid",
+     "acronym": "TL",
+     "slug": "liquid-cs-go",
+     "image": "https://cdn-api.pandascore.co/images/team/image/3213/463px_team_liquid_2024_full_lightmode.png",
+     "location": "US"
+    }
+   ],
    "stream": "https://www.twitch.tv/ESLCS",
    "has_detail": false
   },
@@ -1553,7 +1525,7 @@
    "begin_at": "2026-11-04T04:30:00Z",
    "status": "not_started",
    "bo": 3,
-   "name": "Lower Bracket Quarterfinal 2: TBD vs TBD",
+   "name": "Lower Bracket Quarterfinal 2: AUR vs TBD",
    "tournament": "IEM Beijing 2026",
    "stage": "Group B · Lower Bracket Quarterfinal 2",
    "tier": "s",
@@ -1564,7 +1536,16 @@
     "image": null,
     "prize": null
    },
-   "teams": [],
+   "teams": [
+    {
+     "id": 131505,
+     "name": "Aurora Gaming",
+     "acronym": "AUR",
+     "slug": "aurora-gaming",
+     "image": "https://cdn-api.pandascore.co/images/team/image/131505/600px_aurora_gaming_2025_allmode.png",
+     "location": "RU"
+    }
+   ],
    "stream": "https://www.twitch.tv/ESLCS",
    "has_detail": false
   },
@@ -1790,17 +1771,17 @@
   }
  ],
  "meta": {
-  "panda_requests": 21,
-  "bo3_requests": 80,
-  "liquipedia_requests": 2,
-  "translations": 8,
+  "panda_requests": 19,
+  "bo3_requests": 57,
+  "liquipedia_requests": 0,
+  "translations": 7,
   "warnings": [
-   "GigaChat картинка: URLError(TimeoutError('timed out'))",
+   "GigaChat: URLError(TimeoutError('timed out'))",
    "GigaChat: дневной лимит токенов исчерпан, остальное — завтра"
   ],
-  "giga_calls": 47,
-  "giga_tokens": 12370,
-  "giga_vision": 4,
+  "dust2_requests": 38,
+  "giga_calls": 8,
+  "giga_tokens": 4171,
   "hltv_requests": 2
  }
 }
