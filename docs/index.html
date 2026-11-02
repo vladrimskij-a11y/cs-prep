@@ -423,10 +423,11 @@ a.ni { text-decoration: none; color: inherit; }
   function usd(n) { return n == null ? "" : "$" + Number(n).toLocaleString("ru-RU"); }
   function prize(p) {
     if (!p) return "";
-    var m = /^(\d+)\s*(.*)$/.exec(String(p).trim());
+    var m = /^([\d,.\s]+?)\s*([^\d,.\s].*)?$/.exec(String(p).trim());
     if (!m) return String(p);
-    var cur = /dollar/i.test(m[2]) ? "$" : /euro/i.test(m[2]) ? "€" : "";
-    var n = Number(m[1]).toLocaleString("ru-RU");
+    m[2] = m[2] || "";
+    var cur = /dollar|usd|\$/i.test(m[2]) ? "$" : /euro|eur|€/i.test(m[2]) ? "€" : "";
+    var n = Number(m[1].replace(/[,\s]/g, "")).toLocaleString("ru-RU");
     return cur ? cur + n : n + " " + m[2];
   }
   function tourOf(m) { return String((m.serie && m.serie.id) || m.tournament); }
@@ -563,7 +564,7 @@ a.ni { text-decoration: none; color: inherit; }
     var ms = (L.matches || []).filter(function (m) { return tourOf(m) === String(id); });
     var html = '<div class="view"><header class="top">' + backBtn("Турниры") +
       '<div class="subhead"><h1>' + esc(t ? t.name : "Турнир") + '</h1><span class="upd">' +
-      (t ? '<span class="pill ' + esc(t.tier) + '">' + esc((t.tier || "").toUpperCase()) + '</span>' + (t.begin ? esc(dm(t.begin) + (t.end ? " – " + dm(t.end) : "")) : "") + (t.prize ? " · " + esc(prize(t.prize)) : "") : "") +
+      (t ? '<span class="pill ' + esc(t.tier) + '">' + esc((t.tier || "").toUpperCase()) + '</span>' + (t.begin ? esc(dm(t.begin) + (t.end ? " – " + dm(t.end) : "")) : "") + (t.prize_usd ? " · " + esc(usd(t.prize_usd)) : t.prize ? " · " + esc(prize(t.prize)) : "") : "") +
       '</span></div></header>';
     html += ms.length ? byDays(ms, false) : '<div class="empty"><strong>Расписание пока не опубликовано</strong>Матчи появятся здесь, как только организаторы их объявят.</div>';
     if (t && t.hltv) html += prizeBlock(t.hltv);
