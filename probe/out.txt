@@ -1,2 +1,13 @@
-## search IEM Beijing 2026: 200 ['IEM Beijing 2026', [], [], []]
-## search PGL Major Singapore 2026: 200 ['PGL Major Singapore 2026', [], [], []]
+query ['Majors', 'Intel Extreme Masters/2026/Beijing']: 429
+Majors links with Singapore: []
+--- IEM [{{Prize pool] at -1
+
+--- IEM [prize pool] at -1
+
+--- IEM [qualifies] at -1
+
+--- IEM [{{Slot] at -1
+
+--- IEM [Prizepool] at -1
+
+--- IEM [points] at -1
