@@ -451,8 +451,13 @@ def lp_roster(t: dict) -> dict | None:
     """Активный состав с Liquipedia: тренер, капитан, роли. Кэш на ROSTER_TTL_DAYS дней."""
     key = str(t["id"])
     cached = roster_cache.get(key)
-    if cached and (parse_iso(cached.get("t")) or NOW) > NOW - timedelta(days=ROSTER_TTL_DAYS):
-        return cached.get("data")
+    if cached:
+        age = NOW - (parse_iso(cached.get("t")) or NOW)
+        d = cached.get("data") or {}
+        incomplete = not d or any(not p.get("roles") for p in d.get("players") or []) or not d.get("coach")
+        # полный состав живёт ROSTER_TTL_DAYS; неполный (нет ролей или тренера) перепроверяем каждые 3 часа
+        if age < timedelta(days=ROSTER_TTL_DAYS) and not (incomplete and age >= timedelta(hours=3)):
+            return cached.get("data")
     names = []
     for nm in (t.get("name"), re.sub(r"(?<=[a-z])(?=[A-Z])", " ", t.get("name") or ""), t.get("acronym")):
         if nm and nm not in names:
