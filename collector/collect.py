@@ -858,6 +858,25 @@ def _gtx(text: str) -> tuple[str, str] | None:
     return ru, lang
 
 
+def translate_keep(text: str, keep: list[str]) -> tuple[str | None, str | None]:
+    """Перевод, при котором ники и названия команд остаются как есть (Legacy не станет «Наследием»)."""
+    if not text or not keep:
+        return translate_ex(text)
+    marks = {}
+    t = text
+    for i, name in enumerate(sorted({k for k in keep if k and len(k) >= 2}, key=len, reverse=True)):
+        rx = re.compile(r"(?<![\w])" + re.escape(name) + r"(?![\w])", re.IGNORECASE)
+        if rx.search(t):
+            mark = f"ZQ{i}X"
+            marks[mark] = name
+            t = rx.sub(mark, t)
+    ru, lang = translate_ex(t)
+    if ru:
+        for mark, name in marks.items():
+            ru = re.sub(re.escape(mark), name, ru, flags=re.IGNORECASE)
+    return ru, lang
+
+
 def translate_ex(text: str) -> tuple[str | None, str | None]:
     """(перевод на русский или None, если уже русский; код исходного языка)."""
     if not text:
@@ -1078,7 +1097,8 @@ SUM_SYSTEM = """Ты редактор русскоязычного киберс�
 Правила:
 - Не переводи текст подряд и не копируй предложения: только пересказ сути, 4–8 предложений, нейтрально.
 - Сохрани важные факты: кто, что сказал или сделал, цифры, турниры, составы.
-- Ники игроков и названия команд оставляй латиницей как в оригинале.
+- Ники игроков и названия команд НИКОГДА не переводи и не склоняй по смыслу: Legacy, Heroic, Liquid, Falcons, Spirit, Aurora, Vitality,
+  MOUZ и т.д. остаются латиницей как в оригинале — это названия, а не слова. То же в заголовке title_ru.
 - Можно привести не больше 2 коротких цитат (каждая до 15 слов) — самые яркие высказывания, переведённые на русский.
 - Ничего не выдумывай. Если в тексте нет статьи (ошибка, реклама, пусто) — верни "ok": false.
 Ответ строго в JSON без пояснений:
@@ -1199,8 +1219,11 @@ def gather_news(teams: list[dict]) -> list[dict]:
         found[k] = {**it, "about": about, "key": k}
 
     items = sorted(found.values(), key=lambda i: i["date"], reverse=True)[:90]
+    keep = [x for t in teams for x in [t.get("name"), t.get("acronym")] + [p.get("nick") for p in t.get("players") or []]]
+    keep += ["IEM", "BLAST", "PGL", "ESL", "HLTV", "Major", "VRS", "CS2", "Counter-Strike", "Vitality", "Spirit", "MOUZ",
+             "Falcons", "Liquid", "Heroic", "Legacy", "Aurora", "Monte", "Astralis", "Complexity", "Nemiga", "Virtus.pro"]
     for it in items:
-        t_ru, t_lang = translate_ex(it["title"])
+        t_ru, t_lang = translate_keep(it["title"], keep)
         it["title_ru0"], it["lang0"] = (t_ru if t_lang != "ru" else None), t_lang
     clusters = dedupe_news(items, teams)
 
@@ -1218,7 +1241,7 @@ def gather_news(teams: list[dict]) -> list[dict]:
         out.append({
             "key": it["key"],
             "title": it["title"],
-            "title_ru": art.get("title_ru") if lang != "ru" and art.get("title_ru") else t_ru,
+            "title_ru": t_ru,
             "lang": lang,
             "lang_ru": LANG_RU.get(lang or "", lang) if lang and lang != "ru" else None,
             "summary_ru": art.get("summary_ru"),
