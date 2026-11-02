@@ -1345,7 +1345,9 @@ FEED_DEDUP_SYSTEM = """Ты редактор ленты новостей Counter
 Тебе дают пронумерованные посты: время, канал, заголовок и начало текста.
 Найди группы постов, которые сообщают ОБ ОДНОМ И ТОМ ЖЕ событии (одна новость, одна цитата, один трансфер, один итог), даже если формулировки разные.
 Разные события про одну команду или игрока — не объединяй (например, «команда проиграла» и «команда сменила состав» — разные).
-Ответ строго JSON: {"groups": [[номера], [номера]]}. Только группы из двух и более постов."""
+В "stale" перечисли номера устаревших постов: более ранний пост, которого обогнал более поздний про ту же историю
+(«в шаге от MVP» → «получил MVP», «может перейти» → «перешёл»). Устаревшим может быть только более ранний по времени.
+Ответ строго JSON: {"groups": [[номера], [номера]], "stale": [номера]}. В groups — только группы из двух и более постов."""
 
 
 def feed_dedupe(clusters: list[list[dict]]) -> list[list[dict]]:
@@ -1361,6 +1363,7 @@ def feed_dedupe(clusters: list[list[dict]]) -> list[list[dict]]:
             i = parent[i]
         return i
     W, STEP = 40, 30
+    stale: set = set()
     for start in range(0, max(1, min(len(clusters), 110) - 10), STEP):  # свежие ~110 постов: дубли бывают рядом по времени
         idx = list(range(start, min(len(clusters), start + W)))
         if len(idx) < 2:
@@ -1377,10 +1380,12 @@ def feed_dedupe(clusters: list[list[dict]]) -> list[list[dict]]:
         sig = hashlib.sha1(text.encode()).hexdigest()[:16]
         res = (dedup_cache.get("feed:" + sig) or {}).get("res")
         if res is None:
-            res = parse_json_loose(giga_chat(FEED_DEDUP_SYSTEM, text, 1200))
+            res = parse_json_loose(giga_chat(FEED_DEDUP_SYSTEM, text, 1400))
             if res is None:
                 continue
             dedup_cache["feed:" + sig] = {"res": res, "t": iso(NOW)}
+        for j in stale_ids(res, [clusters[i][0]["date"] for i in idx]):
+            stale.add(idx[j])
         for g in res.get("groups") or []:
             ids = [idx[int(x) - 1] for x in g if str(x).isdigit() and 0 < int(x) <= len(idx)]
             ids = [i for i in ids if abs((clusters[i][0]["date"] - clusters[ids[0]][0]["date"]).total_seconds()) < 48 * 3600] if ids else []
@@ -1388,6 +1393,8 @@ def feed_dedupe(clusters: list[list[dict]]) -> list[list[dict]]:
                 parent[find(i)] = find(ids[0])
     groups: dict = {}
     for i in range(len(clusters)):
+        if i in stale and find(i) == i and not any(find(k) == i for k in range(len(clusters)) if k != i):
+            continue  # устаревший одиночный пост — убираем
         groups.setdefault(find(i), []).extend(clusters[i])
     out = list(groups.values())
     for cl in out:
@@ -2515,7 +2522,7 @@ def title_tokens(t: str) -> set:
 def src_rank(it: dict) -> tuple:
     s = (it.get("source") or "").lower()
     r = next((i for i, x in enumerate(SRC_RANK) if x in s), len(SRC_RANK))
-    return (r, 0 if it.get("lang0") == "ru" else 1, it["date"])
+    return (r, 0 if it.get("lang0") == "ru" else 1, -it["date"].timestamp())  # в группе главным — самый свежий пост
 
 
 DEDUP_SYSTEM = """Ты редактор новостей о Counter-Strike 2. Тебе дают пронумерованный список заголовков (уже по-русски) и составы двух команд.
@@ -2524,7 +2531,20 @@ DEDUP_SYSTEM = """Ты редактор новостей о Counter-Strike 2. Т
    страницы «матч X — Y, дата и время», «где смотреть», онлайн-результаты и прогнозы на ставки — это не новости.
 2) В "groups" перечисли группы номеров, которые рассказывают ОДНУ И ТУ ЖЕ новость (одно событие), даже если формулировки и языки разные.
    Разные события про одного игрока — это разные новости, их не объединяй.
-Ответ строго JSON: {"drop": [номера], "groups": [[номера], [номера]]}"""
+3) В "stale" перечисли номера устаревших новостей: более ранняя новость, которую обогнала более поздняя про ту же историю
+   (было «в шаге от MVP» / «может перейти» / «идёт на рекорд» — потом вышло «получил MVP» / «перешёл» / «побил рекорд»).
+   Смотри на время в квадратных скобках: устаревшей может быть только более ранняя.
+Ответ строго JSON: {"drop": [номера], "groups": [[номера], [номера]], "stale": [номера]}"""
+
+
+def stale_ids(res: dict, dates: list) -> set:
+    """Устаревшие новости (их обогнало продолжение той же истории). Самую свежую новость не трогаем."""
+    out = set()
+    newest = max(dates) if dates else None
+    for x in res.get("stale") or []:
+        if str(x).isdigit() and 0 < int(x) <= len(dates) and dates[int(x) - 1] != newest:
+            out.add(int(x) - 1)
+    return out
 
 
 def dedupe_news(items: list[dict], teams: list[dict], same_who_required: bool = True) -> list[list[dict]]:
@@ -2551,14 +2571,15 @@ def dedupe_news(items: list[dict], teams: list[dict], same_who_required: bool = 
     # второй проход: GigaChat — посторонние новости и дубли, которые не поймали правила
     if GIGA_KEY and not _giga["off"] and len(clusters) > 1:
         roster = "\n".join(f"{t['name']}: " + ", ".join(p.get("nick") or "" for p in t.get("players") or []) for t in teams) or "(общая лента новостей CS2 — оценивай только про CS2 или нет)"
-        lines = "\n".join(f"{i + 1}. [{', '.join(cl[0]['about'])}] {cl[0]['title_ru0'] or cl[0]['title']}"
+        lines = "\n".join(f"{i + 1}. [{max(x['date'] for x in cl).strftime('%d.%m %H:%M')}; {', '.join(cl[0]['about'])}] {cl[0]['title_ru0'] or cl[0]['title']}"
                           for i, cl in enumerate(clusters))
         sig = hashlib.sha1((roster + lines).encode()).hexdigest()[:16]
         cached = dedup_cache.get(sig)
-        res = cached["res"] if cached else parse_json_loose(giga_chat(DEDUP_SYSTEM, f"Составы:\n{roster}\n\nЗаголовки:\n{lines}", 600))
+        res = cached["res"] if cached else parse_json_loose(giga_chat(DEDUP_SYSTEM, f"Составы:\n{roster}\n\nЗаголовки:\n{lines}", 900))
         if res is not None:
             dedup_cache[sig] = {"res": res, "t": iso(NOW)}
             drop = {int(x) - 1 for x in res.get("drop") or [] if str(x).isdigit()}
+            drop |= stale_ids(res, [max(x["date"] for x in cl) for cl in clusters])
             merged = []
             used = set()
             for g in res.get("groups") or []:
