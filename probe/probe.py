@@ -1,4 +1,4 @@
-"""Проверка №4: HLTV — призовые по местам, слоты, участники мейджора."""
+"""Проверка №5: HLTV — VRS Invites и стадии мейджора."""
 import gzip, re, urllib.request, urllib.error, time
 out = []
 def get(url):
@@ -10,21 +10,25 @@ def get(url):
             return r.status, b.decode("utf-8", "replace")
     except urllib.error.HTTPError as e:
         return e.code, ""
-st, h = get("https://www.hltv.org/events")
-out.append(f"events: {st} len={len(h)}")
-evs = re.findall(r'href="(/events/(\d+)/([^"]+))"', h)
-seen = []
-for href, i, slug in evs:
-    if slug not in [s for _, s in seen]:
-        seen.append((href, slug))
-out.append("events: " + " | ".join(s for _, s in seen[:40]))
-for key in ["beijing", "major"]:
-    m = next((href for href, slug in seen if key in slug and "2026" in slug), None)
-    if not m: continue
+def clean(h): return re.sub(r"\s+", " ", re.sub(r'<img[^>]*>|<svg.*?</svg>', '', h, flags=re.S))
+st, h = get("https://www.hltv.org/valve-ranking/invites")
+out.append(f"=== invites: {st} len={len(h)}")
+i = h.find('class="contentCol"')
+body = clean(h[i:])
+for k in ["Stage", "stage", "invite", "Invite", "Next", "next", "Region", "Europe"]:
+    j = body.find(k)
+    out.append(f"--- [{k}] at {j}\n" + (body[max(0, j-300):j+3000] if j >= 0 else ""))
+st, ev = get("https://www.hltv.org/events")
+for slug in ["pgl-major-singapore-2026-stage-1", "pgl-major-singapore-2026-stage-2", "pgl-major-singapore-2026"]:
+    m = re.search(r'href="(/events/\d+/' + re.escape(slug) + r')"', ev)
+    if not m: out.append(f"no {slug}"); continue
     time.sleep(3)
-    st, h = get("https://www.hltv.org" + m)
-    out.append(f"=== {m}: {st} len={len(h)}")
-    for k in ["Prize distribution", "prize-distribution", "placement", "qualif", "Teams attending", "team-box", "Invited", "VRS", "Stage"]:
-        i = h.find(k)
-        out.append(f"--- [{k}] at {i}\n" + (re.sub(r"\s+", " ", h[max(0, i-200):i+2500]) if i >= 0 else ""))
+    st, h = get("https://www.hltv.org" + m.group(1))
+    b = clean(h)
+    teams = re.findall(r'<div class="team-name"><a href="/team/\d+/[^"]+"><div class="text-container"><div class="text">([^<]+)</div>.*?<div class="sub-text event-text">(.*?)</div>', b)
+    out.append(f"=== {slug}: {st} teams={len(teams)} {teams[:40]}")
+    j = b.find("PrizeDistribution")
+    out.append("prize: " + (b[j:j+2500] if j >= 0 else ""))
+    j = b.find("qualif")
+    out.append("qualif ctx: " + (b[max(0,j-500):j+800] if j >= 0 else ""))
 open("probe/out.txt", "w").write("\n".join(out))
