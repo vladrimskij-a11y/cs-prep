@@ -252,9 +252,10 @@ a { color: inherit; }
 
 .in-left { animation: tabInL .14s ease-out; }
 .in-right { animation: tabInR .14s ease-out; }
-html { overflow-x: clip; }
+html, body { overflow-x: clip; }  /* соседняя страница при свайпе не расширяет экран (иначе телефон на миг отдаляет страницу) */
+html { overflow-anchor: none; }
 #tabbody, #tabbody .news, #tabbody .recent2 { touch-action: pan-y; }
-#tabbody { display: flow-root; }  /* отступы внутри — копия-сосед при свайпе встаёт ровно туда же */
+#tabbody { display: flow-root; min-height: calc(100vh - var(--tabs-h, 62px)); }  /* короткая вкладка не сдёргивает прокрутку при свайпе */  /* отступы внутри — копия-сосед при свайпе встаёт ровно туда же */
 .swipe-ghost { position: absolute; pointer-events: none; }
 @keyframes tabInL { from { opacity: .35; transform: translateX(40%); } to { opacity: 1; transform: none; } }
 @keyframes tabInR { from { opacity: .35; transform: translateX(-40%); } to { opacity: 1; transform: none; } }
@@ -1123,13 +1124,23 @@ a.ni { text-decoration: none; color: inherit; }
       el = document.querySelector("#tabbody .news");
     } else el = document.getElementById("tabbody");
     if (!el) return null;
-    return mkGhost(el, html);
+    return mkGhost(el, html, true);
   }
-  function mkGhost(el, html) {
+  // pin: страница прокручена вниз — соседа показываем с его начала, сразу под закреплённым меню
+  // (после свайпа прокрутка встанет ровно туда же, поэтому ничего не прыгает)
+  function mkGhost(el, html, pin) {
     var g = document.createElement("div");
     g.className = el.className + " swipe-ghost"; g.id = ""; g.innerHTML = html;
     if (getComputedStyle(el.parentNode).position === "static") el.parentNode.style.position = "relative";
-    g.style.top = el.offsetTop + "px"; g.style.left = el.offsetLeft + "px"; g.style.width = el.offsetWidth + "px";
+    var er = el.getBoundingClientRect(), pr = el.parentNode.getBoundingClientRect();
+    var vTop = er.top;  // где начнётся сосед на экране
+    if (pin) {
+      var nav = document.querySelector(".tabs"), nf = el.classList.contains("news") ? document.querySelector(".nfilt") : null;
+      var stick = (nav ? nav.offsetHeight : 0) + (nf ? nf.offsetHeight + 6 : 0);
+      if (vTop < stick) vTop = stick;  // начало страницы ушло под меню — показываем соседа с начала
+    }
+    g.style.top = (vTop - pr.top - el.parentNode.clientTop) + "px"; 
+    g.style.left = (er.left - pr.left - el.parentNode.clientLeft) + "px"; g.style.width = el.offsetWidth + "px";
     el.parentNode.appendChild(g);
     return { el: el, g: g };
   }
