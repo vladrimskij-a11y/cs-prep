@@ -52,6 +52,10 @@ NEWS_DAYS = int(os.environ.get("NEWS_DAYS", "7"))
 MAPS_WINDOW_DAYS = 120
 
 # Ленты профильных сайтов. Любую можно убрать или добавить свою.
+# Новостные Telegram-каналы про CS (лента на главном экране + новости в карточках матчей).
+TG_NEWS_CHANNELS = ["cs3news", "retakenews", "raiznews", "newcsgo", "m0NESYGG"]
+TG_PAGES = 4                 # страниц по ~20 постов на канал за запуск
+
 RSS_FEEDS = [
     ("HLTV", "https://www.hltv.org/rss/news"),
     ("Cybersport.ru", "https://www.cybersport.ru/rss/materials"),
@@ -142,7 +146,8 @@ GAMES_CACHE_F = CACHE / "bo3_games_v2.json"   # карты по завершён
 DETAILS_CACHE_F = CACHE / "bo3_game_details.json"  # раунды и статистика игроков по каждой карте
 TEAMS_CACHE_F = CACHE / "bo3_teams.json"     # PandaScore id → bo3 id
 TR_CACHE_F = CACHE / "translations.json"     # переводы заголовков
-ROSTER_CACHE_F = CACHE / "liquipedia_rosters.json"  # тренер и роли игроков с Liquipedia
+ROSTER_CACHE_F = CACHE / "liquipedia_rosters_v2.json"  # тренер, роли, даты рождения с Liquipedia
+PRON_CACHE_F = CACHE / "pronunciation.json"       # имена и ники по-русски с ударением
 games_cache: dict = load_json(GAMES_CACHE_F, {})
 details_cache: dict = load_json(DETAILS_CACHE_F, {})
 DETAILS_NEW_LIMIT = int(os.environ.get("DETAILS_NEW_LIMIT", "450"))  # новых карт с раундами за запуск
@@ -370,6 +375,31 @@ def player_roles(wikitext: str) -> tuple[list[str], bool]:
     return res, igl
 
 
+def birth_date(wikitext: str) -> str | None:
+    """Дата рождения из инфобокса: |birth_date={{Birth date and age|2005|5|1}} или |birth_date=2005-05-01."""
+    m = re.search(r"\|\s*birth_date\s*=\s*([^\n]*)", wikitext[:6000])
+    if not m:
+        return None
+    v = m.group(1)
+    d = re.search(r"(\d{4})\s*[|-]\s*(\d{1,2})\s*[|-]\s*(\d{1,2})", v)
+    if d:
+        return f"{int(d.group(1)):04d}-{int(d.group(2)):02d}-{int(d.group(3)):02d}"
+    y = re.search(r"(19|20)\d{2}", v)
+    return y.group(0) if y else None
+
+
+def age_from(birth: str | None) -> int | None:
+    if not birth:
+        return None
+    try:
+        if len(birth) == 4:
+            return NOW.year - int(birth)
+        b = datetime.fromisoformat(birth).replace(tzinfo=timezone.utc)
+        return NOW.year - b.year - ((NOW.month, NOW.day) < (b.month, b.day))
+    except Exception:
+        return None
+
+
 def lp_roster(t: dict) -> dict | None:
     """Активный состав с Liquipedia: тренер, капитан, роли. Кэш на ROSTER_TTL_DAYS дней."""
     key = str(t["id"])
@@ -413,7 +443,9 @@ def lp_roster(t: dict) -> dict | None:
                     "note": None if "coach" in role or not role else role,
                 })
             players = [p for p in people if not p["coach"]]
-            ppages = lp_pages([p["page"] for p in players]) if players else {}
+            ppages = lp_pages([p["page"] for p in people]) if people else {}
+            for p in people:
+                p["birth"] = birth_date(ppages.get(p["page"], ""))
             any_igl = any(p["igl"] for p in players)
             for p in players:
                 roles, igl = player_roles(ppages.get(p["page"], ""))
@@ -421,8 +453,8 @@ def lp_roster(t: dict) -> dict | None:
                 if not any_igl and igl:
                     p["igl"] = True  # в составе капитан не отмечен — берём со страницы игрока
             data = {
-                "coach": [{"nick": p["nick"], "name": p["name"], "flag": p["flag"]} for p in people if p["coach"]],
-                "players": [{k: p[k] for k in ("nick", "name", "flag", "igl", "roles", "note")} for p in players],
+                "coach": [{"nick": p["nick"], "name": p["name"], "flag": p["flag"], "birth": p["birth"]} for p in people if p["coach"]],
+                "players": [{k: p[k] for k in ("nick", "name", "flag", "igl", "roles", "note", "birth")} for p in players],
             }
     except Exception as e:
         warn(f"Liquipedia {t.get('name')}: {e!r}")
@@ -451,11 +483,13 @@ def merge_roster(panda_players: list[dict], lp: dict | None) -> tuple[list[dict]
             "first_name": first,
             "last_name": last,
             "nationality": pp.get("nationality") or lp_p.get("flag"),
-            "age": pp.get("age"),
+            "age": age_from(lp_p.get("birth")) or pp.get("age"),
+            "birth": lp_p.get("birth"),
             "image": pp.get("image"),
             "tags": tags,
         })
-    return res, lp.get("coach") or []
+    coach = [{**c, "age": age_from(c.get("birth"))} for c in lp.get("coach") or []]
+    return res, coach
 
 # ---------------------------------------------------------------- bo3.gg: история, карты
 
@@ -842,6 +876,237 @@ def build_player_stats(team: dict, bid: int | None, hist: list[dict]) -> list[di
     out.sort(key=lambda x: -x["rating"])
     return out
 
+
+
+# ---------------------------------------------------------------- имена по-русски с ударением
+
+pron_cache: dict = load_json(PRON_CACHE_F, {})
+PRON_SYSTEM = """Ты помогаешь русскоязычному спортивному комментатору правильно произносить имена киберспортсменов CS2.
+Для каждого человека дай:
+- "name_ru": имя и фамилию по-русски так, как их принято произносить на родном языке человека (учитывай страну),
+  со знаком ударения (комбинируемый акут U+0301 после ударной гласной, например: Илья́ Оси́пов);
+- "nick_ru": как произносится ник по-русски, тоже с ударением (например m0NESY → мо́нэси, ZywOo → зы́ву). Если ник — обычное
+  английское слово, дай его привычное произношение.
+Ничего не выдумывай про людей, только произношение. Ответ строго JSON:
+{"people": [{"nick": "<ник как во входе>", "nick_ru": "...", "name_ru": "..."}]}"""
+
+
+def add_pronunciation(people: list[dict]) -> None:
+    """Дописывает nick_ru и name_ru (с ударениями). Одним запросом на команду, результат кэшируется навсегда."""
+    todo = []
+    for p in people:
+        full = " ".join(x for x in (p.get("first_name"), p.get("last_name")) if x) or p.get("name") or ""
+        key = norm(p.get("nick")) + "|" + norm(full)
+        p["_pk"] = key
+        if key in pron_cache:
+            p.update(pron_cache[key])
+        else:
+            todo.append((p, full))
+    if todo and GIGA_KEY and not _giga["off"]:
+        lines = "\n".join(f"- ник: {p.get('nick')}; имя: {full or 'неизвестно'}; страна: {p.get('nationality') or p.get('flag') or '?'}"
+                          for p, full in todo)
+        res = parse_json_loose(giga_chat(PRON_SYSTEM, lines, 900))
+        got = {norm(x.get("nick")): x for x in (res or {}).get("people") or [] if isinstance(x, dict)}
+        for p, full in todo:
+            x = got.get(norm(p.get("nick")))
+            if x:
+                val = {"nick_ru": (x.get("nick_ru") or "").strip() or None, "name_ru": (x.get("name_ru") or "").strip() or None}
+                if not full:
+                    val["name_ru"] = None
+                pron_cache[p["_pk"]] = val
+                p.update(val)
+    for p in people:
+        p.pop("_pk", None)
+
+
+# ---------------------------------------------------------------- Telegram-каналы
+
+TG_CACHE_F = CACHE / "telegram_posts.json"
+tg_cache: dict = load_json(TG_CACHE_F, {})   # "канал/id" → обработанный пост (заголовок, текст с картинки)
+TG_GIGA_LIMIT = int(os.environ.get("TG_GIGA_LIMIT", "80"))
+_tg_giga = [0]
+
+
+def tg_fetch_channel(ch: str) -> tuple[str, list[dict]]:
+    """Посты публичного канала за NEWS_DAYS дней через веб-версию t.me/s/<канал>."""
+    since = NOW - timedelta(days=NEWS_DAYS)
+    posts: list[dict] = []
+    title = ch
+    before = None
+    for _ in range(TG_PAGES):
+        url = f"https://t.me/s/{ch}" + (f"?before={before}" if before else "")
+        try:
+            html = http_get(url, {"Accept": "text/html"}, timeout=25).decode("utf-8", "replace")
+        except Exception as e:
+            warn(f"Telegram @{ch}: {e!r}")
+            break
+        m = re.search(r'<meta property="og:title" content="([^"]+)"', html)
+        if m:
+            title = strip_html(m.group(1))
+        blocks = html.split('class="tgme_widget_message_wrap')[1:]
+        page = []
+        for b in blocks:
+            pm = re.search(r'data-post="([^"]+)/(\d+)"', b)
+            tm = re.search(r'<time datetime="([^"]+)"', b)
+            if not pm or not tm:
+                continue
+            tx = re.search(r'<div class="tgme_widget_message_text[^"]*"[^>]*>(.*?)</div>', b, re.DOTALL)
+            text = ""
+            if tx:
+                text = re.sub(r"<br\s*/?>", " ZZBRZZ ", tx.group(1))
+                text = strip_html(text).replace(" ZZBRZZ ", "\n").replace("ZZBRZZ", "\n").strip()
+            photos = re.findall(r"tgme_widget_message_photo_wrap[^>]*background-image:url\('([^']+)'\)", b)
+            vthumb = re.findall(r"tgme_widget_message_video_thumb[^>]*background-image:url\('([^']+)'\)", b)
+            d = parse_iso(tm.group(1))
+            page.append({"channel": ch, "id": int(pm.group(2)), "date": d, "text": text,
+                         "photo": (photos or vthumb or [None])[0], "url": f"https://t.me/{ch}/{pm.group(2)}"})
+        if not page:
+            break
+        posts += page
+        oldest = min(page, key=lambda x: x["id"])
+        before = oldest["id"]
+        if oldest["date"] and oldest["date"] < since:
+            break
+        time.sleep(1)
+    posts = [p for p in posts if p["date"] and p["date"] >= since]
+    return title, posts
+
+
+def giga_upload(data: bytes, name: str = "image.jpg") -> str | None:
+    import uuid
+    boundary = "----csprep" + uuid.uuid4().hex
+    body = (f"--{boundary}\r\nContent-Disposition: form-data; name=\"purpose\"\r\n\r\ngeneral\r\n"
+            f"--{boundary}\r\nContent-Disposition: form-data; name=\"file\"; filename=\"{name}\"\r\n"
+            f"Content-Type: image/jpeg\r\n\r\n").encode() + data + f"\r\n--{boundary}--\r\n".encode()
+    try:
+        req = urllib.request.Request("https://gigachat.devices.sberbank.ru/api/v1/files", data=body, method="POST",
+                                     headers={"Authorization": f"Bearer {giga_token()}",
+                                              "Content-Type": f"multipart/form-data; boundary={boundary}"})
+        with urllib.request.urlopen(req, timeout=60, context=giga_ctx()) as r:
+            return json.loads(r.read()).get("id")
+    except Exception as e:
+        warn(f"GigaChat загрузка картинки: {e!r}")
+        return None
+
+
+def giga_read_image(url: str) -> str | None:
+    """Текст с картинки поста (новостные карточки) через GigaChat с распознаванием изображений."""
+    if not GIGA_KEY or _giga["off"]:
+        return None
+    try:
+        img = http_get(url, {"Accept": "image/*"}, timeout=25)
+    except Exception:
+        return None
+    if len(img) > 9_000_000:
+        return None
+    fid = giga_upload(img)
+    if not fid:
+        return None
+    body = json.dumps({"model": os.environ.get("GIGACHAT_VISION_MODEL", "GigaChat-2-Max"), "temperature": 0.1, "max_tokens": 500,
+                       "messages": [{"role": "user", "attachments": [fid],
+                                     "content": "Перепиши весь текст, который написан на картинке, без пояснений. "
+                                                "Если текста нет — ответь одним словом: НЕТ."}]}).encode()
+    try:
+        req = urllib.request.Request("https://gigachat.devices.sberbank.ru/api/v1/chat/completions", data=body, method="POST",
+                                     headers={"Authorization": f"Bearer {giga_token()}", "Content-Type": "application/json"})
+        with urllib.request.urlopen(req, timeout=90, context=giga_ctx()) as r:
+            j = json.loads(r.read())
+        stats["giga_vision"] = stats.get("giga_vision", 0) + 1
+        txt = j["choices"][0]["message"]["content"].strip()
+        return None if txt.upper().startswith("НЕТ") else txt
+    except Exception as e:
+        warn(f"GigaChat картинка: {e!r}")
+        return None
+
+
+TG_SYSTEM = """Ты редактор новостей о Counter-Strike 2. Тебе дают пост из Telegram-канала (текст и, если был, текст с картинки).
+Определи, новость ли это про киберспорт CS2 (не реклама, не ставки/промокоды/казино, не розыгрыш, не мем без новости, не другая игра).
+Если да — дай короткий заголовок по-русски (до 100 символов), ники и названия команд латиницей как в оригинале.
+Ответ строго JSON: {"news": true|false, "title": "<заголовок>"}"""
+
+
+def tg_process(post: dict) -> dict:
+    key = f"{post['channel']}/{post['id']}"
+    c = tg_cache.get(key)
+    if c is not None:
+        return c
+    text = post["text"] or ""
+    info: dict = {"t": iso(NOW)}
+    ad = re.search(r"промокод|реклама|#ad\b|erid|казино|casino|ставк\w*|букмекер|розыгрыш|giveaway|подпишись", text, re.IGNORECASE)
+    if post.get("photo") and len(text) < 60 and _tg_giga[0] < TG_GIGA_LIMIT:
+        _tg_giga[0] += 1
+        info["ocr"] = giga_read_image(post["photo"])
+    full = (text + "\n" + (info.get("ocr") or "")).strip()
+    if not full:
+        info["news"] = False
+    elif _tg_giga[0] < TG_GIGA_LIMIT and GIGA_KEY and not _giga["off"]:
+        _tg_giga[0] += 1
+        res = parse_json_loose(giga_chat(TG_SYSTEM, full[:2500], 200))
+        if res is not None:
+            info["news"] = bool(res.get("news")) and not ad
+            info["title"] = (res.get("title") or "").strip() or None
+    if "news" not in info:  # нейросеть недоступна — простое правило
+        info["news"] = not ad and len(full) >= 40
+        info["fallback"] = True
+    if not info.get("title"):
+        first = re.split(r"(?<=[.!?…])\s+|\n", full.strip(), 1)[0] if full else ""
+        info["title"] = first[:120]
+    if "fallback" not in info:
+        tg_cache[key] = info
+    return info
+
+
+_tg_all: list[dict] | None = None
+_tg_titles: dict = {}
+
+
+def tg_posts() -> list[dict]:
+    """Все посты новостных каналов за неделю, уже отобранные и с заголовками (один раз за запуск)."""
+    global _tg_all
+    if _tg_all is not None:
+        return _tg_all
+    res = []
+    for ch in TG_NEWS_CHANNELS:
+        title, posts = tg_fetch_channel(ch)
+        _tg_titles[ch] = title
+        for p in posts:
+            info = tg_process(p)
+            if not info.get("news"):
+                continue
+            body = p["text"] or info.get("ocr") or ""
+            res.append({
+                "title": info["title"], "url": p["url"], "source": f"TG · {title}", "channel": ch,
+                "date": p["date"], "snippet": body[:400], "text": body, "photo": p.get("photo"), "tg": True,
+            })
+    res.sort(key=lambda x: x["date"], reverse=True)
+    _tg_all = res
+    return res
+
+
+def tg_text_preview(text: str, limit: int = 420) -> str:
+    t = re.sub(r"\n{3,}", "\n\n", (text or "").strip())
+    return t if len(t) <= limit else t[:limit].rsplit(" ", 1)[0] + "…"
+
+
+def build_feed() -> dict:
+    """Лента на главном экране: посты каналов без повторов."""
+    posts = [dict(p, about=["CS"]) for p in tg_posts()]
+    for p in posts:
+        p["key"] = "tg:" + p["url"].split("t.me/")[1]
+        p["title_ru0"], p["lang0"] = None, "ru"
+    clusters = dedupe_news(posts, [], same_who_required=False)
+    items = []
+    for cl in clusters[:150]:
+        it, others = cl[0], cl[1:]
+        items.append({
+            "key": it["key"], "title": it["title"], "text": tg_text_preview(it["text"]), "photo": it.get("photo"),
+            "channel": it["channel"], "channel_title": _tg_titles.get(it["channel"], it["channel"]),
+            "url": it["url"], "date": iso(it["date"]),
+            "also": [{"channel": o["channel"], "channel_title": _tg_titles.get(o["channel"], o["channel"]), "url": o["url"]}
+                     for o in others],
+        })
+    return {"updated": iso(NOW), "channels": [{"id": c, "title": _tg_titles.get(c, c)} for c in TG_NEWS_CHANNELS],
+            "items": items}
 
 # ---------------------------------------------------------------- новости
 
@@ -1261,6 +1526,8 @@ def summarize_article(it: dict, url: str) -> dict:
 
 def article_info(it: dict) -> dict:
     """Ссылка на оригинал, пересказ, цитаты. Всё кэшируется по новости."""
+    if it.get("tg"):
+        return {"url": it["url"], "summary_ru": tg_text_preview(it.get("text") or ""), "image": it.get("photo"), "lang": "ru"}
     k = it["key"]
     info = dict(art_cache.get(k) or {})
     url = info.get("url") or (it["url"] if "news.google.com" not in (it["url"] or "") else None)
@@ -1305,6 +1572,7 @@ def gather_news(teams: list[dict]) -> list[dict]:
                     pool += google_news(f'"{p["nick"]}" {cs}', lang)
     for source, url in RSS_FEEDS:
         pool += fetch_feed(url, source)
+    pool += tg_posts()
 
     team_names = [t["name"] for t in teams]
     found: dict[str, dict] = {}
@@ -1315,7 +1583,7 @@ def gather_news(teams: list[dict]) -> list[dict]:
         if (OTHER_GAMES.search(text) or NON_CS_SOURCES.search(it["source"] or "")) and not CS_STRICT.search(title):
             continue
         src = (it["source"] or "").lower()
-        cs_src = any(s in src for s in CS_SOURCES)
+        cs_src = any(s in src for s in CS_SOURCES) or bool(it.get("tg"))
         about = []
         for label, rx, amb, ti in entities:
             if not rx.search(title):
@@ -1342,7 +1610,7 @@ def gather_news(teams: list[dict]) -> list[dict]:
             if not ctx_ok:
                 continue
         only_teams = all(a in team_names for a in about)
-        cs_only_src = any(x in src for x in ("hltv", "dust2"))
+        cs_only_src = any(x in src for x in ("hltv", "dust2")) or bool(it.get("tg"))
         if only_teams and not (CS_STRICT.search(text) or cs_only_src):
             continue
         if not (cs_src or CS_CONTEXT.search(text) or not only_teams):
@@ -1421,7 +1689,7 @@ DEDUP_SYSTEM = """Ты редактор новостей о Counter-Strike 2. Т
 Ответ строго JSON: {"drop": [номера], "groups": [[номера], [номера]]}"""
 
 
-def dedupe_news(items: list[dict], teams: list[dict]) -> list[list[dict]]:
+def dedupe_news(items: list[dict], teams: list[dict], same_who_required: bool = True) -> list[list[dict]]:
     """Склеивает одну и ту же новость с разных сайтов. Первый в группе — основной."""
     clusters: list[list[dict]] = []
     for it in items:
@@ -1434,7 +1702,7 @@ def dedupe_news(items: list[dict], teams: list[dict]) -> list[list[dict]]:
                 union = len(tok | o["_tok"]) or 1
                 sim = inter / union
                 close = abs((it["date"] - o["date"]).total_seconds()) < 36 * 3600
-                same_who = bool(set(it["about"]) & set(o["about"]))
+                same_who = bool(set(it["about"]) & set(o["about"])) or not same_who_required
                 if close and same_who and (sim >= 0.45 or (sim >= 0.3 and inter >= 3)) and sim > best_sim:
                     best, best_sim = cl, sim
         if best is not None:
@@ -1444,7 +1712,7 @@ def dedupe_news(items: list[dict], teams: list[dict]) -> list[list[dict]]:
 
     # второй проход: GigaChat — посторонние новости и дубли, которые не поймали правила
     if GIGA_KEY and not _giga["off"] and len(clusters) > 1:
-        roster = "\n".join(f"{t['name']}: " + ", ".join(p.get("nick") or "" for p in t.get("players") or []) for t in teams)
+        roster = "\n".join(f"{t['name']}: " + ", ".join(p.get("nick") or "" for p in t.get("players") or []) for t in teams) or "(общая лента новостей CS2 — оценивай только про CS2 или нет)"
         lines = "\n".join(f"{i + 1}. [{', '.join(cl[0]['about'])}] {cl[0]['title_ru0'] or cl[0]['title']}"
                           for i, cl in enumerate(clusters))
         sig = hashlib.sha1((roster + lines).encode()).hexdigest()[:16]
@@ -1484,6 +1752,10 @@ def build_detail(m: dict, prev: dict | None) -> dict:
         full = fetch_team(t["id"])
         players = [player_brief(p) for p in full.get("players") or [] if p.get("active", True)]
         players, coach = merge_roster(players, lp_roster({**t, "name": full.get("name") or t.get("name")}))
+        try:
+            add_pronunciation(players + coach)
+        except Exception as e:
+            warn(f"Произношение: {e!r}")
         bid = bo3_team_id({**t, "slug": full.get("slug") or t.get("slug")})
         add_alias(bid, t.get("name"), t.get("acronym"), t.get("slug"), full.get("name"), full.get("acronym"))
         hist = bo3_history(bid) if bid else []
@@ -1547,6 +1819,14 @@ def main() -> int:
         if int(f.stem) not in keep_ids:
             f.unlink()
 
+    try:
+        save_json(OUT / "feed.json", build_feed())
+    except Exception as e:
+        warn(f"Лента: {e!r}")
+    for k in [k for k, v in tg_cache.items() if (v.get("t") or "") < iso(NOW - timedelta(days=NEWS_DAYS + 3))]:
+        del tg_cache[k]
+    save_json(TG_CACHE_F, tg_cache)
+    save_json(PRON_CACHE_F, pron_cache)
     prune_caches()
     save_json(GAMES_CACHE_F, games_cache)
     save_json(DETAILS_CACHE_F, details_cache)

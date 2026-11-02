@@ -180,6 +180,7 @@ a { color: inherit; }
 .roster.a .hd { color: var(--ct); } .roster.b .hd { color: var(--t); }
 .pl { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; padding: 10px 12px; border-top: 1px solid var(--line); width: 100%; text-align: left; }
 .pl .nick { font-weight: 700; font-size: 16px; }
+.pron { font-weight: 500; font-size: 13px; color: var(--muted); }
 .pl .rn { font-size: 12px; color: var(--muted); }
 .pl .nb { grid-row: 1 / 3; grid-column: 2; align-self: center; font-size: 12px; font-weight: 600; padding: 4px 8px; border-radius: 6px; background: var(--sunk); color: var(--muted); }
 .pl .nb.has { background: var(--onair-soft); color: var(--onair); }
@@ -209,6 +210,17 @@ a { color: inherit; }
 .coach { padding: 10px 12px; border-top: 1px solid var(--line); display: flex; justify-content: space-between; gap: 10px; font-size: 13px; }
 .coach .lbl { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 600; }
 .coach b { font-size: 15px; }
+
+/* лента */
+.hometabs { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+.feedch { margin-top: 10px; }
+.feed .sect-title { margin-top: 14px; }
+.fi { text-decoration: none; color: inherit; }
+.fi .chn { color: var(--fg); font-weight: 600; }
+.fi-body { display: flex; gap: 10px; align-items: flex-start; }
+.fi-body img { width: 84px; height: 84px; object-fit: cover; border-radius: 8px; flex: none; background: var(--sunk); }
+.fi-body > span { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.fi-body p { white-space: pre-line; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
 
 /* читалка новости */
 .rd { display: flex; flex-direction: column; gap: 12px; margin-top: 4px; max-width: 65ch; }
@@ -401,14 +413,51 @@ a.ni { text-decoration: none; color: inherit; }
     return cur ? html + '</section>' : html;
   }
 
+  function homeHeader(active) {
+    var L = state.list;
+    return '<div class="view"><header class="top"><div class="brand"><h1>CS<b>·</b>Prep</h1>' +
+      '<span class="upd">обновлено ' + esc(ago(L.updated)) + ' · время МСК</span></div>' +
+      '<div class="hometabs" role="tablist"><button class="tab" data-home="tours" aria-selected="' + (active === "tours") + '">Турниры</button>' +
+      '<button class="tab" data-home="feed" aria-selected="' + (active === "feed") + '">Лента</button></div></header>';
+  }
+
+  function getFeed() {
+    if (DEMO) return Promise.resolve(DEMO.feed || { items: [] });
+    if (state.feed) return Promise.resolve(state.feed);
+    return fetch("data/feed.json" + bust()).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then(function (f) { state.feed = f; return f; });
+  }
+
+  function renderFeed() {
+    var html = homeHeader("feed");
+    var F = state.feed;
+    if (!F) { $app.innerHTML = html + '<div class="empty">Загружаю ленту…</div></div>'; return; }
+    var ch = state.feedCh || "all";
+    var items = (F.items || []).filter(function (n) { return ch === "all" || n.channel === ch || (n.also || []).some(function (a) { return a.channel === ch; }); });
+    html += '<div class="filt feedch" role="group" aria-label="Канал"><button class="chip" data-feedch="all" aria-pressed="' + (ch === "all") + '">Все каналы</button>' +
+      (F.channels || []).map(function (c) { return '<button class="chip" data-feedch="' + esc(c.id) + '" aria-pressed="' + (ch === c.id) + '">' + esc(c.title) + '</button>'; }).join("") + '</div>';
+    if (!items.length) html += '<div class="empty"><strong>Пока пусто</strong>Лента собирается вместе с остальными данными каждые 3 часа.</div>';
+    var cur = null;
+    html += '<div class="news feed">';
+    items.forEach(function (n) {
+      var k = dayKey(n.date);
+      if (k !== cur) { cur = k; html += '<h2 class="sect-title">' + esc(dayTitle(n.date)) + '</h2>'; }
+      html += '<a class="box ni fi" href="' + esc(n.url) + '" data-tg="' + esc(n.url) + '" target="_blank" rel="noopener">' +
+        '<span class="src"><span><b class="chn">' + esc(n.channel_title) + '</b> · ' + esc(hm(n.date)) + '</span>' +
+        ((n.also || []).length ? '<span>ещё в ' + n.also.length + ' ' + (n.also.length === 1 ? "канале" : "каналах") + '</span>' : '') + '</span>' +
+        '<span class="fi-body">' + (n.photo ? '<img src="' + esc(n.photo) + '" alt="" loading="lazy" onerror="this.remove()">' : '') +
+        '<span><h4>' + esc(n.title) + '</h4>' + (n.text && n.text !== n.title ? '<p>' + esc(n.text) + '</p>' : '') + '</span></span></a>';
+    });
+    $app.innerHTML = html + '</div></div>';
+  }
+
   function renderHome() {
     var L = state.list;
     var tours = L.tournaments || [];
     var mineCount = (L.matches || []).filter(function (m) { return mine.has(String(m.id)); }).length;
     var today = dayKey(new Date().toISOString());
-    var html = '<div class="view"><header class="top"><div class="brand"><h1>CS<b>·</b>Prep</h1>' +
-      '<span class="upd">обновлено ' + esc(ago(L.updated)) + ' · время МСК</span></div></header>';
-    html += '<h2 class="sect-title">Турниры</h2><div class="tours">';
+    var html = homeHeader("tours");
+    html += '<div class="tours">';
     if (!tours.length) html += '<div class="empty"><strong>Турниров тир-1 на неделю нет</strong>Данные обновляются каждые 3 часа.</div>';
     tours.forEach(function (t) {
       var ms = (L.matches || []).filter(function (m) { return tourOf(m) === String(t.id); });
@@ -573,6 +622,8 @@ a.ni { text-decoration: none; color: inherit; }
       (st.best_map ? it("лучшая", st.best_map) : "") + '<span>' + st.maps + ' карт за 3 мес.</span></span>';
   }
 
+  function years(n) { n = Number(n); var d = n % 10, h = n % 100; return (h > 10 && h < 20) || d === 0 || d > 4 ? "лет" : d === 1 ? "год" : "года"; }
+
   function playersTab(m) {
     var html = "";
     m.teams.forEach(function (t, i) {
@@ -585,13 +636,13 @@ a.ni { text-decoration: none; color: inherit; }
           var cls = x === "Капитан" ? "cap" : x === "Снайпер" ? "awp" : /^Рифлер/.test(x) ? "rif" : "";
           return '<span class="rt ' + cls + '">' + esc(x) + '</span>';
         }).join("");
-        html += '<button class="pl" data-player="' + esc(p.nick) + '"><span class="nick">' + esc(p.nick) + '</span>' +
+        html += '<button class="pl" data-player="' + esc(p.nick) + '"><span class="nick">' + esc(p.nick) + (p.nick_ru ? ' <span class="pron">[' + esc(p.nick_ru) + ']</span>' : '') + '</span>' +
           '<span class="nb' + (n ? " has" : "") + '">' + (n ? n + " новост" + (n === 1 ? "ь" : n < 5 ? "и" : "ей") : "нет новостей") + '</span>' +
-          '<span class="rn">' + esc(flag(p.nationality)) + ' ' + esc(real) + (p.age ? " · " + esc(p.age) + " лет" : "") + '</span>' +
+          '<span class="rn">' + esc(flag(p.nationality)) + ' ' + esc(p.name_ru || real) + (p.age ? " · " + esc(p.age) + " " + years(p.age) : "") + '</span>' +
           (tags ? '<span class="rtags">' + tags + '</span>' : '') + pstat(t, p.nick) + '</button>';
       });
       (t.coach || []).forEach(function (c) {
-        html += '<div class="coach"><span><span class="lbl">Тренер</span><br><b>' + esc(c.nick) + '</b></span><span class="rn" style="font-size:12px;color:var(--muted);text-align:right;align-self:end">' + esc(flag(c.flag)) + ' ' + esc(c.name || "") + '</span></div>';
+        html += '<div class="coach"><span><span class="lbl">Тренер</span><br><b>' + esc(c.nick) + '</b>' + (c.nick_ru ? ' <span class="pron">[' + esc(c.nick_ru) + ']</span>' : '') + '</span><span class="rn" style="font-size:12px;color:var(--muted);text-align:right;align-self:end">' + esc(flag(c.flag)) + ' ' + esc(c.name_ru || c.name || "") + (c.age ? ' · ' + esc(c.age) + ' ' + years(c.age) : '') + '</span></div>';
       });
       html += '</div></div>';
     });
@@ -681,7 +732,7 @@ a.ni { text-decoration: none; color: inherit; }
   function route() {
     var h = location.hash.replace("#", "");
     var mt = /^m-(\d+)$/.exec(h), tt = /^t-([\w-]+)$/.exec(h);
-    try { TG && (h ? TG.BackButton.show() : TG.BackButton.hide()); } catch (e) {}
+    try { TG && (h && h !== "feed" ? TG.BackButton.show() : TG.BackButton.hide()); } catch (e) {}
     if (!state.list) return;
     if (mt) {
       var id = mt[1];
@@ -695,10 +746,12 @@ a.ni { text-decoration: none; color: inherit; }
     state.openId = null;
     if (tt) { state.view = "tour:" + tt[1]; renderTour(tt[1]); }
     else if (h === "mine") { state.view = "mine"; renderMine(); }
+    else if (h === "feed") { state.view = "feed"; renderFeed(); getFeed().then(function () { if (state.view === "feed") renderFeed(); }).catch(function () { if (state.view === "feed") $app.innerHTML = homeHeader("feed") + '<div class="empty"><strong>Лента пока не собрана</strong>Появится после ближайшего обновления данных.</div></div>'; }); }
     else { state.view = "home"; renderHome(); }
   }
   function rerenderList() {
-    if (state.view === "mine") renderMine();
+    if (state.view === "feed") renderFeed();
+    else if (state.view === "mine") renderMine();
     else if (state.view && state.view.indexOf("tour:") === 0) renderTour(state.view.slice(5));
     else renderHome();
   }
@@ -722,8 +775,11 @@ a.ni { text-decoration: none; color: inherit; }
 
   // ---------- клики
   $app.addEventListener("click", function (e) {
-    var t = e.target.closest("[data-reader],#close-reader,[data-mine],[data-open],[data-tour],[data-tab],[data-map],[data-nf],[data-player],[data-link],[data-news],[data-orig],[data-read],#back,#to-mine");
+    var t = e.target.closest("[data-home],[data-feedch],[data-tg],[data-reader],#close-reader,[data-mine],[data-open],[data-tour],[data-tab],[data-map],[data-nf],[data-player],[data-link],[data-news],[data-orig],[data-read],#back,#to-mine");
     if (!t) return;
+    if (t.hasAttribute("data-home")) { var hv = t.getAttribute("data-home"); if (hv === "feed") { location.hash = "feed"; } else if (location.hash) { location.hash = ""; } return; }
+    if (t.hasAttribute("data-feedch")) { state.feedCh = t.getAttribute("data-feedch"); renderFeed(); return; }
+    if (t.hasAttribute("data-tg")) { if (TG) { e.preventDefault(); try { TG.openTelegramLink(t.getAttribute("data-tg")); } catch (x) { openLink(t.getAttribute("data-tg")); } } return; }
     if (t.hasAttribute("data-reader")) { state.reader = t.getAttribute("data-reader"); state.readerScroll = window.scrollY; renderMatch(state.details[state.openId]); window.scrollTo(0, 0); return; }
     if (t.id === "close-reader") { closeReader(); return; }
     if (t.hasAttribute("data-news")) { var k = t.getAttribute("data-news"); state.openNews = state.openNews === k ? null : k; state.showOrig = null; renderMatch(state.details[state.openId]); var el = document.querySelector('[data-news="' + (window.CSS && CSS.escape ? CSS.escape(k) : k) + '"]'); if (el && state.openNews) el.scrollIntoView({ block: "nearest" }); return; }
