@@ -26,6 +26,13 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Восстановить кэш сборщика
+        uses: actions/cache/restore@v4
+        with:
+          path: cache
+          key: collector-cache-${{ github.run_id }}
+          restore-keys: collector-cache-
+
       - name: Установить библиотеку для чтения статей
         run: pip install --quiet trafilatura
 
@@ -35,11 +42,18 @@ jobs:
           GIGACHAT_KEY: ${{ secrets.GIGACHAT_KEY }}
         run: python collector/collect.py
 
+      - name: Сохранить кэш сборщика
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: cache
+          key: collector-cache-${{ github.run_id }}
+
       - name: Сохранить данные
         run: |
           git config user.name "cs-prep-bot"
           git config user.email "cs-prep-bot@users.noreply.github.com"
-          git add docs/data cache
+          git add docs/data
           git diff --cached --quiet || git commit -m "Данные: $(date -u +'%Y-%m-%d %H:%M') UTC"
           git pull --rebase -q origin main || true
           git push
