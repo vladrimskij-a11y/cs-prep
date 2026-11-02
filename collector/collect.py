@@ -1613,8 +1613,31 @@ def build_major(rosters: dict) -> dict | None:
 
 VETO_CACHE_F = CACHE / "hltv_vetoes.json"
 veto_cache: dict = load_json(VETO_CACHE_F, {})   # "match:<id>" → вето навсегда; "results:<team>" → список матчей на 12 ч
-VETO_NEW_LIMIT = int(os.environ.get("VETO_NEW_LIMIT", "0"))  # страницы матчей HLTV закрыты для ботов (403) — выключено
-VETO_MATCHES = 15
+VETO_NEW_LIMIT = int(os.environ.get("VETO_NEW_LIMIT", "25"))  # вето берём с dust2.us (сайт-партнёр HLTV, та же база)
+D2 = "https://www.dust2.us"
+_d2_blocked = [False]
+_d2_last = [0.0]
+
+
+def d2_get(path: str) -> str | None:
+    if _d2_blocked[0]:
+        return None
+    wait = 3.0 - (time.time() - _d2_last[0])
+    if wait > 0:
+        time.sleep(wait)
+    _d2_last[0] = time.time()
+    stats["dust2_requests"] = stats.get("dust2_requests", 0) + 1
+    try:
+        return http_get(D2 + path, {"User-Agent": HLTV_UA, "Accept": "text/html", "Accept-Language": "en-US,en;q=0.9"},
+                        timeout=40).decode("utf-8", "replace")
+    except urllib.error.HTTPError as e:
+        if e.code in (403, 429, 503):
+            _d2_blocked[0] = True
+        warn(f"dust2 {path}: {e!r}")
+    except Exception as e:
+        warn(f"dust2 {path}: {e!r}")
+    return None
+VETO_MATCHES = 20
 _veto_new = [0]
 hltv_team_ids: dict = {}   # norm(название) → {"id","slug","name"}
 
@@ -1636,11 +1659,11 @@ def hltv_team_matches(team: dict) -> list[dict]:
     c = veto_cache.get(key)
     if c and (parse_iso(c.get("t")) or NOW) > NOW - timedelta(hours=12):
         return c["data"]
-    h = hltv_get(f"/results?team={team['id']}")
+    h = d2_get(f"/results?team={team['id']}")
     if not h:
         return c["data"] if c else []
     out = []
-    for mid, slug in re.findall(r'<a href="/matches/(\d+)/([^"]+)" class="a-reset">', h):
+    for mid, slug in re.findall(r'href="/matches/(\d+)/([^"#?]+)"', h):
         if mid not in [x["id"] for x in out]:
             out.append({"id": mid, "slug": slug})
         if len(out) >= VETO_MATCHES:
@@ -1650,34 +1673,39 @@ def hltv_team_matches(team: dict) -> list[dict]:
 
 
 def hltv_veto(match: dict) -> dict | None:
+    """Вето матча со страницы dust2.us: по порядку карты BANNED / PICKED / оставшаяся. Хранится навсегда."""
     key = f"match:{match['id']}"
     if key in veto_cache:
         return veto_cache[key]
     if _veto_new[0] >= VETO_NEW_LIMIT:
         return None
     _veto_new[0] += 1
-    h = hltv_get(f"/matches/{match['id']}/{match['slug']}")
+    h = d2_get(f"/matches/{match['id']}/{match['slug']}")
     if not h:
         return None
-    b = hclean(h)
+    b = re.sub(r"\s+", " ", h)
     steps = []
-    for box in re.findall(r'<div class="standard-box veto-box">(.*?)</div></div>', b):
-        for n, who, act, mp in re.findall(r"(\d)\. (.+?) (removed|picked) ([A-Za-z0-9]+)", strip_html(box.replace("</div>", "\n"))):
-            steps.append({"n": int(n), "team": who.strip(), "act": "ban" if act == "removed" else "pick", "map": mp})
-        for n, mp in re.findall(r"(\d)\. ([A-Za-z0-9]+) was left over", strip_html(box.replace("</div>", "\n"))):
-            steps.append({"n": int(n), "team": None, "act": "decider", "map": mp})
+    i = b.find('class="maps-container"')
+    sec = b[i:i + 40000] if i >= 0 else ""
+    for n, box in enumerate(re.split(r'<div class="standard-box map-container ', sec)[1:], 1):
+        nm = re.search(r'map-container-map-name">([^<]+)<', box)
+        tp = re.search(r'map-container-type">([^<]+)<', box)
+        team = re.search(r'class="team-logo[^"]*" title="([^"]+)"', box)
+        if not nm:
+            continue
+        t = (tp.group(1).strip().upper() if tp else "")
+        act = "ban" if "BAN" in t else "pick" if "PICK" in t else "decider"
+        steps.append({"n": n, "team": strip_html(team.group(1)) if team and act != "decider" else None, "act": act,
+                      "map": strip_html(nm.group(1))})
     dm = re.search(r'data-unix="(\d+)"', b)
-    ev = re.search(r'<div class="event text-ellipsis"><a [^>]*>([^<]+)</a>', b)
-    d = {"date": iso(datetime.fromtimestamp(int(dm.group(1)) / 1000, tz=timezone.utc)) if dm else None,
-         "event": strip_html(ev.group(1)) if ev else None, "steps": sorted(steps, key=lambda x: x["n"])}
-    veto_cache[key] = d   # вето сыгранного матча не меняется — храним навсегда
+    d = {"date": iso(datetime.fromtimestamp(int(dm.group(1)) / 1000, tz=timezone.utc)) if dm else None, "steps": steps}
+    if steps:
+        veto_cache[key] = d   # вето сыгранного матча не меняется
     return d
 
 
 def build_veto(teams: list[dict]) -> dict | None:
     """По каждой команде: что пикает, что банит первым и вообще, по последним матчам; плюс вероятный маппул."""
-    if VETO_NEW_LIMIT <= 0 and not any(k.startswith("match:") for k in veto_cache):
-        return None
     res = []
     for t in teams:
         ht = hltv_team_for(t)
@@ -1689,7 +1717,12 @@ def build_veto(teams: list[dict]) -> dict | None:
             v = hltv_veto(mt)
             if not v or not v.get("steps"):
                 continue
-            mine = [s for s in v["steps"] if s["team"] and norm(s["team"]) == norm(ht["name"])]
+            vd = parse_iso(v.get("date"))
+            if vd and vd < NOW - timedelta(days=STATS_WINDOW_DAYS):
+                continue  # только последние 3 месяца
+            names = {norm(ht["name"]), norm(t.get("name")), norm(t.get("acronym"))} - {""}
+            mine = [s for s in v["steps"] if s["team"] and (norm(s["team"]) in names
+                                                             or any(len(x) >= 3 and (x in norm(s["team"]) or norm(s["team"]) in x) for x in names))]
             if not mine:
                 continue
             n += 1
