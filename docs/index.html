@@ -784,11 +784,12 @@ a.ni { text-decoration: none; color: inherit; }
       (n.quotes || []).forEach(function (q) {
         html += '<blockquote>«' + esc(String(q.ru).replace(/^[«"]|[»"]$/g, "")) + '»' + (q.who ? '<cite>' + esc(q.who) + '</cite>' : '') + '</blockquote>';
       });
-      html += '<div class="rd-note">Краткий пересказ статьи. Полный текст — по кнопке ниже.</div>';
+      if (!/^https:\/\/t\.me\//.test(n.url || "")) html += '<div class="rd-note">Краткий пересказ статьи. Полный текст — по кнопке ниже.</div>';
     } else {
       html += '<p class="rd-empty">Пересказа этой статьи пока нет: сайт не отдал текст или он ещё в очереди. Можно открыть оригинал.</p>';
     }
-    html += (n.url ? '<a class="readbtn" href="' + esc(n.url) + '" data-read="' + esc(n.url) + '" target="_blank" rel="noopener">Открыть оригинал</a>' : '');
+    var isTg = /^https:\/\/t\.me\//.test(n.url || "");
+    html += (n.url ? '<a class="readbtn" href="' + esc(n.url) + '" ' + (isTg ? 'data-tg' : 'data-read') + '="' + esc(n.url) + '" target="_blank" rel="noopener">' + (isTg ? 'Открыть в Telegram' : 'Открыть оригинал') + '</a>' : '');
     if ((n.also || []).length) {
       html += '<div class="also"><div class="rd-meta">Также писали</div>' + n.also.map(function (a) {
         return '<a href="' + esc(a.url) + '" data-read="' + esc(a.url) + '" target="_blank" rel="noopener"><b>' + esc(a.source) + '</b><span>' + esc(a.title) + '</span></a>';
@@ -796,6 +797,22 @@ a.ni { text-decoration: none; color: inherit; }
     }
     html += '</article></div>';
     return html;
+  }
+
+  function keepFilterScroll(render) {
+    var saved = {};
+    document.querySelectorAll(".filt, .mapsel").forEach(function (el, i) { saved[el.className + i] = el.scrollLeft; });
+    render();
+    document.querySelectorAll(".filt, .mapsel").forEach(function (el, i) {
+      var k = el.className + i;
+      if (saved[k] != null) el.scrollLeft = saved[k];
+      var sel = el.querySelector('[aria-pressed="true"]');
+      if (sel) {
+        var l = sel.offsetLeft, r = l + sel.offsetWidth;
+        if (l < el.scrollLeft) el.scrollLeft = l - 8;
+        else if (r > el.scrollLeft + el.clientWidth) el.scrollLeft = r - el.clientWidth + 8;
+      }
+    });
   }
 
   function renderMatch(m) {
@@ -854,7 +871,10 @@ a.ni { text-decoration: none; color: inherit; }
   function go(hash) { if (location.hash === hash) route(); else { depth++; location.hash = hash; } }
   function closeReader() {
     state.reader = null;
+    var fs = state.filtScroll;
     renderMatch(state.details[state.openId]);
+    var f = document.querySelector(".filt");
+    if (f && fs != null) f.scrollLeft = fs;
     window.scrollTo(0, state.readerScroll || 0);
   }
   function goBack() {
@@ -874,10 +894,10 @@ a.ni { text-decoration: none; color: inherit; }
     var t = e.target.closest("[data-mreg],[data-home],[data-feedch],[data-tg],[data-reader],#close-reader,[data-mine],[data-open],[data-tour],[data-tab],[data-map],[data-nf],[data-player],[data-link],[data-news],[data-orig],[data-read],#back,#to-mine");
     if (!t) return;
     if (t.hasAttribute("data-home")) { var hv = t.getAttribute("data-home"); if (hv === "feed" || hv === "major") { location.hash = hv; } else if (location.hash) { location.hash = ""; } return; }
-    if (t.hasAttribute("data-mreg")) { state.majorReg = t.getAttribute("data-mreg"); renderMajor(); return; }
-    if (t.hasAttribute("data-feedch")) { state.feedCh = t.getAttribute("data-feedch"); renderFeed(); return; }
+    if (t.hasAttribute("data-mreg")) { state.majorReg = t.getAttribute("data-mreg"); keepFilterScroll(renderMajor); return; }
+    if (t.hasAttribute("data-feedch")) { state.feedCh = t.getAttribute("data-feedch"); keepFilterScroll(renderFeed); return; }
     if (t.hasAttribute("data-tg")) { if (TG) { e.preventDefault(); try { TG.openTelegramLink(t.getAttribute("data-tg")); } catch (x) { openLink(t.getAttribute("data-tg")); } } return; }
-    if (t.hasAttribute("data-reader")) { state.reader = t.getAttribute("data-reader"); state.readerScroll = window.scrollY; renderMatch(state.details[state.openId]); window.scrollTo(0, 0); return; }
+    if (t.hasAttribute("data-reader")) { var ff = document.querySelector(".filt"); state.filtScroll = ff ? ff.scrollLeft : null; state.reader = t.getAttribute("data-reader"); state.readerScroll = window.scrollY; renderMatch(state.details[state.openId]); window.scrollTo(0, 0); return; }
     if (t.id === "close-reader") { closeReader(); return; }
     if (t.hasAttribute("data-news")) { var k = t.getAttribute("data-news"); state.openNews = state.openNews === k ? null : k; state.showOrig = null; renderMatch(state.details[state.openId]); var el = document.querySelector('[data-news="' + (window.CSS && CSS.escape ? CSS.escape(k) : k) + '"]'); if (el && state.openNews) el.scrollIntoView({ block: "nearest" }); return; }
     if (t.hasAttribute("data-orig")) { var k2 = t.getAttribute("data-orig"); state.showOrig = state.showOrig === k2 ? null : k2; renderMatch(state.details[state.openId]); return; }
@@ -888,8 +908,8 @@ a.ni { text-decoration: none; color: inherit; }
     if (t.hasAttribute("data-tour")) { go("#t-" + t.getAttribute("data-tour")); window.scrollTo(0, 0); return; }
     if (t.id === "to-mine") { go("#mine"); return; }
     if (t.hasAttribute("data-tab")) { state.tab = t.getAttribute("data-tab"); renderMatch(state.details[state.openId]); return; }
-    if (t.hasAttribute("data-map")) { state.map = t.getAttribute("data-map"); renderMatch(state.details[state.openId]); return; }
-    if (t.hasAttribute("data-nf")) { state.openNews = null; state.newsFilter = t.getAttribute("data-nf"); renderMatch(state.details[state.openId]); return; }
+    if (t.hasAttribute("data-map")) { state.map = t.getAttribute("data-map"); keepFilterScroll(function () { renderMatch(state.details[state.openId]); }); return; }
+    if (t.hasAttribute("data-nf")) { state.openNews = null; state.newsFilter = t.getAttribute("data-nf"); keepFilterScroll(function () { renderMatch(state.details[state.openId]); }); return; }
     if (t.hasAttribute("data-player")) { state.tab = "news"; state.newsFilter = t.getAttribute("data-player"); renderMatch(state.details[state.openId]); window.scrollTo(0, 0); return; }
     if (t.id === "back") { goBack(); return; }
   });

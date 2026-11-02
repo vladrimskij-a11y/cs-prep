@@ -1949,18 +1949,20 @@ def gather_news(teams: list[dict]) -> list[dict]:
             amb = is_ambiguous(nick)
             entities.append((nick, entity_re(nick, case=amb), amb, ti))
 
-    pool: list[dict] = []
-    cs = '(CS2 OR "Counter-Strike")'
-    for t in teams:
-        for lang in ("ru", "en"):
-            pool += google_news(f'"{t["name"]}" {cs}', lang)
-        for p in t.get("players") or []:
-            if p.get("nick") and len(p["nick"]) >= 2:
-                for lang in ("ru", "en"):
-                    pool += google_news(f'"{p["nick"]}" {cs}', lang)
-    for source, url in RSS_FEEDS:
-        pool += fetch_feed(url, source)
-    pool += tg_posts()
+    # Источник новостей — только новостные Telegram-каналы (TG_NEWS_CHANNELS).
+    # Сайты (Google News, RSS) отключены по просьбе пользователя: USE_WEB_NEWS=1 вернёт их.
+    pool: list[dict] = list(tg_posts())
+    if os.environ.get("USE_WEB_NEWS") == "1":
+        cs = '(CS2 OR "Counter-Strike")'
+        for t in teams:
+            for lang in ("ru", "en"):
+                pool += google_news(f'"{t["name"]}" {cs}', lang)
+            for p in t.get("players") or []:
+                if p.get("nick") and len(p["nick"]) >= 2:
+                    for lang in ("ru", "en"):
+                        pool += google_news(f'"{p["nick"]}" {cs}', lang)
+        for source, url in RSS_FEEDS:
+            pool += fetch_feed(url, source)
 
     team_names = [t["name"] for t in teams]
     found: dict[str, dict] = {}
