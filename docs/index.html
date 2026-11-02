@@ -252,7 +252,7 @@ a { color: inherit; }
 .in-left { animation: tabInL .14s ease-out; }
 .in-right { animation: tabInR .14s ease-out; }
 html { overflow-x: clip; }
-#tabbody, #tabbody .news { touch-action: pan-y; }
+#tabbody, #tabbody .news, #tabbody .recent2 { touch-action: pan-y; }
 #tabbody { display: flow-root; }  /* отступы внутри — копия-сосед при свайпе встаёт ровно туда же */
 .swipe-ghost { position: absolute; pointer-events: none; }
 @keyframes tabInL { from { opacity: .35; transform: translateX(40%); } to { opacity: 1; transform: none; } }
@@ -1076,7 +1076,12 @@ a.ni { text-decoration: none; color: inherit; }
     if (L.indexOf(state.newsFilter) < 0) L.push(state.newsFilter);  // личные новости игрока — после команд
     return L;
   }
-  function swipeTarget(dir) {  // dir 1 — палец влево (вперёд), -1 — вправо (назад)
+  function mapNames() { var M = state.details[state.openId].maps; return M && M.table ? M.table.map(function (r) { return r.map; }) : []; }
+  function swipeTarget(dir, zone) {  // dir 1 — палец влево (вперёд), -1 — вправо (назад)
+    if (zone === "map") {  // в зоне «Последние игры на карте» листаем карты
+      var N = mapNames(), k = N.indexOf(state.map) + dir;
+      return k >= 0 && k < N.length ? { map: N[k] } : null;
+    }
     if (state.tab === "news") {
       var L = newsSteps(), j = L.indexOf(state.newsFilter) + dir;
       if (j >= 0 && j < L.length) return { filter: L[j] };
@@ -1095,6 +1100,15 @@ a.ni { text-decoration: none; color: inherit; }
   // страница-сосед: HTML той вкладки (или списка новостей с другим фильтром), не трогая текущий экран
   function ghostFor(tgt) {
     var m = state.details[state.openId], keep = { tab: state.tab, nf: state.newsFilter, on: state.openNews }, html, el;
+    if (tgt.map != null) {
+      var km = state.map; state.map = tgt.map;
+      try { html = mapsBlock(m); } finally { state.map = km; }
+      var tm = document.createElement("div"); tm.innerHTML = html;
+      var rc = tm.querySelector(".recent2"); html = rc ? rc.innerHTML : "";
+      el = document.querySelector("#tabbody .recent2");
+      if (!el) return null;
+      return mkGhost(el, html);
+    }
     if (tgt.filter != null) { state.newsFilter = tgt.filter; state.openNews = null; }
     else { state.tab = tgt.tab; if (tgt.tab === "news") { state.newsFilter = "all"; state.openNews = null; } }
     try { html = tabBodyHtml(m); } finally { state.tab = keep.tab; state.newsFilter = keep.nf; state.openNews = keep.on; }
@@ -1104,6 +1118,9 @@ a.ni { text-decoration: none; color: inherit; }
       el = document.querySelector("#tabbody .news");
     } else el = document.getElementById("tabbody");
     if (!el) return null;
+    return mkGhost(el, html);
+  }
+  function mkGhost(el, html) {
     var g = document.createElement("div");
     g.className = el.className + " swipe-ghost"; g.id = ""; g.innerHTML = html;
     if (getComputedStyle(el.parentNode).position === "static") el.parentNode.style.position = "relative";
@@ -1118,6 +1135,11 @@ a.ni { text-decoration: none; color: inherit; }
   }
   // подсветка верхнего меню — сразу, вместе со страницей, а не после перерисовки
   function markSel(tgt) {
+    if (tgt && tgt.map != null || (!tgt && document.querySelector(".mapsel"))) {
+      var mp = tgt && tgt.map != null ? tgt.map : state.map;
+      document.querySelectorAll("[data-map]").forEach(function (b) { b.setAttribute("aria-pressed", String(b.getAttribute("data-map") === mp)); });
+      if (tgt && tgt.map != null) return;
+    }
     var tab = tgt && tgt.tab ? tgt.tab : state.tab;
     var nf = tgt ? (tgt.filter != null ? tgt.filter : (tgt.tab === "news" ? "all" : null)) : state.newsFilter;
     document.querySelectorAll(".tabs [data-tab]").forEach(function (b) { b.setAttribute("aria-selected", String(b.getAttribute("data-tab") === tab)); });
@@ -1127,7 +1149,8 @@ a.ni { text-decoration: none; color: inherit; }
   document.addEventListener("touchstart", function (e) {
     sw = null;
     if (!document.getElementById("tabbody") || !swipeOk(e)) return;
-    sw = { x: e.touches[0].clientX, y: e.touches[0].clientY, t: Date.now(), dx: 0, lock: null, dir: 0, el: null, g: null, tgt: null };
+    sw = { x: e.touches[0].clientX, y: e.touches[0].clientY, t: Date.now(), dx: 0, lock: null, dir: 0, el: null, g: null, tgt: null,
+           zone: state.tab === "stats" && e.target.closest(".recent2") ? "map" : null };
   }, { passive: true });
   document.addEventListener("touchmove", function (e) {
     if (!sw || sw.lock === "v") return;
@@ -1142,9 +1165,9 @@ a.ni { text-decoration: none; color: inherit; }
       dropGhost(sw);
       if (sw.el) { sw.el.style.transform = ""; }
       if (sw.marked) { markSel(null); sw.marked = false; }
-      sw.dir = dir; sw.tgt = swipeTarget(dir);
+      sw.dir = dir; sw.tgt = swipeTarget(dir, sw.zone);
       var gg = sw.tgt ? ghostFor(sw.tgt) : null;
-      sw.el = gg ? gg.el : document.getElementById("tabbody"); sw.g = gg ? gg.g : null;
+      sw.el = gg ? gg.el : (sw.zone === "map" ? document.querySelector("#tabbody .recent2") : document.getElementById("tabbody")); sw.g = gg ? gg.g : null;
     }
     sw.dx = sw.tgt ? dx : dx * 0.25;  // дальше некуда — тянется туго
     place(sw, sw.dx, false);
@@ -1167,7 +1190,8 @@ a.ni { text-decoration: none; color: inherit; }
     place(s0, -s0.dir * (s0.el.offsetWidth + 24), true);  // соседняя страница встаёт на место
     setTimeout(function () {
       var nav = document.querySelector(".tabs"), top = nav ? nav.getBoundingClientRect().top + window.scrollY - 8 : 0;
-      if (s0.tgt.filter != null) { state.openNews = null; state.newsFilter = s0.tgt.filter; }
+      if (s0.tgt.map != null) state.map = s0.tgt.map;
+      else if (s0.tgt.filter != null) { state.openNews = null; state.newsFilter = s0.tgt.filter; }
       else { state.tab = s0.tgt.tab; if (s0.tgt.tab === "news") { state.newsFilter = "all"; state.openNews = null; } }
       // въехавшая страница остаётся как есть: переносим её готовые элементы на место, без перерисовки — ничего не моргает
       var frag = document.createDocumentFragment();
@@ -1175,6 +1199,15 @@ a.ni { text-decoration: none; color: inherit; }
       s0.el.style.transition = "none"; s0.el.style.transform = "";
       s0.el.textContent = ""; s0.el.appendChild(frag);
       dropGhost(s0);
+      if (s0.tgt.map != null) {
+        // стороны и пистолетки тоже про выбранную карту — обновляем этот блок (без картинок, не моргает)
+        var sd = document.querySelector("#tabbody .box.sides"), sec = sd && sd.closest(".sec");
+        if (sec) { var tmp = document.createElement("div"); tmp.innerHTML = sidesBlock(state.details[state.openId]); if (tmp.firstElementChild) sec.replaceWith(tmp.firstElementChild); }
+        var ms = document.querySelector(".mapsel"), ch = ms && ms.querySelector('[aria-pressed="true"]');
+        if (ch) { var l0 = ch.offsetLeft, r0 = l0 + ch.offsetWidth; if (l0 < ms.scrollLeft) ms.scrollLeft = l0 - 8; else if (r0 > ms.scrollLeft + ms.clientWidth) ms.scrollLeft = r0 - ms.clientWidth + 8; }
+        try { TG && TG.HapticFeedback && TG.HapticFeedback.selectionChanged(); } catch (err) {}
+        return;
+      }
       if (window.scrollY > top) window.scrollTo(0, top);
       var f = document.querySelector(".filt"), sel = f && f.querySelector('[aria-pressed="true"]');
       if (sel) {
