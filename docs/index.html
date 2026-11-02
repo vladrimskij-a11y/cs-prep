@@ -323,7 +323,8 @@ button.ni { width: 100%; text-align: left; }
 .fact { display: flex; flex-direction: column; gap: 3px; padding: 10px 12px; border-top: 1px solid var(--line); font-size: 14px; line-height: 1.45; }
 .fact:first-child { border-top: 0; }
 .fact.link { width: 100%; text-align: left; color: inherit; }
-.fact .fgo { color: var(--muted); font-weight: 700; }
+.fact .fsrc { display: inline-flex; align-items: center; gap: 3px; margin-left: 6px; color: var(--ct); text-transform: none; letter-spacing: 0; font-weight: 600; }
+.fact .fsrc svg { flex: none; }
 .ftag { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
 .fmore { padding: 10px 12px; border-top: 1px solid var(--line); color: var(--ct); font-weight: 600; font-size: 13px; text-align: left; }
 
@@ -750,6 +751,7 @@ a.ni { text-decoration: none; color: inherit; }
   }
 
   // новость-источник факта: по ключу от сборщика, а для старых фактов — по совпадению слов
+  var SRC_ICON = '<svg width="11" height="11" viewBox="0 0 12 12" aria-hidden="true"><path d="M4.5 2H2.5A1 1 0 0 0 1.5 3v6.5a1 1 0 0 0 1 1H9a1 1 0 0 0 1-1V7.5M7 1.5h3.5V5M10.5 1.5 5.5 6.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   var STAT_TAGS = { "Форма": 1, "Игроки": 1, "Стороны": 1, "Карты": 1, "Встречи": 1, "Пистолетки": 1, "Маппул": 1 };
   function ftok(t) {
     return (String(t || "").toLowerCase().match(/[a-zа-яё0-9]+/g) || []).filter(function (w) { return w.length >= 3; }).map(function (w) { return w.slice(0, 5); });
@@ -780,7 +782,7 @@ a.ni { text-decoration: none; color: inherit; }
       var src = factSrc(m, f), hasSrc = !!src;
       f = { tag: f.tag, text: f.text, src: src };
       html += hasSrc
-        ? '<button class="fact link" data-reader="' + esc(f.src) + '"><span class="ftag">' + esc(f.tag || "") + '</span><span>' + esc(f.text) + ' <span class="fgo">›</span></span></button>'
+        ? '<button class="fact link" data-reader="' + esc(f.src) + '"><span class="ftag">' + esc(f.tag || "") + ' <span class="fsrc" aria-label="открыть новость">' + SRC_ICON + 'новость</span></span><span>' + esc(f.text) + '</span></button>'
         : '<div class="fact"><span class="ftag">' + esc(f.tag || "") + '</span><span>' + esc(f.text) + '</span></div>';
     });
     if (F.length > 10) html += '<button class="fmore" id="facts-more">' + (state.factsAll ? "Свернуть" : "Показать ещё " + (F.length - 10)) + '</button>';
