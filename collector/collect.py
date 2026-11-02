@@ -1162,7 +1162,7 @@ def add_pronunciation(people: list[dict]) -> None:
 
 # ---------------------------------------------------------------- Telegram-каналы
 
-TG_CACHE_F = CACHE / "telegram_posts.json"
+TG_CACHE_F = CACHE / "telegram_posts_v2.json"
 tg_cache: dict = load_json(TG_CACHE_F, {})   # "канал/id" → обработанный пост (заголовок, текст с картинки)
 TG_GIGA_LIMIT = int(os.environ.get("TG_GIGA_LIMIT", "80"))
 _tg_giga = [0]
@@ -1263,7 +1263,10 @@ def giga_read_image(url: str) -> str | None:
 
 TG_SYSTEM = """Ты редактор новостей о Counter-Strike 2. Тебе дают пост из Telegram-канала (текст и, если был, текст с картинки).
 Определи, новость ли это про киберспорт CS2 (не реклама, не ставки/промокоды/казино, не розыгрыш, не мем без новости, не другая игра,
-не расписание и не анонс/напоминание о матчах — «сегодня играют…», «когда матчи», «стартует турнир», превью и прогнозы — это НЕ новость).
+не расписание и не анонс/напоминание о матчах — «сегодня играют…», «когда матчи», «стартует турнир», превью и прогнозы — это НЕ новость;
+не ход матча и не моменты: клатчи, квадро, эйсы, хайлайты, клипы, «результат первой карты», счёт карт и раундов, голый итог матча
+без цитат и подробностей — это НЕ новость).
+Новость — это статья, интервью, цитата, заявление, трансфер/замена/аренда, слух, интересный факт или особенность об игроке или команде.
 Если да — дай короткий заголовок по-русски (до 100 символов), ники и названия команд латиницей как в оригинале.
 Ответ строго JSON: {"news": true|false, "title": "<заголовок>"}"""
 
@@ -1317,6 +1320,8 @@ def tg_posts() -> list[dict]:
             info = tg_process(p)
             if not info.get("news") or SPAM.search(info.get("title") or "") or SPAM.search((p["text"] or "")[:200]):
                 continue
+            if is_live_noise((info.get("title") or "") + "\n" + (p["text"] or "") + "\n" + (info.get("ocr") or "")):
+                continue  # клатчи, квадро, счёт карт — трансляция, а не новость
             body = p["text"] or info.get("ocr") or ""
             res.append({
                 "title": info["title"], "url": p["url"], "source": f"TG · {title}", "channel": ch,
@@ -1847,6 +1852,28 @@ OTHER_GAMES = re.compile(
     re.IGNORECASE)
 CS_STRICT = re.compile(r"\bCS ?2\b|\bCS:?GO\b|\bCS\b|Counter[- ]Strike|\bКС ?2?\b|контр-?страйк\w*|\bHLTV\b|\bIEM\b"
                        r"|\bBLAST\b|мейджор\w*|\bAWP\b|авп\w*", re.IGNORECASE)
+# Посты «во время матча»: моменты, ход игры, голый счёт — это трансляция, а не новость.
+LIVE_NOISE = re.compile(
+    r"клатч\w*|clutch|квадр\w*|\bквад\w*|\bэйс\w*|\bace\b|\b[345]k\b|\b1 ?(?:в|v|vs|на) ?[2-5]\b|хайлайт\w*|highlight|"
+    r"\bмомент\w*|\bклип\w*|\bclip\b|прямо сейчас|\blive\b|\bлайв\b|идёт матч|идет матч|"
+    r"(?:перв|втор|трет)\w+ карт\w*|\bкарт[ау] (?:за|в пользу)|забира\w+ (?:карту|mirage|inferno|nuke|ancient|anubis|dust2|train|overpass|vertigo|cache)|"
+    r"взял\w* (?:карту|mirage|inferno|nuke|ancient|anubis|dust2|train|overpass)|счёт по картам|\bmap ?[123]\b|"
+    r"\b\d{1,2} ?[:\-–] ?\d{1,2}\b.{0,20}(?:раунд|по раундам|на карте)|по раундам|пистолетк\w+ раунд",
+    re.IGNORECASE)
+RESULT_ONLY = re.compile(r"(?:обыгра\w+|победил\w*|выигра\w+|проигра\w+|уступил\w*|разгроми\w+|вылете\w+)\b.{0,60}\b[0-3] ?[:\-–] ?[0-3]\b",
+                         re.IGNORECASE)
+HAS_SUBSTANCE = re.compile(r"[«\"“].{8,}[»\"”]|интервью|заяв\w+|рассказ\w+|признал\w*|ответил\w*|высказал\w*|трансфер\w*|"
+                           r"подписал\w*|покинул\w*|замен\w+|скамейк\w+|аренд\w+|контракт\w*|слух\w*|инсайд\w*|травм\w*",
+                           re.IGNORECASE)
+
+
+def is_live_noise(text: str) -> bool:
+    t = (text or "")[:400]
+    if HAS_SUBSTANCE.search(t):
+        return False
+    return bool(LIVE_NOISE.search(t) or RESULT_ONLY.search(t))
+
+
 NON_CS_SOURCES = re.compile(r"dota|dota2\.ru|valorant|lol|mlbb", re.IGNORECASE)
 SPAM = re.compile(
     r"prediction|predictions|прогноз|ставк|коэффициент|\bodds\b|betting|букмекер|live stream|how to watch|где смотреть"
