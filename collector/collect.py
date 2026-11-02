@@ -1858,7 +1858,8 @@ LIVE_NOISE = re.compile(
     r"\bмомент\w*|\bклип\w*|\bclip\b|прямо сейчас|\blive\b|\bлайв\b|идёт матч|идет матч|"
     r"(?:перв|втор|трет)\w+ карт\w*|\bкарт[ау] (?:за|в пользу)|забира\w+ (?:карту|mirage|inferno|nuke|ancient|anubis|dust2|train|overpass|vertigo|cache)|"
     r"взял\w* (?:карту|mirage|inferno|nuke|ancient|anubis|dust2|train|overpass)|счёт по картам|\bmap ?[123]\b|"
-    r"\b\d{1,2} ?[:\-–] ?\d{1,2}\b.{0,20}(?:раунд|по раундам|на карте)|по раундам|пистолет\w* раунд\w*|раунд\w* за \w+",
+    r"\b\d{1,2} ?[:\-–] ?\d{1,2}\b.{0,20}(?:раунд|по раундам|на карте)|по раундам|пистолет\w* раунд\w*|раунд\w* за \w+|"
+    r"камбэк\w*|камбек\w*|камбечил\w*|\bэко\b|эко-раунд\w*|форс\w*|минус (?:три|четыре|пять)|\b(?:с|со) \d{1,2} ?[:\-–] ?\d{1,2}\b|сравнял\w* сч[её]т|приемк\w*|приёмк\w*",
     re.IGNORECASE)
 RESULT_ONLY = re.compile(r"(?:обыгра\w+|победил\w*|выигра\w+|проигра\w+|уступил\w*|разгроми\w+|вылете\w+)\b.{0,60}\b[0-3] ?[:\-–] ?[0-3]\b",
                          re.IGNORECASE)
@@ -2463,7 +2464,7 @@ def build_news(teams: list[dict]) -> dict:
 
 # ---------------------------------------------------------------- факты для эфира
 
-FACTS_CACHE_F = CACHE / "facts_v7.json"
+FACTS_CACHE_F = CACHE / "facts_v8.json"
 facts_cache: dict = load_json(FACTS_CACHE_F, {})
 FACTS_TTL_H = 6
 FACTS_SYSTEM = """Ты помогаешь русскоязычному комментатору CS2 подготовиться к матчу.
@@ -2623,6 +2624,7 @@ def build_facts(d: dict, prev: dict | None) -> list | None:
         data = json.dumps(inp, ensure_ascii=False) if inp else ""
         res = parse_json_loose(giga_chat(FACTS_SYSTEM, data[:14000], 1800, model=os.environ.get("GIGACHAT_FACTS_MODEL", "GigaChat-2-Pro"))) if inp else {"facts": []}
         allowed = _numbers(data)
+        failed = inp is not None and res is None
         story = []
         for f in (res or {}).get("facts") or []:
             if not isinstance(f, dict) or not f.get("text"):
@@ -2636,9 +2638,15 @@ def build_facts(d: dict, prev: dict | None) -> list | None:
             if re.search(r"капитан\w* (команды|является)|является капитан|на позиции AWP|позицию AWP|играет на AWP|в аренде из|"
                          r"последн\w+ (личн\w+ )?встреч", f["text"], re.IGNORECASE) and not re.search(r"стал|назнач|перешёл|перешел|подписал", f["text"], re.IGNORECASE):
                 continue  # это видно в профилях и в блоке встреч
-            story.append({"tag": f.get("tag") or "Новости", "text": f["text"].strip()})
+            if LIVE_NOISE.search(f["text"]) and not HAS_SUBSTANCE.search(f["text"]):
+                continue  # ход матча (камбэки, эко, счёт по раундам) — не факт для эфира
+            tag = f.get("tag") if f.get("tag") in ("Новости", "Цитата", "Трансфер", "Слухи") else "Новости"
+            story.append({"tag": tag, "text": f["text"].strip()})
         story = story[:15]
-        facts_cache[key] = {"t": iso(NOW), "story": story}
+        if failed:
+            story = (c or {}).get("story")  # GigaChat не ответил — оставим прошлое и попробуем в следующий раз
+        else:
+            facts_cache[key] = {"t": iso(NOW), "story": story}
     elif c:
         story = c.get("story")
     facts, seen = [], []
