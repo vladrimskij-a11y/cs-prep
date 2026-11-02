@@ -398,7 +398,7 @@ def player_roles(wikitext: str) -> tuple[list[str], bool]:
     if awp and rifle:
         res.append("Рифл + AWPer")
     elif awp:
-        res.append("Снайпер (AWPer)")
+        res.append("AWP")
     elif rifle:
         res.append("Рифлер" + (f" · {rifle_kind}" if rifle_kind else ""))
     return res, igl

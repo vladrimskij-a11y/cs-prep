@@ -633,7 +633,7 @@ a.ni { text-decoration: none; color: inherit; }
         var n = newsFor(m, p.nick).length;
         var real = [p.first_name, p.last_name].filter(Boolean).join(" ");
         var tags = (p.tags || []).map(function (x) {
-          var cls = x === "Капитан" ? "cap" : /^Снайпер/.test(x) ? "awp" : /^Рифл/.test(x) ? "rif" : "";
+          var cls = x === "Капитан" ? "cap" : (x === "AWP" || /^Снайпер/.test(x)) ? "awp" : /^Рифл/.test(x) ? "rif" : "";
           return '<span class="rt ' + cls + '">' + esc(x) + '</span>';
         }).join("");
         html += '<button class="pl" data-player="' + esc(p.nick) + '"><span class="nick">' + esc(p.nick) + (p.nick_ru ? ' <span class="pron">[' + esc(p.nick_ru) + ']</span>' : '') + '</span>' +
