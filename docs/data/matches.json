@@ -1,5 +1,5 @@
 {
- "updated": "2026-11-03T07:28:42Z",
+ "updated": "2026-11-03T10:08:30Z",
  "tiers": [
   "s"
  ],
@@ -12,9 +12,9 @@
    "begin": "2026-11-02T02:00:00Z",
    "end": "2026-11-08T12:30:00Z",
    "prize": "1,250,000 United States Dollar",
-   "matches": 19,
-   "next": "2026-11-03T08:00:00Z",
-   "live": 2,
+   "matches": 17,
+   "next": "2026-11-03T10:15:00Z",
+   "live": 1,
    "hltv": {
     "prize": 1250000,
     "player_share": 300000,
@@ -98,7 +98,11 @@
       "other": [],
       "team": null,
       "count": 4,
-      "teams": []
+      "teams": [
+       "FaZe",
+       "G2",
+       "9z"
+      ]
      }
     ],
     "teams": [
@@ -862,83 +866,9 @@
  ],
  "matches": [
   {
-   "id": 1781469,
-   "begin_at": "2026-11-03T05:59:30Z",
-   "status": "running",
-   "bo": 3,
-   "name": "Upper Bracket Semifinal 1: MOUZ vs BB",
-   "tournament": "IEM Beijing 2026",
-   "stage": "Group B · Upper Bracket Semifinal 1",
-   "tier": "s",
-   "serie": {
-    "id": 11136,
-    "begin": "2026-11-02T02:00:00Z",
-    "end": "2026-11-08T12:30:00Z",
-    "image": null,
-    "prize": null
-   },
-   "teams": [
-    {
-     "id": 3240,
-     "name": "MOUZ",
-     "acronym": "MOUZ",
-     "slug": "mousesports-cs-go",
-     "image": "https://cdn-api.pandascore.co/images/team/image/3240/208px_mouz_2021_allmode.png",
-     "location": "DE"
-    },
-    {
-     "id": 133458,
-     "name": "BetBoom Team",
-     "acronym": "BB",
-     "slug": "betboom-team-cs-go",
-     "image": "https://cdn-api.pandascore.co/images/team/image/133458/bet_boom_team_2024_allmode.png",
-     "location": "RU"
-    }
-   ],
-   "stream": "https://www.twitch.tv/keliencs",
-   "has_detail": true
-  },
-  {
-   "id": 1781465,
-   "begin_at": "2026-11-03T07:03:36Z",
-   "status": "running",
-   "bo": 3,
-   "name": "Lower Bracket Quarterfinal 2: FaZe vs FAL",
-   "tournament": "IEM Beijing 2026",
-   "stage": "Group A · Lower Bracket Quarterfinal 2",
-   "tier": "s",
-   "serie": {
-    "id": 11136,
-    "begin": "2026-11-02T02:00:00Z",
-    "end": "2026-11-08T12:30:00Z",
-    "image": null,
-    "prize": null
-   },
-   "teams": [
-    {
-     "id": 3212,
-     "name": "FaZe",
-     "acronym": "FaZe",
-     "slug": "faze",
-     "image": "https://cdn-api.pandascore.co/images/team/image/3212/285px_fa_ze_esports_october_2025_lightmode.png",
-     "location": "US"
-    },
-    {
-     "id": 130564,
-     "name": "Team Falcons",
-     "acronym": "FAL",
-     "slug": "falcons-esports",
-     "image": "https://cdn-api.pandascore.co/images/team/image/130564/team_falconslogo_square.png",
-     "location": "SA"
-    }
-   ],
-   "stream": "https://www.twitch.tv/bysl4m",
-   "has_detail": true
-  },
-  {
    "id": 1781461,
-   "begin_at": "2026-11-03T08:00:00Z",
-   "status": "not_started",
+   "begin_at": "2026-11-03T08:14:51Z",
+   "status": "running",
    "bo": 3,
    "name": "Upper Bracket Semifinal 1: MGLZ vs HERO",
    "tournament": "IEM Beijing 2026",
@@ -973,45 +903,8 @@
    "has_detail": true
   },
   {
-   "id": 1781464,
-   "begin_at": "2026-11-03T09:30:00Z",
-   "status": "not_started",
-   "bo": 3,
-   "name": "Lower Bracket Quarterfinal 1: LGC vs B8",
-   "tournament": "IEM Beijing 2026",
-   "stage": "Group A · Lower Bracket Quarterfinal 1",
-   "tier": "s",
-   "serie": {
-    "id": 11136,
-    "begin": "2026-11-02T02:00:00Z",
-    "end": "2026-11-08T12:30:00Z",
-    "image": null,
-    "prize": null
-   },
-   "teams": [
-    {
-     "id": 133708,
-     "name": "Legacy",
-     "acronym": "LGC",
-     "slug": "legacy-48cb0f61-07e7-4b0d-85a0-5f837e29c807",
-     "image": "https://cdn-api.pandascore.co/images/team/image/133708/593px_legacy_allmode.png",
-     "location": "BR"
-    },
-    {
-     "id": 129381,
-     "name": "B8",
-     "acronym": "B8",
-     "slug": "b8-cs-go",
-     "image": "https://cdn-api.pandascore.co/images/team/image/129381/b8_lightmode.png",
-     "location": "UA"
-    }
-   ],
-   "stream": "https://www.twitch.tv/ESLCS",
-   "has_detail": true
-  },
-  {
    "id": 1781462,
-   "begin_at": "2026-11-03T09:30:00Z",
+   "begin_at": "2026-11-03T10:15:00Z",
    "status": "not_started",
    "bo": 3,
    "name": "Upper Bracket Semifinal 2: FURIA vs NAVI",
@@ -1047,11 +940,48 @@
    "has_detail": true
   },
   {
+   "id": 1781464,
+   "begin_at": "2026-11-03T10:25:00Z",
+   "status": "not_started",
+   "bo": 3,
+   "name": "Lower Bracket Quarterfinal 1: LGC vs B8",
+   "tournament": "IEM Beijing 2026",
+   "stage": "Group A · Lower Bracket Quarterfinal 1",
+   "tier": "s",
+   "serie": {
+    "id": 11136,
+    "begin": "2026-11-02T02:00:00Z",
+    "end": "2026-11-08T12:30:00Z",
+    "image": null,
+    "prize": null
+   },
+   "teams": [
+    {
+     "id": 133708,
+     "name": "Legacy",
+     "acronym": "LGC",
+     "slug": "legacy-48cb0f61-07e7-4b0d-85a0-5f837e29c807",
+     "image": "https://cdn-api.pandascore.co/images/team/image/133708/593px_legacy_allmode.png",
+     "location": "BR"
+    },
+    {
+     "id": 129381,
+     "name": "B8",
+     "acronym": "B8",
+     "slug": "b8-cs-go",
+     "image": "https://cdn-api.pandascore.co/images/team/image/129381/b8_lightmode.png",
+     "location": "UA"
+    }
+   ],
+   "stream": "https://www.twitch.tv/cs2_paragon_ru2",
+   "has_detail": true
+  },
+  {
    "id": 1781467,
    "begin_at": "2026-11-04T02:00:00Z",
    "status": "not_started",
    "bo": 3,
-   "name": "Lower Bracket Semifinal 2: TBD vs TBD",
+   "name": "Lower Bracket Semifinal 2: FAL vs TBD",
    "tournament": "IEM Beijing 2026",
    "stage": "Group A · Lower Bracket Semifinal 2",
    "tier": "s",
@@ -1062,7 +992,16 @@
     "image": null,
     "prize": null
    },
-   "teams": [],
+   "teams": [
+    {
+     "id": 130564,
+     "name": "Team Falcons",
+     "acronym": "FAL",
+     "slug": "falcons-esports",
+     "image": "https://cdn-api.pandascore.co/images/team/image/130564/team_falconslogo_square.png",
+     "location": "SA"
+    }
+   ],
    "stream": "https://www.twitch.tv/ESLCS",
    "has_detail": false
   },
@@ -1091,7 +1030,7 @@
    "begin_at": "2026-11-04T04:30:00Z",
    "status": "not_started",
    "bo": 3,
-   "name": "Lower Bracket Semifinal 2: AUR vs TBD",
+   "name": "Lower Bracket Semifinal 2: BB vs AUR",
    "tournament": "IEM Beijing 2026",
    "stage": "Group B · Lower Bracket Semifinal 2",
    "tier": "s",
@@ -1104,6 +1043,14 @@
    },
    "teams": [
     {
+     "id": 133458,
+     "name": "BetBoom Team",
+     "acronym": "BB",
+     "slug": "betboom-team-cs-go",
+     "image": "https://cdn-api.pandascore.co/images/team/image/133458/bet_boom_team_2024_allmode.png",
+     "location": "RU"
+    },
+    {
      "id": 131505,
      "name": "Aurora Gaming",
      "acronym": "AUR",
@@ -1113,7 +1060,7 @@
     }
    ],
    "stream": "https://www.twitch.tv/ESLCS",
-   "has_detail": false
+   "has_detail": true
   },
   {
    "id": 1781474,
@@ -1217,7 +1164,7 @@
    "begin_at": "2026-11-04T09:30:00Z",
    "status": "not_started",
    "bo": 3,
-   "name": "Upper Bracket Final: PRV vs TBD",
+   "name": "Upper Bracket Final: MOUZ vs PRV",
    "tournament": "IEM Beijing 2026",
    "stage": "Group B · Upper Bracket Final",
    "tier": "s",
@@ -1230,6 +1177,14 @@
    },
    "teams": [
     {
+     "id": 3240,
+     "name": "MOUZ",
+     "acronym": "MOUZ",
+     "slug": "mousesports-cs-go",
+     "image": "https://cdn-api.pandascore.co/images/team/image/3240/208px_mouz_2021_allmode.png",
+     "location": "DE"
+    },
+    {
      "id": 133719,
      "name": "PARIVISION",
      "acronym": "PRV",
@@ -1239,7 +1194,7 @@
     }
    ],
    "stream": "https://www.twitch.tv/ESLCS",
-   "has_detail": false
+   "has_detail": true
   },
   {
    "id": 1781482,
@@ -1364,17 +1319,18 @@
  ],
  "meta": {
   "panda_requests": 18,
-  "bo3_requests": 60,
-  "liquipedia_requests": 2,
+  "bo3_requests": 65,
+  "liquipedia_requests": 0,
   "translations": 1,
   "warnings": [
-   "HLTV /events: <HTTPError 403: 'Forbidden'>",
-   "GigaChat картинка: URLError(TimeoutError('timed out'))"
+   "GigaChat загрузка картинки: URLError(TimeoutError('timed out'))",
+   "GigaChat: URLError(TimeoutError('timed out'))",
+   "HLTV /events/8302/pgl-major-singapore-2026: <HTTPError 403: 'Forbidden'>"
   ],
-  "hltv_requests": 1,
-  "dust2_requests": 36,
-  "giga_calls": 78,
-  "giga_tokens": 64634,
-  "giga_vision": 19
+  "hltv_requests": 3,
+  "dust2_requests": 26,
+  "giga_vision": 22,
+  "giga_calls": 68,
+  "giga_tokens": 55468
  }
 }
