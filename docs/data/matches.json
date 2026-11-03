@@ -1,5 +1,5 @@
 {
- "updated": "2026-11-03T10:08:30Z",
+ "updated": "2026-11-03T13:22:15Z",
  "tiers": [
   "s"
  ],
@@ -12,9 +12,9 @@
    "begin": "2026-11-02T02:00:00Z",
    "end": "2026-11-08T12:30:00Z",
    "prize": "1,250,000 United States Dollar",
-   "matches": 17,
-   "next": "2026-11-03T10:15:00Z",
-   "live": 1,
+   "matches": 16,
+   "next": "2026-11-04T02:00:00Z",
+   "live": 2,
    "hltv": {
     "prize": 1250000,
     "player_share": 300000,
@@ -688,17 +688,391 @@
    "live": 0
   },
   {
-   "id": "bo3-4226",
+   "id": "11176",
    "name": "PGL Major Singapore 2026",
    "tier": "s",
-   "image": "https://files.bo3.gg/uploads/tournament/4226/image/webp-ba72fed0f83d2c3ac2895440af551b44.webp",
-   "begin": "2026-11-24T07:00:00Z",
-   "end": "2026-12-13T21:00:00Z",
+   "image": "https://cdn-api.pandascore.co/images/league/image/4163/800px-pgl_allmode-png",
+   "begin": "2026-11-23T23:00:00Z",
+   "end": "2026-12-13T22:00:00Z",
    "prize": null,
-   "prize_usd": 1250000,
    "matches": 0,
    "next": null,
    "live": 0,
+   "hltv": {
+    "prize": 1170000,
+    "player_share": null,
+    "club_share": null,
+    "places": [
+     {
+      "place": "1st",
+      "prize": 500000,
+      "club": null,
+      "spots": [],
+      "other": [],
+      "team": null,
+      "count": 1,
+      "teams": []
+     },
+     {
+      "place": "2nd",
+      "prize": 170000,
+      "club": null,
+      "spots": [],
+      "other": [],
+      "team": null,
+      "count": 1,
+      "teams": []
+     },
+     {
+      "place": "3rd",
+      "prize": 100000,
+      "club": null,
+      "spots": [],
+      "other": [],
+      "team": null,
+      "count": 1,
+      "teams": []
+     },
+     {
+      "place": "4th",
+      "prize": 60000,
+      "club": null,
+      "spots": [],
+      "other": [],
+      "team": null,
+      "count": 1,
+      "teams": []
+     },
+     {
+      "place": "5-8th",
+      "prize": 45000,
+      "club": null,
+      "spots": [],
+      "other": [],
+      "team": null,
+      "count": 4,
+      "teams": []
+     },
+     {
+      "place": "9-11th",
+      "prize": 20000,
+      "club": null,
+      "spots": [],
+      "other": [],
+      "team": null,
+      "count": 3,
+      "teams": []
+     },
+     {
+      "place": "12-14th",
+      "prize": 20000,
+      "club": null,
+      "spots": [],
+      "other": [],
+      "team": null,
+      "count": 3,
+      "teams": []
+     },
+     {
+      "place": "15-16th",
+      "prize": 20000,
+      "club": null,
+      "spots": [],
+      "other": [],
+      "team": null,
+      "count": 2,
+      "teams": []
+     }
+    ],
+    "teams": [
+     {
+      "name": "FURIA",
+      "how": "VRS (Americas)"
+     },
+     {
+      "name": "Vitality",
+      "how": "VRS (Europe)"
+     },
+     {
+      "name": "Spirit",
+      "how": "VRS (Europe)"
+     },
+     {
+      "name": "MOUZ",
+      "how": "VRS (Europe)"
+     },
+     {
+      "name": "Aurora",
+      "how": "VRS (Europe)"
+     },
+     {
+      "name": "Falcons",
+      "how": "VRS (Europe)"
+     },
+     {
+      "name": "BETBOOM",
+      "how": "VRS (Europe)"
+     },
+     {
+      "name": "Legacy",
+      "how": "VRS (Americas)"
+     }
+    ],
+    "lineups": {
+     "FURIA": [
+      {
+       "id": 2023,
+       "slug": "fallen",
+       "nick": "FalleN"
+      },
+      {
+       "id": 12553,
+       "slug": "yuurih",
+       "nick": "yuurih"
+      },
+      {
+       "id": 13915,
+       "slug": "yekindar",
+       "nick": "YEKINDAR"
+      },
+      {
+       "id": 15631,
+       "slug": "kscerato",
+       "nick": "KSCERATO"
+      },
+      {
+       "id": 24144,
+       "slug": "molodoy",
+       "nick": "molodoy"
+      }
+     ],
+     "Vitality": [
+      {
+       "id": 7322,
+       "slug": "apex",
+       "nick": "apEX"
+      },
+      {
+       "id": 11816,
+       "slug": "ropz",
+       "nick": "ropz"
+      },
+      {
+       "id": 11893,
+       "slug": "zywoo",
+       "nick": "ZywOo"
+      },
+      {
+       "id": 16693,
+       "slug": "flamez",
+       "nick": "flameZ"
+      },
+      {
+       "id": 18462,
+       "slug": "mezii",
+       "nick": "mezii"
+      }
+     ],
+     "Spirit": [
+      {
+       "id": 16920,
+       "slug": "sh1ro",
+       "nick": "sh1ro"
+      },
+      {
+       "id": 18317,
+       "slug": "magixx",
+       "nick": "magixx"
+      },
+      {
+       "id": 19808,
+       "slug": "tn1r",
+       "nick": "tN1R"
+      },
+      {
+       "id": 20423,
+       "slug": "zont1x",
+       "nick": "zont1x"
+      },
+      {
+       "id": 21167,
+       "slug": "donk",
+       "nick": "donk"
+      }
+     ],
+     "MOUZ": [
+      {
+       "id": 18072,
+       "slug": "torzsi",
+       "nick": "torzsi"
+      },
+      {
+       "id": 18221,
+       "slug": "spinx",
+       "nick": "Spinx"
+      },
+      {
+       "id": 20312,
+       "slug": "xertion",
+       "nick": "xertioN"
+      },
+      {
+       "id": 22279,
+       "slug": "pr",
+       "nick": "PR"
+      },
+      {
+       "id": 24457,
+       "slug": "xelex",
+       "nick": "xelex"
+      }
+     ],
+     "Aurora": [
+      {
+       "id": 7938,
+       "slug": "xantares",
+       "nick": "XANTARES"
+      },
+      {
+       "id": 8574,
+       "slug": "woxic",
+       "nick": "woxic"
+      },
+      {
+       "id": 18850,
+       "slug": "jimpphat",
+       "nick": "Jimpphat"
+      },
+      {
+       "id": 19677,
+       "slug": "kyxsan",
+       "nick": "kyxsan"
+      },
+      {
+       "id": 21243,
+       "slug": "wicadia",
+       "nick": "Wicadia"
+      }
+     ],
+     "Falcons": [
+      {
+       "id": 429,
+       "slug": "karrigan",
+       "nick": "karrigan"
+      },
+      {
+       "id": 3741,
+       "slug": "niko",
+       "nick": "NiKo"
+      },
+      {
+       "id": 12018,
+       "slug": "teses",
+       "nick": "TeSeS"
+      },
+      {
+       "id": 19230,
+       "slug": "m0nesy",
+       "nick": "m0NESY"
+      },
+      {
+       "id": 24177,
+       "slug": "kyousuke",
+       "nick": "kyousuke"
+      }
+     ],
+     "BETBOOM": [
+      {
+       "id": 11840,
+       "slug": "boombl4",
+       "nick": "Boombl4"
+      },
+      {
+       "id": 15662,
+       "slug": "zorte",
+       "nick": "zorte"
+      },
+      {
+       "id": 18506,
+       "slug": "s1ren",
+       "nick": "S1ren"
+      },
+      {
+       "id": 20357,
+       "slug": "d1ledez",
+       "nick": "d1Ledez"
+      },
+      {
+       "id": 21667,
+       "slug": "magnojez",
+       "nick": "Magnojez"
+      }
+     ],
+     "Legacy": [
+      {
+       "id": 12521,
+       "slug": "art",
+       "nick": "arT"
+      },
+      {
+       "id": 15698,
+       "slug": "dumau",
+       "nick": "dumau"
+      },
+      {
+       "id": 19045,
+       "slug": "latto",
+       "nick": "latto"
+      },
+      {
+       "id": 19869,
+       "slug": "try",
+       "nick": "try"
+      },
+      {
+       "id": 22182,
+       "slug": "ksloks",
+       "nick": "ksloks"
+      }
+     ]
+    },
+    "team_ids": {
+     "FURIA": {
+      "id": 8297,
+      "slug": "furia"
+     },
+     "Vitality": {
+      "id": 9565,
+      "slug": "vitality"
+     },
+     "Spirit": {
+      "id": 7020,
+      "slug": "spirit"
+     },
+     "MOUZ": {
+      "id": 4494,
+      "slug": "mouz"
+     },
+     "Aurora": {
+      "id": 11861,
+      "slug": "aurora"
+     },
+     "Falcons": {
+      "id": 11283,
+      "slug": "falcons"
+     },
+     "BETBOOM": {
+      "id": 12394,
+      "slug": "betboom"
+     },
+     "Legacy": {
+      "id": 12468,
+      "slug": "legacy"
+     }
+    },
+    "hltv": "https://www.hltv.org/events/8302/pgl-major-singapore-2026"
+   },
+   "prize_usd": 1170000,
    "major": {
     "final": true,
     "invite_date": "2 ноября 2026",
@@ -866,46 +1240,9 @@
  ],
  "matches": [
   {
-   "id": 1781461,
-   "begin_at": "2026-11-03T08:14:51Z",
-   "status": "running",
-   "bo": 3,
-   "name": "Upper Bracket Semifinal 1: MGLZ vs HERO",
-   "tournament": "IEM Beijing 2026",
-   "stage": "Group A · Upper Bracket Semifinal 1",
-   "tier": "s",
-   "serie": {
-    "id": 11136,
-    "begin": "2026-11-02T02:00:00Z",
-    "end": "2026-11-08T12:30:00Z",
-    "image": null,
-    "prize": null
-   },
-   "teams": [
-    {
-     "id": 3272,
-     "name": "TheMongolz",
-     "acronym": "MGLZ",
-     "slug": "themongolz",
-     "image": "https://cdn-api.pandascore.co/images/team/image/3272/702px_the_mongol_z_2024_03_allmode.png",
-     "location": "MN"
-    },
-    {
-     "id": 3246,
-     "name": "Heroic",
-     "acronym": "HERO",
-     "slug": "heroic",
-     "image": "https://cdn-api.pandascore.co/images/team/image/3246/680px_heroic_2023_allmode.png",
-     "location": "DK"
-    }
-   ],
-   "stream": "https://www.twitch.tv/watchfulTVb",
-   "has_detail": true
-  },
-  {
    "id": 1781462,
-   "begin_at": "2026-11-03T10:15:00Z",
-   "status": "not_started",
+   "begin_at": "2026-11-03T10:14:36Z",
+   "status": "running",
    "bo": 3,
    "name": "Upper Bracket Semifinal 2: FURIA vs NAVI",
    "tournament": "IEM Beijing 2026",
@@ -941,8 +1278,8 @@
   },
   {
    "id": 1781464,
-   "begin_at": "2026-11-03T10:25:00Z",
-   "status": "not_started",
+   "begin_at": "2026-11-03T11:04:46Z",
+   "status": "running",
    "bo": 3,
    "name": "Lower Bracket Quarterfinal 1: LGC vs B8",
    "tournament": "IEM Beijing 2026",
@@ -977,57 +1314,8 @@
    "has_detail": true
   },
   {
-   "id": 1781467,
-   "begin_at": "2026-11-04T02:00:00Z",
-   "status": "not_started",
-   "bo": 3,
-   "name": "Lower Bracket Semifinal 2: FAL vs TBD",
-   "tournament": "IEM Beijing 2026",
-   "stage": "Group A · Lower Bracket Semifinal 2",
-   "tier": "s",
-   "serie": {
-    "id": 11136,
-    "begin": "2026-11-02T02:00:00Z",
-    "end": "2026-11-08T12:30:00Z",
-    "image": null,
-    "prize": null
-   },
-   "teams": [
-    {
-     "id": 130564,
-     "name": "Team Falcons",
-     "acronym": "FAL",
-     "slug": "falcons-esports",
-     "image": "https://cdn-api.pandascore.co/images/team/image/130564/team_falconslogo_square.png",
-     "location": "SA"
-    }
-   ],
-   "stream": "https://www.twitch.tv/ESLCS",
-   "has_detail": false
-  },
-  {
-   "id": 1781466,
-   "begin_at": "2026-11-04T02:00:00Z",
-   "status": "not_started",
-   "bo": 3,
-   "name": "Lower Bracket Semifinal 1: TBD vs TBD",
-   "tournament": "IEM Beijing 2026",
-   "stage": "Group A · Lower Bracket Semifinal 1",
-   "tier": "s",
-   "serie": {
-    "id": 11136,
-    "begin": "2026-11-02T02:00:00Z",
-    "end": "2026-11-08T12:30:00Z",
-    "image": null,
-    "prize": null
-   },
-   "teams": [],
-   "stream": "https://www.twitch.tv/ESLCS",
-   "has_detail": false
-  },
-  {
    "id": 1781475,
-   "begin_at": "2026-11-04T04:30:00Z",
+   "begin_at": "2026-11-04T02:00:00Z",
    "status": "not_started",
    "bo": 3,
    "name": "Lower Bracket Semifinal 2: BB vs AUR",
@@ -1064,7 +1352,7 @@
   },
   {
    "id": 1781474,
-   "begin_at": "2026-11-04T04:30:00Z",
+   "begin_at": "2026-11-04T02:00:00Z",
    "status": "not_started",
    "bo": 3,
    "name": "Lower Bracket Semifinal 1: TL vs TYLOO",
@@ -1100,13 +1388,13 @@
    "has_detail": true
   },
   {
-   "id": 1781468,
-   "begin_at": "2026-11-04T07:00:00Z",
+   "id": 1781467,
+   "begin_at": "2026-11-04T04:30:00Z",
    "status": "not_started",
    "bo": 3,
-   "name": "Lower Bracket Final: TBD vs TBD",
+   "name": "Lower Bracket Semifinal 2: HERO vs FAL",
    "tournament": "IEM Beijing 2026",
-   "stage": "Group A · Lower Bracket Final",
+   "stage": "Group A · Lower Bracket Semifinal 2",
    "tier": "s",
    "serie": {
     "id": 11136,
@@ -1115,18 +1403,35 @@
     "image": null,
     "prize": null
    },
-   "teams": [],
+   "teams": [
+    {
+     "id": 3246,
+     "name": "Heroic",
+     "acronym": "HERO",
+     "slug": "heroic",
+     "image": "https://cdn-api.pandascore.co/images/team/image/3246/680px_heroic_2023_allmode.png",
+     "location": "DK"
+    },
+    {
+     "id": 130564,
+     "name": "Team Falcons",
+     "acronym": "FAL",
+     "slug": "falcons-esports",
+     "image": "https://cdn-api.pandascore.co/images/team/image/130564/team_falconslogo_square.png",
+     "location": "SA"
+    }
+   ],
    "stream": "https://www.twitch.tv/ESLCS",
-   "has_detail": false
+   "has_detail": true
   },
   {
-   "id": 1781463,
-   "begin_at": "2026-11-04T07:00:00Z",
+   "id": 1781466,
+   "begin_at": "2026-11-04T04:30:00Z",
    "status": "not_started",
    "bo": 3,
-   "name": "Upper Bracket Final: TBD vs TBD",
+   "name": "Lower Bracket Semifinal 1: TBD vs TBD",
    "tournament": "IEM Beijing 2026",
-   "stage": "Group A · Upper Bracket Final",
+   "stage": "Group A · Lower Bracket Semifinal 1",
    "tier": "s",
    "serie": {
     "id": 11136,
@@ -1141,7 +1446,7 @@
   },
   {
    "id": 1781476,
-   "begin_at": "2026-11-04T09:30:00Z",
+   "begin_at": "2026-11-04T07:00:00Z",
    "status": "not_started",
    "bo": 3,
    "name": "Lower Bracket Final: TBD vs TBD",
@@ -1161,7 +1466,7 @@
   },
   {
    "id": 1781471,
-   "begin_at": "2026-11-04T09:30:00Z",
+   "begin_at": "2026-11-04T07:00:00Z",
    "status": "not_started",
    "bo": 3,
    "name": "Upper Bracket Final: MOUZ vs PRV",
@@ -1195,6 +1500,55 @@
    ],
    "stream": "https://www.twitch.tv/ESLCS",
    "has_detail": true
+  },
+  {
+   "id": 1781468,
+   "begin_at": "2026-11-04T09:30:00Z",
+   "status": "not_started",
+   "bo": 3,
+   "name": "Lower Bracket Final: TBD vs TBD",
+   "tournament": "IEM Beijing 2026",
+   "stage": "Group A · Lower Bracket Final",
+   "tier": "s",
+   "serie": {
+    "id": 11136,
+    "begin": "2026-11-02T02:00:00Z",
+    "end": "2026-11-08T12:30:00Z",
+    "image": null,
+    "prize": null
+   },
+   "teams": [],
+   "stream": "https://www.twitch.tv/ESLCS",
+   "has_detail": false
+  },
+  {
+   "id": 1781463,
+   "begin_at": "2026-11-04T09:30:00Z",
+   "status": "not_started",
+   "bo": 3,
+   "name": "Upper Bracket Final: MGLZ vs TBD",
+   "tournament": "IEM Beijing 2026",
+   "stage": "Group A · Upper Bracket Final",
+   "tier": "s",
+   "serie": {
+    "id": 11136,
+    "begin": "2026-11-02T02:00:00Z",
+    "end": "2026-11-08T12:30:00Z",
+    "image": null,
+    "prize": null
+   },
+   "teams": [
+    {
+     "id": 3272,
+     "name": "TheMongolz",
+     "acronym": "MGLZ",
+     "slug": "themongolz",
+     "image": "https://cdn-api.pandascore.co/images/team/image/3272/702px_the_mongol_z_2024_03_allmode.png",
+     "location": "MN"
+    }
+   ],
+   "stream": "https://www.twitch.tv/ESLCS",
+   "has_detail": false
   },
   {
    "id": 1781482,
@@ -1319,18 +1673,16 @@
  ],
  "meta": {
   "panda_requests": 18,
-  "bo3_requests": 65,
-  "liquipedia_requests": 0,
+  "bo3_requests": 61,
+  "liquipedia_requests": 2,
   "translations": 1,
   "warnings": [
-   "GigaChat загрузка картинки: URLError(TimeoutError('timed out'))",
-   "GigaChat: URLError(TimeoutError('timed out'))",
-   "HLTV /events/8302/pgl-major-singapore-2026: <HTTPError 403: 'Forbidden'>"
+   "GigaChat: URLError(TimeoutError('timed out'))"
   ],
-  "hltv_requests": 3,
-  "dust2_requests": 26,
-  "giga_vision": 22,
-  "giga_calls": 68,
-  "giga_tokens": 55468
+  "dust2_requests": 25,
+  "giga_calls": 71,
+  "giga_tokens": 55292,
+  "giga_vision": 6,
+  "hltv_requests": 2
  }
 }
