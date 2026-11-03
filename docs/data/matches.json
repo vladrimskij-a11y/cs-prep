@@ -1,5 +1,5 @@
 {
- "updated": "2026-11-03T13:22:15Z",
+ "updated": "2026-11-03T16:06:00Z",
  "tiers": [
   "s"
  ],
@@ -12,9 +12,9 @@
    "begin": "2026-11-02T02:00:00Z",
    "end": "2026-11-08T12:30:00Z",
    "prize": "1,250,000 United States Dollar",
-   "matches": 16,
+   "matches": 14,
    "next": "2026-11-04T02:00:00Z",
-   "live": 2,
+   "live": 0,
    "hltv": {
     "prize": 1250000,
     "player_share": 300000,
@@ -1240,80 +1240,6 @@
  ],
  "matches": [
   {
-   "id": 1781462,
-   "begin_at": "2026-11-03T10:14:36Z",
-   "status": "running",
-   "bo": 3,
-   "name": "Upper Bracket Semifinal 2: FURIA vs NAVI",
-   "tournament": "IEM Beijing 2026",
-   "stage": "Group A · Upper Bracket Semifinal 2",
-   "tier": "s",
-   "serie": {
-    "id": 11136,
-    "begin": "2026-11-02T02:00:00Z",
-    "end": "2026-11-08T12:30:00Z",
-    "image": null,
-    "prize": null
-   },
-   "teams": [
-    {
-     "id": 124530,
-     "name": "FURIA",
-     "acronym": "FURIA",
-     "slug": "furia",
-     "image": "https://cdn-api.pandascore.co/images/team/image/124530/8297.png",
-     "location": "BR"
-    },
-    {
-     "id": 3216,
-     "name": "Natus Vincere",
-     "acronym": "NAVI",
-     "slug": "natus-vincere-cs-go",
-     "image": "https://cdn-api.pandascore.co/images/team/image/3216/1022px_natus_vincere_2021_lightmode.png",
-     "location": "UA"
-    }
-   ],
-   "stream": "https://www.twitch.tv/bysl4m",
-   "has_detail": true
-  },
-  {
-   "id": 1781464,
-   "begin_at": "2026-11-03T11:04:46Z",
-   "status": "running",
-   "bo": 3,
-   "name": "Lower Bracket Quarterfinal 1: LGC vs B8",
-   "tournament": "IEM Beijing 2026",
-   "stage": "Group A · Lower Bracket Quarterfinal 1",
-   "tier": "s",
-   "serie": {
-    "id": 11136,
-    "begin": "2026-11-02T02:00:00Z",
-    "end": "2026-11-08T12:30:00Z",
-    "image": null,
-    "prize": null
-   },
-   "teams": [
-    {
-     "id": 133708,
-     "name": "Legacy",
-     "acronym": "LGC",
-     "slug": "legacy-48cb0f61-07e7-4b0d-85a0-5f837e29c807",
-     "image": "https://cdn-api.pandascore.co/images/team/image/133708/593px_legacy_allmode.png",
-     "location": "BR"
-    },
-    {
-     "id": 129381,
-     "name": "B8",
-     "acronym": "B8",
-     "slug": "b8-cs-go",
-     "image": "https://cdn-api.pandascore.co/images/team/image/129381/b8_lightmode.png",
-     "location": "UA"
-    }
-   ],
-   "stream": "https://www.twitch.tv/cs2_paragon_ru2",
-   "has_detail": true
-  },
-  {
    "id": 1781475,
    "begin_at": "2026-11-04T02:00:00Z",
    "status": "not_started",
@@ -1429,7 +1355,7 @@
    "begin_at": "2026-11-04T04:30:00Z",
    "status": "not_started",
    "bo": 3,
-   "name": "Lower Bracket Semifinal 1: TBD vs TBD",
+   "name": "Lower Bracket Semifinal 1: NAVI vs B8",
    "tournament": "IEM Beijing 2026",
    "stage": "Group A · Lower Bracket Semifinal 1",
    "tier": "s",
@@ -1440,9 +1366,26 @@
     "image": null,
     "prize": null
    },
-   "teams": [],
+   "teams": [
+    {
+     "id": 3216,
+     "name": "Natus Vincere",
+     "acronym": "NAVI",
+     "slug": "natus-vincere-cs-go",
+     "image": "https://cdn-api.pandascore.co/images/team/image/3216/1022px_natus_vincere_2021_lightmode.png",
+     "location": "UA"
+    },
+    {
+     "id": 129381,
+     "name": "B8",
+     "acronym": "B8",
+     "slug": "b8-cs-go",
+     "image": "https://cdn-api.pandascore.co/images/team/image/129381/b8_lightmode.png",
+     "location": "UA"
+    }
+   ],
    "stream": "https://www.twitch.tv/ESLCS",
-   "has_detail": false
+   "has_detail": true
   },
   {
    "id": 1781476,
@@ -1526,7 +1469,7 @@
    "begin_at": "2026-11-04T09:30:00Z",
    "status": "not_started",
    "bo": 3,
-   "name": "Upper Bracket Final: MGLZ vs TBD",
+   "name": "Upper Bracket Final: MGLZ vs FURIA",
    "tournament": "IEM Beijing 2026",
    "stage": "Group A · Upper Bracket Final",
    "tier": "s",
@@ -1545,10 +1488,18 @@
      "slug": "themongolz",
      "image": "https://cdn-api.pandascore.co/images/team/image/3272/702px_the_mongol_z_2024_03_allmode.png",
      "location": "MN"
+    },
+    {
+     "id": 124530,
+     "name": "FURIA",
+     "acronym": "FURIA",
+     "slug": "furia",
+     "image": "https://cdn-api.pandascore.co/images/team/image/124530/8297.png",
+     "location": "BR"
     }
    ],
    "stream": "https://www.twitch.tv/ESLCS",
-   "has_detail": false
+   "has_detail": true
   },
   {
    "id": 1781482,
@@ -1673,16 +1624,15 @@
  ],
  "meta": {
   "panda_requests": 18,
-  "bo3_requests": 61,
-  "liquipedia_requests": 2,
-  "translations": 1,
+  "bo3_requests": 71,
+  "liquipedia_requests": 0,
+  "translations": 2,
   "warnings": [
    "GigaChat: URLError(TimeoutError('timed out'))"
   ],
-  "dust2_requests": 25,
-  "giga_calls": 71,
-  "giga_tokens": 55292,
-  "giga_vision": 6,
+  "dust2_requests": 27,
+  "giga_calls": 75,
+  "giga_tokens": 55755,
   "hltv_requests": 2
  }
 }
