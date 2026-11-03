@@ -1,5 +1,5 @@
 {
- "updated": "2026-11-03T01:22:31Z",
+ "updated": "2026-11-03T04:06:37Z",
  "tiers": [
   "s"
  ],
@@ -12,9 +12,9 @@
    "begin": "2026-11-02T02:00:00Z",
    "end": "2026-11-08T12:30:00Z",
    "prize": "1,250,000 United States Dollar",
-   "matches": 22,
-   "next": "2026-11-03T02:00:00Z",
-   "live": 0,
+   "matches": 21,
+   "next": "2026-11-03T04:30:00Z",
+   "live": 1,
    "hltv": {
     "prize": 1250000,
     "player_share": 300000,
@@ -863,8 +863,8 @@
  "matches": [
   {
    "id": 1781473,
-   "begin_at": "2026-11-03T02:00:00Z",
-   "status": "not_started",
+   "begin_at": "2026-11-03T02:04:36Z",
+   "status": "running",
    "bo": 3,
    "name": "Lower Bracket Quarterfinal 2: AUR vs G2",
    "tournament": "IEM Beijing 2026",
@@ -896,43 +896,6 @@
     }
    ],
    "stream": "https://www.twitch.tv/watchfulTV",
-   "has_detail": true
-  },
-  {
-   "id": 1781470,
-   "begin_at": "2026-11-03T02:00:00Z",
-   "status": "not_started",
-   "bo": 3,
-   "name": "Upper Bracket Semifinal 2: TL vs PRV",
-   "tournament": "IEM Beijing 2026",
-   "stage": "Group B · Upper Bracket Semifinal 2",
-   "tier": "s",
-   "serie": {
-    "id": 11136,
-    "begin": "2026-11-02T02:00:00Z",
-    "end": "2026-11-08T12:30:00Z",
-    "image": null,
-    "prize": null
-   },
-   "teams": [
-    {
-     "id": 3213,
-     "name": "Liquid",
-     "acronym": "TL",
-     "slug": "liquid-cs-go",
-     "image": "https://cdn-api.pandascore.co/images/team/image/3213/463px_team_liquid_2024_full_lightmode.png",
-     "location": "US"
-    },
-    {
-     "id": 133719,
-     "name": "PARIVISION",
-     "acronym": "PRV",
-     "slug": "parivision",
-     "image": "https://cdn-api.pandascore.co/images/team/image/133719/250px_parivision_allmode.png",
-     "location": "RU"
-    }
-   ],
-   "stream": "https://kick.com/watchfultvb",
    "has_detail": true
   },
   {
@@ -969,7 +932,7 @@
      "location": "AR"
     }
    ],
-   "stream": "https://www.twitch.tv/bysl4m",
+   "stream": "https://www.twitch.tv/watchfulTVb",
    "has_detail": true
   },
   {
@@ -1222,7 +1185,7 @@
    "begin_at": "2026-11-04T04:30:00Z",
    "status": "not_started",
    "bo": 3,
-   "name": "Lower Bracket Semifinal 1: TBD vs TBD",
+   "name": "Lower Bracket Semifinal 1: TL vs TBD",
    "tournament": "IEM Beijing 2026",
    "stage": "Group B · Lower Bracket Semifinal 1",
    "tier": "s",
@@ -1233,7 +1196,16 @@
     "image": null,
     "prize": null
    },
-   "teams": [],
+   "teams": [
+    {
+     "id": 3213,
+     "name": "Liquid",
+     "acronym": "TL",
+     "slug": "liquid-cs-go",
+     "image": "https://cdn-api.pandascore.co/images/team/image/3213/463px_team_liquid_2024_full_lightmode.png",
+     "location": "US"
+    }
+   ],
    "stream": "https://www.twitch.tv/ESLCS",
    "has_detail": false
   },
@@ -1302,7 +1274,7 @@
    "begin_at": "2026-11-04T09:30:00Z",
    "status": "not_started",
    "bo": 3,
-   "name": "Upper Bracket Final: TBD vs TBD",
+   "name": "Upper Bracket Final: PRV vs TBD",
    "tournament": "IEM Beijing 2026",
    "stage": "Group B · Upper Bracket Final",
    "tier": "s",
@@ -1313,7 +1285,16 @@
     "image": null,
     "prize": null
    },
-   "teams": [],
+   "teams": [
+    {
+     "id": 133719,
+     "name": "PARIVISION",
+     "acronym": "PRV",
+     "slug": "parivision",
+     "image": "https://cdn-api.pandascore.co/images/team/image/133719/250px_parivision_allmode.png",
+     "location": "RU"
+    }
+   ],
    "stream": "https://www.twitch.tv/ESLCS",
    "has_detail": false
   },
@@ -1439,17 +1420,17 @@
   }
  ],
  "meta": {
-  "panda_requests": 22,
-  "bo3_requests": 65,
-  "liquipedia_requests": 2,
+  "panda_requests": 20,
+  "bo3_requests": 57,
+  "liquipedia_requests": 0,
   "translations": 1,
   "warnings": [
    "GigaChat: URLError(TimeoutError('timed out'))"
   ],
-  "hltv_requests": 2,
-  "dust2_requests": 27,
-  "giga_calls": 94,
-  "giga_tokens": 64207,
-  "giga_vision": 7
+  "dust2_requests": 25,
+  "giga_calls": 79,
+  "giga_tokens": 54588,
+  "giga_vision": 14,
+  "hltv_requests": 1
  }
 }
