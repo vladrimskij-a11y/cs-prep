@@ -1,0 +1,37 @@
+name: probe
+on: { workflow_dispatch: {} }
+jobs:
+  p:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          python3 - <<'E'
+          import json, urllib.request, re
+          def get(u):
+              try:
+                  r = urllib.request.urlopen(urllib.request.Request(u, headers={"Accept": "application/json", "User-Agent": "Mozilla/5.0"}), timeout=30)
+                  return json.loads(r.read())
+              except Exception as e:
+                  print("PR: ERR", u, e); return None
+          def walk(o, p=""):
+              if isinstance(o, dict):
+                  for k, v in o.items():
+                      if re.search(r"pick|ban|veto|decid", k, re.I):
+                          print("PR: KEY", p + "." + k, "=", json.dumps(v)[:300])
+                      walk(v, p + "." + k)
+              elif isinstance(o, list):
+                  for i, v in enumerate(o[:3]): walk(v, p + f"[{i}]")
+          B = "https://api.bo3.gg/api/v1"
+          for u in [f"{B}/matches/132254", f"{B}/matches?filter[matches.id][eq]=132254",
+                    f"{B}/games?filter[games.match_id][eq]=132254"]:
+              d = get(u)
+              if d is None: continue
+              top = d.get("results", d) if isinstance(d, dict) else d
+              x = top[0] if isinstance(top, list) and top else top
+              print("PR:", u, "keys:", sorted(x.keys()) if isinstance(x, dict) else type(x))
+              walk(d)
+              if isinstance(x, dict) and x.get("slug"):
+                  d2 = get(f"{B}/matches/{x['slug']}")
+                  if d2:
+                      print("PR: slug keys", sorted(d2.keys())); walk(d2, "slug")
+          E
