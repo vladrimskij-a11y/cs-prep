@@ -322,6 +322,9 @@ html { overflow-anchor: none; }
 .match.res .tname.won { color: var(--fg); }
 .match.res .tname:not(.won) { color: var(--muted); font-weight: 500; }
 .match.res .maps { margin-top: 4px; }
+.match.res { grid-template-columns: 38px 1fr !important; }
+.match.res .rs { margin-left: auto; font-size: 17px; font-weight: 700; color: var(--muted); padding-left: 10px; }
+.match.res .rs.won.a { color: var(--ct); } .match.res .rs.won.b { color: var(--t); }
 .rscore { font-weight: 700; font-size: 18px; display: flex; flex-direction: column; align-items: center; gap: 0; line-height: 1.35; }
 .rscore .a { color: var(--ct); } .rscore .b { color: var(--t); } .rscore .x { display: none; }
 .sres { margin-top: 8px; }
@@ -1088,13 +1091,13 @@ a.ni { text-decoration: none; color: inherit; }
     var sub = [x.stage, x.round].filter(Boolean).join(" · ");
     return '<button class="match res" data-rseries="' + esc(x.id) + '">' +
       '<div class="time"><small>BO' + esc(x.bo || "?") + '</small></div>' +
-      '<div class="vs"><div class="row"><span class="dot a"></span>' + logo(A.name, A.logo) + '<span class="tname' + (x.winner === 0 ? ' won' : '') + '">' + esc(A.name || "?") + '</span></div>' +
-      '<div class="row"><span class="dot b"></span>' + logo(B.name, B.logo) + '<span class="tname' + (x.winner === 1 ? ' won' : '') + '">' + esc(B.name || "?") + '</span></div>' +
+      '<div class="vs"><div class="row"><span class="dot a"></span>' + logo(A.name, A.logo) + '<span class="tname' + (x.winner === 0 ? ' won' : '') + '">' + esc(A.name || "?") + '</span><b class="rs num a' + (x.winner === 0 ? ' won' : '') + '">' + esc(A.score) + '</b></div>' +
+      '<div class="row"><span class="dot b"></span>' + logo(B.name, B.logo) + '<span class="tname' + (x.winner === 1 ? ' won' : '') + '">' + esc(B.name || "?") + '</span><b class="rs num b' + (x.winner === 1 ? ' won' : '') + '">' + esc(B.score) + '</b></div>' +
       (sub ? '<div class="tour">' + esc(sub) + '</div>' : '') +
       ((x.maps || []).length ? '<div class="maps">' + x.maps.map(function (g) {
         return '<span class="mp ' + (g.winner === 0 ? "a" : g.winner === 1 ? "b" : "n") + '">' + esc(g.map || "?") + (g.score ? ' <span class="num">' + esc(g.score[0] + ":" + g.score[1]) + '</span>' : '') + '</span>';
       }).join("") + '</div>' : '') + '</div>' +
-      '<div class="rscore num"><span class="a">' + esc(A.score) + '</span><span class="x">:</span><span class="b">' + esc(B.score) + '</span></div></button>';
+      '</button>';
   }
 
   function cap(x) { return x ? x.charAt(0).toUpperCase() + x.slice(1) : x; }
