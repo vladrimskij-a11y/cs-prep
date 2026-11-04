@@ -881,7 +881,7 @@ def build_form(bid: int, hist: list[dict], n: int = 10) -> list[dict]:
         res.append({
             "date": m.get("start_date"),
             "opponent": opp.get("acronym") or opp.get("name"),
-            "opponent_name": opp.get("name"),
+            "opponent_name": opp.get("name"), "logo": opp.get("image_url"),
             "score": my, "opp_score": their,
             "won": m.get("winner_team_id") == bid,
             "tournament": tour_name(m),
@@ -958,7 +958,7 @@ def build_maps(bids: list[int | None], hists: list[list[dict]], max_matches: int
                 row["teams"][idx]["played"] += 1
                 row["teams"][idx]["won"] += int(r["won"])
                 recent.setdefault(name, []).append({
-                    "team": idx, "date": m.get("start_date"), "vs": opp.get("acronym") or opp.get("name"),
+                    "team": idx, "date": m.get("start_date"), "vs": opp.get("acronym") or opp.get("name"), "logo": opp.get("image_url"),
                     "won": r["won"], "score": r["score"], "tournament": tour_name(m), "sid": m.get("id")})
     for name in recent:
         recent[name].sort(key=lambda r: r["date"] or "", reverse=True)
@@ -1191,8 +1191,8 @@ def series_detail(m: dict) -> dict | None:
     return {
         "id": m["id"], "date": m.get("start_date"), "bo": m.get("bo_type"),
         "tournament": tour_name(m) or None,
-        "teams": [{"name": tm1.get("name"), "acronym": tm1.get("acronym"), "score": m.get("team1_score")},
-                  {"name": tm2.get("name"), "acronym": tm2.get("acronym"), "score": m.get("team2_score")}],
+        "teams": [{"name": tm1.get("name"), "acronym": tm1.get("acronym"), "score": m.get("team1_score"), "logo": tm1.get("image_url")},
+                  {"name": tm2.get("name"), "acronym": tm2.get("acronym"), "score": m.get("team2_score"), "logo": tm2.get("image_url")}],
         "winner": 0 if m.get("winner_team_id") == t1 else 1 if m.get("winner_team_id") == t2 else None,
         "maps": maps,
         "players": [series_players(every, t1, names), series_players(every, t2, names)] if every else None,
@@ -1502,6 +1502,10 @@ def team_achievements(hltv_team: dict) -> list[dict]:
         h = hltv_get(f"/team/{hltv_team['id']}/{hltv_team['slug']}")
         if not h:
             return None
+        for pid, slug, nick in re.findall(r'href="/player/(\d+)/([^"]+)"[^>]*>.{0,400}?<div class="text-ellipsis">([^<]+)</div>', h[:400000], re.S)[:12]:
+            hltv_player_ids.setdefault(norm(strip_html(nick)), {"id": int(pid), "slug": slug})
+        for pid, slug in re.findall(r'href="/player/(\d+)/([^"/]+)"', h[:400000])[:20]:
+            hltv_player_ids.setdefault(norm(slug), {"id": int(pid), "slug": slug})
         i = h.find('id="lanAchievement"')
         if i < 0:
             return []
@@ -1521,7 +1525,7 @@ def prize_places(hltv_team: dict | None, hist: list[dict], days: int = 92) -> li
     ach = team_achievements(hltv_team)
     if not ach:
         return []
-    since = iso(NOW - timedelta(days=days))
+    since = iso(datetime(NOW.year, 1, 1, tzinfo=timezone.utc))  # с 1 января текущего года
     tours: dict = {}
     for m in hist:
         if (m.get("start_date") or "") < since:
@@ -3474,7 +3478,7 @@ def hltv_player_info(nick: str) -> dict | None:
     c = hltv_cache.get(key)
     if c and (parse_iso(c.get("t")) or NOW) > NOW - timedelta(days=7):
         return c["data"]
-    if _mvp_new[0] >= 12 or _hltv_blocked[0] or STATS:
+    if _mvp_new[0] >= 30 or _hltv_blocked[0] or STATS:
         return c["data"] if c else None
     _mvp_new[0] += 1
     h = hltv_get(f"/player/{pl['id']}/{pl['slug']}")
@@ -3769,7 +3773,7 @@ def build_team_page(r: dict) -> dict | None:
     if not bid:
         return None
     add_alias(bid, r["name"])
-    hist = bo3_history(bid, pages=1)
+    hist = bo3_history(bid, pages=2)
     form = build_form(bid, hist)
     series = {}
     for m0 in hist[:10]:
@@ -3793,6 +3797,10 @@ def build_team_page(r: dict) -> dict | None:
             roster, coach = merge_roster([], lp_roster({"id": key, "name": r["name"]}))
             fix_names(roster)
             for p in roster:
+                info = hltv_player_info(p.get("nick") or "")
+                if info:
+                    p.update({k: v for k, v in info.items() if v})
+            for p in roster:
                 full = " ".join(x for x in (p.get("first_name"), p.get("last_name")) if x)
                 pc = pron_cache.get(norm(p.get("nick")) + "|" + norm(full)) or {}
                 if pc.get("name_ru") and not p.get("name_ru"):
@@ -3808,6 +3816,7 @@ def build_team_page(r: dict) -> dict | None:
             warn(f"Призовые {r['name']}: {e!r}")
     return {"updated": iso(NOW), "name": r["name"], "vrs": {k: r.get(k) for k in ("rank", "points", "region", "reg_rank", "hltv_rank")},
             "players": players or r.get("roster") or [], "roster": roster, "coach": coach, "logo": r.get("logo"),
+            "stats": build_player_stats({"players": roster}, bid, hist) if roster else [],
             "form": form, "series": series,
             "maps": {"window_days": maps.get("window_days"), "table": maps.get("table") or []}, "prizes": ach}
 
@@ -3983,7 +3992,7 @@ def main() -> int:
     keep_res = set()
     for tr in tour_list:
         b, e = parse_iso(tr.get("begin")), parse_iso(tr.get("end"))
-        if not b or b > NOW + timedelta(days=3):
+        if not b or b > NOW + timedelta(days=30):
             continue
         fid = re.sub(r"[^\w-]", "-", str(tr["id"]))
         path = OUT / "results" / f"{fid}.json"

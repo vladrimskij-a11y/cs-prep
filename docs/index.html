@@ -436,6 +436,16 @@ html { overflow-anchor: none; }
 .bm .bl { display: block; font-style: normal; font-size: 10.5px; color: var(--muted); padding: 4px 8px 0; }
 .snav { left: 50%; right: auto; transform: translateX(-50%); bottom: calc(34px + env(safe-area-inset-bottom, 0px)); flex-direction: row; gap: 16px; }
 .snav button { width: 54px; height: 54px; font-size: 24px; }
+.match .vs .row .lg { margin-right: 0; }
+.lg.big { width: 34px; height: 34px; margin: 0 0 4px; }
+.face .tm.b .lg.big { align-self: flex-end; }
+.swt { display: grid; grid-template-columns: 1fr 1fr; gap: 0; margin-bottom: 8px; }
+.swr { display: flex; align-items: center; gap: 4px; padding: 7px 12px; border-top: 1px solid var(--line); font-size: 13px; min-width: 0; }
+.swr:nth-child(-n+2) { border-top: 0; }
+.swn { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.swr.q b { color: var(--win); } .swr.out { opacity: .55; } .swr.out b { color: var(--loss); }
+.brk-row.nolines .brk-ms { justify-content: flex-start; }
+
 
 
 /* разделы: неподвижная шапка, вкладки-страницы */
@@ -680,14 +690,19 @@ a.ni { text-decoration: none; color: inherit; }
   function tourOf(m) { return String((m.serie && m.serie.id) || m.tournament); }
   function findTour(id) { return (state.list.tournaments || []).find(function (t) { return String(t.id) === String(id); }); }
 
+  // логотипы команд: что знаем из расписания, рейтинга и итогов
+  var LOGOS = {};
+  function nkey(n) { return String(n || "").toLowerCase().replace(/^(the|team)\s+|\s+(team|esports|gaming)$/g, "").replace(/[^a-z0-9а-я]/g, ""); }
+  function rememberLogo(name, url) { if (name && url) LOGOS[nkey(name)] = LOGOS[nkey(name)] || url; }
+  function logo(name, url) { var u = url || LOGOS[nkey(name)]; return u ? '<img class="lg" src="' + esc(u) + '" alt="" loading="lazy" onerror="this.remove()">' : ''; }
   function matchRow(m, showTour) {
     var a = m.teams[0], b = m.teams[1], on = mine.has(String(m.id));
     var live = m.status === "running";
     var sub = showTour ? (m.stage ? m.tournament + " · " + m.stage : m.tournament) : (m.stage || m.tournament);
     return '<div class="match' + (m.has_detail ? "" : " nodetail") + '" data-open="' + m.id + '" role="button" tabindex="0" aria-label="' + esc(abbr(a) + " против " + abbr(b)) + '">' +
       '<div class="time">' + (live ? '<span class="live">LIVE</span>' : esc(hm(m.begin_at))) + '<small>BO' + esc(m.bo || "?") + '</small></div>' +
-      '<div class="vs"><div class="row"><span class="dot a"></span><span class="tname">' + esc(a ? a.name : "TBD") + '</span></div>' +
-      '<div class="row"><span class="dot b"></span><span class="tname">' + esc(b ? b.name : "TBD") + '</span></div>' +
+      '<div class="vs"><div class="row"><span class="dot a"></span>' + logo(a && a.name, a && a.image) + '<span class="tname">' + esc(a ? a.name : "TBD") + '</span></div>' +
+      '<div class="row"><span class="dot b"></span>' + logo(b && b.name, b && b.image) + '<span class="tname">' + esc(b ? b.name : "TBD") + '</span></div>' +
       '<div class="tour">' + esc(sub) + '</div></div>' +
       '<div class="side">' + (showTour ? '<span class="pill ' + esc(m.tier) + '">' + esc((m.tier || "?").toUpperCase()) + '</span>' : '') + '</div></div>';
   }
@@ -791,7 +806,7 @@ a.ni { text-decoration: none; color: inherit; }
       : ms.length ? (t.next ? 'ближайший <b>' + esc(dayKey(t.next) === today ? "сегодня " + hm(t.next) : dm(t.next) + " " + hm(t.next)) + '</b>' : '')
       : '<span class="muted">расписание пока не опубликовано</span>';
     return '<button class="tour-card' + (todayN ? " today" : "") + (t.tier !== "s" ? " t2" : "") + '" data-tour="' + esc(t.id) + '">' +
-      '<span class="tn">' + esc(t.name) + '</span><span class="pill go ' + esc(t.tier) + '">' + (t.tier === "s" ? "ТИР-1" : "ТИР-2") + '</span>' +
+      '<span class="tn">' + esc(t.name) + '</span><span class="pill go ' + esc(t.tier) + '">' + esc((t.tier || "?").toUpperCase()) + '</span>' +
       '<span class="tm2">' + [dates && '<b>' + esc(dates) + '</b>', live && !t.live ? '<span class="live">идёт сейчас</span>' : '',
         (t.prize_usd || t.prize) && esc(t.prize_usd ? usd(t.prize_usd) : prize(t.prize)),
         todayN ? '<b>сегодня ' + todayN + '</b>' : (!t.finished && ms.length ? ms.length + ' матч.' : ''), next].filter(Boolean).join(' · ') + '</span>' +
@@ -961,7 +976,7 @@ a.ni { text-decoration: none; color: inherit; }
   var REG_ABBR = { "Европа": "EU", "Америка": "AM", "Азия": "AS" };
   function getRanking() {
     if (state.ranking) return Promise.resolve(state.ranking);
-    return fetch("data/ranking.json" + bust()).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); }).then(function (j) { state.ranking = j; return j; });
+    return fetch("data/ranking.json" + bust()).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); }).then(function (j) { state.ranking = j; ((j.vrs || {}).teams || []).forEach(function (t) { rememberLogo(t.name, t.logo); }); return j; });
   }
   function ratingPane(R, sub) {
     if (!R) return '<div class="empty">' + (state.rankingErr ? '<strong>Рейтинг ещё не собран</strong>Появится после ближайшего полного обновления.' : 'Загружаю рейтинг…') + '</div>';
@@ -999,14 +1014,14 @@ a.ni { text-decoration: none; color: inherit; }
     var v = T.vrs || {};
     var html = '<section class="hero"><div class="tm-h">' + (T.logo ? '<img class="tlogo" src="' + esc(T.logo) + '" alt="" onerror="this.remove()">' : '') + '<span class="tvrs">' + (v.rank ? 'Мир #' + esc(v.rank) + (v.region ? ' · ' + esc(REG_ABBR[v.region] || v.region) + ' #' + esc(v.reg_rank) : '') + ' · ' + esc(v.points) + ' очк.' : '') +
       '</span>' + trophyCount(T.prizes) + '</div>' + medalsHtml(T.prizes) + '</section>';
-    if ((T.roster || []).length) html += '<div class="sec"><div class="box roster a"><div class="hd"><span class="tn">Состав</span></div>' + rosterRows(T.roster, T.coach, null, false) + '</div></div>';
+    if ((T.roster || []).length) html += '<div class="sec"><div class="box roster a"><div class="hd"><span class="tn">Состав</span></div>' + rosterRows(T.roster, T.coach, { stats: T.stats || [] }, false) + '</div></div>';
     else if ((T.players || []).length) html += '<div class="sec"><div class="box"><div class="tm-pl" style="padding:12px">' + T.players.map(function (p) { return '<span>' + esc(typeof p === "string" ? p : p.nick) + '</span>'; }).join("") + '</div></div></div>';
     var f = T.form || [], w = f.filter(function (x) { return x.won; }).length, S = T.series || {};
     html += '<div class="sec"><h3>Форма <span>последние 10 серий · нажми на матч</span></h3><div class="box form"><div class="tmh a">' + esc(T.name) + '<span>' + w + '–' + (f.length - w) + '</span></div>' +
       '<div class="squares">' + f.map(function (x) { return '<span class="sq ' + (x.won ? "w" : "l") + '">' + (x.won ? "W" : "L") + '</span>'; }).join("") + '</div>' +
       groupByTour(f, function (x) {
         var has = x.sid != null && S[String(x.sid)];
-        var inner = '<span>vs ' + esc(x.opponent_name || x.opponent) + ' <span class="d">' + esc(dm(x.date)) + '</span></span><span class="wl ' + (x.won ? "w" : "l") + ' num">' + esc(x.score) + ':' + esc(x.opp_score) + (has ? ' <i class="chev2">›</i>' : '') + '</span>';
+        var inner = '<span>vs ' + logo(x.opponent_name, x.logo) + esc(x.opponent_name || x.opponent) + ' <span class="d">' + esc(dm(x.date)) + '</span></span><span class="wl ' + (x.won ? "w" : "l") + ' num">' + esc(x.score) + ':' + esc(x.opp_score) + (has ? ' <i class="chev2">›</i>' : '') + '</span>';
         return has ? '<button class="gr gbtn" data-tseries="' + esc(x.sid) + '">' + inner + '</button>' : '<div class="gr">' + inner + '</div>';
       }) + '</div></div>';
     var M = T.maps || {};
@@ -1027,7 +1042,7 @@ a.ni { text-decoration: none; color: inherit; }
     if (state.results[id]) return Promise.resolve(state.results[id]);
     if (DEMO) return Promise.resolve((DEMO.results || {})[id] || null);
     return fetch("data/results/" + String(id).replace(/[^\w-]/g, "-") + ".json" + bust()).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
-      .then(function (j) { state.results[id] = j; return j; });
+      .then(function (j) { state.results[id] = j; (j.matches || []).forEach(function (x) { (x.teams || []).forEach(function (t) { rememberLogo(t.name, t.logo); }); }); (j.stages || []).forEach(function (st) { st.rounds.forEach(function (rd) { rd.matches.forEach(function (x) { rememberLogo(x.a, x.la); rememberLogo(x.b, x.lb); }); }); }); return j; });
   }
 
   function resultRow(x) {
@@ -1035,8 +1050,8 @@ a.ni { text-decoration: none; color: inherit; }
     var sub = [x.stage, x.round].filter(Boolean).join(" · ");
     return '<button class="match res" data-rseries="' + esc(x.id) + '">' +
       '<div class="time"><small>BO' + esc(x.bo || "?") + '</small></div>' +
-      '<div class="vs"><div class="row"><span class="dot a"></span><span class="tname' + (x.winner === 0 ? ' won' : '') + '">' + esc(A.name || "?") + '</span></div>' +
-      '<div class="row"><span class="dot b"></span><span class="tname' + (x.winner === 1 ? ' won' : '') + '">' + esc(B.name || "?") + '</span></div>' +
+      '<div class="vs"><div class="row"><span class="dot a"></span>' + logo(A.name, A.logo) + '<span class="tname' + (x.winner === 0 ? ' won' : '') + '">' + esc(A.name || "?") + '</span></div>' +
+      '<div class="row"><span class="dot b"></span>' + logo(B.name, B.logo) + '<span class="tname' + (x.winner === 1 ? ' won' : '') + '">' + esc(B.name || "?") + '</span></div>' +
       (sub ? '<div class="tour">' + esc(sub) + '</div>' : '') +
       ((x.maps || []).length ? '<div class="maps">' + x.maps.map(function (g) {
         return '<span class="mp ' + (g.winner === 0 ? "a" : g.winner === 1 ? "b" : "n") + '">' + esc(g.map || "?") + (g.score ? ' <span class="num">' + esc(g.score[0] + ":" + g.score[1]) + '</span>' : '') + '</span>';
@@ -1054,19 +1069,29 @@ a.ni { text-decoration: none; color: inherit; }
       return '<span class="bt' + cls + '">' + (logo ? '<img class="lg" src="' + esc(logo) + '" alt="" loading="lazy" onerror="this.remove()">' : '') +
         '<span>' + esc(name || "TBD") + '</span><b class="num">' + esc(fin || sc ? (sc == null ? "" : sc) : "") + '</b></span>';
     }
+    function openKey(x) {  // будущий/идущий матч → карточка матча из расписания
+      var A = nkey(x.a), B = nkey(x.b);
+      if (!A || !B) return null;
+      var m = (state.list.matches || []).find(function (mm) { var t = mm.teams || []; return t.length === 2 && ((nkey(t[0].name) === A && nkey(t[1].name) === B) || (nkey(t[0].name) === B && nkey(t[1].name) === A)); });
+      return m ? m.id : null;
+    }
     function box(x, label) {
-      var fin = x.st === "finished", btn = fin && have[String(x.id)];
+      var fin = x.st === "finished", btn = fin && have[String(x.id)], op = !btn && openKey(x);
       var inner = (label ? '<em class="bl">' + esc(label) + '</em>' : '') +
         side(x.a, x.la, x.sa, x.w === 0 ? ' w' : x.w === 1 ? ' l' : '', fin) + side(x.b, x.lb, x.sb, x.w === 1 ? ' w' : x.w === 0 ? ' l' : '', fin) +
         (!fin && x.date ? '<small>' + esc(dm(x.date) + " " + hm(x.date)) + (x.st === "current" ? ' · LIVE' : '') + '</small>' : '');
-      return btn ? '<button class="bm fin" data-rseries="' + esc(x.id) + '">' + inner + '</button>' : '<div class="bm' + (fin ? ' fin' : '') + '">' + inner + '</div>';
+      if (btn) return '<button class="bm fin" data-rseries="' + esc(x.id) + '">' + inner + '</button>';
+      if (op) return '<button class="bm" data-open="' + esc(op) + '">' + inner + '</button>';
+      return '<div class="bm' + (fin ? ' fin' : '') + '">' + inner + '</div>';
     }
     function rname(n) { return cap(String(n || "").replace(/^(Верхняя|Нижняя) сетка\s*/i, "")); }
     var html = "";
     (R.stages || []).forEach(function (st, si) {
+      if (isSwiss(st)) { html += swissHtml(st, si, box); return; }
       var upper = [], lower = [], other = [], third = [];
+      var po = /плей|playoff/i.test(st.title || "") || si === (R.stages || []).length - 1;
       st.rounds.forEach(function (rd) {
-        if (/(3|третье|third)/i.test(rd.name || "") && !rd.bracket) third.push(rd);
+        if (po && !rd.bracket && /(3|третье|third|решающ|decider)/i.test(rd.name || "")) third.push(rd);
         else (rd.bracket === "lower" ? lower : rd.bracket === "upper" ? upper : other).push(rd);
       });
       var rows = [];
@@ -1084,9 +1109,35 @@ a.ni { text-decoration: none; color: inherit; }
     });
     return html || '<div class="empty"><strong>Сетки пока нет</strong></div>';
   }
+  function isSwiss(st) {
+    if (/swiss|швейцар/i.test((st.format || "") + " " + (st.title || ""))) return true;
+    var big = st.rounds.filter(function (rd) { return !rd.bracket; });
+    return big.length >= 3 && big.length === st.rounds.length && big[0].matches.length >= 6;
+  }
+  // швейцарка: таблица побед-поражений и раунды столбцами (без ниточек)
+  function swissHtml(st, si, box) {
+    var rec = {};
+    st.rounds.forEach(function (rd) { rd.matches.forEach(function (x) {
+      [[x.a, x.la, 0], [x.b, x.lb, 1]].forEach(function (t) {
+        if (!t[0]) return;
+        var r = rec[t[0]] = rec[t[0]] || { n: t[0], l: t[1], w: 0, ls: 0 };
+        if (x.st === "finished" && x.w != null) { if (x.w === t[2]) r.w++; else r.ls++; }
+      });
+    }); });
+    var rows = Object.keys(rec).map(function (k) { return rec[k]; }).sort(function (a, b) { return (b.w - b.ls) - (a.w - a.ls) || b.w - a.w; });
+    var html = '<div class="sec stage" style="--stc:' + STAGE_COL[si % STAGE_COL.length] + '"><h3>' + esc(st.title) + (st.status === "current" ? ' <span>идёт · швейцарская система</span>' : ' <span>швейцарская система</span>') + '</h3>';
+    html += '<div class="box swt">' + rows.map(function (r) {
+      var q = r.w >= 3 ? " q" : r.ls >= 3 ? " out" : "";
+      return '<div class="swr' + q + '">' + logo(r.n, r.l) + '<span class="swn">' + esc(r.n) + '</span><b class="num">' + r.w + '–' + r.ls + '</b></div>';
+    }).join("") + '</div>';
+    html += '<div class="box brk"><div class="bracket"><div class="brk-row nolines">' + st.rounds.map(function (rd) {
+      return '<div class="brk-col"><div class="brk-rn">' + esc(cap(rd.name || "")) + '</div><div class="brk-ms">' + rd.matches.map(function (x) { return box(x); }).join("") + '</div></div>';
+    }).join("") + '</div></div></div></div>';
+    return html;
+  }
   // ниточки между матчами соседних раундов
   function drawBrackets() {
-    document.querySelectorAll(".brk-row").forEach(function (row) {
+    document.querySelectorAll(".brk-row:not(.nolines)").forEach(function (row) {
       var old = row.querySelector("svg.brk-lines"); if (old) old.remove();
       var cols = [].slice.call(row.children).filter(function (c) { return c.classList.contains("brk-col"); });
       var R0 = row.getBoundingClientRect(), d = "";
@@ -1115,7 +1166,7 @@ a.ni { text-decoration: none; color: inherit; }
     if (t && t.bracket) tabs.push({ key: "overview", label: "Обзор" });
     if (ms.length || !(t && t.results)) tabs.push({ key: "matches", label: "Матчи" });
     if (t && t.results) tabs.push({ key: "done", label: "Завершённые" });
-    var sub = t ? '<span class="pill ' + esc(t.tier) + '">' + (t.tier === "s" ? "ТИР-1" : "ТИР-2") + '</span>' + (t.begin ? esc(dm(t.begin) + (t.end ? " – " + dm(t.end) : "")) : "") + (t.prize_usd ? " · " + esc(usd(t.prize_usd)) : t.prize ? " · " + esc(prize(t.prize)) : "") : "";
+    var sub = t ? '<span class="pill ' + esc(t.tier) + '">' + esc((t.tier || "?").toUpperCase()) + '</span>' + (t.begin ? esc(dm(t.begin) + (t.end ? " – " + dm(t.end) : "")) : "") + (t.prize_usd ? " · " + esc(usd(t.prize_usd)) : t.prize ? " · " + esc(prize(t.prize)) : "") : "";
     setTimeout(drawBrackets, 0);
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { if (q(".brk-row")) drawBrackets(); });
     renderShell({ id: "tour:" + id, back: "Турниры", title: esc(t ? t.name : "Турнир") + '<span class="upd shsub">' + sub + '</span>', tabs: tabs,
@@ -1158,7 +1209,7 @@ a.ni { text-decoration: none; color: inherit; }
       html += '<div class="box mjs"><div class="mjs-h"><b>' + esc(st.stage) + '</b><span>' + esc(STAGE_RU[st.stage] || "") + ' · ' + st.teams.length + ' ' + plural(st.teams.length, "команда", "команды", "команд") + '</span></div><div class="mjs-list">';
       st.teams.forEach(function (x) {
         var rc = x.roster_change;
-        html += '<div class="mjs-t"><span class="mjs-n">' + esc(x.name) + '</span><span class="mjs-r">' + esc(x.region || "") + '</span>' +
+        html += '<div class="mjs-t"><span class="mjs-n">' + logo(x.name) + esc(x.name) + '</span><span class="mjs-r">' + esc(x.region || "") + '</span>' +
           (x.chance ? '<span class="ch ' + (x.chance === "уверенно" ? "hi" : x.chance === "вероятно" ? "mid" : "lo") + '">' + esc(x.chance) + '</span>' : '') +
           (rc ? '<span class="ch lo">состав изменился</span>' : '') + '</div>';
       });
@@ -1353,7 +1404,7 @@ a.ni { text-decoration: none; color: inherit; }
       var S = m.series || {};
       html += groupByTour(list, function (g) {
         var has = g.sid != null && S[String(g.sid)];
-        var inner = '<span>vs ' + esc(g.vs) + ' <span class="d">' + esc(dm(g.date)) + '</span></span><span class="wl ' + (g.won ? "w" : "l") + '">' + (g.score ? esc(g.score) : (g.won ? "W" : "L")) + (has ? ' <i class="chev2">›</i>' : '') + '</span>';
+        var inner = '<span>vs ' + logo(g.vs, g.logo) + esc(g.vs) + ' <span class="d">' + esc(dm(g.date)) + '</span></span><span class="wl ' + (g.won ? "w" : "l") + '">' + (g.score ? esc(g.score) : (g.won ? "W" : "L")) + (has ? ' <i class="chev2">›</i>' : '') + '</span>';
         return has ? '<button class="gr gbtn" data-series="' + esc(g.sid) + '">' + inner + '</button>' : '<div class="gr">' + inner + '</div>';
       });
       html += '</div>';
@@ -1403,7 +1454,7 @@ a.ni { text-decoration: none; color: inherit; }
       html += '<div class="squares">' + f.map(function (x) { return '<span class="sq ' + (x.won ? "w" : "l") + '" title="' + esc("vs " + x.opponent_name) + '">' + (x.won ? "W" : "L") + '</span>'; }).join("") + '</div>';
       html += groupByTour(f, function (x) {
         var has = x.sid != null && S[String(x.sid)];
-        var inner = '<span>vs ' + esc(x.opponent_name || x.opponent) + ' <span class="d">' + esc(dm(x.date)) + '</span></span><span class="wl ' + (x.won ? "w" : "l") + ' num">' + esc(x.score) + ':' + esc(x.opp_score) + (has ? ' <i class="chev2">›</i>' : '') + '</span>';
+        var inner = '<span>vs ' + logo(x.opponent_name, x.logo) + esc(x.opponent_name || x.opponent) + ' <span class="d">' + esc(dm(x.date)) + '</span></span><span class="wl ' + (x.won ? "w" : "l") + ' num">' + esc(x.score) + ':' + esc(x.opp_score) + (has ? ' <i class="chev2">›</i>' : '') + '</span>';
         return has ? '<button class="gr gbtn" data-series="' + esc(x.sid) + '">' + inner + '</button>' : '<div class="gr">' + inner + '</div>';
       });
       html += '</div>';
@@ -1516,7 +1567,7 @@ a.ni { text-decoration: none; color: inherit; }
       return '<div class="mcol"><span class="mic">' + c[0] + ' <b>' + ev.length + '</b></span>' + (ev.length ? ev.map(function (x) { return '<span class="mev">' + esc(x.event) + '</span>'; }).join("") : '<span class="mev none">—</span>') + '</div>';
     }).join("") + '</div>';
   }
-  function trophyCount(pr) { var n = (pr || []).filter(function (x) { return MEDAL[x.place]; }).length; return n ? '<span class="tcount" title="призовые места за 3 месяца">🏆 ' + n + '</span>' : ''; }
+  function trophyCount(pr) { var n = (pr || []).filter(function (x) { return MEDAL[x.place]; }).length; return n ? '<span class="tcount" title="призовые места с 1 января">🏆 ' + n + '</span>' : ''; }
   function rosterRows(players, coach, statsTeam, clickable) {
     var html = "";
     function prank(p) {
@@ -1609,9 +1660,9 @@ a.ni { text-decoration: none; color: inherit; }
     var dec = (S.veto || []).find(function (v) { return v.act === "decider"; });
     var html = '<div class="pin"><div class="ovtop">' + (TG ? '' : '<button class="back" data-close>' + ARROW + esc(backLabel) + '</button>') + '</div>' +
       '<div class="rd-meta">' + esc([S.tournament, S.stage, S.round].filter(Boolean).join(" · ")) + (S.date ? ' · ' + esc(dmy(S.date)) : '') + '</div>' +
-      '<section class="hero sres"><div class="face"><div class="tm a"><span class="acr' + ((A.acronym || A.name || "").length > 6 ? ' sm' : '') + '">' + esc(A.acronym || A.name) + '</span><span class="full">' + esc(A.name) + '</span></div>' +
+      '<section class="hero sres"><div class="face"><div class="tm a">' + logo(A.name, A.logo).replace('class="lg"', 'class="lg big"') + '<span class="acr' + ((A.acronym || A.name || "").length > 6 ? ' sm' : '') + '">' + esc(A.acronym || A.name) + '</span><span class="full">' + esc(A.name) + '</span></div>' +
       '<div class="mid"><b class="num">' + esc(A.score) + ' : ' + esc(B.score) + '</b>BO' + esc(S.bo || "?") + '</div>' +
-      '<div class="tm b"><span class="acr' + ((B.acronym || B.name || "").length > 6 ? ' sm' : '') + '">' + esc(B.acronym || B.name) + '</span><span class="full">' + esc(B.name) + '</span></div></div>' +
+      '<div class="tm b">' + logo(B.name, B.logo).replace('class="lg"', 'class="lg big"') + '<span class="acr' + ((B.acronym || B.name || "").length > 6 ? ' sm' : '') + '">' + esc(B.acronym || B.name) + '</span><span class="full">' + esc(B.name) + '</span></div></div>' +
       (maps.length ? '<div class="smaps">' + maps.map(function (g) {
         return '<div class="smap"><span>' + esc(g.map || "?") + '</span><b class="num"><span class="' + (g.winner === 0 ? "a" : "") + '">' + esc(g.score ? g.score[0] : "–") + '</span>:<span class="' + (g.winner === 1 ? "b" : "") + '">' + esc(g.score ? g.score[1] : "–") + '</span></b></div>';
       }).join("") + (dec && maps.length < (S.bo || 3) ? '<div class="smap left"><span>' + esc(dec.map) + '</span><b>не сыграна</b></div>' : '') + '</div>' : '') + '</section>';
@@ -2108,7 +2159,7 @@ a.ni { text-decoration: none; color: inherit; }
     ptrShow(56, "Обновляю…", true);
     try { TG && TG.HapticFeedback && TG.HapticFeedback.impactOccurred("light"); } catch (err) {}
     state.details = {}; state.feed = null; state.results = {}; state.ranking = null; state.teams = {};
-    getList().then(function (L) { state.list = L; route(); }).catch(function () {})
+    getList().then(function (L) { state.list = L; (L.matches || []).forEach(function (m) { (m.teams || []).forEach(function (t) { rememberLogo(t.name, t.image); }); }); route(); }).catch(function () {})
       .then(function () { setTimeout(function () { state.refreshing = false; ptrHide(); }, 400); });
   }
   window.addEventListener("hashchange", route);
