@@ -429,6 +429,15 @@ html { overflow-anchor: none; }
 .pmaj { grid-column: 1 / -1; font-size: 12px; color: var(--muted); }
 .pmaj b { color: var(--fg); }
 .tlogo { width: 44px; height: 44px; object-fit: contain; }
+.hero.thero { display: flex; flex-direction: row; align-items: center; gap: 12px; padding: 14px; }
+.th-logo { flex: none; width: 64px; height: 64px; border-radius: 14px; background: var(--sunk); display: grid; place-items: center; }
+.th-logo .tlogo { width: 48px; height: 48px; }
+.th-tiles { flex: 1; min-width: 0; display: grid; grid-template-columns: repeat(var(--n), minmax(0, 1fr)); gap: 6px; }
+.th-t { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 8px 4px; border-radius: 10px; background: var(--sunk); text-align: center; min-width: 0; }
+.th-t b { font-family: var(--display); font-size: 18px; font-weight: 800; line-height: 1.1; white-space: nowrap; }
+.th-t span { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.th-t.cupt { cursor: pointer; background: color-mix(in srgb, #e3b341 18%, var(--sunk)); }
+@media (max-width: 360px) { .th-logo { width: 52px; height: 52px; } .th-t b { font-size: 16px; } }
 .lg { width: 16px; height: 16px; object-fit: contain; flex: none; display: inline-block; vertical-align: -3px; margin-right: 6px; }
 .lg.ph { margin-right: 6px; }
 .rk-t .lg { width: 18px; height: 18px; }
@@ -443,6 +452,9 @@ html { overflow-anchor: none; }
 .brk-col { position: relative; display: flex; flex-direction: column; width: 160px; color: var(--fg); }
 .brk-ms { flex: 1; display: flex; flex-direction: column; justify-content: space-around; gap: 10px; }
 .brk-3 { margin-top: 14px; }
+.gfw { position: relative; }
+.gfw .brk-3 { position: absolute; left: 0; right: 0; top: 100%; margin-top: 14px; }
+.brk-row.has3 { padding-bottom: 110px; }
 .bm { position: relative; z-index: 1; }
 .bm .bt { align-items: center; justify-content: flex-start; }
 .bm .bt > span { flex: 1; min-width: 0; }
@@ -511,7 +523,7 @@ html { overflow-anchor: none; }
 .mini small { letter-spacing: 0; }
 .ovl.sov { overflow-y: auto; }  /* страница серии листается целиком, шапка уезжает вместе с ней */
 .ov-head { flex: none; }
-.ov-head > .pin { padding-bottom: 6px; }
+.ov-head > .pin { max-width: 640px; margin: 0 auto; padding: env(safe-area-inset-top, 0px) max(16px, env(safe-area-inset-right, 0px)) 6px max(16px, env(safe-area-inset-left, 0px)); }
 .ov-vp { overflow: hidden; }
 .ov-track { display: flex; align-items: flex-start; will-change: transform; }
 .opane { flex: 0 0 100%; width: 100%; }
@@ -1140,11 +1152,23 @@ a.ni { text-decoration: none; color: inherit; }
     if (!pr.length) return "";
     return '<span class="tpr">🏆 <b>' + pr.length + '</b> · ' + pr.map(function (x) { return MEDAL[x.place] + ' ' + esc(x.event); }).join(' · ') + '</span>';
   }
+  var REG_RU = { "Европа": "Европа", "Америка": "Америка", "Азия": "Азия", Europe: "Европа", Americas: "Америка", Asia: "Азия" };
   function teamPane(T) {
     if (!T) return '<div class="empty">' + (state.teamErr ? '<strong>Данных о команде пока нет</strong>' : 'Загружаю…') + '</div>';
     var v = T.vrs || {};
-    var html = '<section class="hero"><div class="tm-h">' + logo(T.name, T.logo).replace('class="lg"', 'class="tlogo"') + '<span class="tvrs">' + (v.rank ? 'Мир #' + esc(v.rank) + (v.region ? ' · ' + esc(REG_ABBR[v.region] || v.region) + ' #' + esc(v.reg_rank) : '') + ' · ' + esc(v.points) + ' очк.' : '') +
-      '</span>' + trophyCount(T.prizes) + '</div>' + medalsHtml(T.prizes) + '</section>';
+    // шапка команды: логотип и плитки — место в мире, в регионе, очки VRS, трофеи (нажать — список)
+    var cups = (T.prizes || []).filter(function (x) { return MEDAL[x.place]; });
+    var cols = [["🥇", ["1st"]], ["🥈", ["2nd"]], ["🥉", ["3rd", "3-4th"]]].map(function (c) {
+      return { i: c[0], l: cups.filter(function (x) { return c[1].indexOf(x.place) >= 0; }).map(function (x) { return x.event; }) };
+    });
+    var tiles = [];
+    if (v.rank) tiles.push('<div class="th-t"><b class="num">#' + esc(v.rank) + '</b><span>в мире</span></div>');
+    if (v.region && v.reg_rank) tiles.push('<div class="th-t"><b class="num">#' + esc(v.reg_rank) + '</b><span>' + esc(REG_RU[v.region] || v.region) + '</span></div>');
+    if (v.points) tiles.push('<div class="th-t"><b class="num">' + esc(v.points) + '</b><span>очков</span></div>');
+    if (cups.length) tiles.push('<div class="th-t cupt" role="button" data-pop="' + esc(JSON.stringify({ t: "🏆 Трофеи с 1 января: " + cups.length, c: cols })) + '"><b class="num">🏆 ' + cups.length + '</b><span>трофеи</span></div>');
+    var lg = logo(T.name, T.logo).replace('class="lg"', 'class="tlogo"');
+    var html = '<section class="hero thero">' + (lg ? '<div class="th-logo">' + lg + '</div>' : '') +
+      (tiles.length ? '<div class="th-tiles" style="--n:' + tiles.length + '">' + tiles.join("") + '</div>' : '<div class="note">Команды нет в рейтинге Valve</div>') + '</section>';
     if ((T.roster || []).length) html += '<div class="sec"><div class="box roster a"><div class="hd"><span class="tn">Состав</span></div>' + rosterRows(T.roster, T.coach, { stats: T.stats || [] }, false) + '</div></div>';
     else if ((T.players || []).length) html += '<div class="sec"><div class="box"><div class="tm-pl" style="padding:12px">' + T.players.map(function (p) { return '<span>' + esc(typeof p === "string" ? p : p.nick) + '</span>'; }).join("") + '</div></div></div>';
     var f = T.form || [], w = f.filter(function (x) { return x.won; }).length, S = T.series || {};
@@ -1239,23 +1263,42 @@ a.ni { text-decoration: none; color: inherit; }
     }
     function rname(n) { return cap(String(n || "").replace(/^(Верхняя|Нижняя) сетка\s*/i, "")); }
     var html = "";
-    (R.stages || []).forEach(function (st, si) {
+    // матч за 3-е место (у bo3.gg бывает отдельной стадией «Решающий матч») — переносим в плей-офф
+    var THIRD = /3rd|3-е место|третье|third/i;
+    var stages = (R.stages || []).map(function (st) { return { title: st.title, format: st.format, status: st.status, rounds: st.rounds.slice() }; });
+    stages = stages.filter(function (st, si) {
+      var only3 = st.rounds.length && st.rounds.every(function (rd) { return THIRD.test(rd.name || ""); });
+      if (!only3) return true;
+      var po = null;
+      for (var j = si - 1; j >= 0 && !po; j--) if (/плей|playoff/i.test(stages[j].title || "") || stages[j].format === "playoff") po = stages[j];
+      if (!po) return true;
+      st.rounds.forEach(function (rd) { po.rounds.push(Object.assign({}, rd, { _third: true })); });
+      return false;
+    });
+    stages.forEach(function (st, si) {
       if (isSwiss(st)) { html += swissHtml(st, si, box); return; }
       var upper = [], lower = [], other = [], third = [];
-      var po = /плей|playoff/i.test(st.title || "") || si === (R.stages || []).length - 1;
+      var po = /плей|playoff/i.test(st.title || "") || st.format === "playoff" || si === stages.length - 1;
       st.rounds.forEach(function (rd) {
-        if (po && !rd.bracket && /(3|третье|third|решающ|decider)/i.test(rd.name || "")) third.push(rd);
+        if (rd._third || (po && THIRD.test(rd.name || ""))) third.push(rd);
         else (rd.bracket === "lower" ? lower : rd.bracket === "upper" ? upper : other).push(rd);
       });
       var rows = [];
       if (upper.length) rows.push({ t: "Верхняя сетка", r: upper });
       if (other.length) rows.push({ t: "", r: other });
       if (lower.length) rows.push({ t: "Нижняя сетка", r: lower });
+      // где гранд-финал: под ним и ставим матч за 3-е место, без ниточек
+      var gf = { ri: rows.length ? 0 : -1, k: rows.length ? rows[0].r.length - 1 : -1 };
+      rows.forEach(function (row, ri) { row.r.forEach(function (rd, k) { if (/гранд|grand/i.test(rd.name || "")) gf = { ri: ri, k: k }; }); });
+      if (gf.ri >= 0 && !rows.some(function (row) { return row.r.some(function (rd) { return /гранд|grand/i.test(rd.name || ""); }); })) gf = { ri: rows.length - 1, k: rows[rows.length - 1].r.length - 1 };
+      var t3 = third.map(function (t) { return t.matches.map(function (x) { return box(x, "Матч за 3-е место"); }).join(""); }).join("");
       html += '<div class="sec stage" style="--stc:' + STAGE_COL[si % STAGE_COL.length] + '"><h3>' + esc(st.title) + (st.status === "current" ? ' <span>идёт</span>' : '') + '</h3><div class="box brk"><div class="bracket">';
       rows.forEach(function (row, ri) {
-        html += (row.t ? '<div class="brk-h">' + row.t + '</div>' : '') + '<div class="brk-row">' + row.r.map(function (rd, k) {
-          var extra = k === row.r.length - 1 && ri === rows.length - 1 && third.length ? third.map(function (t3) { return t3.matches.map(function (x) { return box(x, "Матч за 3 место"); }).join(""); }).join("") : "";
-          return '<div class="brk-col"><div class="brk-rn">' + esc(rname(rd.name)) + '</div><div class="brk-ms">' + rd.matches.map(function (x) { return box(x); }).join("") + '</div>' + (extra ? '<div class="brk-3">' + extra + '</div>' : '') + '</div>';
+        var has3 = t3 && ri === gf.ri;
+        html += (row.t ? '<div class="brk-h">' + row.t + '</div>' : '') + '<div class="brk-row' + (has3 ? ' has3' : '') + '">' + row.r.map(function (rd, k) {
+          var ms = rd.matches.map(function (x) { return box(x); });
+          if (has3 && k === gf.k && ms.length) ms[ms.length - 1] = '<div class="gfw">' + ms[ms.length - 1] + '<div class="brk-3">' + t3 + '</div></div>';
+          return '<div class="brk-col"><div class="brk-rn">' + esc(rname(rd.name)) + '</div><div class="brk-ms">' + ms.join("") + '</div></div>';
         }).join("") + '</div>';
       });
       html += '</div></div></div>';
@@ -1295,7 +1338,7 @@ a.ni { text-decoration: none; color: inherit; }
       var cols = [].slice.call(row.children).filter(function (c) { return c.classList.contains("brk-col"); });
       var R0 = row.getBoundingClientRect(), d = "";
       for (var c = 0; c < cols.length - 1; c++) {
-        var A = cols[c].querySelectorAll(".brk-ms > .bm"), B = cols[c + 1].querySelectorAll(".brk-ms > .bm");
+        var A = cols[c].querySelectorAll(".brk-ms > .bm, .brk-ms > .gfw > .bm"), B = cols[c + 1].querySelectorAll(".brk-ms > .bm, .brk-ms > .gfw > .bm");
         if (!A.length || !B.length) continue;
         for (var i = 0; i < A.length; i++) {
           var j = A.length === 2 * B.length ? Math.floor(i / 2) : A.length === B.length ? i : Math.min(B.length - 1, Math.floor(i * B.length / A.length));
