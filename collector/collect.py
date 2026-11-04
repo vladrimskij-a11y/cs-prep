@@ -46,7 +46,8 @@ CACHE = ROOT / "cache"
 PANDA = "https://api.pandascore.co"
 BO3 = "https://api.bo3.gg/api/v1"
 TOKEN = os.environ.get("PANDASCORE_TOKEN", "").strip()
-TIERS = {t.strip().lower() for t in os.environ.get("TIERS", "s").split(",") if t.strip()}
+TIERS = {t.strip().lower() for t in os.environ.get("TIERS", "s,a").split(",") if t.strip()}  # тир-1 (s) и тир-2 (a)
+STATS = os.environ.get("STATS_ONLY") == "1"   # быстрый сбор статистики: без HLTV, Liquipedia и нейросети
 DAYS_AHEAD = int(os.environ.get("DAYS_AHEAD", "21"))  # расписание: BLAST и др. публикуют заранее
 DETAIL_HOURS = int(os.environ.get("DETAIL_HOURS", "72"))
 NEWS_DAYS = int(os.environ.get("NEWS_DAYS", "7"))
@@ -1244,6 +1245,10 @@ def build_results(tr: dict) -> dict | None:
                     warn(f"Итог матча {m.get('id')}: {e!r}")
                     d = None
                 if d:
+                    try:
+                        attach_veto(d)
+                    except Exception as e:
+                        warn(f"Вето итога: {e!r}")
                     d["stage"] = round_ru(stage)
                     d["round"] = round_ru(rd.get("name"))
                     d["tournament"] = tr["name"]
@@ -1427,7 +1432,7 @@ def add_pronunciation(people: list[dict]) -> None:
             p.update(pron_cache[key])
         else:
             todo.append((p, full))
-    if todo and GIGA_KEY and not _giga["off"]:
+    if todo and llm_ok():
         def line(p, full):
             fn, ln = p.get("first_name"), p.get("last_name")
             who = f"имя: {fn}; фамилия: {ln}" if fn and ln else f"полное имя: {full or 'неизвестно'}"
@@ -1522,13 +1527,23 @@ def giga_upload(data: bytes, name: str = "image.jpg") -> str | None:
 
 def giga_read_image(url: str) -> str | None:
     """Текст с картинки поста (новостные карточки) через GigaChat с распознаванием изображений."""
-    if not GIGA_KEY or _giga["off"] or not giga_budget_ok("max"):
+    if not llm_ok() or not (gem_ok() or giga_budget_ok("max")):
         return None
     try:
         img = http_get(url, {"Accept": "image/*"}, timeout=25)
     except Exception:
         return None
     if len(img) > 9_000_000:
+        return None
+    if gem_ok():
+        import base64
+        txt = gemini_call(None, [{"inline_data": {"mime_type": "image/jpeg", "data": base64.b64encode(img).decode()}},
+                                 {"text": "Перепиши весь текст, который написан на картинке, без пояснений. Если текста нет — ответь одним словом: НЕТ."}],
+                          600, json_mode=False)
+        if txt:
+            txt = txt.strip()
+            return None if txt.upper().startswith("НЕТ") else txt
+    if not GIGA_KEY or _giga["off"] or not giga_budget_ok("max"):
         return None
     fid = giga_upload(img)
     if not fid:
@@ -1593,7 +1608,7 @@ def tg_process(post: dict) -> dict:
     if info is None:
         info = {"t": iso(NOW)}
         text = post["text"] or ""
-        if post.get("photo") and len(text) < 60 and _tg_giga[0] < TG_GIGA_LIMIT and GIGA_KEY and not _giga["off"]:
+        if post.get("photo") and len(text) < 60 and _tg_giga[0] < TG_GIGA_LIMIT and llm_ok():
             _tg_giga[0] += 1
             info["ocr"] = giga_read_image(post["photo"])
         tg_cache[key] = info
@@ -1609,7 +1624,7 @@ def tg_classify(posts: list[dict]) -> None:
     todo = [p for p in sorted(posts, key=lambda p: p["date"], reverse=True)
             if tg_cache.get(f"{p['channel']}/{p['id']}", {}).get("v") != 3][:TG_CLASSIFY_LIMIT]
     for i in range(0, len(todo), 10):
-        if not GIGA_KEY or _giga["off"] or not giga_budget_ok("lite"):
+        if not llm_ok() or not (gem_ok() or giga_budget_ok("lite")):
             return
         chunk = todo[i:i + 10]
         lines = []
@@ -1727,7 +1742,7 @@ FEED_DEDUP_SYSTEM = """Ты редактор ленты новостей Counter
 
 def feed_dedupe(clusters: list[list[dict]]) -> list[list[dict]]:
     """Второй проход по ленте: GigaChat склеивает одну новость из разных каналов. Окна по 40 постов с перекрытием."""
-    if not GIGA_KEY or _giga["off"] or len(clusters) < 2:
+    if not llm_ok() or len(clusters) < 2:
         return clusters
     clusters = sorted(clusters, key=lambda cl: max(x["date"] for x in cl), reverse=True)
     parent = list(range(len(clusters)))
@@ -2645,9 +2660,87 @@ def giga_kind(model: str | None) -> str:
 FAST = os.environ.get("NEWS_ONLY") == "1"   # быстрое обновление: только новости из Telegram
 
 
+# ---------------------------------------------------------------- Gemini (основная нейросеть) и GigaChat (запасная)
+
+GEMINI_KEY = os.environ.get("GEMINI_KEY", "").strip()
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-flash-latest")
+GEMINI_DAY_LIMIT = int(os.environ.get("GEMINI_DAY_LIMIT", "800"))   # запросов в день — запас до бесплатного лимита Google
+_gem = {"off": False, "last": 0.0, "fails": 0, "model": GEMINI_MODEL, "think": True}
+
+
+def gem_ok() -> bool:
+    if not GEMINI_KEY or _gem["off"]:
+        return False
+    return (giga_usage.get(NOW.strftime("%Y-%m-%d")) or {}).get("gemini", 0) < GEMINI_DAY_LIMIT
+
+
+def llm_ok() -> bool:
+    return gem_ok() or bool(GIGA_KEY and not _giga["off"])
+
+
+def gemini_call(system: str | None, parts: list, max_tokens: int = 900, json_mode: bool = True) -> str | None:
+    if not gem_ok():
+        return None
+    for attempt in range(3):
+        wait = 4.5 - (time.time() - _gem["last"])  # бесплатный уровень: ~15 запросов в минуту
+        if wait > 0:
+            time.sleep(wait)
+        _gem["last"] = time.time()
+        cfg = {"temperature": 0.3, "maxOutputTokens": max(1024, max_tokens * 2)}
+        if json_mode:
+            cfg["responseMimeType"] = "application/json"
+        if _gem["think"]:
+            cfg["thinkingConfig"] = {"thinkingBudget": 0}
+        body = {"contents": [{"role": "user", "parts": parts}], "generationConfig": cfg}
+        if system:
+            body["systemInstruction"] = {"parts": [{"text": system}]}
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{_gem['model']}:generateContent"
+        try:
+            req = urllib.request.Request(url, data=json.dumps(body).encode(), method="POST",
+                                         headers={"Content-Type": "application/json", "x-goog-api-key": GEMINI_KEY})
+            with urllib.request.urlopen(req, timeout=120) as r:
+                j = json.loads(r.read())
+            day = NOW.strftime("%Y-%m-%d")
+            giga_usage.setdefault(day, {})["gemini"] = (giga_usage.get(day) or {}).get("gemini", 0) + 1
+            stats["gemini_calls"] = stats.get("gemini_calls", 0) + 1
+            _gem["fails"] = 0
+            cand = (j.get("candidates") or [{}])[0]
+            return "".join(p.get("text", "") for p in (cand.get("content") or {}).get("parts") or []) or None
+        except urllib.error.HTTPError as e:
+            msg = e.read()[:300].decode("utf-8", "replace")
+            if e.code == 400 and "thinking" in msg.lower() and _gem["think"]:
+                _gem["think"] = False
+                continue
+            if e.code == 404 and _gem["model"] != "gemini-2.5-flash":
+                _gem["model"] = "gemini-2.5-flash"
+                continue
+            if e.code == 429 and attempt == 0:
+                time.sleep(25)
+                continue
+            if e.code in (401, 403, 429):
+                _gem["off"] = True  # ключ не подходит или кончился дневной лимит — до конца прогона работает GigaChat
+            warn(f"Gemini: HTTP {e.code} {msg[:120]}")
+            return None
+        except Exception as e:
+            _gem["fails"] += 1
+            if _gem["fails"] >= 3:
+                _gem["off"] = True
+            warn(f"Gemini: {e!r}")
+            return None
+    return None
+
+
 def giga_chat(system: str, user: str, max_tokens: int = 900, model: str | None = None) -> str | None:
     if FAST and system is DEDUP_SYSTEM:
         return None  # в быстром режиме повторы в новостях матча склеиваем без нейросети (экономим лимит)
+    if gem_ok():
+        txt = gemini_call(system, [{"text": user}], max_tokens)
+        if txt:
+            return txt
+    return gigachat_call(system, user, max_tokens, model)
+
+
+def gigachat_call(system: str, user: str, max_tokens: int = 900, model: str | None = None) -> str | None:
     if not GIGA_KEY or _giga["off"]:
         return None
     if not giga_budget_ok(giga_kind(model)):
@@ -2966,7 +3059,7 @@ def dedupe_news(items: list[dict], teams: list[dict], same_who_required: bool = 
             clusters.append([it])
 
     # второй проход: GigaChat — посторонние новости и дубли, которые не поймали правила
-    if GIGA_KEY and not _giga["off"] and len(clusters) > 1:
+    if llm_ok() and len(clusters) > 1:
         roster = "\n".join(f"{t['name']}: " + ", ".join(p.get("nick") or "" for p in t.get("players") or []) for t in teams) or "(общая лента новостей CS2 — оценивай только про CS2 или нет)"
         lines = "\n".join(f"{i + 1}. [{max(x['date'] for x in cl).strftime('%d.%m %H:%M')}; {', '.join(cl[0]['about'])}] {cl[0]['title_ru0'] or cl[0]['title']}"
                           for i, cl in enumerate(clusters))
@@ -3174,7 +3267,7 @@ def build_facts(d: dict, prev: dict | None) -> list | None:
     story = None
     if c and (parse_iso(c.get("t")) or NOW) > NOW - timedelta(hours=FACTS_TTL_H):
         story = c["story"]
-    elif GIGA_KEY and not _giga["off"]:
+    elif llm_ok():
         inp = facts_input(d)
         if not inp.get("news_week"):
             inp = None
@@ -3226,6 +3319,58 @@ def build_facts(d: dict, prev: dict | None) -> list | None:
 
 # ---------------------------------------------------------------- main
 
+_mvp_new = [0]
+
+
+def hltv_mvps(nick: str) -> int | None:
+    """Сколько медалей MVP у игрока (трофеи на странице игрока HLTV). Кэш на неделю, до 10 новых страниц за запуск."""
+    pl = hltv_player_ids.get(norm(nick))
+    if not pl:
+        return None
+    key = f"mvp:{pl['id']}"
+    c = hltv_cache.get(key)
+    if c and (parse_iso(c.get("t")) or NOW) > NOW - timedelta(days=7):
+        return c["data"]
+    if _mvp_new[0] >= 10 or _hltv_blocked[0] or STATS:
+        return c["data"] if c else None
+    _mvp_new[0] += 1
+    h = hltv_get(f"/player/{pl['id']}/{pl['slug']}")
+    if not h:
+        return c["data"] if c else None
+    titles = set()
+    for rx in (r'<[^>]*class="[^"]*(?:trophy|mvp)[^"]*"[^>]*(?:title|alt)="([^"]*MVP[^"]*)"',
+               r'<[^>]*(?:title|alt)="([^"]*MVP[^"]*)"[^>]*class="[^"]*(?:trophy|mvp)[^"]*"'):
+        titles |= {strip_html(x) for x in re.findall(rx, h, re.IGNORECASE)}
+    n = len(titles)
+    hltv_cache[key] = {"t": iso(NOW), "data": n}
+    return n
+
+
+def attach_veto(sd: dict) -> None:
+    """Полное вето серии (dust2.us): кто что банил и пикал, какая карта осталась третьей."""
+    if sd.get("veto") is not None:
+        return
+    names = [(t or {}).get("name") or "" for t in sd.get("teams") or []]
+    d0 = parse_iso(sd.get("date"))
+    if len(names) < 2 or not d0:
+        return
+    for i in (0, 1):
+        ht = hltv_team_for({"name": names[i]})
+        if not ht:
+            continue
+        opp = norm(names[1 - i])
+        opp2 = norm(re.sub(r"^(the|team)\s+|\s+(team|esports|gaming)$", "", names[1 - i], flags=re.IGNORECASE))
+        for mt in hltv_team_matches(ht):
+            sl = norm(mt.get("slug"))
+            if not ((opp and opp in sl) or (opp2 and len(opp2) >= 3 and opp2 in sl)):
+                continue
+            v = veto_cache.get(f"match:{mt['id']}") or (None if STATS else hltv_veto(mt))
+            vd = parse_iso((v or {}).get("date"))
+            if v and v.get("steps") and vd and abs((vd - d0).total_seconds()) < 36 * 3600:
+                sd["veto"] = v["steps"]
+                return
+
+
 def build_detail(m: dict, prev: dict | None) -> dict:
     brief = match_brief(m)
     teams, bids, hists = [], [], []
@@ -3256,6 +3401,14 @@ def build_detail(m: dict, prev: dict | None) -> dict:
         warn(f"Вето: {e!r}")
     for t, bid, hist in zip(teams, bids, hists):
         t["stats"] = build_player_stats(t, bid, hist)
+        for p in t.get("players") or []:
+            try:
+                n = hltv_mvps(p.get("nick") or "")
+            except Exception as e:
+                warn(f"MVP {p.get('nick')}: {e!r}")
+                n = None
+            if n:
+                p["mvp"] = n
     # подробности по каждой серии из «Формы» — открываются по нажатию
     series = {}
     for bid, hist in zip(bids, hists):
@@ -3285,6 +3438,11 @@ def build_detail(m: dict, prev: dict | None) -> dict:
                     sd = None
                 if sd:
                     series[k] = sd
+    for sd in series.values():
+        try:
+            attach_veto(sd)
+        except Exception as e:
+            warn(f"Вето серии: {e!r}")
     detail["series"] = series
     # место и очки VRS, оценка при разных исходах, призовые места за 3 месяца
     try:
@@ -3306,13 +3464,21 @@ def build_detail(m: dict, prev: dict | None) -> dict:
         detail["vrs_outcomes"] = vrs_outcomes(rows[0], rows[1], table)
     begin = parse_iso(brief["begin_at"])
     soon = begin is not None and begin - NOW <= timedelta(hours=DETAIL_HOURS)
-    if soon or not (prev and prev.get("news")):
+    if STATS and prev and prev.get("news"):
+        detail["news"] = prev["news"]  # новости обновляет свой быстрый сбор
+    elif soon or not (prev and prev.get("news")):
         detail["news"] = build_news(teams)
     else:
         detail["news"] = prev["news"]
+    if STATS and prev:
+        for k in ("veto",):
+            if prev.get(k) is not None:
+                detail[k] = prev[k]
     try:
-        if soon or not prev:
+        if (soon or not prev) and brief.get("tier") == "s" and not STATS:
             detail["facts"] = build_facts(detail, prev)
+        elif STATS and prev:
+            detail["facts"] = prev.get("facts")
         else:
             detail["facts"] = prev.get("facts") or (code_facts(detail)[:20] or None)  # до матча ещё далеко — нейросеть не тратим
     except Exception as e:
@@ -3361,7 +3527,7 @@ def build_team_page(r: dict) -> dict | None:
             ach = prize_places(r["hltv"], hist)
         except Exception as e:
             warn(f"Призовые {r['name']}: {e!r}")
-    return {"updated": iso(NOW), "name": r["name"], "vrs": {k: r.get(k) for k in ("rank", "points", "region", "reg_rank")},
+    return {"updated": iso(NOW), "name": r["name"], "vrs": {k: r.get(k) for k in ("rank", "points", "region", "reg_rank", "hltv_rank")},
             "players": players or r.get("roster") or [], "form": form, "series": series,
             "maps": {"window_days": maps.get("window_days"), "table": maps.get("table") or []}, "prizes": ach}
 
@@ -3380,6 +3546,9 @@ def build_ranking() -> dict:
             vrs, src, date = md["teams"], "Valve · официальный рейтинг", md.get("date")
     vrs = vrs[:100]
     hl = hltv_world_ranking()[:100]
+    hm0 = {norm(r["name"]): r["rank"] for r in hl}
+    for r in vrs:
+        r["hltv_rank"] = hm0.get(norm(r["name"]))
     (OUT / "team").mkdir(parents=True, exist_ok=True)
     keep = set()
     for r in vrs:
@@ -3395,13 +3564,10 @@ def build_ranking() -> dict:
         if path.exists():
             keep.add(path.name)
             r["page"] = True
-    for r in hl:
-        r["slug"] = team_slug(r["name"])
-        r["page"] = (r["slug"] + ".json") in keep
     for f in (OUT / "team").glob("*.json"):
         if f.name not in keep:
             f.unlink()
-    return {"updated": iso(NOW), "vrs": {"source": src, "date": date, "teams": vrs}, "hltv": {"teams": hl}}
+    return {"updated": iso(NOW), "vrs": {"source": src, "date": date, "teams": vrs}}
 
 
 def finished_tournaments() -> list[dict]:
@@ -3436,13 +3602,16 @@ def main() -> int:
     if not TOKEN:
         print("Нет PANDASCORE_TOKEN. Добавь его в Settings → Secrets → Actions.", file=sys.stderr)
         return 1
+    if STATS:  # быстрый сбор: только то, что бесплатно и не блокируют
+        _hltv_blocked[0] = _lp_blocked[0] = _d2_blocked[0] = True
+        _giga["off"] = _gem["off"] = True
     matches = fetch_upcoming()
     CURRENT_TOURS[:] = list(dict.fromkeys(tournament_label(m) for m in matches))
     # id игроков HLTV из составов на страницах ближайших турниров (нужны для Rating 3.0)
     seen_tours = set()
     for m in matches:
         tname = tournament_label(m)
-        if tname in seen_tours:
+        if tname in seen_tours or ((m.get("tournament") or {}).get("tier") or "").lower() != "s":
             continue
         seen_tours.add(tname)
         ex = tournament_extras(tname) or {}
@@ -3457,8 +3626,11 @@ def main() -> int:
         b = match_brief(m)
         begin = parse_iso(b["begin_at"])
         sb = parse_iso((b.get("serie") or {}).get("begin"))
-        detailed = len(b["teams"]) == 2 and begin is not None and (begin - NOW <= timedelta(hours=DETAIL_HOURS)
-                                                                   or (sb is not None and sb - NOW <= timedelta(hours=DETAIL_HOURS)))  # за 3 дня до турнира
+        if b.get("tier") == "s":
+            detailed = len(b["teams"]) == 2 and begin is not None and (begin - NOW <= timedelta(hours=DETAIL_HOURS)
+                                                                       or (sb is not None and sb - NOW <= timedelta(hours=DETAIL_HOURS)))  # за 3 дня до турнира
+        else:  # тир-2: карточка за сутки до матча, без фактов от нейросети
+            detailed = len(b["teams"]) == 2 and begin is not None and begin - NOW <= timedelta(hours=24)
         if detailed:
             path = OUT / "match" / f"{m['id']}.json"
             prev = load_json(path, None)
@@ -3478,10 +3650,11 @@ def main() -> int:
         if int(f.stem) not in keep_ids:
             f.unlink()
 
-    try:
-        save_json(OUT / "feed.json", build_feed())
-    except Exception as e:
-        warn(f"Лента: {e!r}")
+    if not STATS:
+        try:
+            save_json(OUT / "feed.json", build_feed())
+        except Exception as e:
+            warn(f"Лента: {e!r}")
     tours: dict = {}
     for b in listing:
         sid = str((b.get("serie") or {}).get("id") or re.sub(r"\W+", "-", b["tournament"]).strip("-").lower())
@@ -3518,7 +3691,7 @@ def main() -> int:
     tour_list.sort(key=lambda x: (x.get("begin") or x.get("next") or "9999"))
     for tr in tour_list:
         b = parse_iso(tr.get("begin"))
-        if b and b - NOW > timedelta(days=21):
+        if (b and b - NOW > timedelta(days=21)) or tr.get("tier") != "s" or tr.get("finished"):
             continue  # призовые и участники с HLTV — только для ближайших, чтобы лишний раз туда не ходить
         ex = tournament_extras(tr["name"])
         if ex:
@@ -3563,7 +3736,11 @@ def main() -> int:
     except Exception as e:
         warn(f"Мейджор: {e!r}")
     try:
-        save_json(OUT / "ranking.json", build_ranking())
+        rk = load_json(OUT / "ranking.json", None)
+        active = any((x.get("tier") == "s") and x.get("has_detail") for x in listing)
+        stale = not rk or (parse_iso(rk.get("updated")) or NOW) < NOW - timedelta(hours=3 if active else 12)
+        if not STATS and stale:  # без турниров рейтинг и страницы команд — раз в 12 часов
+            save_json(OUT / "ranking.json", build_ranking())
     except Exception as e:
         warn(f"Рейтинг: {e!r}")
     for k in [k for k, v in tg_cache.items() if (v.get("t") or "") < iso(NOW - timedelta(days=NEWS_DAYS + 3))]:

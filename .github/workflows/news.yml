@@ -2,26 +2,35 @@ name: Обновить новости
 
 on:
   schedule:
-    - cron: "*/20 * * * *"   # каждые 20 минут: только Telegram-каналы (лента и новости матчей)
+    - cron: "*/5 * * * *"
   workflow_dispatch:
 
 permissions:
   contents: write
+  pages: write
+  id-token: write
 
 concurrency:
   group: collect
   cancel-in-progress: false
 
 jobs:
-  news:
+  run:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
+    environment:
+      name: github-pages
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+
+      - name: Взять текущие данные (ветка data)
+        run: |
+          mkdir -p docs/data
+          if git fetch -q --depth 1 origin data; then git archive FETCH_HEAD | tar -x -C docs/data; fi
 
       - name: Восстановить кэш сборщика
         uses: actions/cache/restore@v4
@@ -30,10 +39,11 @@ jobs:
           key: collector-cache-${{ github.run_id }}
           restore-keys: collector-cache-
 
-      - name: Свежие новости
+      - name: Сбор
         env:
           NEWS_ONLY: "1"
           GIGACHAT_KEY: ${{ secrets.GIGACHAT_KEY }}
+          GEMINI_KEY: ${{ secrets.GEMINI_KEY }}
         run: python collector/collect.py
 
       - name: Сохранить кэш сборщика
@@ -43,16 +53,19 @@ jobs:
           path: cache
           key: collector-cache-${{ github.run_id }}
 
-      - name: Сохранить данные
+      - name: Сохранить данные (ветка data, без истории)
         run: |
+          cd docs/data
+          git init -q -b data
           git config user.name "cs-prep-bot"
           git config user.email "cs-prep-bot@users.noreply.github.com"
-          git add docs/data
-          git diff --cached --quiet && exit 0
-          git commit -m "Новости: $(date -u +'%Y-%m-%d %H:%M') UTC"
-          for i in 1 2 3; do
-            git pull --rebase --autostash -X theirs -q origin main && git push && exit 0
-            git rebase --abort 2>/dev/null || true
-            sleep 5
-          done
-          exit 1
+          git add -A
+          git commit -qm "Данные: $(date -u +'%Y-%m-%d %H:%M') UTC"
+          git push -f -q "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" data
+          rm -rf .git
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+
+      - uses: actions/deploy-pages@v4

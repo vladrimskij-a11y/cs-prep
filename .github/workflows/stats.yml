@@ -1,0 +1,71 @@
+name: Обновить статистику
+
+on:
+  schedule:
+    - cron: "0,40 */2 * * *"
+    - cron: "20 1-23/2 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: collect
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: github-pages
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Взять текущие данные (ветка data)
+        run: |
+          mkdir -p docs/data
+          if git fetch -q --depth 1 origin data; then git archive FETCH_HEAD | tar -x -C docs/data; fi
+
+      - name: Восстановить кэш сборщика
+        uses: actions/cache/restore@v4
+        with:
+          path: cache
+          key: collector-cache-${{ github.run_id }}
+          restore-keys: collector-cache-
+
+      - name: Сбор
+        env:
+          PANDASCORE_TOKEN: ${{ secrets.PANDASCORE_TOKEN }}
+          STATS_ONLY: "1"
+        run: python collector/collect.py
+
+      - name: Сохранить кэш сборщика
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: cache
+          key: collector-cache-${{ github.run_id }}
+
+      - name: Сохранить данные (ветка data, без истории)
+        run: |
+          cd docs/data
+          git init -q -b data
+          git config user.name "cs-prep-bot"
+          git config user.email "cs-prep-bot@users.noreply.github.com"
+          git add -A
+          git commit -qm "Данные: $(date -u +'%Y-%m-%d %H:%M') UTC"
+          git push -f -q "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" data
+          rm -rf .git
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+
+      - uses: actions/deploy-pages@v4

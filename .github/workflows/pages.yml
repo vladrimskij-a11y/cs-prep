@@ -1,0 +1,32 @@
+name: Опубликовать сайт
+
+on:
+  push:
+    branches: [main]
+    paths: ["docs/**"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: collect
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+    steps:
+      - uses: actions/checkout@v4
+      - name: Взять данные (ветка data)
+        run: |
+          mkdir -p docs/data
+          if git fetch -q --depth 1 origin data; then git archive FETCH_HEAD | tar -x -C docs/data; fi
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+      - uses: actions/deploy-pages@v4

@@ -362,6 +362,39 @@ html { overflow-anchor: none; }
 .ptr .spin { width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--line); border-top-color: var(--fg); animation: spin .7s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .hero-wrap, .mini-wrap { transition: opacity .12s linear; }
+/* разделы: неподвижная шапка, вкладки-страницы */
+.sshell { position: fixed; left: 0; right: 0; top: 0; height: var(--tg-viewport-stable-height, 100dvh); overflow: hidden; background: var(--bg); z-index: 1; }
+.sshell .pane > .pin { padding-top: calc(var(--shh, 120px) + 6px); }
+.shead { position: absolute; top: 0; left: 0; right: 0; z-index: 5; background: var(--bg); }
+.shead > .pin { max-width: 640px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-top: env(safe-area-inset-top, 0px); padding-bottom: 8px; }
+.shead .hbar { padding-top: 12px; }
+.shtitle { font-family: var(--display); font-weight: 700; font-size: 20px; line-height: 1.25; margin: 4px 0 8px; display: flex; flex-direction: column; gap: 4px; text-wrap: balance; }
+.shtitle .shsub { font-family: var(--body); font-weight: 500; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.shead .tabs { position: static; padding-block: 0; }
+.tabs.n2 { grid-template-columns: repeat(2, 1fr); } .tabs.n3 { grid-template-columns: repeat(3, 1fr); } .tabs.n4 { grid-template-columns: repeat(4, 1fr); }
+.tabs.n4 .tab { font-size: 13px; }
+.menu { display: flex; flex-direction: column; gap: 10px; margin-top: 14px; }
+.mcard { display: grid; grid-template-columns: 1fr auto; gap: 6px 12px; align-items: center; text-align: left; width: 100%; padding: 22px 18px; border-radius: 14px;
+  background: var(--surface); border: 1px solid var(--line); min-height: 110px; box-sizing: border-box; }
+.mcard .mc-t { font-family: var(--display); font-weight: 800; font-size: 24px; }
+.mcard .mc-s { grid-column: 1; font-size: 13px; color: var(--muted); }
+.mcard .chev2 { grid-row: 1 / span 2; grid-column: 2; font-size: 26px; }
+.mcard:active { background: var(--sunk); }
+.tour-card.t2 { opacity: .9; }
+.rk-t small { display: block; font-size: 11px; color: var(--muted); font-weight: 500; }
+.mvp { font-size: 11px; font-weight: 700; color: var(--t); background: var(--t-soft); padding: 2px 6px; border-radius: 4px; white-space: nowrap; }
+.smap.left { background: transparent; border: 1px dashed var(--line); }
+.smap.left b { font-size: 11px; font-weight: 600; }
+.veto { display: flex; flex-direction: column; }
+.vt { display: grid; grid-template-columns: 18px 1fr auto 90px; gap: 8px; padding: 8px 12px; border-top: 1px solid var(--line); align-items: baseline; font-size: 13px; }
+.vt:first-child { border-top: 0; }
+.vt-n { color: var(--muted); font-size: 11px; }
+.vt-t { font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vt-t.a { color: var(--ct); } .vt-t.b { color: var(--t); }
+.vt-a { font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--muted); }
+.vt-a.pick { color: var(--win); } .vt-a.decider { color: var(--fg); }
+.vt b { text-align: right; }
+
 
 .face .acr.sm { font-size: 18px; overflow-wrap: anywhere; }
 
@@ -643,54 +676,13 @@ a.ni { text-decoration: none; color: inherit; }
     return html + '</article></div>';
   }
 
-  function renderFeed() {
-    var html = homeHeader("feed");
-    var F = state.feed;
-    if (!F) { $app.innerHTML = html + '<div class="empty">Загружаю ленту…</div></div>'; return; }
-    var ch = state.feedCh || "all";
-    var items = (F.items || []).filter(function (n) { return ch === "all" || n.channel === ch || (n.also || []).some(function (a) { return a.channel === ch; }); });
-    html += '<div class="filt feedch" role="group" aria-label="Канал"><button class="chip" data-feedch="all" aria-pressed="' + (ch === "all") + '">Все каналы</button>' +
-      (F.channels || []).map(function (c) { return '<button class="chip" data-feedch="' + esc(c.id) + '" aria-pressed="' + (ch === c.id) + '">' + esc(c.title) + '</button>'; }).join("") + '</div>';
-    if (!items.length) html += '<div class="empty"><strong>Пока пусто</strong>Лента собирается вместе с остальными данными каждые 3 часа.</div>';
-    var cur = null;
-    html += '<div class="news feed">';
-    items.forEach(function (n) {
-      var k = dayKey(n.date);
-      if (k !== cur) { cur = k; html += '<h2 class="sect-title">' + esc(dayTitle(n.date)) + '</h2>'; }
-      html += '<button class="box ni fi" data-fread="' + esc(n.key) + '">' +
-        '<span class="src"><span><b class="chn">' + esc(n.channel_title) + '</b> · ' + esc(hm(n.date)) + '</span>' +
-        ((n.also || []).length ? '<span>ещё в ' + n.also.length + ' ' + (n.also.length === 1 ? "канале" : "каналах") + '</span>' : '') + '</span>' +
-        '<span class="fi-body">' + (n.photo ? '<span class="thumb"><img src="' + esc(n.photo) + '" alt="" loading="lazy" onerror="this.parentNode.remove()">' + (n.video ? '<i class="play" aria-label="видео">▶</i>' : '') + '</span>' : '') +
-        '<span><h4>' + esc(n.title) + '</h4>' + (n.text && n.text !== n.title ? '<p>' + esc(n.text) + '</p>' : '') + '</span></span></button>';
-    });
-    $app.innerHTML = html + '</div></div>';
-  }
-
   var MONTHS = ["январь", "февраль", "март", "апрель", "май", "июнь", "июль", "август", "сентябрь", "октябрь", "ноябрь", "декабрь"];
   var MONTHS_IN = ["январе", "феврале", "марте", "апреле", "мае", "июне", "июле", "августе", "сентябре", "октябре", "ноябре", "декабре"];
   function ym(s) { var d = new Date(s); var p = new Intl.DateTimeFormat("en-CA", { timeZone: TZ, year: "numeric", month: "2-digit" }).format(d).split("-"); return { y: +p[0], m: +p[1] - 1 }; }
   function ymKey(o) { return o.y * 12 + o.m; }
 
-  function homeHeader(active) {
-    var L = state.list;
-    function t(id, label) { return '<button class="tab" data-home="' + id + '" aria-selected="' + (active === id) + '">' + label + '</button>'; }
-    var sub = "";
-    if (active === "tours") {
-      var c = tourBuckets();
-      sub = '<div class="filt hsub" role="group">' + [["live", "Идущие"], ["up", "Грядущие"], ["done", "Завершённые"]].map(function (o) {
-        return '<button class="chip" data-tsub="' + o[0] + '" aria-pressed="' + (tourSub() === o[0]) + '">' + o[1] + '<span class="c">' + c[o[0]].length + '</span></button>';
-      }).join("") + '</div>';
-    } else if (active === "rating") {
-      sub = '<div class="filt hsub" role="group">' + RATE_SUBS.map(function (o) {
-        return '<button class="chip" data-rsub="' + o[0] + '" aria-pressed="' + (rateSub() === o[0]) + '">' + o[1] + '</button>';
-      }).join("") + '</div>';
-    }
-    return '<div class="view"><header class="top"><div class="brand"><h1>RIM<b>·</b>CS</h1>' +
-      '<span class="upd">обновлено ' + esc(ago(L.updated)) + ' · время МСК</span></div>' +
-      '<div class="hometabs three" role="tablist">' + t("tours", "Турниры") + t("feed", "Лента") + t("rating", "Рейтинг") + '</div>' + sub + '</header>';
-  }
-
-  // турниры: идущие, грядущие, завершённые
+  // турниры: идущие, грядущие, завершённые (тир-1 всегда выше тир-2)
+  function tierW(t) { return t.tier === "s" ? 0 : 1; }
   function tourBuckets() {
     var now = Date.now(), out = { live: [], up: [], done: [] };
     (state.list.tournaments || []).forEach(function (t) {
@@ -700,12 +692,10 @@ a.ni { text-decoration: none; color: inherit; }
       else if (t.live || bt <= now) out.live.push(t);
       else out.up.push(t);
     });
-    out.done.sort(function (a, b) { return String(b.end || "").localeCompare(String(a.end || "")); });
+    out.live.sort(function (a, b) { return tierW(a) - tierW(b) || String(a.begin || "").localeCompare(String(b.begin || "")); });
+    out.up.sort(function (a, b) { return tierW(a) - tierW(b) || String(a.begin || a.next || "").localeCompare(String(b.begin || b.next || "")); });
+    out.done.sort(function (a, b) { return tierW(a) - tierW(b) || String(b.end || "").localeCompare(String(a.end || "")); });
     return out;
-  }
-  function tourSub() {
-    if (!state.tourSub) { var c = tourBuckets(); state.tourSub = c.live.length ? "live" : "up"; }
-    return state.tourSub;
   }
 
   function tourCard(t, today, span) {
@@ -719,85 +709,209 @@ a.ni { text-decoration: none; color: inherit; }
       : t.live ? '<span class="live">● LIVE ' + t.live + '</span>'
       : ms.length ? (t.next ? 'ближайший <b>' + esc(dayKey(t.next) === today ? "сегодня " + hm(t.next) : dm(t.next) + " " + hm(t.next)) + '</b>' : '')
       : '<span class="muted">расписание пока не опубликовано</span>';
-    return '<button class="tour-card' + (todayN ? " today" : "") + '" data-tour="' + esc(t.id) + '">' +
-      '<span class="tn">' + esc(t.name) + '</span><span class="pill go ' + esc(t.tier) + '">' + esc((t.tier || "?").toUpperCase()) + '</span>' +
+    return '<button class="tour-card' + (todayN ? " today" : "") + (t.tier !== "s" ? " t2" : "") + '" data-tour="' + esc(t.id) + '">' +
+      '<span class="tn">' + esc(t.name) + '</span><span class="pill go ' + esc(t.tier) + '">' + (t.tier === "s" ? "ТИР-1" : "ТИР-2") + '</span>' +
       '<span class="tm2">' + [dates && '<b>' + esc(dates) + '</b>', live && !t.live ? '<span class="live">идёт сейчас</span>' : '',
         (t.prize_usd || t.prize) && esc(t.prize_usd ? usd(t.prize_usd) : prize(t.prize)),
         todayN ? '<b>сегодня ' + todayN + '</b>' : (!t.finished && ms.length ? ms.length + ' матч.' : ''), next].filter(Boolean).join(' · ') + '</span>' +
       (span ? '<span class="tm2 spanrow">' + span + '</span>' : '') + '</button>';
   }
 
-  function renderHome() {
-    var html = homeHeader("tours");
-    var today = dayKey(new Date().toISOString());
-    var c = tourBuckets(), sub = tourSub(), list = c[sub];
-    if (!list.length) {
-      $app.innerHTML = html + '<div class="empty"><strong>' + (sub === "live" ? "Сейчас турниров нет" : sub === "up" ? "Ближайших турниров нет" : "Завершённых турниров пока нет") + '</strong>Данные обновляются каждые 3 часа.</div></div>';
+  // ---------- главная: три больших раздела
+  function renderMenu() {
+    var L = state.list, c = tourBuckets();
+    function card(h, t, sub) { return '<button class="mcard" data-goto="' + h + '"><span class="mc-t">' + t + '</span><span class="mc-s">' + esc(sub) + '</span><i class="chev2">›</i></button>'; }
+    $app.innerHTML = '<div class="view"><header class="top"><div class="brand"><h1>RIM<b>·</b>CS</h1><span class="upd">обновлено ' + esc(ago(L.updated)) + ' · время МСК</span></div></header>' +
+      '<div class="menu">' + card("feed", "Лента", "Новости Telegram-каналов без повторов и мусора") +
+      card("tours", "Турниры", c.live[0] ? "Идёт: " + c.live.map(function (t) { return t.name; }).slice(0, 2).join(", ") : c.up[0] ? "Скоро: " + c.up[0].name : "Тир-1 и тир-2") +
+      card("rating", "Рейтинг", "Топ-100 VRS и место в HLTV") + '</div></div>';
+  }
+
+  // ---------- разделы с вкладками: шапка стоит на месте, вкладки — страницы в ряд со своей прокруткой
+  var SH = null;
+  state.shk = {}; state.shs = {};
+  function renderShell(cfg) {
+    var id = cfg.id, sc = state.shs[id] = state.shs[id] || {};
+    if (SH && SH.id === id) document.querySelectorAll(".sshell .pane").forEach(function (p) { sc[p.getAttribute("data-key")] = p.scrollTop; });
+    var keys = cfg.tabs.map(function (t) { return t.key; });
+    var key = state.shk[id];
+    if (keys.indexOf(key) < 0) key = state.shk[id] = cfg.def && keys.indexOf(cfg.def) >= 0 ? cfg.def : keys[0];
+    SH = { id: id, keys: keys, key: key };
+    var many = keys.length > 4;
+    var tabsHtml = keys.length < 2 ? '' : many
+      ? '<div class="filt stabs" role="tablist">' + cfg.tabs.map(function (t) { return '<button class="chip" data-sk="' + esc(t.key) + '" aria-pressed="' + (t.key === key) + '">' + esc(t.label) + '</button>'; }).join("") + '</div>'
+      : '<nav class="tabs stabs n' + keys.length + '" role="tablist">' + cfg.tabs.map(function (t) { return '<button class="tab" data-sk="' + esc(t.key) + '" aria-selected="' + (t.key === key) + '">' + esc(t.label) + '</button>'; }).join("") + '</nav>';
+    $app.innerHTML = '<div class="sshell"><div class="mviewport"><div class="mtrack">' + cfg.tabs.map(function (t) {
+      return '<div class="pane" data-key="' + esc(t.key) + '"><div class="pin">' + cfg.pane(t.key) + '</div></div>';
+    }).join("") + '</div></div><div class="shead"><div class="pin"><div class="hbar">' + backBtn(cfg.back || "Назад") + '</div><div class="shtitle">' + cfg.title + '</div>' + tabsHtml + '</div></div></div>';
+    var sh = q(".sshell");
+    sh.style.setProperty("--shh", q(".shead").offsetHeight + "px");
+    trackTo(keys.indexOf(key), false);
+    document.querySelectorAll(".sshell .pane").forEach(function (p) { var k = p.getAttribute("data-key"); if (sc[k]) p.scrollTop = sc[k]; });
+    revealSel(q(".shead .filt"));
+  }
+  function shellPane() { return SH ? document.querySelector('.sshell .pane[data-key="' + (window.CSS && CSS.escape ? CSS.escape(SH.key) : SH.key) + '"]') : null; }
+  function markShell(k) {
+    document.querySelectorAll(".shead [data-sk]").forEach(function (b) { var on = String(b.getAttribute("data-sk") === k); b.setAttribute(b.classList.contains("tab") ? "aria-selected" : "aria-pressed", on); });
+    revealSel(q(".shead .filt"));
+  }
+  function shellGo(k, ms) {
+    if (!SH) return;
+    var i = SH.keys.indexOf(k);
+    if (i < 0) return;
+    trackTo(i, true, ms); SH.key = k; state.shk[SH.id] = k; markShell(k);
+    try { TG && TG.HapticFeedback && TG.HapticFeedback.selectionChanged(); } catch (err) {}
+  }
+  window.addEventListener("resize", function () { if (q(".sshell") && SH) trackTo(SH.keys.indexOf(SH.key), false); });
+
+  var ss = null;
+  document.addEventListener("touchstart", function (e) {
+    ss = null;
+    if (!SH || !q(".sshell") || state.ovl || e.touches.length !== 1) return;
+    var x = e.touches[0].clientX;
+    if (x < 20 || x > window.innerWidth - 20 || e.target.closest("video, input")) return;
+    var sc = e.target.closest(".filt");
+    if (sc && sc.scrollWidth > sc.clientWidth + 2) return;
+    ss = { x: x, y: e.touches[0].clientY, t: Date.now(), dx: 0, lock: null, i: SH.keys.indexOf(SH.key) };
+  }, { passive: true });
+  document.addEventListener("touchmove", function (e) {
+    if (!ss || ss.lock === "v") return;
+    var dx = e.touches[0].clientX - ss.x, dy = e.touches[0].clientY - ss.y;
+    if (!ss.lock) {
+      if (Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy) * 1.5) ss.lock = "h";
+      else if (Math.abs(dy) > 10) { ss.lock = "v"; return; }
+      else return;
+    }
+    var W = paneW(), next = ss.i + (dx < 0 ? 1 : -1);
+    if (next < 0) {  // с первой вкладки вправо — назад: уезжает весь экран, шапка вместе с ним
+      ss.back = true; ss.dx = dx;
+      var sh = q(".sshell");
+      sh.style.transition = "none"; sh.style.transform = "translate3d(" + Math.max(0, dx) + "px,0,0)";
+      sh.style.opacity = String(1 - Math.min(0.6, Math.max(0, dx) / W * 0.8));
       return;
     }
-    if (sub === "up") {
-      // по месяцам: турнир — в месяце начала; «продолжится в…», если идёт и в следующем
-      var months = {};
-      list.forEach(function (t) {
-        var b = t.begin || t.next, e = t.end || b;
-        if (!b) return;
-        var bk = ymKey(ym(b)), ek = ymKey(ym(e));
-        (months[bk] = months[bk] || []).push({ t: t, bk: bk, ek: ek });
-      });
-      Object.keys(months).map(Number).sort(function (a, b) { return a - b; }).forEach(function (k) {
-        var y = Math.floor(k / 12), m = k % 12;
-        html += '<h2 class="sect-title month">' + MONTHS[m].charAt(0).toUpperCase() + MONTHS[m].slice(1) + ' ' + y + '</h2><div class="tours">';
-        months[k].forEach(function (x) {
-          var span = x.ek > x.bk ? '<span class="span">→ продолжится в ' + MONTHS_IN[(x.bk + 1) % 12] + '</span>' : '';
-          html += tourCard(x.t, today, span);
-        });
-        html += '</div>';
-      });
-    } else {
-      html += '<div class="tours" style="margin-top:14px">' + list.map(function (t) { return tourCard(t, today, ""); }).join("") + '</div>';
+    ss.back = false;
+    ss.dx = next >= SH.keys.length ? dx * 0.25 : dx;
+    var tr = q(".mtrack");
+    tr.style.transition = "none";
+    tr.style.transform = "translate3d(" + (-ss.i * W + ss.dx) + "px,0,0)";
+    var past = next < SH.keys.length && Math.abs(ss.dx) > W / 2;
+    if (past !== ss.marked) { markShell(past ? SH.keys[next] : SH.keys[ss.i]); ss.marked = past; }
+  }, { passive: true });
+  function shellSwipeEnd() {
+    if (!ss) return;
+    var s0 = ss; ss = null;
+    if (s0.lock !== "h" || !SH) return;
+    var W = paneW(), v = Math.abs(s0.dx) / Math.max(1, Date.now() - s0.t);
+    var far = Math.abs(s0.dx) > W * 0.22 || (v > 0.45 && Math.abs(s0.dx) > 35);
+    if (s0.back) {
+      var sh = q(".sshell");
+      sh.style.transition = "transform .16s ease-out, opacity .16s ease-out";
+      if (!(far && s0.dx > 0)) { sh.style.transform = ""; sh.style.opacity = ""; return; }
+      sh.style.transform = "translate3d(" + W + "px,0,0)"; sh.style.opacity = "0";
+      setTimeout(function () { goBack(); fadeInView(); }, 150);
+      return;
     }
-    $app.innerHTML = html + '</div>';
+    var next = s0.i + (s0.dx < 0 ? 1 : -1);
+    if (far && next >= 0 && next < SH.keys.length) shellGo(SH.keys[next], Math.round(Math.max(130, Math.min(260, (W - Math.abs(s0.dx)) / Math.max(v * 1.6, 1.4)))));
+    else { trackTo(s0.i, true); markShell(SH.keys[s0.i]); }
+  }
+  document.addEventListener("touchend", shellSwipeEnd, { passive: true });
+  document.addEventListener("touchcancel", shellSwipeEnd, { passive: true });
+
+  // ---------- лента
+  function feedPane(F, ch) {
+    var items = (F.items || []).filter(function (n) { return ch === "all" || n.channel === ch || (n.also || []).some(function (a) { return a.channel === ch; }); });
+    if (!items.length) return '<div class="empty"><strong>Пока пусто</strong>Лента обновляется каждые несколько минут.</div>';
+    var cur = null, html = '<div class="news feed">';
+    items.forEach(function (n) {
+      var k = dayKey(n.date);
+      if (k !== cur) { cur = k; html += '<h2 class="sect-title">' + esc(dayTitle(n.date)) + '</h2>'; }
+      html += '<button class="box ni fi" data-fread="' + esc(n.key) + '">' +
+        '<span class="src"><span><b class="chn">' + esc(n.channel_title) + '</b> · ' + esc(hm(n.date)) + '</span>' +
+        ((n.also || []).length ? '<span>ещё в ' + n.also.length + ' ' + (n.also.length === 1 ? "канале" : "каналах") + '</span>' : '') + '</span>' +
+        '<span class="fi-body">' + (n.photo ? '<span class="thumb"><img src="' + esc(n.photo) + '" alt="" loading="lazy" onerror="this.parentNode.remove()">' + (n.video ? '<i class="play" aria-label="видео">▶</i>' : '') + '</span>' : '') +
+        '<span><h4>' + esc(n.title) + '</h4>' + (n.text && n.text !== n.title ? '<p>' + esc(n.text) + '</p>' : '') + '</span></span></button>';
+    });
+    return html + '</div>';
+  }
+  function showFeed() {
+    var F = state.feed;
+    renderShell({ id: "feed", back: "Главная", title: "Лента", tabs: [{ key: "all", label: "Все каналы" }].concat(F ? (F.channels || []).map(function (c) { return { key: c.id, label: c.title }; }) : []),
+      pane: function (k) { return F ? feedPane(F, k) : '<div class="empty">' + (state.feedErr ? '<strong>Лента пока не собрана</strong>' : 'Загружаю ленту…') + '</div>'; } });
+  }
+
+  // ---------- турниры
+  function toursPane(c, sub) {
+    var today = dayKey(new Date().toISOString()), list = c[sub], html = "";
+    if (!list.length) return '<div class="empty"><strong>' + (sub === "live" ? "Сейчас турниров нет" : sub === "up" ? "Ближайших турниров нет" : "Завершённых турниров пока нет") + '</strong></div>';
+    if (sub !== "up") return '<div class="tours" style="margin-top:8px">' + list.map(function (t) { return tourCard(t, today, ""); }).join("") + '</div>';
+    var months = {};  // турнир — в месяце начала; «продолжится в…», если заходит на следующий
+    list.forEach(function (t) {
+      var b = t.begin || t.next, e = t.end || b;
+      if (!b) return;
+      var bk = ymKey(ym(b)), ek = ymKey(ym(e));
+      (months[bk] = months[bk] || []).push({ t: t, bk: bk, ek: ek });
+    });
+    Object.keys(months).map(Number).sort(function (a, b) { return a - b; }).forEach(function (k) {
+      var y = Math.floor(k / 12), m = k % 12;
+      html += '<h2 class="sect-title month">' + MONTHS[m].charAt(0).toUpperCase() + MONTHS[m].slice(1) + ' ' + y + '</h2><div class="tours">';
+      months[k].sort(function (a, b) { return tierW(a.t) - tierW(b.t); }).forEach(function (x) {
+        html += tourCard(x.t, today, x.ek > x.bk ? '<span class="span">→ продолжится в ' + MONTHS_IN[(x.bk + 1) % 12] + '</span>' : '');
+      });
+      html += '</div>';
+    });
+    return html;
+  }
+  function showTours() {
+    var c = tourBuckets();
+    renderShell({ id: "tours", back: "Главная", title: "Турниры", def: c.live.length ? "live" : "up",
+      tabs: [{ key: "live", label: "Идущие" }, { key: "up", label: "Грядущие" }, { key: "done", label: "Завершённые" }],
+      pane: function (k) { return toursPane(c, k); } });
   }
 
   // ---------- рейтинг
-  var RATE_SUBS = [["all", "Все"], ["Европа", "Европа"], ["Азия", "Азия"], ["Америка", "Америка"], ["hltv", "HLTV"]];
   var REG_ABBR = { "Европа": "EU", "Америка": "AM", "Азия": "AS" };
-  function rateSub() { return state.rateSub || "all"; }
   function getRanking() {
     if (state.ranking) return Promise.resolve(state.ranking);
     return fetch("data/ranking.json" + bust()).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); }).then(function (j) { state.ranking = j; return j; });
   }
-  function renderRating() {
-    var html = homeHeader("rating"), R = state.ranking, sub = rateSub();
-    if (!R) { $app.innerHTML = html + '<div class="empty">' + (state.rankingErr ? '<strong>Рейтинг ещё не собран</strong>Появится после ближайшего полного обновления.' : 'Загружаю рейтинг…') + '</div></div>'; return; }
-    var hl = sub === "hltv", rows = hl ? (R.hltv || {}).teams || [] : ((R.vrs || {}).teams || []).filter(function (t) { return sub === "all" || t.region === sub; });
-    html += '<div class="upd" style="margin-top:10px">' + (hl ? 'Рейтинг HLTV' : esc((R.vrs || {}).source || 'Рейтинг Valve (VRS)') + ((R.vrs || {}).date ? ' на ' + esc(R.vrs.date) : '')) + ' · нажми на команду</div>';
-    if (!rows.length) html += '<div class="empty"><strong>Нет данных</strong>Появятся после ближайшего полного обновления.</div>';
-    html += '<div class="box rank">' + rows.map(function (t) {
-      var pos = hl || sub === "all" ? t.rank : t.reg_rank;
-      return '<' + (t.page ? 'button class="rk" data-team="' + esc(t.slug) + '"' : 'div class="rk"') + '><span class="rk-n num">' + esc(pos) + '</span><span class="rk-t">' + esc(t.name) + '</span>' +
-        '<span class="rk-m">' + (!hl && t.region ? esc(REG_ABBR[t.region] || t.region) + (sub === "all" && t.reg_rank ? ' #' + t.reg_rank : ' · #' + t.rank) : '') + '</span>' +
+  function ratingPane(R, sub) {
+    if (!R) return '<div class="empty">' + (state.rankingErr ? '<strong>Рейтинг ещё не собран</strong>Появится после ближайшего полного обновления.' : 'Загружаю рейтинг…') + '</div>';
+    var rows = ((R.vrs || {}).teams || []).filter(function (t) { return sub === "all" || t.region === sub; });
+    var html = '<div class="upd" style="margin-top:4px">' + esc((R.vrs || {}).source || 'Рейтинг Valve (VRS)') + ((R.vrs || {}).date ? ' на ' + esc(R.vrs.date) : '') + ' · нажми на команду</div>';
+    if (!rows.length) return html + '<div class="empty"><strong>Нет данных</strong></div>';
+    return html + '<div class="box rank">' + rows.map(function (t) {
+      var pos = sub === "all" ? t.rank : t.reg_rank;
+      return '<' + (t.page ? 'button class="rk" data-team="' + esc(t.slug) + '"' : 'div class="rk"') + '><span class="rk-n num">' + esc(pos) + '</span>' +
+        '<span class="rk-t">' + esc(t.name) + '<small>' + (sub === "all" ? (t.region ? esc(REG_ABBR[t.region] || t.region) + ' #' + esc(t.reg_rank) : '') : 'VRS #' + esc(t.rank)) + '</small></span>' +
+        '<span class="rk-m">' + (t.hltv_rank ? 'HLTV #' + esc(t.hltv_rank) : '') + '</span>' +
         '<span class="rk-p num">' + esc(t.points) + '</span>' + (t.page ? '<i class="chev2">›</i>' : '<i></i>') + '</' + (t.page ? 'button' : 'div') + '>';
     }).join("") + '</div>';
-    $app.innerHTML = html + '</div>';
   }
+  function showRating() {
+    var R = state.ranking;
+    renderShell({ id: "rating", back: "Главная", title: "Рейтинг",
+      tabs: [{ key: "all", label: "Все" }, { key: "Европа", label: "Европа" }, { key: "Азия", label: "Азия" }, { key: "Америка", label: "Америка" }],
+      pane: function (k) { return ratingPane(R, k); } });
+  }
+
+  // ---------- команда из рейтинга
   function getTeam(slug) {
     state.teams = state.teams || {};
     if (state.teams[slug]) return Promise.resolve(state.teams[slug]);
     return fetch("data/team/" + encodeURIComponent(slug) + ".json" + bust()).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); }).then(function (j) { state.teams[slug] = j; return j; });
   }
   function prizesLine(pr) {
-    if (!(pr || []).length) return "";
-    return '<span class="tpr">🏆 <b>' + pr.length + '</b> · ' + pr.map(function (x) { return (MEDAL[x.place] || "") + ' ' + esc(x.event); }).join(' · ') + '</span>';
+    pr = (pr || []).filter(function (x) { return MEDAL[x.place]; });
+    if (!pr.length) return "";
+    return '<span class="tpr">🏆 <b>' + pr.length + '</b> · ' + pr.map(function (x) { return MEDAL[x.place] + ' ' + esc(x.event); }).join(' · ') + '</span>';
   }
-  function renderTeam(slug) {
-    var T = (state.teams || {})[slug];
-    var html = '<div class="view"><header class="top">' + backBtn("Рейтинг") + '</header>';
-    if (!T) { $app.innerHTML = html + '<div class="empty">' + (state.teamErr ? '<strong>Данных о команде пока нет</strong>' : 'Загружаю…') + '</div></div>'; return; }
+  function teamPane(T) {
+    if (!T) return '<div class="empty">' + (state.teamErr ? '<strong>Данных о команде пока нет</strong>' : 'Загружаю…') + '</div>';
     var v = T.vrs || {};
-    html += '<section class="hero"><div class="tm-h"><span class="acr">' + esc(T.name) + '</span>' +
-      '<span class="tvrs">' + (v.rank ? '#' + esc(v.rank) + ' VRS' + (v.region ? ' · ' + esc(REG_ABBR[v.region] || v.region) + ' #' + esc(v.reg_rank) : '') + ' · ' + esc(v.points) + ' очк.' : '') + '</span>' +
-      prizesLine(T.prizes) + '</div>' +
+    var html = '<section class="hero"><div class="tm-h"><span class="tvrs">' + (v.rank ? '#' + esc(v.rank) + ' VRS' + (v.region ? ' · ' + esc(REG_ABBR[v.region] || v.region) + ' #' + esc(v.reg_rank) : '') + ' · ' + esc(v.points) + ' очк.' : '') +
+      (v.hltv_rank ? ' · HLTV #' + esc(v.hltv_rank) : '') + '</span>' + prizesLine(T.prizes) + '</div>' +
       ((T.players || []).length ? '<div class="tm-pl">' + T.players.map(function (p) { return '<span>' + esc(p) + '</span>'; }).join("") + '</div>' : '') + '</section>';
     var f = T.form || [], w = f.filter(function (x) { return x.won; }).length, S = T.series || {};
     html += '<div class="sec"><h3>Форма <span>последние 10 серий · нажми на матч</span></h3><div class="box form"><div class="tmh a">' + esc(T.name) + '<span>' + w + '–' + (f.length - w) + '</span></div>' +
@@ -813,7 +927,11 @@ a.ni { text-decoration: none; color: inherit; }
         M.table.map(function (r) { var t = r.teams[0], p = pct(t.won, t.played); return '<tr><td class="mn">' + esc(r.map) + '</td><td class="a"><span class="wr"><span class="pct">' + p + '%</span><span class="track"><i style="width:' + p + '%"></i></span><span class="gp">' + t.won + '/' + t.played + '</span></span></td></tr>'; }).join("") +
         '</tbody></table></div></div>';
     }
-    $app.innerHTML = html + '</div>';
+    return html;
+  }
+  function showTeam(slug) {
+    var T = (state.teams || {})[slug];
+    renderShell({ id: "team:" + slug, back: "Рейтинг", title: esc(T ? T.name : "Команда"), tabs: [{ key: "main", label: "" }], pane: function () { return teamPane(T); } });
   }
 
   function getResults(id) {
@@ -838,40 +956,37 @@ a.ni { text-decoration: none; color: inherit; }
       '<div class="rscore num"><span class="a">' + esc(A.score) + '</span><span class="x">:</span><span class="b">' + esc(B.score) + '</span></div></button>';
   }
 
-  function renderTour(id) {
+  function showTour(id) {
     var L = state.list, t = findTour(id);
     var ms = (L.matches || []).filter(function (m) { return tourOf(m) === String(id); });
-    var hasRes = !!(t && t.results);
-    var tab = hasRes && (state.tourTab === "done" || !ms.length) ? "done" : "matches";
-    var html = '<div class="view"><header class="top">' + backBtn("Турниры") +
-      '<div class="subhead"><h1>' + esc(t ? t.name : "Турнир") + '</h1><span class="upd">' +
-      (t ? '<span class="pill ' + esc(t.tier) + '">' + esc((t.tier || "").toUpperCase()) + '</span>' + (t.begin ? esc(dm(t.begin) + (t.end ? " – " + dm(t.end) : "")) : "") + (t.prize_usd ? " · " + esc(usd(t.prize_usd)) : t.prize ? " · " + esc(prize(t.prize)) : "") : "") +
-      '</span></div>' +
-      (hasRes ? '<div class="hometabs" role="tablist"><button class="tab" data-ttab="matches" aria-selected="' + (tab === "matches") + '">Матчи</button>' +
-        '<button class="tab" data-ttab="done" aria-selected="' + (tab === "done") + '">Завершённые<span class="c">' + t.results + '</span></button></div>' : '') +
-      '</header>';
-    if (tab === "done") {
-      var R = (state.results || {})[id];
-      if (!R) { html += '<div class="empty">Загружаю результаты…</div>'; }
-      else {
-        var cur = null;
-        (R.matches || []).forEach(function (x) {
-          var k = dayKey(x.date);
-          if (k !== cur) { if (cur) html += '</section>'; cur = k; html += '<section class="day"><h2>' + esc(dayTitle(x.date)) + '</h2>'; }
-          html += resultRow(x);
-        });
-        if (cur) html += '</section>';
-        html += '<div class="upd" style="text-align:center;margin-top:14px">Нажми на матч — карты, счёт и статистика игроков</div>';
-      }
-      $app.innerHTML = html + '</div>';
-      return;
-    }
-    var mj = t && t.major ? majorBlock(t.major) : "";
-    if (ms.length) html += byDays(ms, false) + mj;
-    else html += mj + (mj ? '<div class="note" style="padding:12px 0 0">Расписание матчей пока не опубликовано — появится здесь, как только организаторы его объявят.</div>'
-      : '<div class="empty"><strong>Расписание пока не опубликовано</strong>Матчи появятся здесь, как только организаторы их объявят.</div>');
-    if (t && t.hltv) html += prizeBlock(t.hltv);
-    $app.innerHTML = html + '</div>';
+    var tabs = [];
+    if (ms.length || !(t && t.results)) tabs.push({ key: "matches", label: "Матчи" });
+    if (t && t.results) tabs.push({ key: "done", label: "Завершённые" });
+    var sub = t ? '<span class="pill ' + esc(t.tier) + '">' + (t.tier === "s" ? "ТИР-1" : "ТИР-2") + '</span>' + (t.begin ? esc(dm(t.begin) + (t.end ? " – " + dm(t.end) : "")) : "") + (t.prize_usd ? " · " + esc(usd(t.prize_usd)) : t.prize ? " · " + esc(prize(t.prize)) : "") : "";
+    renderShell({ id: "tour:" + id, back: "Турниры", title: esc(t ? t.name : "Турнир") + '<span class="upd shsub">' + sub + '</span>', tabs: tabs,
+      pane: function (k) {
+        if (k === "done") {
+          var R = (state.results || {})[id];
+          if (!R) {
+            getResults(id).then(function () { if (state.view === "tour:" + id) showTour(id); }).catch(function () {});
+            return '<div class="empty">Загружаю результаты…</div>';
+          }
+          var html = "", cur = null;
+          (R.matches || []).forEach(function (x) {
+            var dk = dayKey(x.date);
+            if (dk !== cur) { if (cur) html += '</section>'; cur = dk; html += '<section class="day"><h2>' + esc(dayTitle(x.date)) + '</h2>'; }
+            html += resultRow(x);
+          });
+          if (cur) html += '</section>';
+          return html + '<div class="upd" style="text-align:center;margin-top:14px">Нажми на матч — вето, карты, счёт и статистика игроков</div>';
+        }
+        var mj = t && t.major ? majorBlock(t.major) : "", out = "";
+        if (ms.length) out += byDays(ms, false) + mj;
+        else out += mj + (mj ? '<div class="note" style="padding:12px 0 0">Расписание матчей пока не опубликовано — появится здесь, как только организаторы его объявят.</div>'
+          : '<div class="empty"><strong>Расписание пока не опубликовано</strong>Матчи появятся здесь, как только организаторы их объявят.</div>');
+        if (t && t.hltv) out += prizeBlock(t.hltv);
+        return out;
+      } });
   }
 
   function majorBlock(M) {
@@ -1196,7 +1311,7 @@ a.ni { text-decoration: none; color: inherit; }
   function personRow(p, roles, real, extra, statsHtml, attrs) {
     var info = [real ? esc(real) + (p.name_ru ? ' <span class="pron">[' + esc(plain(p.name_ru)) + ']</span>' : '') : (p.name_ru ? esc(plain(p.name_ru)) : ""),
       p.age ? esc(p.age) + " " + years(p.age) : ""].concat(extra || []).filter(Boolean);
-    return '<' + (attrs ? 'button class="pl"' + attrs : 'div class="pl"') + '><span class="nickline"><span class="pflag">' + esc(flag(p.nationality || p.flag)) + '</span><span class="nick">' + esc(p.nick) + '</span></span>' +
+    return '<' + (attrs ? 'button class="pl"' + attrs : 'div class="pl"') + '><span class="nickline"><span class="pflag">' + esc(flag(p.nationality || p.flag)) + '</span><span class="nick">' + esc(p.nick) + '</span>' + (p.mvp ? '<span class="mvp" title="медали MVP">🏅 ' + esc(p.mvp) + ' MVP</span>' : '') + '</span>' +
       (roles.length ? '<span class="rcol">' + roles.map(function (r) { return '<span class="rt ' + r[1] + '">' + esc(r[0]) + '</span>'; }).join("") + '</span>' : '') +
       '<span class="rn">' + info.join(" · ") + '</span>' + (statsHtml || "") + '</' + (attrs ? 'button' : 'div') + '>';
   }
@@ -1288,6 +1403,7 @@ a.ni { text-decoration: none; color: inherit; }
     var maps = S.maps || [];
     if (sel >= maps.length || (sel >= 0 && !maps[sel].players)) sel = -1;
     var rows = sel < 0 ? S.players : maps[sel].players;
+    var dec = (S.veto || []).find(function (v) { return v.act === "decider"; });
     var html = '<div class="pin"><div class="ovtop">' + (TG ? '' : '<button class="back" data-close>' + ARROW + esc(backLabel) + '</button>') + '</div>' +
       '<div class="rd-meta">' + esc([S.tournament, S.stage, S.round].filter(Boolean).join(" · ")) + (S.date ? ' · ' + esc(dmy(S.date)) : '') + '</div>' +
       '<section class="hero sres"><div class="face"><div class="tm a"><span class="acr' + ((A.acronym || A.name || "").length > 6 ? ' sm' : '') + '">' + esc(A.acronym || A.name) + '</span><span class="full">' + esc(A.name) + '</span></div>' +
@@ -1295,7 +1411,14 @@ a.ni { text-decoration: none; color: inherit; }
       '<div class="tm b"><span class="acr' + ((B.acronym || B.name || "").length > 6 ? ' sm' : '') + '">' + esc(B.acronym || B.name) + '</span><span class="full">' + esc(B.name) + '</span></div></div>' +
       (maps.length ? '<div class="smaps">' + maps.map(function (g) {
         return '<div class="smap"><span>' + esc(g.map || "?") + '</span><b class="num"><span class="' + (g.winner === 0 ? "a" : "") + '">' + esc(g.score ? g.score[0] : "–") + '</span>:<span class="' + (g.winner === 1 ? "b" : "") + '">' + esc(g.score ? g.score[1] : "–") + '</span></b></div>';
-      }).join("") + '</div>' : '') + '</section>';
+      }).join("") + (dec && maps.length < (S.bo || 3) ? '<div class="smap left"><span>' + esc(dec.map) + '</span><b>не сыграна</b></div>' : '') + '</div>' : '') + '</section>';
+    if ((S.veto || []).length) {
+      html += '<div class="sec"><h3>Вето</h3><div class="box veto">' + S.veto.map(function (v, i) {
+        var who = v.team ? ([A, B].findIndex(function (t) { return t && t.name && (t.name.toLowerCase().indexOf(v.team.toLowerCase()) >= 0 || v.team.toLowerCase().indexOf(String(t.name).toLowerCase()) >= 0); })) : -1;
+        return '<div class="vt"><span class="vt-n num">' + (i + 1) + '</span><span class="vt-t ' + (who === 0 ? "a" : who === 1 ? "b" : "") + '">' + esc(v.team || "") + '</span>' +
+          '<span class="vt-a ' + esc(v.act) + '">' + (v.act === "ban" ? "бан" : v.act === "pick" ? "пик" : "осталась") + '</span><b>' + esc(v.map) + '</b></div>';
+      }).join("") + '</div></div>';
+    }
     if (rows) {
       html += '<div class="filt sfilt" role="group" aria-label="Карта"><button class="chip" data-smap="-1" aria-pressed="' + (sel < 0) + '">Вся серия</button>' +
         maps.map(function (g, i) { return g.players ? '<button class="chip" data-smap="' + i + '" aria-pressed="' + (sel === i) + '">' + esc(g.map || ("Карта " + (i + 1))) + '</button>' : ''; }).join("") + '</div>';
@@ -1631,7 +1754,7 @@ a.ni { text-decoration: none; color: inherit; }
   }
   function updateBackBtn() {
     var h = location.hash.replace("#", "");
-    try { TG && (state.ovl || (h && h !== "feed" && h !== "rating") ? TG.BackButton.show() : TG.BackButton.hide()); } catch (e) {}
+    try { TG && (state.ovl || h ? TG.BackButton.show() : TG.BackButton.hide()); } catch (e) {}
   }
   function openSeries(S, label) { state.seriesMap = -1; openOverlay("series", S, seriesView(S, label)); }
 
@@ -1669,85 +1792,6 @@ a.ni { text-decoration: none; color: inherit; }
   document.addEventListener("touchend", readerSwipeEnd, { passive: true });
   document.addEventListener("touchcancel", readerSwipeEnd, { passive: true });
 
-  // ---------- свайпы на главной и в турнире: вкладки и назад
-  var ps = null;
-  function pageSteps() {
-    if (state.view === "home" || state.view === "feed" || state.view === "rating") {
-      var L = ["t:live", "t:up", "t:done", "feed"].concat(RATE_SUBS.map(function (o) { return "r:" + o[0]; }));
-      var cur = state.view === "feed" ? "feed" : state.view === "rating" ? "r:" + rateSub() : "t:" + tourSub();
-      return { list: L, i: Math.max(0, L.indexOf(cur)), back: false, home: true };
-    }
-    if (state.view && state.view.indexOf("team:") === 0) return { list: ["team"], i: 0, back: true };
-    if (state.view && state.view.indexOf("tour:") === 0) {
-      var t = findTour(state.view.slice(5)), L = t && t.results ? ["matches", "done"] : ["matches"];
-      return { list: L, i: state.tourTab === "done" && L.length > 1 ? 1 : 0, back: true };
-    }
-    return null;
-  }
-  document.addEventListener("touchstart", function (e) {
-    ps = null;
-    if (state.openId || state.ovl || e.touches.length !== 1) return;
-    var x = e.touches[0].clientX;
-    if (x < 20 || x > window.innerWidth - 20 || e.target.closest("video, input")) return;
-    var sc = e.target.closest(".filt");
-    if (sc && sc.scrollWidth > sc.clientWidth + 2) return;
-    var st = pageSteps();
-    if (!st) return;
-    ps = { x: x, y: e.touches[0].clientY, t: Date.now(), dx: 0, lock: null, st: st, v: q("#app > .view") };
-  }, { passive: true });
-  document.addEventListener("touchmove", function (e) {
-    if (!ps || ps.lock === "v" || !ps.v) return;
-    var dx = e.touches[0].clientX - ps.x, dy = e.touches[0].clientY - ps.y;
-    if (!ps.lock) {
-      if (Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy) * 1.5) ps.lock = "h";
-      else if (Math.abs(dy) > 10) { ps.lock = "v"; return; }
-      else return;
-    }
-    var next = ps.st.i + (dx < 0 ? 1 : -1);
-    var ok = (next >= 0 && next < ps.st.list.length) || (next < 0 && ps.st.back);
-    ps.dx = ok ? dx : dx * 0.2;
-    ps.v.style.transition = "none";
-    ps.v.style.transform = "translate3d(" + ps.dx + "px,0,0)";
-    ps.v.style.opacity = String(1 - Math.min(0.5, Math.abs(ps.dx) / window.innerWidth * 0.7));
-  }, { passive: true });
-  function pageSwipeEnd() {
-    if (!ps) return;
-    var p0 = ps; ps = null;
-    if (p0.lock !== "h" || !p0.v) return;
-    var W = window.innerWidth, v = Math.abs(p0.dx) / Math.max(1, Date.now() - p0.t);
-    var next = p0.st.i + (p0.dx < 0 ? 1 : -1);
-    var ok = (next >= 0 && next < p0.st.list.length) || (next < 0 && p0.st.back);
-    var far = ok && (Math.abs(p0.dx) > W * 0.22 || (v > 0.45 && Math.abs(p0.dx) > 35));
-    p0.v.style.transition = "transform .15s ease-out, opacity .15s ease-out";
-    if (!far) { p0.v.style.transform = ""; p0.v.style.opacity = ""; return; }
-    p0.v.style.transform = "translate3d(" + (p0.dx < 0 ? -W : W) + "px,0,0)"; p0.v.style.opacity = "0";
-    setTimeout(function () {
-      var from = p0.dx < 0 ? 1 : -1;
-      if (next < 0) { goBack(); }
-      else if (p0.st.home) {
-        var k = p0.st.list[next];
-        if (k === "feed") { if (location.hash !== "#feed") location.hash = "feed"; else renderFeed(); }
-        else if (k.indexOf("r:") === 0) { state.rateSub = k.slice(2); if (location.hash !== "#rating") location.hash = "rating"; else renderRating(); }
-        else { state.tourSub = k.slice(2); if (location.hash) location.hash = ""; else renderHome(); }
-        var hs = q("#app .hsub"); if (hs) revealSel(hs);
-      }
-      else { state.tourTab = p0.st.list[next]; showTourTab(); }
-      var nv = q("#app > .view");
-      if (nv) {
-        nv.style.transition = "none"; nv.style.transform = "translate3d(" + (from * 40) + "px,0,0)"; nv.style.opacity = "0";
-        requestAnimationFrame(function () { requestAnimationFrame(function () { nv.style.transition = "transform .18s ease-out, opacity .18s ease-out"; nv.style.transform = ""; nv.style.opacity = ""; }); });
-      }
-      try { TG && TG.HapticFeedback && TG.HapticFeedback.selectionChanged(); } catch (err) {}
-    }, 140);
-  }
-  document.addEventListener("touchend", pageSwipeEnd, { passive: true });
-  document.addEventListener("touchcancel", pageSwipeEnd, { passive: true });
-  function showTourTab() {
-    var id = state.view.slice(5);
-    renderTour(id);
-    if (state.tourTab === "done" && !(state.results || {})[id]) getResults(id).then(function () { if (state.view === "tour:" + id) renderTour(id); }).catch(function () {});
-  }
-
   // ---------- роутинг: "" турниры, #t-ID турнир, #m-ID матч, #feed лента
   var depth = 0;
   function route() {
@@ -1757,6 +1801,7 @@ a.ni { text-decoration: none; color: inherit; }
     updateBackBtn();
     if (!state.list) return;
     if (mt) {
+      SH = null;
       var id = mt[1];
       if (state.openId !== id) { state.openId = id; state.tab = "players"; state.newsFilter = "all"; state.map = null; state.scrolls = {}; state.factsAll = false; window.scrollTo(0, 0); }
       $app.innerHTML = '<div class="empty">Загружаю матч…</div>';
@@ -1766,14 +1811,13 @@ a.ni { text-decoration: none; color: inherit; }
       return;
     }
     state.openId = null;
-    if (tt) {
-      if (state.view !== "tour:" + tt[1]) state.tourTab = "matches";
-      state.view = "tour:" + tt[1]; showTourTab();
-    }
-    else if (h === "rating") { state.view = "rating"; renderRating(); getRanking().then(function () { if (state.view === "rating") renderRating(); }).catch(function () { state.rankingErr = true; if (state.view === "rating") renderRating(); }); }
-    else if (/^r-/.test(h)) { var sl = h.slice(2); state.view = "team:" + sl; state.teamErr = false; renderTeam(sl); getTeam(sl).then(function () { if (state.view === "team:" + sl) renderTeam(sl); }).catch(function () { state.teamErr = true; if (state.view === "team:" + sl) renderTeam(sl); }); }
-    else if (h === "feed") { state.view = "feed"; renderFeed(); getFeed().then(function () { if (state.view === "feed") renderFeed(); }).catch(function () { if (state.view === "feed") $app.innerHTML = homeHeader("feed") + '<div class="empty"><strong>Лента пока не собрана</strong>Появится после ближайшего обновления данных.</div></div>'; }); }
-    else { state.view = "home"; renderHome(); }
+    if (!(tt || /^(tours|rating|feed|r-)/.test(h))) SH = null;
+    if (tt) { state.view = "tour:" + tt[1]; showTour(tt[1]); }
+    else if (h === "tours") { state.view = "tours"; showTours(); }
+    else if (h === "rating") { state.view = "rating"; showRating(); if (!state.ranking) getRanking().then(function () { if (state.view === "rating") showRating(); }).catch(function () { state.rankingErr = true; if (state.view === "rating") showRating(); }); }
+    else if (/^r-/.test(h)) { var sl = h.slice(2); state.view = "team:" + sl; state.teamErr = false; showTeam(sl); getTeam(sl).then(function () { if (state.view === "team:" + sl) showTeam(sl); }).catch(function () { state.teamErr = true; if (state.view === "team:" + sl) showTeam(sl); }); }
+    else if (h === "feed") { state.view = "feed"; showFeed(); if (!state.feed) getFeed().then(function () { if (state.view === "feed") showFeed(); }).catch(function () { state.feedErr = true; if (state.view === "feed") showFeed(); }); }
+    else { state.view = "home"; SH = null; renderMenu(); }
   }
   function go(hash) { if (location.hash === hash) route(); else { depth++; location.hash = hash; } }
   function goBack() {
@@ -1784,6 +1828,7 @@ a.ni { text-decoration: none; color: inherit; }
       var m = (state.list.matches || []).find(function (x) { return "m-" + x.id === h; });
       location.hash = m ? "t-" + tourOf(m) : "";
     } else if (/^r-/.test(h)) location.hash = "rating";
+    else if (/^t-/.test(h)) location.hash = "tours";
     else location.hash = "";
   }
 
@@ -1794,6 +1839,7 @@ a.ni { text-decoration: none; color: inherit; }
   function atTop() {
     if (state.ovl) return false;
     if (state.openId) { var p = activePane(); return !!p && p.scrollTop <= 0; }
+    if (SH && q(".sshell")) { var sp = shellPane(); return !!sp && sp.scrollTop <= 0; }
     return window.scrollY <= 0;
   }
   function ptrShow(y, txt, spin) {
@@ -1841,11 +1887,10 @@ a.ni { text-decoration: none; color: inherit; }
 
   // ---------- клики
   document.addEventListener("click", function (e) {
-    var t = e.target.closest("[data-tsub],[data-rsub],[data-team],[data-tseries],[data-fread],[data-close],#facts-more,[data-home],[data-feedch],[data-tg],[data-reader],[data-open],[data-tour],[data-tab],[data-map],[data-nf],[data-player],[data-link],[data-read],[data-series],[data-rseries],[data-smap],[data-ttab],#back");
+    var t = e.target.closest("[data-goto],[data-sk],[data-team],[data-tseries],[data-fread],[data-close],#facts-more,[data-home],[data-feedch],[data-tg],[data-reader],[data-open],[data-tour],[data-tab],[data-map],[data-nf],[data-player],[data-link],[data-read],[data-series],[data-rseries],[data-smap],[data-ttab],#back");
     if (!t) return;
-    if (t.hasAttribute("data-home")) { var hv = t.getAttribute("data-home"); if (hv === "feed" || hv === "rating") { location.hash = hv; } else if (location.hash) { location.hash = ""; } return; }
-    if (t.hasAttribute("data-tsub")) { state.tourSub = t.getAttribute("data-tsub"); keepFilterScroll(renderHome); return; }
-    if (t.hasAttribute("data-rsub")) { state.rateSub = t.getAttribute("data-rsub"); keepFilterScroll(renderRating); return; }
+    if (t.hasAttribute("data-goto")) { go("#" + t.getAttribute("data-goto")); return; }
+    if (t.hasAttribute("data-sk")) { shellGo(t.getAttribute("data-sk")); return; }
     if (t.hasAttribute("data-team")) { go("#r-" + t.getAttribute("data-team")); window.scrollTo(0, 0); return; }
     if (t.hasAttribute("data-tseries")) {
       var TT = (state.teams || {})[state.view.slice(5)], S3 = TT && (TT.series || {})[t.getAttribute("data-tseries")];
@@ -1859,7 +1904,6 @@ a.ni { text-decoration: none; color: inherit; }
       return;
     }
     if (t.id === "facts-more") { state.factsAll = !state.factsAll; renderMatch(state.details[state.openId]); return; }
-    if (t.hasAttribute("data-feedch")) { state.feedCh = t.getAttribute("data-feedch"); keepFilterScroll(renderFeed); return; }
     if (t.hasAttribute("data-tg")) { if (TG) { e.preventDefault(); try { TG.openTelegramLink(t.getAttribute("data-tg")); } catch (x) { openLink(t.getAttribute("data-tg")); } } return; }
     if (t.hasAttribute("data-reader")) {
       var m0 = state.details[state.openId], n = m0 && ((m0.news && m0.news.items) || []).find(function (x) { return x.key === t.getAttribute("data-reader"); });
@@ -1884,7 +1928,6 @@ a.ni { text-decoration: none; color: inherit; }
       el.scrollTop = top; f = el.querySelector(".sfilt"); if (f) { f.scrollLeft = sl; revealSel(f); }
       return;
     }
-    if (t.hasAttribute("data-ttab")) { state.tourTab = t.getAttribute("data-ttab"); showTourTab(); return; }
     if (t.hasAttribute("data-read")) { if (TG) { e.preventDefault(); try { TG.openLink(t.getAttribute("data-read"), { try_instant_view: true }); } catch (x) { openLink(t.getAttribute("data-read")); } } return; }
     if (t.hasAttribute("data-link")) { if (TG) { e.preventDefault(); openLink(t.getAttribute("data-link")); } return; }
     if (t.hasAttribute("data-open")) { go("#m-" + t.getAttribute("data-open")); return; }
