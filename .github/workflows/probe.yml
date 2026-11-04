@@ -5,10 +5,20 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: |
-          for r in DigitalFriends/cs2-map-images bnt0p/MapPictures MurkyYT/cs2-map-icons; do
-            b=$(curl -s https://api.github.com/repos/$r | python3 -c "import json,sys;print(json.load(sys.stdin).get('default_branch','main'))")
-            curl -s "https://api.github.com/repos/$r/git/trees/$b?recursive=1" | python3 -c "
-          import json,sys;d=json.load(sys.stdin)
-          for t in d.get('tree',[]):
-              if 'cache' in t['path'].lower() and t['type']=='blob': print('CACHE|', '$r', '$b', t['path'], t.get('size'))"
-          done
+          pip install -q pillow
+          python3 - <<'X'
+          import io, base64, urllib.request
+          from PIL import Image
+          raw = urllib.request.urlopen("https://raw.githubusercontent.com/MurkyYT/cs2-map-icons/main/images/thumbs/de_cache_png.png", timeout=120).read()
+          im = Image.open(io.BytesIO(raw)).convert("RGB")
+          w, h = im.size
+          t = int(w * 9 / 16)
+          if h > t:
+              im = im.crop((0, (h - t) // 2, w, (h - t) // 2 + t))
+          im.thumbnail((480, 480))
+          buf = io.BytesIO(); im.save(buf, "WEBP", quality=58)
+          b = base64.b64encode(buf.getvalue()).decode()
+          print("IMG|cache|", len(buf.getvalue()), im.size)
+          for i in range(0, len(b), 3000):
+              print(f"B64|cache|{i // 3000}|{b[i:i + 3000]}")
+          X
