@@ -1,0 +1,9 @@
+name: probe
+on: { workflow_dispatch: {} }
+jobs:
+  p:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          curl -sI "https://raw.githubusercontent.com/vladrimskij-a11y/cs-prep/data/matches.json?t=$RANDOM" -H "Origin: https://vladrimskij-a11y.github.io" | grep -iE "^HTTP|access-control|cache-control|x-cache" | sed 's/^/PR: /'
+          curl -s "https://raw.githubusercontent.com/vladrimskij-a11y/cs-prep/data/matches.json?t=$RANDOM" | head -c 60 | sed 's/^/PR: /'
