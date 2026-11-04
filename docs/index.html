@@ -250,37 +250,92 @@ a { color: inherit; }
 .ch { font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 4px; white-space: nowrap; background: var(--sunk); color: var(--muted); }
 .ch.hi { color: var(--win); } .ch.lo { color: var(--loss); }
 
-.in-left { animation: tabInL .14s ease-out; }
-.in-right { animation: tabInR .14s ease-out; }
-html, body { overflow-x: clip; }  /* соседняя страница при свайпе не расширяет экран (иначе телефон на миг отдаляет страницу) */
+html, body { overflow-x: clip; }
 html { overflow-anchor: none; }
-.mshell { position: fixed; inset: 0; overflow: hidden; background: var(--bg); z-index: 1; display: flex; flex-direction: column; }
-.mhead { flex: none; background: var(--bg); }
+/* карточка матча: страницы-вкладки в ряд, шапка поверх них и сворачивается вслед за прокруткой */
+.mshell { position: fixed; left: 0; right: 0; top: 0; height: var(--tg-viewport-stable-height, 100dvh); overflow: hidden; background: var(--bg); z-index: 1; }
+.mviewport { position: absolute; inset: 0; overflow: hidden; }
+.mtrack { display: flex; height: 100%; will-change: transform; }
+.pane { flex: 0 0 100%; width: 100%; height: 100%; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; touch-action: pan-y; }
+.pane > .pin { max-width: 640px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-top: var(--hfull, 300px); padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px)); box-sizing: border-box; }
+.pane.np > .pin { padding-top: calc(var(--hfull, 300px) + var(--nfh, 44px)); }
+.mhead { position: absolute; top: 0; left: 0; right: 0; z-index: 5; background: var(--bg); }
 .mhead > .pin { max-width: 640px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-top: env(safe-area-inset-top, 0px); }
-.mhead .tabs { position: static; }
-.fold { display: grid; transition: grid-template-rows .24s ease, opacity .2s ease; }
-.fold > * { min-height: 0; overflow: hidden; }
-.hero-wrap { grid-template-rows: 1fr; opacity: 1; }
-.mini-wrap { grid-template-rows: 0fr; opacity: 0; }
-.mhead.compact .hero-wrap { grid-template-rows: 0fr; opacity: 0; }
-.mhead.compact .mini-wrap { grid-template-rows: 1fr; opacity: 1; }
-.mhead.noanim .fold { transition: none; }
-.mini { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 10px; padding: 8px 2px 2px; }
+.mhead .hbar { padding-top: 12px; }
+.mhead .tabs { position: static; padding-block: 10px 8px; }
+.fold { overflow: hidden; }
+.fold > .fi { will-change: transform; }
+.mini-wrap { height: 0; opacity: 0; }
+.nf-wrap { height: 0; opacity: 0; visibility: hidden; }
+.mhead.anim .fold { transition: height .26s cubic-bezier(.2,.7,.3,1), opacity .2s ease; }
+.mhead.anim .fold > .fi { transition: transform .26s cubic-bezier(.2,.7,.3,1); }
+.mhead .nfilt { position: static; padding-block: 0 8px; }
+.mini { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 10px; padding: 6px 2px 2px; }
 .mini .ma { font-family: var(--display); font-weight: 700; font-size: 17px; color: var(--ct); }
 .mini .mb { font-family: var(--display); font-weight: 700; font-size: 17px; color: var(--t); text-align: right; }
 .mini .mm { font-family: var(--mono); font-size: 12px; color: var(--muted); white-space: nowrap; }
-@media (prefers-reduced-motion: reduce) { .fold { transition: none; } }
-.mviewport { flex: 1; min-height: 0; overflow: hidden; position: relative; }
-.mtrack { display: flex; height: 100%; will-change: transform; }
-.pane .nfilt { top: 0; }
-.pane { flex: 0 0 100%; width: 100%; height: 100%; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; touch-action: pan-y; }
-.pane > .pin { max-width: 640px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-bottom: calc(32px + env(safe-area-inset-bottom, 0px)); }
+@media (prefers-reduced-motion: reduce) { .mhead.anim .fold, .mhead.anim .fold > .fi { transition: none; } }
 .tabbody { display: flow-root; }
-.view.reader { touch-action: pan-y; }
 .swipe-ghost { position: absolute; pointer-events: none; }
-@keyframes tabInL { from { opacity: .35; transform: translateX(40%); } to { opacity: 1; transform: none; } }
-@keyframes tabInR { from { opacity: .35; transform: translateX(-40%); } to { opacity: 1; transform: none; } }
-@media (prefers-reduced-motion: reduce) { .in-left, .in-right { animation: none; } }
+.face .tvrs { font-size: 11px; color: var(--muted); }
+/* поверх экрана: новость, пост, серия */
+.ovl { position: fixed; left: 0; right: 0; top: 0; height: var(--tg-viewport-stable-height, 100dvh); overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain; background: var(--bg); z-index: 30; box-shadow: -8px 0 24px rgba(0,0,0,.18); touch-action: pan-y; will-change: transform; }
+.ovl > .pin { max-width: 640px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-top: env(safe-area-inset-top, 0px); padding-bottom: calc(48px + env(safe-area-inset-bottom, 0px)); }
+.ovtop { padding-top: 12px; min-height: 4px; }
+/* зона карты */
+.mapzone { position: relative; gap: 8px; }
+.mapzone .mapsel { position: sticky; top: var(--hcur, 0px); z-index: 2; background: var(--bg); padding-block: 8px; margin-block: -8px 0; }
+.mzbody { display: flex; flex-direction: column; gap: 14px; }
+.mzsec { display: flex; flex-direction: column; gap: 10px; }
+.mzh { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 600; margin: 0; display: flex; justify-content: space-between; gap: 8px; }
+.mzh span { text-transform: none; letter-spacing: 0; font-weight: 500; }
+/* форма: строка-кнопка */
+.gbtn { width: 100%; text-align: left; }
+.gbtn:active { background: var(--sunk); }
+.chev2 { font-style: normal; color: var(--muted); margin-left: 4px; }
+/* VRS */
+.vr-r { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 8px; padding: 8px 12px; border-top: 1px solid var(--line); align-items: baseline; }
+.vr-h { border-top: 0; font-size: 11px; color: var(--muted); font-weight: 600; padding-bottom: 2px; }
+.vr-t { font-family: var(--display); font-weight: 700; font-size: 14px; }
+.vr-r.a .vr-t { color: var(--ct); } .vr-r.b .vr-t { color: var(--t); }
+.vr-c { display: flex; gap: 6px; align-items: baseline; flex-wrap: wrap; }
+.vr-c small { font-size: 11px; color: var(--muted); }
+.up { color: var(--win) !important; } .dn { color: var(--loss) !important; }
+.vrs .note { border-top: 1px solid var(--line); font-size: 12px; }
+/* игроки */
+.roster .hd { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; align-items: baseline; padding: 10px 12px 8px; }
+.roster .hd .tn { font-weight: 700; font-size: 15px; }
+.roster .hd .tinfo { font-size: 12px; color: var(--muted); font-weight: 600; text-align: right; }
+.roster .hd .tpr { grid-column: 1 / -1; font-size: 12px; color: var(--muted); font-weight: 500; }
+.roster .hd .tpr b { color: var(--fg); }
+.pl { grid-template-columns: 1fr auto; box-sizing: border-box; }
+.pl .nickline { grid-row: 1; grid-column: 1; }
+.pl .pflag { font-size: 16px; line-height: 1; }
+.pl .rcol { grid-row: 1 / span 2; grid-column: 2; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; align-self: start; }
+.pl .rn { grid-column: 1; grid-row: 2; }
+.pl .pstat { grid-column: 1 / -1; }
+/* итоги турнира и серия */
+.match.res { grid-template-columns: 52px 1fr auto; }
+.match.res .tname.won { color: var(--fg); }
+.match.res .tname:not(.won) { color: var(--muted); font-weight: 500; }
+.match.res .maps { margin-top: 4px; }
+.rscore { font-weight: 700; font-size: 18px; display: flex; flex-direction: column; align-items: center; gap: 0; line-height: 1.35; }
+.rscore .a { color: var(--ct); } .rscore .b { color: var(--t); } .rscore .x { display: none; }
+.sres { margin-top: 8px; }
+.smaps { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
+.smap { display: flex; flex-direction: column; align-items: center; padding: 6px 10px; border-radius: 8px; background: var(--sunk); font-size: 12px; color: var(--muted); }
+.smap b { font-size: 15px; color: var(--muted); }
+.smap .a { color: var(--ct); } .smap .b { color: var(--t); }
+.sfilt { margin-top: 12px; }
+.st-h { padding: 10px 12px 4px; font-weight: 700; font-size: 13px; }
+.st-h.a { color: var(--ct); } .st-h.b { color: var(--t); }
+.ptab td, .ptab th { padding-left: 10px; padding-right: 10px; }
+.ptab td.mn { max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ptab small { font-size: 10px; }
+.rt2 { font-weight: 700; }
 
 /* лента */
 .hometabs { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
@@ -546,10 +601,18 @@ a.ni { text-decoration: none; color: inherit; }
     v.parentNode.replaceWith(a);
   }, true);
 
+  // картинки поста: альбом — все фото подряд
+  function photosHtml(list, video, url, img) {
+    var ph = (list || []).filter(Boolean);
+    if (video) return media(img || ph[0], video, url) + ph.slice(1).map(function (p) { return media(p, null, url); }).join("");
+    if (ph.length > 1) return ph.map(function (p) { return media(p, null, url); }).join("");
+    return media(img || ph[0], null, url);
+  }
+
   function feedReader(n) {
-    var html = '<div class="view reader"><div style="padding-top:12px">' + (TG ? '' : '<button class="back" id="close-freader">' + ARROW + 'Лента</button>') + '</div>' +
+    var html = '<div class="pin"><div class="ovtop">' + (TG ? '' : '<button class="back" data-close>' + ARROW + 'Лента</button>') + '</div>' +
       '<article class="rd"><div class="rd-meta"><b>' + esc(n.channel_title) + '</b> · ' + esc(dmy(n.date)) + ' ' + esc(hm(n.date)) + '</div>' +
-      media(n.photo, n.video, n.url) +
+      photosHtml(n.photos, n.video, n.url, n.photo) +
       String(n.full || n.text || n.title).split(/\n+/).filter(Boolean).map(function (p) { return '<p>' + esc(p) + '</p>'; }).join("") +
       '<a class="readbtn" href="' + esc(n.url) + '" data-tg="' + esc(n.url) + '" target="_blank" rel="noopener">Открыть в Telegram</a>';
     if ((n.also || []).length) {
@@ -563,11 +626,6 @@ a.ni { text-decoration: none; color: inherit; }
   function renderFeed() {
     var html = homeHeader("feed");
     var F = state.feed;
-    if (F && state.feedRead) {
-      var it = (F.items || []).find(function (x) { return x.key === state.feedRead; });
-      if (it) { $app.innerHTML = feedReader(it); try { TG && TG.BackButton.show(); } catch (e) {} return; }
-      state.feedRead = null;
-    }
     if (!F) { $app.innerHTML = html + '<div class="empty">Загружаю ленту…</div></div>'; return; }
     var ch = state.feedCh || "all";
     var items = (F.items || []).filter(function (n) { return ch === "all" || n.channel === ch || (n.also || []).some(function (a) { return a.channel === ch; }); });
@@ -635,13 +693,56 @@ a.ni { text-decoration: none; color: inherit; }
     $app.innerHTML = html + '</div>';
   }
 
+  function getResults(id) {
+    state.results = state.results || {};
+    if (state.results[id]) return Promise.resolve(state.results[id]);
+    if (DEMO) return Promise.resolve((DEMO.results || {})[id] || null);
+    return fetch("data/results/" + String(id).replace(/[^\w-]/g, "-") + ".json" + bust()).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then(function (j) { state.results[id] = j; return j; });
+  }
+
+  function resultRow(x) {
+    var A = x.teams[0] || {}, B = x.teams[1] || {};
+    var sub = [x.stage, x.round].filter(Boolean).join(" · ");
+    return '<button class="match res" data-rseries="' + esc(x.id) + '">' +
+      '<div class="time">' + esc(hm(x.date)) + '<small>BO' + esc(x.bo || "?") + '</small></div>' +
+      '<div class="vs"><div class="row"><span class="dot a"></span><span class="tname' + (x.winner === 0 ? ' won' : '') + '">' + esc(A.name || "?") + '</span></div>' +
+      '<div class="row"><span class="dot b"></span><span class="tname' + (x.winner === 1 ? ' won' : '') + '">' + esc(B.name || "?") + '</span></div>' +
+      (sub ? '<div class="tour">' + esc(sub) + '</div>' : '') +
+      ((x.maps || []).length ? '<div class="maps">' + x.maps.map(function (g) {
+        return '<span class="mp ' + (g.winner === 0 ? "a" : g.winner === 1 ? "b" : "n") + '">' + esc(g.map || "?") + (g.score ? ' <span class="num">' + esc(g.score[0] + ":" + g.score[1]) + '</span>' : '') + '</span>';
+      }).join("") + '</div>' : '') + '</div>' +
+      '<div class="rscore num"><span class="a">' + esc(A.score) + '</span><span class="x">:</span><span class="b">' + esc(B.score) + '</span></div></button>';
+  }
+
   function renderTour(id) {
     var L = state.list, t = findTour(id);
     var ms = (L.matches || []).filter(function (m) { return tourOf(m) === String(id); });
+    var hasRes = !!(t && t.results);
+    var tab = hasRes && state.tourTab === "done" ? "done" : "matches";
     var html = '<div class="view"><header class="top">' + backBtn("Турниры") +
       '<div class="subhead"><h1>' + esc(t ? t.name : "Турнир") + '</h1><span class="upd">' +
       (t ? '<span class="pill ' + esc(t.tier) + '">' + esc((t.tier || "").toUpperCase()) + '</span>' + (t.begin ? esc(dm(t.begin) + (t.end ? " – " + dm(t.end) : "")) : "") + (t.prize_usd ? " · " + esc(usd(t.prize_usd)) : t.prize ? " · " + esc(prize(t.prize)) : "") : "") +
-      '</span></div></header>';
+      '</span></div>' +
+      (hasRes ? '<div class="hometabs" role="tablist"><button class="tab" data-ttab="matches" aria-selected="' + (tab === "matches") + '">Матчи</button>' +
+        '<button class="tab" data-ttab="done" aria-selected="' + (tab === "done") + '">Завершённые<span class="c">' + t.results + '</span></button></div>' : '') +
+      '</header>';
+    if (tab === "done") {
+      var R = (state.results || {})[id];
+      if (!R) { html += '<div class="empty">Загружаю результаты…</div>'; }
+      else {
+        var cur = null;
+        (R.matches || []).forEach(function (x) {
+          var k = dayKey(x.date);
+          if (k !== cur) { if (cur) html += '</section>'; cur = k; html += '<section class="day"><h2>' + esc(dayTitle(x.date)) + '</h2>'; }
+          html += resultRow(x);
+        });
+        if (cur) html += '</section>';
+        html += '<div class="upd" style="text-align:center;margin-top:14px">Нажми на матч — карты, счёт и статистика игроков</div>';
+      }
+      $app.innerHTML = html + '</div>';
+      return;
+    }
     var mj = t && t.major ? majorBlock(t.major) : "";
     if (ms.length) html += byDays(ms, false) + mj;
     else html += mj + (mj ? '<div class="note" style="padding:12px 0 0">Расписание матчей пока не опубликовано — появится здесь, как только организаторы его объявят.</div>'
@@ -748,29 +849,6 @@ a.ni { text-decoration: none; color: inherit; }
 
   function backBtn(label) { return TG ? '' : '<button class="back" id="back">' + ARROW + esc(label) + '</button>'; }
 
-  // ---------- карточка матча
-  function vetoBlock(m) {
-    var V = m.veto;
-    if (!V || !(V.teams || []).some(function (t) { return t && t.matches; })) return "";
-    var html = '<div class="sec"><h3>Вето <span>по последним матчам</span></h3>';
-    if ((V.likely_pool || []).length) {
-      html += '<div class="box vpool"><span class="lbl">Вероятный маппул</span><div class="maps">' + V.likely_pool.map(function (p) {
-        return '<span class="mp ' + (p.by === 0 ? "a" : p.by === 1 ? "b" : "n") + '">' + esc(p.map) + (p.by == null ? ' · десайдер' : ' · пик ' + esc(abbr(m.teams[p.by]))) + '</span>';
-      }).join("") + '</div></div>';
-    }
-    html += '<div class="recent2">';
-    (V.teams || []).forEach(function (t, i) {
-      if (!t || !t.matches) return;
-      function list(arr, n) { return (arr || []).slice(0, n).map(function (x) { return esc(x[0]) + ' <b>' + x[1] + ' из ' + t.matches + '</b>'; }).join(", ") || "—"; }
-      var mw = t.matches % 10 === 1 && t.matches % 100 !== 11 ? "матча" : "матчей";
-      html += '<div class="box ' + (i ? "b" : "a") + '"><div class="hd">' + esc(m.teams[i].name) + '<span>по ' + t.matches + ' ' + mw + '</span></div>' +
-        '<div class="vrow"><span>Пикает</span><span>' + list(t.picks, 4) + '</span></div>' +
-        '<div class="vrow"><span>Первый бан</span><span>' + list(t.first_bans, 3) + '</span></div>' +
-        '<div class="vrow"><span>Банит</span><span>' + list(t.bans, 4) + '</span></div></div>';
-    });
-    return html + '</div></div>';
-  }
-
   // новость-источник факта: по ключу от сборщика, а для старых фактов — по совпадению слов
   var SRC_ICON = '<svg width="11" height="11" viewBox="0 0 12 12" aria-hidden="true"><path d="M4.5 2H2.5A1 1 0 0 0 1.5 3v6.5a1 1 0 0 0 1 1H9a1 1 0 0 0 1-1V7.5M7 1.5h3.5V5M10.5 1.5 5.5 6.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   var STAT_TAGS = { "Форма": 1, "Игроки": 1, "Стороны": 1, "Карты": 1, "Встречи": 1, "Пистолетки": 1, "Маппул": 1 };
@@ -812,7 +890,6 @@ a.ni { text-decoration: none; color: inherit; }
 
   function h2hBlock(m) {
     var h = m.h2h || [];
-    var A = m.teams[0], B = m.teams[1];
     if (!h.length) return '<div class="sec"><h3>Личные встречи</h3><div class="box note">За последний год команды не встречались.</div></div>';
     var wa = h.filter(function (x) { return x.winner === 0; }).length, wb = h.filter(function (x) { return x.winner === 1; }).length;
     var mapsA = 0, mapsB = 0;
@@ -821,7 +898,7 @@ a.ni { text-decoration: none; color: inherit; }
     var html = '<div class="sec"><h3>Личные встречи <span>' + h.length + ' за год</span></h3><div class="box">' +
       '<div class="tally"><div class="n a num">' + wa + '</div><div class="lbl">победы в сериях' + (mapsA + mapsB ? '<br><span class="num">' + mapsA + ':' + mapsB + '</span> по картам' : '') + '</div><div class="n b num">' + wb + '</div>' +
       '<div class="bar2"><i class="a" style="width:' + (100 * wa / tot) + '%"></i><i class="b" style="width:' + (100 * wb / tot) + '%"></i></div></div>' +
-'<div class="h2h">';
+      '<div class="h2h">';
     h.slice(0, 10).forEach(function (x) {
       html += '<div class="it"><div class="d">' + esc(dmy(x.date)) + ' · BO' + esc(x.bo) + '</div>' +
         '<div class="sc"><span class="a">' + esc(x.score[0]) + '</span><span class="x">:</span><span class="b">' + esc(x.score[1]) + '</span></div>' +
@@ -836,51 +913,57 @@ a.ni { text-decoration: none; color: inherit; }
     return html + '</div></div></div>';
   }
 
-  function mapsBlock(m) {
-    var M = m.maps;
-    var A = m.teams[0], B = m.teams[1];
-    if (!M || !M.available || !M.table.length) {
-      return '<div class="sec"><h3>Карты</h3><div class="box note">Нет данных по картам за последние 4 месяца.</div></div>';
-    }
+  // таблица карт: винрейт за 4 месяца
+  function mapsTable(m) {
+    var M = m.maps, A = m.teams[0], B = m.teams[1];
+    if (!M || !M.available || !M.table.length) return '<div class="sec"><h3>Карты</h3><div class="box note">Нет данных по картам за последние 4 месяца.</div></div>';
     var html = '<div class="sec"><h3>Карты <span>за ' + Math.round(M.window_days / 30) + ' мес.</span></h3><div class="box" style="overflow-x:auto"><table class="mtab"><thead><tr><th>Карта</th><th>' + esc(abbr(A)) + '</th><th>' + esc(abbr(B)) + '</th></tr></thead><tbody>';
     M.table.forEach(function (r) {
       var ta = r.teams[0], tb = r.teams[1];
-      var pa = pct(ta.won, ta.played), pb = pct(tb.won, tb.played);
-      html += '<tr><td class="mn">' + esc(r.map) + '</td>' +
-        '<td class="a">' + cell(ta, pa) + '</td><td class="b">' + cell(tb, pb) + '</td></tr>';
+      html += '<tr><td class="mn">' + esc(r.map) + '</td><td class="a">' + cell(ta, pct(ta.won, ta.played)) + '</td><td class="b">' + cell(tb, pct(tb.won, tb.played)) + '</td></tr>';
     });
-    html += '</tbody></table></div></div>';
+    return html + '</tbody></table></div></div>';
     function cell(t, p) {
       if (!t.played) return '<span class="wr"><span class="gp">не играли</span></span>';
       return '<span class="wr"><span class="pct">' + p + '%</span><span class="track"><i style="width:' + p + '%"></i></span><span class="gp">' + t.won + '/' + t.played + '</span></span>';
     }
-    // последние игры на карте
-    var names = M.table.map(function (r) { return r.map; });
+  }
+
+  function mapNames() { var M = state.details[state.openId].maps; return M && M.table ? M.table.map(function (r) { return r.map; }) : []; }
+
+  // зона карты: липкая шапка с картами, ниже — стороны и пистолетки, потом последние игры; свайп по зоне листает карты
+  function mapZone(m) {
+    var names = mapNames();
+    if (!names.length) return "";
     if (!state.map || names.indexOf(state.map) < 0) state.map = names[0];
-    var rec = (M.recent[state.map] || []);
-    html += '<div class="sec"><h3>Последние игры на карте</h3><div class="mapsel" role="group" aria-label="Карта">' +
+    return '<div class="sec mapzone"><div class="mapsel" role="group" aria-label="Карта">' +
       names.map(function (n) { return '<button class="chip" data-map="' + esc(n) + '" aria-pressed="' + (n === state.map) + '">' + esc(n) + '</button>'; }).join("") +
-      '</div><div class="recent2">';
+      '</div><div class="mzbody">' + mapBody(m, state.map) + '</div></div>';
+  }
+  function mapBody(m, mp) { return sidesInner(m, mp) + recentInner(m, mp); }
+
+  function recentInner(m, mp) {
+    var rec = ((m.maps || {}).recent || {})[mp] || [];
+    var html = '<div class="mzsec"><h3 class="mzh">Последние игры на карте</h3><div class="recent2">';
     [0, 1].forEach(function (i) {
       var t = m.teams[i];
       var list = rec.filter(function (g) { return g.team === i; }).slice(0, 8);
       var w = list.filter(function (g) { return g.won; }).length;
       html += '<div class="box ' + (i ? "b" : "a") + '"><div class="hd">' + esc(t.name) + (list.length ? '<span>' + w + '–' + (list.length - w) + '</span>' : '') + '</div>';
-      if (!list.length) html += '<div class="note">На ' + esc(state.map) + ' не играли</div>';
+      if (!list.length) html += '<div class="note">На ' + esc(mp) + ' не играли</div>';
       html += groupByTour(list, function (g) {
         return '<div class="gr"><span>vs ' + esc(g.vs) + ' <span class="d">' + esc(dm(g.date)) + '</span></span><span class="wl ' + (g.won ? "w" : "l") + '">' + (g.score ? esc(g.score) : (g.won ? "W" : "L")) + '</span></div>';
       });
       html += '</div>';
     });
-    html += '</div></div>' + sidesBlock(m);
-    return html;
+    return html + '</div></div>';
   }
 
-  function sidesBlock(m) {
+  function sidesInner(m, mp) {
     var S = m.sides;
     if (!S) return "";
-    var rows = (S.maps || {})[state.map] || [null, null];
-    var html = '<div class="sec"><h3>Стороны и пистолетки <span>' + esc(state.map) + ' · за ' + Math.round(S.window_days / 30) + ' мес.</span></h3><div class="box sides">' +
+    var rows = (S.maps || {})[mp] || [null, null];
+    var html = '<div class="mzsec"><h3 class="mzh">Стороны и пистолетки <span>' + esc(mp) + ' · за ' + Math.round(S.window_days / 30) + ' мес.</span></h3><div class="box sides">' +
       '<div class="sd-head"><span></span><span>CT</span><span>T</span><span>Пистолетки</span></div>';
     [0, 1].forEach(function (i) {
       var r = rows[i], tot = (S.total || [])[i];
@@ -908,7 +991,8 @@ a.ni { text-decoration: none; color: inherit; }
   }
 
   function formBlock(m) {
-    var html = '<div class="sec"><h3>Форма <span>последние 10 серий</span></h3>';
+    var S = m.series || {};
+    var html = '<div class="sec"><h3>Форма <span>последние 10 серий · нажми на матч</span></h3>';
     m.teams.forEach(function (t, i) {
       var f = t.form || [];
       var w = f.filter(function (x) { return x.won; }).length;
@@ -916,11 +1000,30 @@ a.ni { text-decoration: none; color: inherit; }
       if (!f.length) { html += '<div class="note">нет данных</div></div>'; return; }
       html += '<div class="squares">' + f.map(function (x) { return '<span class="sq ' + (x.won ? "w" : "l") + '" title="' + esc("vs " + x.opponent_name) + '">' + (x.won ? "W" : "L") + '</span>'; }).join("") + '</div>';
       html += groupByTour(f, function (x) {
-        return '<div class="gr"><span>vs ' + esc(x.opponent_name || x.opponent) + ' <span class="d">' + esc(dm(x.date)) + '</span></span><span class="wl ' + (x.won ? "w" : "l") + ' num">' + esc(x.score) + ':' + esc(x.opp_score) + '</span></div>';
+        var has = x.sid != null && S[String(x.sid)];
+        var inner = '<span>vs ' + esc(x.opponent_name || x.opponent) + ' <span class="d">' + esc(dm(x.date)) + '</span></span><span class="wl ' + (x.won ? "w" : "l") + ' num">' + esc(x.score) + ':' + esc(x.opp_score) + (has ? ' <i class="chev2">›</i>' : '') + '</span>';
+        return has ? '<button class="gr gbtn" data-series="' + esc(x.sid) + '">' + inner + '</button>' : '<div class="gr">' + inner + '</div>';
       });
       html += '</div>';
     });
     return html + '</div>';
+  }
+
+  // место и очки VRS: сейчас и после матча (оценка)
+  function vrsBlock(m) {
+    var O = m.vrs_outcomes, A = m.teams[0] || {}, B = m.teams[1] || {};
+    if (!O || !A.vrs || !B.vrs) return "";
+    function cell(x) {
+      return '<span class="vr-c"><b class="num">#' + x.rank + '</b><small class="num ' + (x.delta > 0 ? "up" : x.delta < 0 ? "dn" : "") + '">' + (x.delta > 0 ? "+" : x.delta < 0 ? "−" : "±") + Math.abs(x.delta) + '</small></span>';
+    }
+    var html = '<div class="sec"><h3>Рейтинг VRS <span>что будет после матча</span></h3><div class="box vrs">' +
+      '<div class="vr-r vr-h"><span></span><span>Сейчас</span><span>Победа ' + esc(abbr(A)) + '</span><span>Победа ' + esc(abbr(B)) + '</span></div>';
+    [A, B].forEach(function (t, i) {
+      html += '<div class="vr-r ' + (i ? "b" : "a") + '"><span class="vr-t">' + esc(abbr(t)) + '</span>' +
+        '<span class="vr-c"><b class="num">#' + t.vrs.rank + '</b><small class="num">' + t.vrs.points + '</small></span>' +
+        cell(O.win0[i]) + cell(O.win1[i]) + '</div>';
+    });
+    return html + '<div class="note">Оценка по формуле личных встреч Valve: изменение очков за саму победу или поражение. Бонусы за итог турнира сюда не входят.</div></div></div>';
   }
 
   function newsFor(m, who) {
@@ -939,24 +1042,43 @@ a.ni { text-decoration: none; color: inherit; }
     function it(label, v, suf) { return v == null ? "" : '<span>' + label + ' <b>' + esc(v) + (suf || "") + '</b></span>'; }
     var fx = function (v, d) { return v == null ? null : Number(v).toFixed(d); };
     return '<span class="pstat">' +
-      it("Рейтинг 3.0", fx(h.rating, 2)) +
       it("K/D", fx(h.kd != null ? h.kd : st.kd, 2)) +
       it("ADR", fx(h.adr != null ? h.adr : st.adr, 1)) +
       it("KAST", fx(h.kast != null ? h.kast : st.kast, 1), "%") + '</span>';
   }
 
   // без знаков ударения (комбинируемые акценты), й и ё не трогаем
-  function plain(s) { return String(s || "").normalize("NFD").replace(/[\u0300\u0301]/g, "").normalize("NFC"); }
-
+  function plain(s) { return String(s || "").normalize("NFD").replace(/[̀́]/g, "").normalize("NFC"); }
   function plural(n, one, few, many) { n = Math.abs(Number(n)); var d = n % 10, h = n % 100; return h > 10 && h < 20 ? many : d === 1 ? one : d > 1 && d < 5 ? few : many; }
   function years(n) { n = Number(n); var d = n % 10, h = n % 100; return (h > 10 && h < 20) || d === 0 || d > 4 ? "лет" : d === 1 ? "год" : "года"; }
+  var REGNAMES = null;
+  try { REGNAMES = new Intl.DisplayNames(["ru"], { type: "region" }); } catch (e) {}
+  function country(cc) { if (!cc || cc.length !== 2) return ""; try { return REGNAMES ? REGNAMES.of(cc.toUpperCase()) : cc; } catch (e) { return cc; } }
+  var PLACE_RU = { "1st": "1 место", "2nd": "2 место", "3rd": "3 место", "3-4th": "3–4 место", "4th": "4 место" };
+  var MEDAL = { "1st": "🥇", "2nd": "🥈", "3rd": "🥉", "3-4th": "🥉", "4th": "4" };
+  function vrsLine(t) {
+    var v = t.vrs;
+    if (!v) return "";
+    return [v.region, "#" + v.rank + " VRS", v.points + " очк."].filter(Boolean).join(" · ");
+  }
+
+  function heroVrs(t) { var v = t.vrs; return v ? '<span class="tvrs">' + esc(v.region || "") + '<br>#' + esc(v.rank) + ' VRS · ' + esc(v.points) + '</span>' : ''; }
+  function personRow(p, roles, real, extra, statsHtml, attrs) {
+    var info = [esc(country(p.nationality || p.flag)), real ? esc(real) + (p.name_ru ? ' <span class="pron">[' + esc(plain(p.name_ru)) + ']</span>' : '') : (p.name_ru ? esc(plain(p.name_ru)) : ""),
+      p.age ? esc(p.age) + " " + years(p.age) : ""].concat(extra || []).filter(Boolean);
+    return '<' + (attrs ? 'button class="pl"' + attrs : 'div class="pl"') + '><span class="nickline"><span class="pflag">' + esc(flag(p.nationality || p.flag)) + '</span><span class="nick">' + esc(p.nick) + '</span></span>' +
+      (roles.length ? '<span class="rcol">' + roles.map(function (r) { return '<span class="rt ' + r[1] + '">' + esc(r[0]) + '</span>'; }).join("") + '</span>' : '') +
+      '<span class="rn">' + info.join(" · ") + '</span>' + (statsHtml || "") + '</' + (attrs ? 'button' : 'div') + '>';
+  }
 
   function playersTab(m) {
-    var html = "";
+    var html = factsBlock(m);
     m.teams.forEach(function (t, i) {
-      html += '<div class="sec"><div class="box roster ' + (i ? "b" : "a") + '"><div class="hd">' + esc(t.name) + '<span class="num">' + esc(flag(t.location)) + '</span></div>';
+      var pr = t.prizes || [];
+      html += '<div class="sec"><div class="box roster ' + (i ? "b" : "a") + '"><div class="hd"><span class="tn">' + esc(t.name) + '</span>' +
+        (vrsLine(t) ? '<span class="tinfo">' + esc(vrsLine(t)) + '</span>' : '') +
+        '<span class="tpr">' + (pr.length ? 'Призовые за 3 мес.: <b>' + pr.length + '</b> — ' + pr.map(function (x) { return (MEDAL[x.place] && MEDAL[x.place].length > 1 ? MEDAL[x.place] + ' ' : '') + esc(PLACE_RU[x.place] || x.place) + ', ' + esc(x.event); }).join('; ') : 'Призовых мест за 3 мес. нет') + '</span></div>';
       if (!(t.players || []).length) html += '<div class="note">Состав не указан.</div>';
-      // порядок: капитан, снайпер (AWP), гибрид, остальные — внутри групп как на Liquipedia
       function prank(p) {
         var tg = p.tags || [];
         if (tg.indexOf("Капитан") >= 0) return 0;
@@ -964,39 +1086,28 @@ a.ni { text-decoration: none; color: inherit; }
         if (tg.some(function (x) { return /AWP/.test(x); })) return 2;
         return 3;
       }
-      (t.players || []).map(function (p, i) { return [p, i]; })
+      (t.players || []).map(function (p, k) { return [p, k]; })
         .sort(function (a, b) { return prank(a[0]) - prank(b[0]) || a[1] - b[1]; })
         .map(function (x) { return x[0]; }).forEach(function (p) {
-        var n = newsFor(m, p.nick).length;
-        var real = [p.first_name, p.last_name].filter(Boolean).join(" ");
-        var tags = (p.tags || []).map(function (x) { return /^Рифлер/.test(x) && !/люркер/.test(x) ? "Рифлер" : x; })
-          .filter(function (x, i, arr) { return arr.indexOf(x) === i; }).map(function (x) {
-          var cls = x === "Капитан" ? "cap" : (x === "AWP" || /^Снайпер/.test(x)) ? "awp" : /^Рифл/.test(x) ? "rif" : "";
-          return '<span class="rt ' + cls + '">' + esc(x) + '</span>';
-        }).join("");
-        html += '<button class="pl" data-player="' + esc(p.nick) + '"><span class="nickline"><span class="nick">' + esc(p.nick) + '</span>' +
-          (tags ? '<span class="rtags">' + tags + '</span>' : '') + '</span>' +
-          '<span class="rn">' + esc(flag(p.nationality)) + ' ' + esc(real || plain(p.name_ru) || "") + (real && p.name_ru ? ' <span class="pron">[' + esc(plain(p.name_ru)) + ']</span>' : '') + (p.age ? " · " + esc(p.age) + " " + years(p.age) : "") + '</span>' +
-          pstat(t, p.nick) + '</button>';
-      });
+          var tg = p.tags || [], roles = [], extra = [];
+          if (tg.indexOf("Капитан") >= 0) roles.push(["Капитан", "cap"]);
+          if (tg.some(function (x) { return x === "AWP" || /^Снайпер/.test(x); })) roles.push(["AWP", "awp"]);
+          tg.forEach(function (x) { if (/^В аренде/.test(x)) extra.push(esc(x.toLowerCase())); else if (x === "Замена") extra.push("замена"); });
+          var real = [p.first_name, p.last_name].filter(Boolean).join(" ");
+          html += personRow(p, roles, real, extra, pstat(t, p.nick), ' data-player="' + esc(p.nick) + '"');
+        });
       (t.coach || []).forEach(function (c) {
-        html += '<div class="coach"><span><span class="lbl">Тренер</span><br><b>' + esc(c.nick) + '</b></span><span class="rn" style="font-size:12px;color:var(--muted);text-align:right;align-self:end">' + esc(flag(c.flag)) + ' ' + esc(c.name || plain(c.name_ru) || "") + (c.name && c.name_ru ? ' <span class="pron">[' + esc(plain(c.name_ru)) + ']</span>' : '') + (c.age ? ' · ' + esc(c.age) + ' ' + years(c.age) : '') + '</span></div>';
+        html += personRow({ nick: c.nick, flag: c.flag, name_ru: c.name_ru, age: c.age }, [["Тренер", ""]], c.name || "", [], "", "");
       });
       html += '</div></div>';
     });
     return html;
   }
 
-  function newsTab(m) {
+  function newsList(m, who) {
     var N = m.news || { items: [] };
-    var who = state.newsFilter;
-    var opts = [["all", "Все"]];
-    m.teams.forEach(function (t) { opts.push([t.name, t.name]); });
-    if (who !== "all" && !m.teams.some(function (t) { return t.name === who; })) opts.push([who, who]);  // пришли из карточки игрока
-    var html = '<div class="sec"><div class="filt nfilt" role="group" aria-label="О ком">' + opts.map(function (o) {
-      return '<button class="chip" data-nf="' + esc(o[0]) + '" aria-pressed="' + (who === o[0]) + '">' + esc(o[1]) + '<span class="c">' + newsFor(m, o[0]).length + '</span></button>';
-    }).join("") + '</div>';
     var items = newsFor(m, who);
+    var html = '<div class="sec">';
     if (!items.length) html += '<div class="box note">За ' + esc(N.days || 7) + ' дней ничего не нашлось.</div>';
     html += '<div class="news">';
     var teamA = m.teams[0] && m.teams[0].players ? m.teams[0].players.map(function (p) { return p.nick; }).concat([m.teams[0].name]) : [];
@@ -1006,7 +1117,7 @@ a.ni { text-decoration: none; color: inherit; }
         '<span class="tags">' + (n.kind ? '<span class="kind k-' + esc(n.kind) + '">' + esc(n.kind) + '</span>' : '') + whoHtml + '</span>' +
         '<h4>' + esc(n.title_ru || n.title) + '</h4>' +
         '<span class="src"><span>' + esc(n.source) + ' · ' + esc(ago(n.date)) + (n.lang_ru ? ' · с ' + esc(n.lang_ru) : '') + ((n.also || []).length ? ' · ещё ' + n.also.length + ' ' + srcWord(n.also.length) : '') + '</span>' +
-        (n.summary_ru ? '<span class="open">Читать ›</span>' : '<span class="open">Оригинал ›</span>') + '</span></button>';
+        '<span class="open">Читать ›</span></span></button>';
     });
     html += '</div>';
     if (N.updated) html += '<div class="upd" style="text-align:center">Новости собраны ' + esc(ago(N.updated)) + '</div>';
@@ -1015,32 +1126,62 @@ a.ni { text-decoration: none; color: inherit; }
 
   function srcWord(k) { k = k % 100; var d = k % 10; return (k > 10 && k < 20) || d === 0 || d > 4 ? "источников" : d === 1 ? "источник" : "источника"; }
 
-  function readerView(m, n) {
+  function readerView(n) {
     var paras = String(n.summary_ru || "").split(/\n+/).filter(Boolean);
-    var html = '<div class="view reader"><div style="padding-top:12px">' + (TG ? '' : '<button class="back" id="close-reader">' + ARROW + 'Новости</button>') + '</div>' +
+    var html = '<div class="pin"><div class="ovtop">' + (TG ? '' : '<button class="back" data-close>' + ARROW + 'Новости</button>') + '</div>' +
       '<article class="rd"><div class="rd-meta">' + esc(n.source) + ' · ' + esc(dmy(n.date)) + ' ' + esc(hm(n.date)) + '</div>' +
       '<h1>' + esc(n.title_ru || n.title) + '</h1>' +
       (n.title_ru && n.title_ru !== n.title ? '<div class="rd-orig">' + esc(n.title) + '</div>' : '') +
       (n.lang_ru ? '<div class="rd-tr">Пересказ переведён с ' + esc(n.lang_ru) + '</div>' : '') +
-      media(n.image, n.video, n.url);
+      photosHtml(n.photos, n.video, n.url, n.image);
     if (paras.length) {
       html += paras.map(function (p) { return '<p>' + esc(p) + '</p>'; }).join("");
       (n.quotes || []).forEach(function (q) {
         html += '<blockquote>«' + esc(String(q.ru).replace(/^[«"]|[»"]$/g, "")) + '»' + (q.who ? '<cite>' + esc(q.who) + '</cite>' : '') + '</blockquote>';
       });
-      if (!/^https:\/\/t\.me\//.test(n.url || "")) html += '<div class="rd-note">Краткий пересказ статьи. Полный текст — по кнопке ниже.</div>';
     } else {
-      html += '<p class="rd-empty">Пересказа этой статьи пока нет: сайт не отдал текст или он ещё в очереди. Можно открыть оригинал.</p>';
+      html += '<p class="rd-empty">Текста у этой новости нет. Можно открыть оригинал.</p>';
     }
     var isTg = /^https:\/\/t\.me\//.test(n.url || "");
     html += (n.url ? '<a class="readbtn" href="' + esc(n.url) + '" ' + (isTg ? 'data-tg' : 'data-read') + '="' + esc(n.url) + '" target="_blank" rel="noopener">' + (isTg ? 'Открыть в Telegram' : 'Открыть оригинал') + '</a>' : '');
     if ((n.also || []).length) {
       html += '<div class="also"><div class="rd-meta">Также писали</div>' + n.also.map(function (a) {
-        return '<a href="' + esc(a.url) + '" data-read="' + esc(a.url) + '" target="_blank" rel="noopener"><b>' + esc(a.source) + '</b><span>' + esc(a.title) + '</span></a>';
+        var tg = /^https:\/\/t\.me\//.test(a.url || "");
+        return '<a href="' + esc(a.url) + '" ' + (tg ? 'data-tg' : 'data-read') + '="' + esc(a.url) + '" target="_blank" rel="noopener"><b>' + esc(a.source) + '</b><span>' + esc(a.title) + '</span></a>';
       }).join("") + '</div>';
     }
-    html += '</article></div>';
-    return html;
+    return html + '</article></div>';
+  }
+
+  // подробности серии: карты, счёт, статистика игроков (вся серия или отдельная карта)
+  function seriesView(S, backLabel) {
+    var A = S.teams[0] || {}, B = S.teams[1] || {}, sel = state.seriesMap == null ? -1 : state.seriesMap;
+    var maps = S.maps || [];
+    if (sel >= maps.length || (sel >= 0 && !maps[sel].players)) sel = -1;
+    var rows = sel < 0 ? S.players : maps[sel].players;
+    var html = '<div class="pin"><div class="ovtop">' + (TG ? '' : '<button class="back" data-close>' + ARROW + esc(backLabel) + '</button>') + '</div>' +
+      '<div class="rd-meta">' + esc([S.tournament, S.stage, S.round].filter(Boolean).join(" · ")) + (S.date ? ' · ' + esc(dmy(S.date)) : '') + '</div>' +
+      '<section class="hero sres"><div class="face"><div class="tm a"><span class="acr">' + esc(A.acronym || A.name) + '</span><span class="full">' + esc(A.name) + '</span></div>' +
+      '<div class="mid"><b class="num">' + esc(A.score) + ' : ' + esc(B.score) + '</b>BO' + esc(S.bo || "?") + '</div>' +
+      '<div class="tm b"><span class="acr">' + esc(B.acronym || B.name) + '</span><span class="full">' + esc(B.name) + '</span></div></div>' +
+      (maps.length ? '<div class="smaps">' + maps.map(function (g) {
+        return '<div class="smap"><span>' + esc(g.map || "?") + '</span><b class="num"><span class="' + (g.winner === 0 ? "a" : "") + '">' + esc(g.score ? g.score[0] : "–") + '</span>:<span class="' + (g.winner === 1 ? "b" : "") + '">' + esc(g.score ? g.score[1] : "–") + '</span></b></div>';
+      }).join("") + '</div>' : '') + '</section>';
+    if (rows) {
+      html += '<div class="filt sfilt" role="group" aria-label="Карта"><button class="chip" data-smap="-1" aria-pressed="' + (sel < 0) + '">Вся серия</button>' +
+        maps.map(function (g, i) { return g.players ? '<button class="chip" data-smap="' + i + '" aria-pressed="' + (sel === i) + '">' + esc(g.map || ("Карта " + (i + 1))) + '</button>' : ''; }).join("") + '</div>';
+      [0, 1].forEach(function (i) {
+        var t = S.teams[i] || {};
+        html += '<div class="sec"><div class="box"><div class="st-h ' + (i ? "b" : "a") + '">' + esc(t.name) + '</div><table class="mtab ptab"><thead><tr><th>Игрок</th><th class="r">K–D</th><th class="r">ADR</th><th class="r">KAST</th><th class="r">Рейт.</th></tr></thead><tbody>' +
+          (rows[i] || []).map(function (r) {
+            var diff = r[1] - r[2];
+            return '<tr><td class="mn">' + esc(r[0]) + '</td><td class="r num">' + r[1] + '–' + r[2] + ' <small class="' + (diff > 0 ? "up" : diff < 0 ? "dn" : "") + '">' + (diff > 0 ? "+" : "") + diff + '</small></td>' +
+              '<td class="r num">' + Number(r[3]).toFixed(1) + '</td><td class="r num">' + r[4] + '%</td><td class="r num rt2 ' + (r[5] >= 1.1 ? "up" : r[5] <= 0.9 ? "dn" : "") + '">' + Number(r[5]).toFixed(2) + '</td></tr>';
+          }).join("") + '</tbody></table></div></div>';
+      });
+      html += '<div class="upd" style="text-align:center;margin-top:12px">Статистика bo3.gg · рейтинг bo3</div>';
+    } else html += '<div class="box note" style="margin-top:12px">Статистики игроков по этому матчу пока нет.</div>';
+    return html + '</div>';
   }
 
   function keepFilterScroll(render) {
@@ -1050,120 +1191,151 @@ a.ni { text-decoration: none; color: inherit; }
     document.querySelectorAll(".filt, .mapsel").forEach(function (el, i) {
       var k = el.className + i;
       if (saved[k] != null) el.scrollLeft = saved[k];
-      var sel = el.querySelector('[aria-pressed="true"]');
-      if (sel) {
-        var l = sel.offsetLeft, r = l + sel.offsetWidth;
-        if (l < el.scrollLeft) el.scrollLeft = l - 8;
-        else if (r > el.scrollLeft + el.clientWidth) el.scrollLeft = r - el.clientWidth + 8;
-      }
+      revealSel(el);
     });
   }
-
-  function tabBodyHtml(m) {
-    if (state.tab === "stats") return factsBlock(m) + h2hBlock(m) + vetoBlock(m) + mapsBlock(m) + formBlock(m);
-    if (state.tab === "players") return playersTab(m);
-    return newsTab(m);
+  function revealSel(el) {
+    var sel = el && el.querySelector('[aria-pressed="true"]');
+    if (!sel) return;
+    var l = sel.offsetLeft, r = l + sel.offsetWidth;
+    if (l < el.scrollLeft) el.scrollLeft = l - 8;
+    else if (r > el.scrollLeft + el.clientWidth) el.scrollLeft = r - el.clientWidth + 8;
   }
 
   // ---------- карточка матча: вкладки (и фильтры новостей) — отдельные страницы в ряд, у каждой своя прокрутка.
-  // Свайп двигает ряд, как галерею: ничего не подменяется и не прокручивается — поэтому нечему мигать.
+  // Шапка лежит поверх страниц и сворачивается вслед за прокруткой (как профиль в Telegram).
   function newsSteps() {
     var m = state.details[state.openId], L = ["all"].concat((m.teams || []).map(function (t) { return t.name; }));
     if (state.newsFilter && L.indexOf(state.newsFilter) < 0) L.push(state.newsFilter);  // личные новости игрока
     return L;
   }
   function viewKey(tab, nf) { return tab === "news" ? "news:" + nf : tab; }
-  function paneKeys() { return ["stats", "players"].concat(newsSteps().map(function (f) { return "news:" + f; })); }
+  function paneKeys() { return ["players", "stats"].concat(newsSteps().map(function (f) { return "news:" + f; })); }
   function curKey() { return viewKey(state.tab, state.newsFilter); }
-  function setKey(k) {
-    if (k.indexOf("news:") === 0) { state.tab = "news"; state.newsFilter = k.slice(5); } else state.tab = k;
-    state.openNews = null;
+  function setKey(k) { if (k.indexOf("news:") === 0) { state.tab = "news"; state.newsFilter = k.slice(5); } else state.tab = k; }
+  function isNews(k) { return k.indexOf("news:") === 0; }
+
+  function tabBodyHtml(m, key) {
+    if (key === "players") return playersTab(m);
+    if (key === "stats") return vrsBlock(m) + formBlock(m) + h2hBlock(m) + mapsTable(m) + mapZone(m);
+    return newsList(m, key.slice(5));
   }
+
   function headHtml(m) {
     var A = m.teams[0] || {}, B = m.teams[1] || {};
     var nCount = ((m.news && m.news.items) || []).length;
     function tabBtn(id, label, c) { return '<button class="tab" role="tab" data-tab="' + id + '" aria-selected="' + (state.tab === id) + '">' + label + (c ? '<span class="c">' + c + '</span>' : '') + '</button>'; }
-    return '<div style="padding-top:12px">' + backBtn(m.tournament || "Назад") + '</div>' +
-      // тонкий версус — появляется, когда листаешь вниз
-      '<div class="fold mini-wrap"><div class="fi"><div class="mini"><span class="ma">' + esc(abbr(A)) + '</span><span class="mm">' + esc(hm(m.begin_at)) + ' · ' + esc(dm(m.begin_at)) + ' · BO' + esc(m.bo) + '</span><span class="mb">' + esc(abbr(B)) + '</span></div></div></div>' +
+    var opts = newsSteps().map(function (f) { return [f, f === "all" ? "Все" : f]; });
+    return '<div class="hbar">' + backBtn(m.tournament || "Назад") + '</div>' +
+      '<div class="fold mini-wrap"><div class="fi"><div class="mini"><span class="ma">' + esc(abbr(A)) + '</span><span class="mm">BO' + esc(m.bo) + '</span><span class="mb">' + esc(abbr(B)) + '</span></div></div></div>' +
       '<div class="fold hero-wrap"><div class="fi"><section class="hero"><div class="meta"><span class="pill ' + esc(m.tier) + '">' + esc((m.tier || "").toUpperCase()) + '</span><span>' + esc(m.tournament) + (m.stage ? " · " + esc(m.stage) : "") + '</span></div>' +
-      '<div class="face"><div class="tm a"><span class="acr">' + esc(abbr(A)) + '</span><span class="full">' + esc(A.name) + '</span></div>' +
+      '<div class="face"><div class="tm a"><span class="acr">' + esc(abbr(A)) + '</span><span class="full">' + esc(A.name) + '</span>' + heroVrs(A) + '</div>' +
       '<div class="mid"><b>' + esc(hm(m.begin_at)) + '</b>' + esc(dm(m.begin_at)) + ' · BO' + esc(m.bo) + '</div>' +
-      '<div class="tm b"><span class="acr">' + esc(abbr(B)) + '</span><span class="full">' + esc(B.name) + '</span></div></div>' +
+      '<div class="tm b"><span class="acr">' + esc(abbr(B)) + '</span><span class="full">' + esc(B.name) + '</span>' + heroVrs(B) + '</div></div>' +
       '</section></div></div>' +
-      '<nav class="tabs" role="tablist">' + tabBtn("stats", "Статистика") + tabBtn("players", "Игроки") + tabBtn("news", "Новости", nCount) + '</nav>';
+      '<nav class="tabs" role="tablist">' + tabBtn("players", "Игроки") + tabBtn("stats", "Статистика") + tabBtn("news", "Новости", nCount) + '</nav>' +
+      '<div class="fold nf-wrap"><div class="fi"><div class="filt nfilt" role="group" aria-label="О ком">' + opts.map(function (o) {
+        return '<button class="chip" data-nf="' + esc(o[0]) + '" aria-pressed="' + (state.newsFilter === o[0]) + '">' + esc(o[1]) + '<span class="c">' + newsFor(m, o[0]).length + '</span></button>';
+      }).join("") + '</div></div></div>';
   }
-  // полная карточка ↔ тонкий версус: по прокрутке открытой вкладки (с запасом, чтобы не дёргалось на границе)
-  function updateHead(anim) {
-    var h = document.querySelector(".mhead"), p = activePane();
-    if (!h || !p) return;
-    var on = h.classList.contains("compact"), y = p.scrollTop;
-    var want = on ? y > 12 : y > 70;
-    if (want === on) return;
-    if (!anim) h.classList.add("noanim");
-    h.classList.toggle("compact", want);
-    if (!anim) { void h.offsetHeight; h.classList.remove("noanim"); }
+
+  // размеры шапки: полная, тонкая, строка фильтров новостей
+  var HD = null;
+  function q(sel) { return document.querySelector(sel); }
+  function measureHead() {
+    var h = q(".mhead"), sh = q(".mshell");
+    if (!h || !sh) return;
+    var hw = h.querySelector(".hero-wrap"), mw = h.querySelector(".mini-wrap"), nw = h.querySelector(".nf-wrap");
+    var heroH = hw.firstElementChild.offsetHeight, miniH = mw.firstElementChild.offsetHeight, nfH = nw.firstElementChild.offsetHeight;
+    var base = h.offsetHeight - hw.offsetHeight - mw.offsetHeight - nw.offsetHeight;
+    HD = { h: h, sh: sh, hw: hw, mw: mw, nw: nw, heroH: heroH, miniH: miniH, nfH: nfH, base: base, full: base + heroH, D: Math.max(1, heroH - miniH) };
+    sh.style.setProperty("--hfull", HD.full + "px");
+    sh.style.setProperty("--nfh", nfH + "px");
   }
-  function paneHtml(m) { return '<div class="tabbody">' + tabBodyHtml(m) + '</div>'; }
-  // подсветка вкладок в неподвижной шапке — вместе со свайпом
+  // y — прокрутка открытой страницы; nf — насколько показана строка фильтров (0…1); anim — плавно (при смене вкладки)
+  function applyHead(y, nf, anim) {
+    if (!HD || !HD.h.isConnected) return;
+    var p = Math.max(0, Math.min(1, y / HD.D));
+    HD.h.classList.toggle("anim", !!anim);
+    HD.hw.style.height = (HD.heroH * (1 - p)) + "px";
+    HD.hw.firstElementChild.style.transform = "translate3d(0," + (-HD.heroH * p * 0.5) + "px,0)";
+    HD.hw.style.opacity = String(Math.max(0, 1 - p * 1.4));
+    HD.mw.style.height = (HD.miniH * p) + "px";
+    HD.mw.style.opacity = String(Math.max(0, Math.min(1, (p - 0.4) / 0.6)));
+    HD.nw.style.height = (HD.nfH * nf) + "px";
+    HD.nw.style.opacity = String(nf);
+    HD.nw.style.visibility = nf > 0.01 ? "visible" : "hidden";
+    HD.sh.style.setProperty("--hcur", (HD.base + HD.heroH * (1 - p) + HD.miniH * p + HD.nfH * nf) + "px");
+  }
+  function headNow(anim) { var p = activePane(); applyHead(p ? p.scrollTop : 0, isNews(curKey()) ? 1 : 0, anim); }
+  // соседняя страница встаёт так же, как текущая: шапка не прыгает (свёрнута — остаётся свёрнутой)
+  function syncPane(target, from) {
+    if (!HD || !target || !from || target === from) return;
+    var y = from.scrollTop, ty = target.scrollTop, D = HD.D;
+    if (y >= D) { if (ty < D) target.scrollTop = D; }
+    else if (ty < D) target.scrollTop = y;
+  }
   function markTabs(key) {
-    var tab = key.indexOf("news:") === 0 ? "news" : key;
+    var tab = isNews(key) ? "news" : key, nf = isNews(key) ? key.slice(5) : null;
     document.querySelectorAll(".mhead [data-tab]").forEach(function (b) { b.setAttribute("aria-selected", String(b.getAttribute("data-tab") === tab)); });
+    if (nf != null) {
+      document.querySelectorAll(".mhead [data-nf]").forEach(function (b) { b.setAttribute("aria-pressed", String(b.getAttribute("data-nf") === nf)); });
+      revealSel(q(".mhead .nfilt"));
+    }
   }
   function panes() { return [].slice.call(document.querySelectorAll(".mshell .pane")); }
-  function activePane() { return document.querySelector('.mshell .pane[data-key="' + (window.CSS && CSS.escape ? CSS.escape(curKey()) : curKey()) + '"]'); }
-  function paneW() { var sh = document.querySelector(".mviewport"); return sh ? sh.clientWidth : window.innerWidth; }
+  function paneOf(k) { return panes().find(function (p) { return p.getAttribute("data-key") === k; }) || null; }
+  function activePane() { return paneOf(curKey()); }
+  function paneW() { var sh = q(".mviewport"); return sh ? sh.clientWidth : window.innerWidth; }
   function trackTo(i, anim) {
-    var tr = document.querySelector(".mtrack");
+    var tr = q(".mtrack");
     if (!tr) return;
-    tr.style.transition = anim ? "transform .24s cubic-bezier(.2,.7,.3,1)" : "none";
+    tr.style.transition = anim ? "transform .26s cubic-bezier(.2,.7,.3,1)" : "none";
     tr.style.transform = "translate3d(" + (-i * paneW()) + "px,0,0)";
   }
   function renderMatch(m) {
     state.scrolls = state.scrolls || {};
-    panes().forEach(function (p) { state.scrolls[p.getAttribute("data-key")] = p.scrollTop; });  // запомнить, где стоит каждая вкладка
-    if (state.reader) {
-      var n = ((m.news && m.news.items) || []).find(function (x) { return x.key === state.reader; });
-      if (n) { $app.innerHTML = readerView(m, n); try { TG && TG.BackButton.show(); } catch (e) {} return; }
-      state.reader = null;
-    }
-    var keep = { tab: state.tab, nf: state.newsFilter, on: state.openNews };
-    var keys = paneKeys(), html = '<div class="mshell"><div class="mhead"><div class="pin view">' + headHtml(m) + '</div></div><div class="mviewport"><div class="mtrack">';
+    panes().forEach(function (p) { state.scrolls[p.getAttribute("data-key")] = p.scrollTop; });
+    var keys = paneKeys();
+    if (keys.indexOf(curKey()) < 0) setKey("players");
+    var html = '<div class="mshell"><div class="mviewport"><div class="mtrack">';
     keys.forEach(function (k) {
-      setKey(k);
-      if (k === viewKey(keep.tab, keep.nf)) state.openNews = keep.on;
-      html += '<div class="pane" data-key="' + esc(k) + '"><div class="view pin">' + paneHtml(m) + '</div></div>';
+      html += '<div class="pane' + (isNews(k) ? ' np' : '') + '" data-key="' + esc(k) + '"><div class="pin"><div class="tabbody">' + tabBodyHtml(m, k) + '</div></div></div>';
     });
-    state.tab = keep.tab; state.newsFilter = keep.nf; state.openNews = keep.on;
-    $app.innerHTML = html + '</div></div></div>';
-    var idx = Math.max(0, keys.indexOf(curKey()));
-    trackTo(idx, false);
+    $app.innerHTML = html + '</div></div><div class="mhead"><div class="pin">' + headHtml(m) + '</div></div></div>';
+    measureHead();
+    trackTo(Math.max(0, keys.indexOf(curKey())), false);
     panes().forEach(function (p) {
       var k = p.getAttribute("data-key");
       if (state.scrolls[k]) p.scrollTop = state.scrolls[k];
-      p.addEventListener("scroll", function () { state.scrolls[k] = p.scrollTop; if (k === curKey()) updateHead(true); }, { passive: true });
+      var raf = 0;
+      p.addEventListener("scroll", function () {
+        state.scrolls[k] = p.scrollTop;
+        if (k !== curKey() || raf) return;
+        raf = requestAnimationFrame(function () { raf = 0; if (k === curKey() && !(sw && sw.lock === "h")) applyHead(p.scrollTop, isNews(k) ? 1 : 0, false); });
+      }, { passive: true });
     });
-    updateHead(false);
-    var tbar = document.querySelector(".tabs");
-    if (tbar) document.documentElement.style.setProperty("--tabs-h", tbar.offsetHeight + "px");
+    headNow(false);
+    revealSel(q(".mhead .nfilt"));
     try { TG && TG.disableVerticalSwipes && TG.disableVerticalSwipes(); } catch (e) {}
   }
-  // перейти на другую вкладку/фильтр (по нажатию) — ряд плавно едет туда
   function goKey(k) {
     var keys = paneKeys(), i = keys.indexOf(k);
     if (i < 0) { setKey(k); renderMatch(state.details[state.openId]); return; }
+    syncPane(paneOf(k), activePane());
     trackTo(i, true);
-    setKey(k); markTabs(k); updateHead(true);
+    setKey(k); markTabs(k); headNow(true);
     try { TG && TG.HapticFeedback && TG.HapticFeedback.selectionChanged(); } catch (err) {}
   }
+  window.addEventListener("resize", function () { if (q(".mshell")) { measureHead(); trackTo(Math.max(0, paneKeys().indexOf(curKey())), false); headNow(false); } });
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { if (q(".mshell")) { measureHead(); headNow(false); } });
 
   // ---------- свайпы в матче
-  function mapNames() { var M = state.details[state.openId].maps; return M && M.table ? M.table.map(function (r) { return r.map; }) : []; }
   var sw = null;
   function swipeOk(e) {
-    if (!state.openId || !document.querySelector(".mshell") || state.reader || e.touches.length !== 1) return false;
+    if (!state.openId || !q(".mshell") || state.ovl || e.touches.length !== 1) return false;
     var x = e.touches[0].clientX;
-    if (x < 24 || x > window.innerWidth - 24) return false;  // у края — системный жест «назад»
+    if (x < 20 || x > window.innerWidth - 20) return false;  // у края — системный жест «назад»
     if (e.target.closest("video, input, textarea")) return false;
     var sc = e.target.closest(".filt, .mapsel, [style*='overflow-x']");
     return !(sc && sc.scrollWidth > sc.clientWidth + 2);  // своя прокрутка вбок — только если ей правда есть куда листать
@@ -1173,30 +1345,36 @@ a.ni { text-decoration: none; color: inherit; }
     if (!swipeOk(e)) return;
     var keys = paneKeys();
     sw = { x: e.touches[0].clientX, y: e.touches[0].clientY, t: Date.now(), dx: 0, lock: null, keys: keys,
-           i: Math.max(0, keys.indexOf(curKey())), zone: state.tab === "stats" && e.target.closest(".recent2") ? "map" : null, dir: 0 };
+           i: Math.max(0, keys.indexOf(curKey())), zone: state.tab === "stats" && e.target.closest(".mzbody") ? "map" : null, dir: 0 };
   }, { passive: true });
   document.addEventListener("touchmove", function (e) {
     if (!sw || sw.lock === "v") return;
     var dx = e.touches[0].clientX - sw.x, dy = e.touches[0].clientY - sw.y;
     if (!sw.lock) {
-      if (Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy) * 1.5) sw.lock = "h";
-      else if (Math.abs(dy) > 10) { sw.lock = "v"; return; }
+      if (Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+        sw.lock = "h";
+        if (sw.zone !== "map") { var cp = paneOf(sw.keys[sw.i]); [sw.i - 1, sw.i + 1].forEach(function (j) { if (j >= 0 && j < sw.keys.length) syncPane(paneOf(sw.keys[j]), cp); }); }
+      } else if (Math.abs(dy) > 10) { sw.lock = "v"; return; }
       else return;
     }
     if (sw.zone === "map") { mapMove(sw, dx); return; }
     var W = paneW(), next = sw.i + (dx < 0 ? 1 : -1);
-    if (next < 0) {  // со «Статистики» вправо — уходим к турниру: уезжает весь экран
+    if (next < 0) {  // с первой вкладки вправо — назад к турниру: уезжает весь экран
       sw.back = true; sw.dx = dx;
-      var sh = document.querySelector(".mshell");
+      var sh = q(".mshell");
       sh.style.transition = "none"; sh.style.transform = "translate3d(" + Math.max(0, dx) + "px,0,0)";
       sh.style.opacity = String(1 - Math.min(0.6, Math.max(0, dx) / W * 0.8));
       return;
     }
     sw.back = false;
     sw.dx = next >= sw.keys.length ? dx * 0.25 : dx;  // дальше вкладок нет — тянется туго
-    var tr = document.querySelector(".mtrack");
+    var tr = q(".mtrack");
     tr.style.transition = "none";
     tr.style.transform = "translate3d(" + (-sw.i * W + sw.dx) + "px,0,0)";
+    if (next < sw.keys.length) {  // строка фильтров новостей проявляется вместе со свайпом
+      var a = isNews(sw.keys[sw.i]) ? 1 : 0, b = isNews(sw.keys[next]) ? 1 : 0, f = Math.min(1, Math.abs(sw.dx) / W);
+      if (a !== b) { var cp2 = paneOf(sw.keys[sw.i]); applyHead(cp2 ? cp2.scrollTop : 0, a + (b - a) * f, false); }
+    }
     var past = next >= 0 && next < sw.keys.length && Math.abs(sw.dx) > W / 2;
     if (past !== sw.marked) { markTabs(past ? sw.keys[next] : sw.keys[sw.i]); sw.marked = past; }
   }, { passive: true });
@@ -1208,50 +1386,37 @@ a.ni { text-decoration: none; color: inherit; }
     var W = paneW(), v = Math.abs(s0.dx) / Math.max(1, Date.now() - s0.t);
     var far = Math.abs(s0.dx) > W * 0.22 || (v > 0.45 && Math.abs(s0.dx) > 35);
     if (s0.back) {
-      var sh = document.querySelector(".mshell");
+      var sh = q(".mshell");
       sh.style.transition = "transform .16s ease-out, opacity .16s ease-out";
       if (!(far && s0.dx > 0)) { sh.style.transform = ""; sh.style.opacity = ""; return; }
       sh.style.transform = "translate3d(" + W + "px,0,0)"; sh.style.opacity = "0";
-      setTimeout(function () {
-        goBack();
-        var nv = document.querySelector(".view");
-        if (nv) { nv.style.opacity = "0"; requestAnimationFrame(function () { nv.style.transition = "opacity .14s ease-out"; nv.style.opacity = ""; }); }
-      }, 150);
+      setTimeout(function () { goBack(); fadeInView(); }, 150);
       return;
     }
     var next = s0.i + (s0.dx < 0 ? 1 : -1);
     if (far && next >= 0 && next < s0.keys.length) {
       trackTo(next, true);
-      setKey(s0.keys[next]); markTabs(s0.keys[next]); updateHead(true);
+      setKey(s0.keys[next]); markTabs(s0.keys[next]); headNow(true);
       try { TG && TG.HapticFeedback && TG.HapticFeedback.selectionChanged(); } catch (err) {}
-    } else { trackTo(s0.i, true); markTabs(s0.keys[s0.i]); }
+    } else { trackTo(s0.i, true); markTabs(s0.keys[s0.i]); headNow(true); }
   }
   document.addEventListener("touchend", swipeEnd, { passive: true });
   document.addEventListener("touchcancel", swipeEnd, { passive: true });
+  function fadeInView() {
+    var nv = q("#app > .view");
+    if (nv) { nv.style.opacity = "0"; requestAnimationFrame(function () { nv.style.transition = "opacity .12s ease-out"; nv.style.opacity = ""; }); }
+  }
 
-  // ---------- «Последние игры на карте»: свайп по результатам листает карты (внутри страницы, без прокрутки)
-  function mapGhost(s0, mp) {
-    var pane = activePane(), el = pane && pane.querySelector(".recent2");
+  // ---------- зона карты: свайп по сторонам и последним играм листает карты; шапка с картами стоит на месте
+  function mapGhost(mp) {
+    var pane = activePane(), el = pane && pane.querySelector(".mzbody");
     if (!el) return null;
-    var m = state.details[state.openId], km = state.map, html;
-    state.map = mp;
-    try { html = mapsBlock(m); } finally { state.map = km; }
-    var tmp = document.createElement("div"); tmp.innerHTML = html;
-    var rc = tmp.querySelector(".recent2");
     var g = document.createElement("div");
-    g.className = el.className + " swipe-ghost"; g.innerHTML = rc ? rc.innerHTML : "";
-    var par = el.parentNode;
-    if (getComputedStyle(par).position === "static") par.style.position = "relative";
+    g.className = "mzbody swipe-ghost"; g.innerHTML = mapBody(state.details[state.openId], mp);
     g.style.top = el.offsetTop + "px"; g.style.left = el.offsetLeft + "px"; g.style.width = el.offsetWidth + "px";
-    par.appendChild(g);
+    el.parentNode.appendChild(g);
     return { el: el, g: g };
   }
-  function belowMaps() {
-    var pane = activePane(), rc = pane && pane.querySelector(".recent2"), sec = rc && rc.closest(".sec"), out = [];
-    for (var n = sec && sec.nextElementSibling; n; n = n.nextElementSibling) out.push(n);
-    return out;
-  }
-  function fadeBelow(on) { belowMaps().forEach(function (n) { n.style.transition = "opacity .12s ease-out"; n.style.opacity = on ? "" : "0"; }); }
   function markMap(mp) { var pane = activePane(); if (pane) pane.querySelectorAll("[data-map]").forEach(function (b) { b.setAttribute("aria-pressed", String(b.getAttribute("data-map") === mp)); }); }
   function mapMove(s0, dx) {
     var dir = dx < 0 ? 1 : -1;
@@ -1260,10 +1425,9 @@ a.ni { text-decoration: none; color: inherit; }
       s0.dir = dir;
       var N = mapNames(), k = N.indexOf(state.map) + dir;
       s0.mp = k >= 0 && k < N.length ? N[k] : null;
-      var gg = s0.mp ? mapGhost(s0, s0.mp) : null;
+      var gg = s0.mp ? mapGhost(s0.mp) : null;
       var pane = activePane();
-      s0.el = gg ? gg.el : pane && pane.querySelector(".recent2"); s0.g = gg ? gg.g : null;
-      fadeBelow(!s0.g);
+      s0.el = gg ? gg.el : pane && pane.querySelector(".mzbody"); s0.g = gg ? gg.g : null;
     }
     if (!s0.el) return;
     s0.dx = s0.g ? dx : dx * 0.25;
@@ -1277,13 +1441,12 @@ a.ni { text-decoration: none; color: inherit; }
     if (!s0.el) return;
     var W = paneW(), v = Math.abs(s0.dx) / Math.max(1, Date.now() - s0.t), D = s0.el.offsetWidth + 24;
     var go = s0.g && (Math.abs(s0.dx) > W * 0.22 || (v > 0.45 && Math.abs(s0.dx) > 35));
-    var t = "transform .2s cubic-bezier(.2,.7,.3,1)";
+    var t = "transform .22s cubic-bezier(.2,.7,.3,1)";
     if (!go) {
       if (s0.marked) markMap(state.map);
-      fadeBelow(true);
       s0.el.style.transition = t; s0.el.style.transform = "";
       if (s0.g) { s0.g.style.transition = t; s0.g.style.transform = "translate3d(" + (s0.dir * D) + "px,0,0)"; }
-      setTimeout(function () { if (s0.g && s0.g.parentNode) s0.g.parentNode.removeChild(s0.g); }, 220);
+      setTimeout(function () { if (s0.g && s0.g.parentNode) s0.g.parentNode.removeChild(s0.g); }, 240);
       return;
     }
     markMap(s0.mp);
@@ -1298,83 +1461,58 @@ a.ni { text-decoration: none; color: inherit; }
       s0.el.style.transition = "none"; s0.el.style.transform = "";
       s0.el.textContent = ""; s0.el.appendChild(frag);
       if (s0.g.parentNode) s0.g.parentNode.removeChild(s0.g);
-      var pane = activePane(), sd = pane && pane.querySelector(".box.sides"), sec = sd && sd.closest(".sec");
-      if (sec) { var tmp = document.createElement("div"); tmp.innerHTML = sidesBlock(state.details[state.openId]); if (tmp.firstElementChild) sec.replaceWith(tmp.firstElementChild); }
-      belowMaps().forEach(function (n) { n.style.transition = "none"; n.style.opacity = "0"; });
-      requestAnimationFrame(function () { requestAnimationFrame(function () {
-        belowMaps().forEach(function (n) { n.style.transition = "opacity .18s ease-out"; n.style.opacity = ""; });
-      }); });
-      var ms = pane && pane.querySelector(".mapsel"), ch = ms && ms.querySelector('[aria-pressed="true"]');
-      if (ch) { var l0 = ch.offsetLeft, r0 = l0 + ch.offsetWidth; if (l0 < ms.scrollLeft) ms.scrollLeft = l0 - 8; else if (r0 > ms.scrollLeft + ms.clientWidth) ms.scrollLeft = r0 - ms.clientWidth + 8; }
+      var pane = activePane();
+      revealSel(pane && pane.querySelector(".mapsel"));
       try { TG && TG.HapticFeedback && TG.HapticFeedback.selectionChanged(); } catch (err) {}
     }
     s0.g.addEventListener("transitionend", function (ev) { if (ev.target === s0.g) fin(); });
     setTimeout(fin, 320);
   }
+  function setMap(mp) {
+    state.map = mp;
+    var pane = activePane(), b = pane && pane.querySelector(".mzbody");
+    if (b) b.innerHTML = mapBody(state.details[state.openId], mp);
+    markMap(mp); revealSel(pane && pane.querySelector(".mapsel"));
+  }
 
-  // ---------- роутинг: "" турниры, #t-ID турнир, #mine мои матчи, #m-ID матч
-  var depth = 0;
-  function route() {
-    var h = location.hash.replace("#", "");
-    var mt = /^m-(\d+)$/.exec(h), tt = /^t-([\w-]+)$/.exec(h);
-    try { TG && (h && h !== "feed" && h !== "major" ? TG.BackButton.show() : TG.BackButton.hide()); } catch (e) {}
-    if (!state.list) return;
-    if (mt) {
-      var id = mt[1];
-      if (state.openId !== id) { state.openId = id; state.reader = null; state.tab = "stats"; state.newsFilter = "all"; state.map = null; state.scrolls = {}; window.scrollTo(0, 0); }
-      $app.innerHTML = '<div class="empty">Загружаю матч…</div>';
-      getDetail(id).then(renderMatch).catch(function () {
-        $app.innerHTML = '<div class="empty"><strong>Подробностей пока нет</strong>Карточки собираются за 3 дня до матча. <button class="chip" id="back" style="margin-top:8px">Назад</button></div>';
-      });
-      return;
+  // ---------- поверх экрана: новость, пост ленты, подробности серии. Экран под ней остаётся как был — назад мгновенно.
+  function openOverlay(kind, key, html) {
+    closeOverlay(true);
+    var o = document.createElement("div");
+    o.className = "ovl"; o.innerHTML = html;
+    document.body.appendChild(o);
+    state.ovl = { kind: kind, key: key, el: o };
+    o.style.transform = "translate3d(100%,0,0)";
+    requestAnimationFrame(function () { o.style.transition = "transform .22s cubic-bezier(.2,.7,.3,1)"; o.style.transform = ""; });
+    try { TG && TG.BackButton.show(); } catch (e) {}
+  }
+  function closeOverlay(instant) {
+    var O = state.ovl;
+    if (!O) return;
+    state.ovl = null;
+    var el = O.el;
+    if (instant) el.remove();
+    else {
+      el.style.transition = "transform .16s ease-out";
+      el.style.transform = "translate3d(100%,0,0)";
+      setTimeout(function () { el.remove(); }, 170);
     }
-    state.openId = null;
-    if (tt) { state.view = "tour:" + tt[1]; renderTour(tt[1]); }
-    else if (h === "mine") { state.view = "mine"; renderMine(); }
-    else if (h === "major") { location.hash = ""; return; }
-    else if (h === "major-disabled") { state.view = "major"; renderMajor(); getMajor().then(function () { if (state.view === "major") renderMajor(); }).catch(function () { if (state.view === "major") $app.innerHTML = homeHeader("major") + '<div class="empty"><strong>Данные по мейджору ещё не собраны</strong>Появятся после ближайшего обновления.</div></div>'; }); }
-    else if (h === "feed") { state.view = "feed"; renderFeed(); getFeed().then(function () { if (state.view === "feed") renderFeed(); }).catch(function () { if (state.view === "feed") $app.innerHTML = homeHeader("feed") + '<div class="empty"><strong>Лента пока не собрана</strong>Появится после ближайшего обновления данных.</div></div>'; }); }
-    else { state.view = "home"; renderHome(); }
+    updateBackBtn();
   }
-  function rerenderList() {
-    if (state.view === "feed") renderFeed();
-    else if (state.view === "major") renderMajor();
-    else if (state.view === "mine") renderMine();
-    else if (state.view && state.view.indexOf("tour:") === 0) renderTour(state.view.slice(5));
-    else renderHome();
-  }
-  function go(hash) { if (location.hash === hash) route(); else { depth++; location.hash = hash; } }
-  function closeReader() {
-    state.reader = null;
-    var fs = state.filtScroll;
-    renderMatch(state.details[state.openId]);
-    var ap = activePane(), f = ap && ap.querySelector(".filt");
-    if (f && fs != null) f.scrollLeft = fs;
-  }
-  function closeFeedReader() {
-    state.feedRead = null;
-    renderFeed();
-    try { TG && TG.BackButton.hide(); } catch (e) {}
-    window.scrollTo(0, state.feedScroll || 0);
-    var fc = document.querySelector(".feedch"); if (fc) fc.scrollLeft = state.feedChScroll || 0;
-  }
-  function goBack() {
-    if (state.feedRead) { closeFeedReader(); return; }
-    if (state.reader) { closeReader(); return; }
-    if (depth > 0) { depth--; history.back(); return; }
+  function updateBackBtn() {
     var h = location.hash.replace("#", "");
-    if (/^m-/.test(h)) {
-      var m = (state.list.matches || []).find(function (x) { return "m-" + x.id === h; });
-      location.hash = m ? "t-" + tourOf(m) : "";
-    } else location.hash = "";
+    try { TG && (state.ovl || (h && h !== "feed") ? TG.BackButton.show() : TG.BackButton.hide()); } catch (e) {}
   }
-  // ---------- открытая новость: свайп вправо — назад к списку, на то же место
+  function openSeries(S, label) { state.seriesMap = -1; openOverlay("series", S, seriesView(S, label)); }
+
+  // свайп вправо по открытой новости/серии — назад; под ней видно экран, на который вернёмся
   var rs = null;
   document.addEventListener("touchstart", function (e) {
     rs = null;
-    var v = document.querySelector(".view.reader");
-    if (!v || !(state.reader || state.feedRead) || e.touches.length !== 1 || e.target.closest("video")) return;
-    rs = { x: e.touches[0].clientX, y: e.touches[0].clientY, t: Date.now(), dx: 0, lock: null, v: v };
+    if (!state.ovl || e.touches.length !== 1 || e.target.closest("video")) return;
+    var sc = e.target.closest(".filt");
+    if (sc && sc.scrollWidth > sc.clientWidth + 2) return;
+    rs = { x: e.touches[0].clientX, y: e.touches[0].clientY, t: Date.now(), dx: 0, lock: null, v: state.ovl.el };
   }, { passive: true });
   document.addEventListener("touchmove", function (e) {
     if (!rs || rs.lock === "v") return;
@@ -1386,62 +1524,176 @@ a.ni { text-decoration: none; color: inherit; }
     }
     rs.dx = Math.max(0, dx);
     rs.v.style.transition = "none";
-    rs.v.style.transform = "translateX(" + rs.dx + "px)";
-    rs.v.style.opacity = String(1 - Math.min(0.6, rs.dx / window.innerWidth * 0.8));
+    rs.v.style.transform = "translate3d(" + rs.dx + "px,0,0)";
   }, { passive: true });
   function readerSwipeEnd() {
     if (!rs) return;
     var r0 = rs; rs = null;
     if (r0.lock !== "h") return;
     var W = document.documentElement.clientWidth, v = r0.dx / Math.max(1, Date.now() - r0.t);
-    r0.v.style.transition = "transform .16s ease-out, opacity .16s ease-out";
-    if (r0.dx > W * 0.28 || (v > 0.45 && r0.dx > 40)) {
-      r0.v.style.transform = "translateX(" + W + "px)"; r0.v.style.opacity = "0";
-      setTimeout(function () {
-        goBack();  // список откроется на том же месте, откуда открывали новость
-        var nv = document.querySelector(".view");
-        if (nv) { nv.style.opacity = "0"; requestAnimationFrame(function () { nv.style.transition = "opacity .14s ease-out"; nv.style.opacity = ""; }); }
-        try { TG && TG.HapticFeedback && TG.HapticFeedback.impactOccurred("light"); } catch (err) {}
-      }, 150);
-    } else { r0.v.style.transform = ""; r0.v.style.opacity = ""; }
+    if (r0.dx > W * 0.25 || (v > 0.4 && r0.dx > 30)) {
+      closeOverlay(false);
+      try { TG && TG.HapticFeedback && TG.HapticFeedback.impactOccurred("light"); } catch (err) {}
+    } else { r0.v.style.transition = "transform .18s ease-out"; r0.v.style.transform = ""; }
   }
   document.addEventListener("touchend", readerSwipeEnd, { passive: true });
   document.addEventListener("touchcancel", readerSwipeEnd, { passive: true });
+
+  // ---------- свайпы на главной и в турнире: вкладки и назад
+  var ps = null;
+  function pageSteps() {
+    if (state.view === "home" || state.view === "feed") return { list: ["home", "feed"], i: state.view === "feed" ? 1 : 0, back: false };
+    if (state.view && state.view.indexOf("tour:") === 0) {
+      var t = findTour(state.view.slice(5)), L = t && t.results ? ["matches", "done"] : ["matches"];
+      return { list: L, i: state.tourTab === "done" && L.length > 1 ? 1 : 0, back: true };
+    }
+    return null;
+  }
+  document.addEventListener("touchstart", function (e) {
+    ps = null;
+    if (state.openId || state.ovl || e.touches.length !== 1) return;
+    var x = e.touches[0].clientX;
+    if (x < 20 || x > window.innerWidth - 20 || e.target.closest("video, input")) return;
+    var sc = e.target.closest(".filt");
+    if (sc && sc.scrollWidth > sc.clientWidth + 2) return;
+    var st = pageSteps();
+    if (!st) return;
+    ps = { x: x, y: e.touches[0].clientY, t: Date.now(), dx: 0, lock: null, st: st, v: q("#app > .view") };
+  }, { passive: true });
+  document.addEventListener("touchmove", function (e) {
+    if (!ps || ps.lock === "v" || !ps.v) return;
+    var dx = e.touches[0].clientX - ps.x, dy = e.touches[0].clientY - ps.y;
+    if (!ps.lock) {
+      if (Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy) * 1.5) ps.lock = "h";
+      else if (Math.abs(dy) > 10) { ps.lock = "v"; return; }
+      else return;
+    }
+    var next = ps.st.i + (dx < 0 ? 1 : -1);
+    var ok = (next >= 0 && next < ps.st.list.length) || (next < 0 && ps.st.back);
+    ps.dx = ok ? dx : dx * 0.2;
+    ps.v.style.transition = "none";
+    ps.v.style.transform = "translate3d(" + ps.dx + "px,0,0)";
+    ps.v.style.opacity = String(1 - Math.min(0.5, Math.abs(ps.dx) / window.innerWidth * 0.7));
+  }, { passive: true });
+  function pageSwipeEnd() {
+    if (!ps) return;
+    var p0 = ps; ps = null;
+    if (p0.lock !== "h" || !p0.v) return;
+    var W = window.innerWidth, v = Math.abs(p0.dx) / Math.max(1, Date.now() - p0.t);
+    var next = p0.st.i + (p0.dx < 0 ? 1 : -1);
+    var ok = (next >= 0 && next < p0.st.list.length) || (next < 0 && p0.st.back);
+    var far = ok && (Math.abs(p0.dx) > W * 0.22 || (v > 0.45 && Math.abs(p0.dx) > 35));
+    p0.v.style.transition = "transform .15s ease-out, opacity .15s ease-out";
+    if (!far) { p0.v.style.transform = ""; p0.v.style.opacity = ""; return; }
+    p0.v.style.transform = "translate3d(" + (p0.dx < 0 ? -W : W) + "px,0,0)"; p0.v.style.opacity = "0";
+    setTimeout(function () {
+      var from = p0.dx < 0 ? 1 : -1;
+      if (next < 0) { goBack(); }
+      else if (p0.st.list[0] === "home") { location.hash = p0.st.list[next] === "feed" ? "feed" : ""; }
+      else { state.tourTab = p0.st.list[next]; showTourTab(); }
+      var nv = q("#app > .view");
+      if (nv) {
+        nv.style.transition = "none"; nv.style.transform = "translate3d(" + (from * 40) + "px,0,0)"; nv.style.opacity = "0";
+        requestAnimationFrame(function () { requestAnimationFrame(function () { nv.style.transition = "transform .18s ease-out, opacity .18s ease-out"; nv.style.transform = ""; nv.style.opacity = ""; }); });
+      }
+      try { TG && TG.HapticFeedback && TG.HapticFeedback.selectionChanged(); } catch (err) {}
+    }, 140);
+  }
+  document.addEventListener("touchend", pageSwipeEnd, { passive: true });
+  document.addEventListener("touchcancel", pageSwipeEnd, { passive: true });
+  function showTourTab() {
+    var id = state.view.slice(5);
+    renderTour(id);
+    if (state.tourTab === "done" && !(state.results || {})[id]) getResults(id).then(function () { if (state.view === "tour:" + id) renderTour(id); }).catch(function () {});
+  }
+
+  // ---------- роутинг: "" турниры, #t-ID турнир, #m-ID матч, #feed лента
+  var depth = 0;
+  function route() {
+    var h = location.hash.replace("#", "");
+    var mt = /^m-(\d+)$/.exec(h), tt = /^t-([\w-]+)$/.exec(h);
+    closeOverlay(true);
+    updateBackBtn();
+    if (!state.list) return;
+    if (mt) {
+      var id = mt[1];
+      if (state.openId !== id) { state.openId = id; state.tab = "players"; state.newsFilter = "all"; state.map = null; state.scrolls = {}; state.factsAll = false; window.scrollTo(0, 0); }
+      $app.innerHTML = '<div class="empty">Загружаю матч…</div>';
+      getDetail(id).then(renderMatch).catch(function () {
+        $app.innerHTML = '<div class="empty"><strong>Подробностей пока нет</strong>Карточки собираются за 3 дня до матча. <button class="chip" id="back" style="margin-top:8px">Назад</button></div>';
+      });
+      return;
+    }
+    state.openId = null;
+    if (tt) {
+      if (state.view !== "tour:" + tt[1]) state.tourTab = "matches";
+      state.view = "tour:" + tt[1]; showTourTab();
+    }
+    else if (h === "feed") { state.view = "feed"; renderFeed(); getFeed().then(function () { if (state.view === "feed") renderFeed(); }).catch(function () { if (state.view === "feed") $app.innerHTML = homeHeader("feed") + '<div class="empty"><strong>Лента пока не собрана</strong>Появится после ближайшего обновления данных.</div></div>'; }); }
+    else { state.view = "home"; renderHome(); }
+  }
+  function go(hash) { if (location.hash === hash) route(); else { depth++; location.hash = hash; } }
+  function goBack() {
+    if (state.ovl) { closeOverlay(false); return; }
+    if (depth > 0) { depth--; history.back(); return; }
+    var h = location.hash.replace("#", "");
+    if (/^m-/.test(h)) {
+      var m = (state.list.matches || []).find(function (x) { return "m-" + x.id === h; });
+      location.hash = m ? "t-" + tourOf(m) : "";
+    } else location.hash = "";
+  }
 
   if (TG) { try { TG.BackButton.onClick(goBack); } catch (e) {} }
   window.addEventListener("hashchange", route);
 
   // ---------- клики
-  $app.addEventListener("click", function (e) {
-    var t = e.target.closest("[data-fread],#close-freader,#facts-more,[data-mreg],[data-home],[data-feedch],[data-tg],[data-reader],#close-reader,[data-mine],[data-open],[data-tour],[data-tab],[data-map],[data-nf],[data-player],[data-link],[data-news],[data-orig],[data-read],#back,#to-mine");
+  document.addEventListener("click", function (e) {
+    var t = e.target.closest("[data-fread],[data-close],#facts-more,[data-home],[data-feedch],[data-tg],[data-reader],[data-open],[data-tour],[data-tab],[data-map],[data-nf],[data-player],[data-link],[data-read],[data-series],[data-rseries],[data-smap],[data-ttab],#back");
     if (!t) return;
-    if (t.hasAttribute("data-home")) { var hv = t.getAttribute("data-home"); if (hv === "feed" || hv === "major") { location.hash = hv; } else if (location.hash) { location.hash = ""; } return; }
-    if (t.hasAttribute("data-fread")) { state.feedRead = t.getAttribute("data-fread"); state.feedScroll = window.scrollY; var fc = document.querySelector(".feedch"); state.feedChScroll = fc ? fc.scrollLeft : 0; renderFeed(); window.scrollTo(0, 0); return; }
-    if (t.id === "close-freader") { closeFeedReader(); return; }
-    if (t.id === "facts-more") { state.factsAll = !state.factsAll; renderMatch(state.details[state.openId]); return; }
-    if (t.hasAttribute("data-mreg")) { state.majorReg = t.getAttribute("data-mreg"); keepFilterScroll(renderMajor); return; }
-    if (t.hasAttribute("data-feedch")) { state.feedCh = t.getAttribute("data-feedch"); keepFilterScroll(renderFeed); return; }
-    if (t.hasAttribute("data-tg")) { if (TG) { e.preventDefault(); try { TG.openTelegramLink(t.getAttribute("data-tg")); } catch (x) { openLink(t.getAttribute("data-tg")); } } return; }
-    if (t.hasAttribute("data-reader")) { var ap0 = activePane(), ff = ap0 && ap0.querySelector(".filt"); state.filtScroll = ff ? ff.scrollLeft : null; state.reader = t.getAttribute("data-reader"); state.readerScroll = window.scrollY; renderMatch(state.details[state.openId]); window.scrollTo(0, 0); return; }
-    if (t.id === "close-reader") { closeReader(); return; }
-    if (t.hasAttribute("data-news")) { var k = t.getAttribute("data-news"); state.openNews = state.openNews === k ? null : k; state.showOrig = null; renderMatch(state.details[state.openId]); var el = document.querySelector('[data-news="' + (window.CSS && CSS.escape ? CSS.escape(k) : k) + '"]'); if (el && state.openNews) el.scrollIntoView({ block: "nearest" }); return; }
-    if (t.hasAttribute("data-orig")) { var k2 = t.getAttribute("data-orig"); state.showOrig = state.showOrig === k2 ? null : k2; renderMatch(state.details[state.openId]); return; }
-    if (t.hasAttribute("data-read")) { if (TG) { e.preventDefault(); try { TG.openLink(t.getAttribute("data-read"), { try_instant_view: true }); } catch (x) { openLink(t.getAttribute("data-read")); } } return; }
-    if (t.hasAttribute("data-link")) { if (TG) { e.preventDefault(); openLink(t.getAttribute("data-link")); } return; }
-    if (t.hasAttribute("data-mine")) { e.stopPropagation(); toggleMine(t.getAttribute("data-mine")); state.openId ? renderMatch(state.details[state.openId]) : rerenderList(); return; }
-    if (t.hasAttribute("data-open")) { go("#m-" + t.getAttribute("data-open")); return; }
-    if (t.hasAttribute("data-tour")) { go("#t-" + t.getAttribute("data-tour")); window.scrollTo(0, 0); return; }
-    if (t.id === "to-mine") { go("#mine"); return; }
-    if (t.hasAttribute("data-tab")) {
-      var nt = t.getAttribute("data-tab");
-      goKey(nt === "news" ? viewKey("news", state.newsFilter || "all") : nt);
+    if (t.hasAttribute("data-home")) { var hv = t.getAttribute("data-home"); if (hv === "feed") { location.hash = hv; } else if (location.hash) { location.hash = ""; } return; }
+    if (t.hasAttribute("data-close")) { goBack(); return; }
+    if (t.hasAttribute("data-fread")) {
+      var it = ((state.feed || {}).items || []).find(function (x) { return x.key === t.getAttribute("data-fread"); });
+      if (it) openOverlay("feed", it.key, feedReader(it));
       return;
     }
-    if (t.hasAttribute("data-map")) { state.map = t.getAttribute("data-map"); keepFilterScroll(function () { renderMatch(state.details[state.openId]); }); return; }
+    if (t.id === "facts-more") { state.factsAll = !state.factsAll; renderMatch(state.details[state.openId]); return; }
+    if (t.hasAttribute("data-feedch")) { state.feedCh = t.getAttribute("data-feedch"); keepFilterScroll(renderFeed); return; }
+    if (t.hasAttribute("data-tg")) { if (TG) { e.preventDefault(); try { TG.openTelegramLink(t.getAttribute("data-tg")); } catch (x) { openLink(t.getAttribute("data-tg")); } } return; }
+    if (t.hasAttribute("data-reader")) {
+      var m0 = state.details[state.openId], n = m0 && ((m0.news && m0.news.items) || []).find(function (x) { return x.key === t.getAttribute("data-reader"); });
+      if (n) openOverlay("news", n.key, readerView(n));
+      return;
+    }
+    if (t.hasAttribute("data-series")) {
+      var S = ((state.details[state.openId] || {}).series || {})[t.getAttribute("data-series")];
+      if (S) openSeries(S, "Статистика");
+      return;
+    }
+    if (t.hasAttribute("data-rseries")) {
+      var R = (state.results || {})[state.view.slice(5)], S2 = R && (R.matches || []).find(function (x) { return String(x.id) === t.getAttribute("data-rseries"); });
+      if (S2) openSeries(S2, "Завершённые");
+      return;
+    }
+    if (t.hasAttribute("data-smap")) {
+      if (!state.ovl || state.ovl.kind !== "series") return;
+      state.seriesMap = Number(t.getAttribute("data-smap"));
+      var el = state.ovl.el, f = el.querySelector(".sfilt"), sl = f ? f.scrollLeft : 0, top = el.scrollTop;
+      el.innerHTML = seriesView(state.ovl.key, state.openId ? "Статистика" : "Завершённые");
+      el.scrollTop = top; f = el.querySelector(".sfilt"); if (f) { f.scrollLeft = sl; revealSel(f); }
+      return;
+    }
+    if (t.hasAttribute("data-ttab")) { state.tourTab = t.getAttribute("data-ttab"); showTourTab(); return; }
+    if (t.hasAttribute("data-read")) { if (TG) { e.preventDefault(); try { TG.openLink(t.getAttribute("data-read"), { try_instant_view: true }); } catch (x) { openLink(t.getAttribute("data-read")); } } return; }
+    if (t.hasAttribute("data-link")) { if (TG) { e.preventDefault(); openLink(t.getAttribute("data-link")); } return; }
+    if (t.hasAttribute("data-open")) { go("#m-" + t.getAttribute("data-open")); return; }
+    if (t.hasAttribute("data-tour")) { go("#t-" + t.getAttribute("data-tour")); window.scrollTo(0, 0); return; }
+    if (t.hasAttribute("data-tab")) { var nt = t.getAttribute("data-tab"); goKey(nt === "news" ? viewKey("news", state.newsFilter || "all") : nt); return; }
+    if (t.hasAttribute("data-map")) { setMap(t.getAttribute("data-map")); return; }
     if (t.hasAttribute("data-nf")) { goKey(viewKey("news", t.getAttribute("data-nf"))); return; }
     if (t.hasAttribute("data-player")) {
-      state.tab = "news"; state.newsFilter = t.getAttribute("data-player"); state.openNews = null;
-      state.scrolls = state.scrolls || {}; state.scrolls[curKey()] = 0;
+      state.tab = "news"; state.newsFilter = t.getAttribute("data-player");
+      state.scrolls = state.scrolls || {}; state.scrolls[curKey()] = activePane() ? Math.min(activePane().scrollTop, HD ? HD.D : 0) : 0;
       renderMatch(state.details[state.openId]);
       return;
     }
