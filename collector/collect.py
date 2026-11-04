@@ -1405,8 +1405,10 @@ def valve_links() -> dict:
 def valve_detail(name: str) -> dict | None:
     links = valve_links().get("links") or {}
     path = links.get(norm(name)) or next((v for k, v in links.items() if len(k) >= 3 and (k in norm(name) or norm(name) in k)), None)
-    if not path:
-        return None
+    return valve_detail_path(path) if path else None
+
+
+def valve_detail_path(path: str) -> dict | None:
     def fn():
         t = http_get(VALVE_RAW + path).decode("utf-8", "replace")
         num = lambda rx: float(re.search(rx, t).group(1))
@@ -1415,27 +1417,91 @@ def valve_detail(name: str) -> dict | None:
              "seed": num(r"Starting Rank Value \(([\d.]+)\)")}
         mm = re.search(r"400 \+ \( \( [\d.]+ - ([\d.]+) \) / \( ([\d.]+) - [\d.]+ \) \)", t)
         d["min"], d["max"] = (float(mm.group(1)), float(mm.group(2))) if mm else (0.0, 1.0)
-        bc, net, lan = [], [], []
+        bc, net, lan, opp = [], [], [], {}
         for line in t.split('id="table1"', 1)[-1].split('id="table2"', 1)[0].splitlines():
             c = [x.strip() for x in line.split("|")]
             if len(c) < 12 or not c[1].isdigit():
                 continue
             adj = lambda x: float(re.search(r"\(([\d.]+)\)", x).group(1)) if "(" in x else None
+            base = lambda x: float(re.match(r"([\d.]+)", x).group(1)) if re.match(r"[\d.]+", x) else None
             for col, lst in ((8, bc), (9, net), (10, lan)):
                 v = adj(c[col])
                 if v is not None:
                     lst.append(v)
-        d.update({"bc": bc, "net": net, "lanl": lan})
+            # «сырые» баунти и сеть соперника (до весов) — нужны, чтобы посчитать, что даст новая победа над ним
+            if c[5] == "W":  # «-» — значение не попало в десятку лучших, его не видно; берём только видимые
+                o = opp.setdefault(norm(c[4]), {"date": c[3]})
+                for f, col in (("bounty", 8), ("network", 9)):
+                    v = base(c[col])
+                    if v is not None and f not in o:
+                        o[f] = v
+        d.update({"bc": bc, "net": net, "lanl": lan, "opp": opp})
         return d
-    return hltv_cached("valvedet:" + path, fn)
+    return hltv_cached("valvedet2:" + path, fn)
 
 
-def vrs_outcomes_valve(a: dict, b: dict, table: list[dict], lan: bool = True, hists: list | None = None, bids: list | None = None) -> dict | None:
-    """Как HLTV: победитель получает очки за личную встречу и за улучшение своих факторов (баунти, сеть соперников, LAN),
-    проигравший — только поправку за личную встречу. Факторы — из официального разбора Valve на начало месяца."""
+def valve_bases() -> dict:
+    """norm(команда) → её «сырые» баунти и сеть, как их видят победители (из разборов Valve по топ-60)."""
+    links = valve_links()
+    key = "vbase2:" + (links.get("date") or "")
+    c = hltv_cache.get(key)
+    if c:
+        return c["data"]
+    out = {}
+    for path in list(dict.fromkeys((links.get("links") or {}).values()))[:60]:
+        try:
+            dd = valve_detail_path(path) or {}
+        except Exception:
+            continue
+        for k, v in (dd.get("opp") or {}).items():
+            o = out.setdefault(k, {})
+            for f in ("bounty", "network"):
+                if f in v and (f not in o or v["date"] > o.get(f + "_d", "")):
+                    o[f], o[f + "_d"] = v[f], v["date"]
+    if out:
+        hltv_cache[key] = {"t": iso(NOW), "data": out}
+    return out
+
+
+def valve_inv_curve(y: float) -> float:
+    """Обратная кривая: из «Bounty Offered» в разборе (после кривой) — сырое значение, которое получает победитель."""
+    return 1.0 if y >= 1 else 0.0 if y <= 0 else 10 ** -(1 / y - 1)
+
+
+def prize_usd(v) -> float:
+    m = re.search(r"([\d][\d,. ]*)", str(v or ""))
+    try:
+        return float(re.sub(r"[^\d]", "", m.group(1))) if m else 0.0
+    except ValueError:
+        return 0.0
+
+
+GLICKO_Q = math.log(10) / 400
+GLICKO_RD = 75.0  # Valve: setFixedRD(75) — Glicko с постоянным отклонением
+GLICKO_G = 1 / math.sqrt(1 + 3 * GLICKO_Q ** 2 * GLICKO_RD ** 2 / math.pi ** 2)
+
+
+def glicko_delta(r: float, ro: float, score: float, info: float = 1.0) -> float:
+    """Изменение очков за одну встречу — ровно как glicko.js в репозитории Valve."""
+    ev = 1 / (1 + 10 ** (GLICKO_G * (r - ro) / -400))
+    adj = 1 / (1 / GLICKO_RD ** 2 + GLICKO_Q ** 2 * GLICKO_G ** 2 * ev * (1 - ev) * info * info)
+    return GLICKO_Q * adj * GLICKO_G * (score - ev) * info
+
+
+def vrs_outcomes_valve(a: dict, b: dict, table: list[dict], lan: bool = True, hists: list | None = None,
+                       bids: list | None = None, prize=None, since: str = "") -> dict | None:
+    """Прогноз как у Valve/HLTV: победитель получает очки за личную встречу (Glicko, RD=75, по текущим очкам)
+    и за рост своих факторов: баунти соперника и его сеть (сырые значения × вес турнира), LAN-победа.
+    Проигравший — только личную встречу. Факторы — из официального разбора Valve на начало месяца."""
     da, db = valve_detail(a["name"]), valve_detail(b["name"])
     if not da or not db:
         return None
+    bases = valve_bases()
+    def base_of(name, W):
+        x = bases.get(norm(name)) or next((v for k, v in bases.items() if len(k) >= 3 and (k in norm(name) or norm(name) in k)), None)
+        x = x or {}
+        return x.get("bounty", valve_inv_curve(W["offered"])), x.get("network", W["network"])  # запасной вариант
+    ew_cur = valve_curve(min(max(prize_usd(prize), 1.0), 1e6) / 1e6) if prize_usd(prize) else 0.5
     da, db = dict(da, bc=list(da["bc"]), net=list(da["net"]), lanl=list(da["lanl"])), dict(db, bc=list(db["bc"]), net=list(db["net"]), lanl=list(db["lanl"]))
     def top(vals, v=None):
         return sum(sorted(vals + ([v] if v is not None else []), reverse=True)[:10]) / 10
@@ -1448,26 +1514,32 @@ def vrs_outcomes_valve(a: dict, b: dict, table: list[dict], lan: bool = True, hi
     # победы после снимка Valve (например, на идущем турнире) — добавляем, чтобы факторы были как сейчас
     snap = (valve_links().get("date") or "")
     for W, bid, hist in zip((da, db), bids or [None, None], hists or [[], []]):
-        W["seed0"] = seed_of(W)
         if not bid:
             continue
         for m in hist or []:
-            if (m.get("start_date") or "")[:10] < snap or m.get("winner_team_id") != bid:
+            if (m.get("start_date") or "")[:10] <= snap or m.get("winner_team_id") != bid:
                 continue
-            opp = valve_detail(opp_of(m, bid).get("name") or "")
-            if opp:
-                W["bc"].append(opp["offered"]); W["net"].append(opp["network"])
-                W["lanl"].append(1.0 if (m.get("tier") or "").lower() == "s" else 0.0)
+            on = opp_of(m, bid).get("name") or ""
+            od = valve_detail(on)
+            if not od:
+                continue
+            ob, onet = base_of(on, od)
+            same = bool(since) and (m.get("start_date") or "")[:10] >= since[:10]  # матч идущего турнира
+            ew = ew_cur if same else 0.5
+            W["bc"].append(ob * ew); W["net"].append(onet * ew)
+            W["lanl"].append(1.0 if (m.get("tier") or "").lower() == "s" else 0.0)
+    for W in (da, db):
         W["seed0"] = seed_of(W)
-    def gain(W, L):
-        return max(0.0, seed_of(W, (L["offered"], L["network"], 1.0 if lan else 0.0)) - W["seed0"])
-    ea = 1 / (1 + 10 ** ((db["seed0"] - da["seed0"]) / 400))
+    def gain(W, L, lname):
+        ob, onet = base_of(lname, L)
+        return max(0.0, seed_of(W, (ob * ew_cur, onet * ew_cur, 1.0 if lan else 0.0)) - W["seed0"])
+    pa0, pb0 = float(a["points"]), float(b["points"])
     res = {}
     for win in (0, 1):
         if win == 0:
-            dA, dB = gain(da, db) + VRS_K * (1 - ea), -VRS_K * (1 - ea)
+            dA, dB = gain(da, db, b["name"]) + glicko_delta(pa0, pb0, 1), glicko_delta(pb0, pa0, 0)
         else:
-            dA, dB = -VRS_K * ea, gain(db, da) + VRS_K * ea
+            dA, dB = glicko_delta(pa0, pb0, 0), gain(db, da, a["name"]) + glicko_delta(pb0, pa0, 1)
         dA, dB = round(dA), round(dB)
         pa, pb = a["points"] + dA, b["points"] + dB
         others = [r["points"] for r in table if r["name"] not in (a["name"], b["name"])]
@@ -2272,7 +2344,7 @@ def attach_major(tour_list: list, rosters: dict) -> None:
 
 VETO_CACHE_F = CACHE / "hltv_vetoes.json"
 veto_cache: dict = load_json(VETO_CACHE_F, {})   # "match:<id>" → вето навсегда; "results:<team>" → список матчей на 12 ч
-VETO_NEW_LIMIT = int(os.environ.get("VETO_NEW_LIMIT", "25"))  # вето берём с dust2.us (сайт-партнёр HLTV, та же база)
+VETO_NEW_LIMIT = int(os.environ.get("VETO_NEW_LIMIT", "60"))  # вето берём с dust2.us (сайт-партнёр HLTV, та же база)
 D2 = "https://www.dust2.us"
 _d2_blocked = [False]
 _d2_last = [0.0]
@@ -2314,7 +2386,7 @@ def hltv_team_for(t: dict) -> dict | None:
 
 
 def hltv_team_matches(team: dict) -> list[dict]:
-    key = f"results2:{team['id']}"
+    key = f"results3:{team['id']}"
     c = veto_cache.get(key)
     if c and (parse_iso(c.get("t")) or NOW) > NOW - timedelta(hours=12):
         return c["data"]
@@ -2325,11 +2397,22 @@ def hltv_team_matches(team: dict) -> list[dict]:
         return c["data"] if c else []
     out = []
     own = norm(team.get("slug") or team.get("name"))
-    for mid, slug in re.findall(r'href="/matches/(\d+)/([^"#?]+)"', h):
+    # дата матча — из заголовка блока «Results for November 4th 2026», под которым он стоит
+    heads = [(m.start(), m.group(1), m.group(2), m.group(3)) for m in
+             re.finditer(r'Results for (\w+) (\d+)(?:st|nd|rd|th) (\d{4})', h)]
+    for mm in re.finditer(r'href="/matches/(\d+)/([^"#?]+)"', h):
+        mid, slug = mm.group(1), mm.group(2)
         if own and own not in norm(slug):
             continue  # блоки «избранное» и чужие матчи на странице
         if mid not in [x["id"] for x in out]:
-            out.append({"id": mid, "slug": slug})
+            day = None
+            hd = [x for x in heads if x[0] < mm.start()]
+            if hd:
+                try:
+                    day = datetime.strptime(f"{hd[-1][1]} {hd[-1][2]} {hd[-1][3]}", "%B %d %Y").date().isoformat()
+                except ValueError:
+                    day = None
+            out.append({"id": mid, "slug": slug, "day": day})
         if len(out) >= VETO_MATCHES:
             break
     veto_cache[key] = {"t": iso(NOW), "data": out}
@@ -2339,8 +2422,9 @@ def hltv_team_matches(team: dict) -> list[dict]:
 def hltv_veto(match: dict) -> dict | None:
     """Вето матча со страницы dust2.us: по порядку карты BANNED / PICKED / оставшаяся. Хранится навсегда."""
     key = f"match:{match['id']}"
-    if key in veto_cache:
-        return veto_cache[key]
+    c = veto_cache.get(key)
+    if c and any(x.get("team") for x in c.get("steps") or []):
+        return c  # без команд у банов/пиков — старая разборка, перечитываем
     if _veto_new[0] >= VETO_NEW_LIMIT:
         return None
     _veto_new[0] += 1
@@ -2354,7 +2438,8 @@ def hltv_veto(match: dict) -> dict | None:
     for n, box in enumerate(re.split(r'<div class="standard-box map-container ', sec)[1:], 1):
         nm = re.search(r'map-container-map-name">([^<]+)<', box)
         tp = re.search(r'map-container-type">([^<]+)<', box)
-        team = re.search(r'class="team-logo[^"]*" title="([^"]+)"', box)
+        team = (re.search(r'class="team-logo[^"]*" title="([^"]+)"', box)
+                or re.search(r'map-container-team-logo-container">\s*<span[^>]*>([^<]+)</span>', box))
         if not nm:
             continue
         t = (tp.group(1).strip().upper() if tp else "")
@@ -2363,6 +2448,8 @@ def hltv_veto(match: dict) -> dict | None:
                       "map": strip_html(nm.group(1))})
     dm = re.search(r'data-unix="(\d+)"', b)
     d = {"date": iso(datetime.fromtimestamp(int(dm.group(1)) / 1000, tz=timezone.utc)) if dm else None, "steps": steps}
+    if not d["date"] and match.get("day"):
+        d["date"] = match["day"] + "T12:00:00Z"
     if steps:
         veto_cache[key] = d   # вето сыгранного матча не меняется
     return d
@@ -3531,9 +3618,13 @@ def attach_veto(sd: dict) -> None:
             sl = norm(mt.get("slug"))
             if not ((opp and opp in sl) or (opp2 and len(opp2) >= 3 and opp2 in sl)):
                 continue
-            v = veto_cache.get(f"match:{mt['id']}") or (None if STATS else hltv_veto(mt))
+            v = veto_cache.get(f"match:{mt['id']}")
+            if not (v and any(x.get("team") for x in v.get("steps") or [])):
+                v = None if STATS else hltv_veto(mt)
             vd = parse_iso((v or {}).get("date"))
-            if v and v.get("steps") and vd and abs((vd - d0).total_seconds()) < 36 * 3600:
+            if not vd and mt.get("day"):
+                vd = parse_iso(mt["day"] + "T12:00:00Z")
+            if v and v.get("steps") and vd and abs((vd - d0).total_seconds()) < 40 * 3600:
                 sd["veto"] = v["steps"]
                 return
 
@@ -3740,7 +3831,8 @@ def build_detail(m: dict, prev: dict | None) -> dict:
             warn(f"Призовые места {t.get('name')}: {e!r}")
     if len(rows) == 2 and all(rows):
         try:
-            detail["vrs_outcomes"] = vrs_outcomes_valve(rows[0], rows[1], table, hists=hists, bids=bids) or vrs_outcomes(rows[0], rows[1], table)
+            detail["vrs_outcomes"] = vrs_outcomes_valve(rows[0], rows[1], table, hists=hists, bids=bids,
+                                                        prize=(brief.get("serie") or {}).get("prize"), since=(brief.get("serie") or {}).get("begin") or "") or vrs_outcomes(rows[0], rows[1], table)
         except Exception as e:
             warn(f"VRS прогноз: {e!r}")
             detail["vrs_outcomes"] = vrs_outcomes(rows[0], rows[1], table)
