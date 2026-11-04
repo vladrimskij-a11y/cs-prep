@@ -1671,10 +1671,14 @@ def team_achievements(hltv_team: dict) -> list[dict]:
         h = hltv_get(f"/team/{hltv_team['id']}/{hltv_team['slug']}")
         if not h:
             return None
+        ids = {}
         for pid, slug, nick in re.findall(r'href="/player/(\d+)/([^"]+)"[^>]*>.{0,400}?<div class="text-ellipsis">([^<]+)</div>', h[:400000], re.S)[:12]:
-            hltv_player_ids.setdefault(norm(strip_html(nick)), {"id": int(pid), "slug": slug})
+            ids.setdefault(norm(strip_html(nick)), {"id": int(pid), "slug": slug})
         for pid, slug in re.findall(r'href="/player/(\d+)/([^"/]+)"', h[:400000])[:20]:
-            hltv_player_ids.setdefault(norm(slug), {"id": int(pid), "slug": slug})
+            ids.setdefault(norm(slug), {"id": int(pid), "slug": slug})
+        hltv_cache[f"tpl:{hltv_team['id']}"] = {"t": iso(NOW), "data": ids}  # id игроков нужны и когда достижения из кэша
+        for k, v in ids.items():
+            hltv_player_ids.setdefault(k, v)
         i = h.find('id="lanAchievement"')
         if i < 0:
             return []
@@ -1684,7 +1688,10 @@ def team_achievements(hltv_team: dict) -> list[dict]:
                                       r'<a href="/events/(\d+)/[^"]+">([^<]+)</a>', sec, re.S):
             out.append({"place": pl.strip(), "event": strip_html(ev), "event_id": int(eid)})
         return out
-    return hltv_cached(f"ach:{hltv_team['id']}", fn) or []
+    res = hltv_cached(f"ach:{hltv_team['id']}", fn) or []
+    for k, v in ((hltv_cache.get(f"tpl:{hltv_team['id']}") or {}).get("data") or {}).items():
+        hltv_player_ids.setdefault(k, v)
+    return res
 
 
 def prize_places(hltv_team: dict | None, hist: list[dict], days: int = 92) -> list[dict]:
@@ -3025,7 +3032,7 @@ FAST = os.environ.get("NEWS_ONLY") == "1"   # быстрое обновлени�
 
 GEMINI_KEY = os.environ.get("GEMINI_KEY", "").strip()
 GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-flash-latest")
-GEMINI_DAY_LIMIT = int(os.environ.get("GEMINI_DAY_LIMIT", "800"))   # запросов в день — запас до бесплатного лимита Google
+GEMINI_DAY_LIMIT = int(os.environ.get("GEMINI_DAY_LIMIT", "1500"))   # запросов в день — запас до бесплатного лимита Google
 GEMINI_LITE = os.environ.get("GEMINI_LITE", "gemini-flash-lite-latest")  # запасная облегчённая модель: обычно свободна, тоже бесплатна
 _gem = {"off": False, "last": 0.0, "fails": 0, "model": GEMINI_MODEL, "think": True, "busy": 0}
 
@@ -3711,12 +3718,12 @@ def hltv_player_info(nick: str) -> dict | None:
     pl = hltv_player_ids.get(norm(nick))
     if not pl:
         return None
-    key = f"pinfo2:{pl['id']}"
+    key = f"pinfo3:{pl['id']}"
     c = hltv_cache.get(key)
     if c and (parse_iso(c.get("t")) or NOW) > NOW - timedelta(days=7):
         return c["data"]
-    c = c or hltv_cache.get(f"pinfo:{pl['id']}")  # старая запись — пока не перечитали
-    if _mvp_new[0] >= 30 or _hltv_blocked[0] or STATS:
+    c = c or hltv_cache.get(f"pinfo2:{pl['id']}") or hltv_cache.get(f"pinfo:{pl['id']}")  # старая запись (без названий мейджоров) — пока не перечитали
+    if _mvp_new[0] >= 60 or _hltv_blocked[0] or STATS:
         return c["data"] if c else None
     _mvp_new[0] += 1
     h = hltv_get(f"/player/{pl['id']}/{pl['slug']}")
@@ -3745,7 +3752,15 @@ def hltv_player_info(nick: str) -> dict | None:
         mvp = max(mvp, len(ev))
     pm = re.search(r'<div class="stat">(\d+)</div><div class="description">Majors? played', b)
     wm = re.search(r'<div class="stat">(\d+)</div><div class="description">Majors? won', b)
-    d = {"mvp": mvp, "mvp_events": ev, "majors": int(pm.group(1)) if pm else 0, "major_wins": int(wm.group(1)) if wm else 0}
+    # названия мейджоров: события со словом Major в достижениях/истории игрока (с годом, как на HLTV)
+    mj = []
+    for e in re.findall(r'<a href="/events/\d+/[^"]+"[^>]*>(?:<[^>]+>)*\s*([^<]*Major[^<]*)<', b):
+        e = _html.unescape(e).strip()
+        if e and re.search(r"20\d\d", e) and e not in mj:
+            mj.append(e)
+    mj.sort(key=lambda x: re.findall(r"20\d\d", x)[-1], reverse=True)
+    d = {"mvp": mvp, "mvp_events": ev, "majors": int(pm.group(1)) if pm else 0, "major_wins": int(wm.group(1)) if wm else 0,
+         "major_events": mj}
     hltv_cache[key] = {"t": iso(NOW), "data": d}
     return d
 
@@ -4036,7 +4051,16 @@ def team_by_name(name: str) -> int | None:
     key = "n:" + norm(name)
     if teams_map.get(key):
         return teams_map[key]
-    bid = bo3_team_id({"id": key, "name": name})
+    n = norm(name)
+    for b0, names in team_aliases.items():  # уже встречали эту команду под другим написанием (BETBOOM → BetBoom Team)
+        if n in names or norm(re.sub(r"\s+(team|esports|gaming|clan)$", "", name, flags=re.IGNORECASE)) in names:
+            teams_map[key] = b0
+            return b0
+    bid = None
+    for nm in dict.fromkeys([name, name.title(), name + " Team", name.title() + " Team"]):
+        bid = bo3_team_id({"id": key, "name": nm})
+        if bid:
+            break
     if bid:
         teams_map[key] = bid
     return bid
@@ -4065,7 +4089,15 @@ def build_team_page(r: dict) -> dict | None:
     players = list((bo3_team_players(bid, hist) or {}).values())
     roster, coach = [], []
     key = "n:" + norm(r["name"])
-    if roster_cache.get(key) or _team_lp_new[0] < 10:
+    # призовые и id игроков с HLTV — раньше состава: по этим id ищутся MVP и мейджоры игроков
+    ach = []
+    if r.get("hltv") and (hltv_cache.get(f"ach:{r['hltv']['id']}") or TEAM_GAMES_NEW[0] < 30):
+        TEAM_GAMES_NEW[0] += 1
+        try:
+            ach = prize_places(r["hltv"], hist)
+        except Exception as e:
+            warn(f"Призовые {r['name']}: {e!r}")
+    if roster_cache.get(key) or _team_lp_new[0] < 40:
         if not roster_cache.get(key):
             _team_lp_new[0] += 1
         try:
@@ -4082,13 +4114,16 @@ def build_team_page(r: dict) -> dict | None:
                     p["name_ru"] = pc["name_ru"]
         except Exception as e:
             warn(f"Состав {r['name']}: {e!r}")
-    ach = []
-    if r.get("hltv") and (hltv_cache.get(f"ach:{r['hltv']['id']}") or TEAM_GAMES_NEW[0] < 6):
-        TEAM_GAMES_NEW[0] += 1
-        try:
-            ach = prize_places(r["hltv"], hist)
-        except Exception as e:
-            warn(f"Призовые {r['name']}: {e!r}")
+    if not roster and players:  # состава с Liquipedia нет — строим строки из игроков bo3, чтобы было как во вкладке «Игроки»
+        roster = [{"nick": n if isinstance(n, str) else (n.get("nick") or "")} for n in players]
+        roster = [p for p in roster if p["nick"]]
+        for p in roster:
+            info = hltv_player_info(p["nick"])
+            if info:
+                p.update({k: v for k, v in info.items() if v})
+            pc = next((v for k, v in pron_cache.items() if k.startswith(norm(p["nick"]) + "|") and v.get("name_ru")), None)
+            if pc:
+                p["name_ru"] = pc["name_ru"]
     return {"updated": iso(NOW), "name": r["name"], "vrs": {k: r.get(k) for k in ("rank", "points", "region", "reg_rank", "hltv_rank")},
             "players": players or r.get("roster") or [], "roster": roster, "coach": coach, "logo": r.get("logo"),
             "stats": build_player_stats({"players": roster}, bid, hist) if roster else [],
@@ -4282,12 +4317,9 @@ def main() -> int:
     for m in matches:
         b = match_brief(m)
         begin = parse_iso(b["begin_at"])
-        sb = parse_iso((b.get("serie") or {}).get("begin"))
-        if b.get("tier") == "s":
-            detailed = len(b["teams"]) == 2 and begin is not None and (begin - NOW <= timedelta(hours=DETAIL_HOURS)
-                                                                       or (sb is not None and sb - NOW <= timedelta(hours=DETAIL_HOURS)))  # за 3 дня до турнира
-        else:  # тир-2: карточка за сутки до матча, без фактов от нейросети
-            detailed = len(b["teams"]) == 2 and begin is not None and begin - NOW <= timedelta(hours=24)
+        # карточка — для каждого матча недели, где известны обе команды. Дальше 3 дней она «лёгкая»
+        # (без фактов от нейросети, новости один раз), за 3 дня до матча — полная (см. soon в build_detail)
+        detailed = len(b["teams"]) == 2 and begin is not None
         if detailed:
             path = OUT / "match" / f"{m['id']}.json"
             prev = load_json(path, None)
