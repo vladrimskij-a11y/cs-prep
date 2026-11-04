@@ -461,6 +461,20 @@ html { overflow-anchor: none; }
 .pop-in .pci { font-size: 16px; padding-bottom: 4px; border-bottom: 1px solid var(--line); margin-bottom: 2px; } .pop-in .pci b { display: inline; font-size: 14px; margin: 0; }
 .pce { font-size: 12px; line-height: 1.3; color: var(--fg); overflow-wrap: anywhere; }
 .pce.none { color: var(--muted); }
+.lv-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--onair); margin-right: 6px; animation: lvb 1.4s infinite; vertical-align: middle; }
+@keyframes lvb { 50% { opacity: .3; } }
+.lv-upd { font-weight: 500; color: var(--muted); margin-left: 6px; text-transform: none; letter-spacing: 0; }
+.box.live { padding: 10px 12px; }
+.lv-s { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 10px; font-weight: 800; }
+.lv-s .a { color: var(--ct); } .lv-s .b { color: var(--t); text-align: right; } .lv-s b { font-size: 22px; }
+.lv-maps { display: flex; gap: 6px; margin-top: 10px; }
+.lv-m { flex: 1; min-width: 0; background: var(--sunk); border-radius: 8px; padding: 6px 8px; display: flex; flex-direction: column; font-size: 12px; }
+.lv-m b { font-size: 16px; } .lv-m small { color: var(--muted); font-size: 10.5px; } .lv-m.cur { outline: 1.5px solid var(--onair); }
+.lv-ts { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+.lv-tn { font-weight: 800; font-size: 12px; margin-bottom: 4px; } .lv-t.a .lv-tn { color: var(--ct); } .lv-t.b .lv-tn { color: var(--t); }
+.lv-p { display: grid; grid-template-columns: 1fr auto 30px; gap: 6px; font-size: 12.5px; padding: 2px 0; }
+.lv-p span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .lv-p i { font-style: normal; color: var(--muted); text-align: right; }
+.lv-h { margin-top: 8px; font-size: 11px; color: var(--muted); }
 .pop { position: fixed; inset: 0; z-index: 50; }
 .pop-in { position: fixed; max-width: min(320px, calc(100vw - 24px)); max-height: 50vh; overflow: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
   box-shadow: 0 10px 30px rgba(0,0,0,.35); padding: 10px 12px; font-size: 13px; }
@@ -1676,7 +1690,7 @@ a.ni { text-decoration: none; color: inherit; }
     return html;
   }
   function playersTab(m) {
-    var html = "";
+    var html = '<div id="livebox">' + (state.live && state.live.id === m.id ? state.live.html || "" : "") + '</div>';
     m.teams.forEach(function (t, i) {
       html += '<div class="sec"><div class="box roster ' + (i ? "b" : "a") + '"><div class="hd"><span class="tn">' + esc(t.name) + '</span>' + trophyCount(t.prizes) + medalsHtml(t.prizes) + '</div>';
       if (!(t.players || []).length) html += '<div class="note">Состав не указан.</div>';
@@ -1890,7 +1904,85 @@ a.ni { text-decoration: none; color: inherit; }
     tr.style.transition = anim ? "transform " + (ms || 260) + "ms cubic-bezier(.2,.7,.3,1)" : "none";
     tr.style.transform = "translate3d(" + (-i * paneW()) + "px,0,0)";
   }
+  // ---- живой режим: счёт карт, раунды и статистика игроков с bo3.gg через наш посредник (обновление раз в 15 с)
+  var LIVE = "https://rimcs-live.vladrimskij.workers.dev";
+  function liveWanted(m) {
+    if (!m || !m.teams || m.teams.length < 2 || !m.teams[0].bo3_id || !m.teams[1].bo3_id) return false;
+    if (m.status === "finished" || m.status === "canceled") return false;
+    if (m.status === "running") return true;
+    var t = Date.parse(m.begin_at || "");
+    return t && Date.now() > t - 15 * 60000 && Date.now() < t + 8 * 3600000;
+  }
+  function liveJ(path) {
+    return fetch(LIVE + path, { cache: "no-store" }).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); });
+  }
+  function liveStop() { if (state.live && state.live.timer) clearTimeout(state.live.timer); state.live = null; }
+  function liveStart(m) {
+    if (state.live && state.live.id === m.id) return;
+    liveStop();
+    if (!liveWanted(m)) return;
+    state.live = { id: m.id, html: "" };
+    liveTick(m);
+  }
+  function liveTick(m) {
+    var L = state.live; if (!L || L.id !== m.id) return;
+    var A = m.teams[0], B = m.teams[1];
+    liveJ("/matches?page%5Blimit%5D=10&filter%5Bmatches.status%5D%5Bin%5D=current&filter%5Bmatches.team_ids%5D%5Boverlap%5D=" + A.bo3_id).then(function (j) {
+      var M = (j.results || []).find(function (x) { return [x.team1_id, x.team2_id].indexOf(B.bo3_id) >= 0; });
+      if (!M) { L.html = ""; return null; }
+      return liveJ("/games?filter%5Bgames.match_id%5D%5Beq%5D=" + M.id).then(function (g) {
+        var games = (g.results || []).sort(function (a, b) { return (a.number || 0) - (b.number || 0); });
+        var cur = games.find(function (x) { return x.status === "current"; });
+        if (!cur) return [M, games, null, null];
+        return Promise.all([liveJ("/games/" + cur.id).catch(function () { return null; }), liveJ("/games/" + cur.id + "/players_stats").catch(function () { return []; })])
+          .then(function (r) { return [M, games, r[0], r[1]]; });
+      });
+    }).then(function (r) {
+      if (!state.live || state.live.id !== m.id) return;
+      if (r) state.live.html = liveHtml(m, r[0], r[1], r[2], r[3]);
+      var box = document.getElementById("livebox"); if (box) box.innerHTML = state.live.html;
+    }).catch(function () {}).then(function () {
+      if (state.live && state.live.id === m.id) state.live.timer = setTimeout(function () { liveTick(m); }, 15000);
+    });
+  }
+  function liveHtml(m, M, games, G, PS) {
+    var A = m.teams[0], B = m.teams[1], flip = M.team1_id === B.bo3_id;
+    var sa = flip ? M.team2_score : M.team1_score, sb = flip ? M.team1_score : M.team2_score;
+    var clan = {};  // название клана в игре → наша команда 0/1
+    (PS || []).forEach(function (p) { var tid = (p.team_clan || {}).team_id; if (tid) clan[p.clan_name] = tid === A.bo3_id ? 0 : 1; });
+    function side(name, tid) { if (tid) return tid === A.bo3_id ? 0 : 1; return clan[name]; }
+    var mapsHtml = games.map(function (g) {
+      var nm = String(g.map_name || "").replace(/^de_/, ""); nm = nm.charAt(0).toUpperCase() + nm.slice(1);
+      var sc = ["–", "–"];
+      if (g.status === "finished") {
+        var w = side(g.winner_clan_name, (g.winner_team_clan || {}).team_id);
+        if (w == null) w = 0;
+        sc[w] = g.winner_clan_score; sc[1 - w] = g.loser_clan_score;
+      } else if (g.status === "current" && G) {
+        sc = [0, 0];
+        (G.game_rounds || []).forEach(function (rd) { var s2 = side(rd.winner_clan_name); if (s2 != null) sc[s2]++; });
+      }
+      return '<div class="lv-m' + (g.status === "current" ? " cur" : "") + '"><span>' + esc(nm) + '</span><b class="num">' + esc(sc[0]) + ':' + esc(sc[1]) + '</b><small>' + (g.status === "current" ? "идёт" : g.status === "finished" ? "сыграна" : "") + '</small></div>';
+    }).join("");
+    var rows = [[], []];
+    (PS || []).forEach(function (p) {
+      var s2 = side(p.clan_name, (p.team_clan || {}).team_id); if (s2 == null) return;
+      rows[s2].push(p);
+    });
+    var tables = (rows[0].length || rows[1].length) ? [0, 1].map(function (i) {
+      var t = m.teams[i];
+      return '<div class="lv-t ' + (i ? "b" : "a") + '"><div class="lv-tn">' + esc(t.acronym || t.name) + '</div>' + rows[i].sort(function (x, y) { return (y.kills || 0) - (x.kills || 0); }).map(function (p) {
+        return '<div class="lv-p"><span>' + esc((p.steam_profile || {}).nickname || p.nickname || "?") + '</span><b class="num">' + esc(p.kills || 0) + '–' + esc(p.death || 0) + '</b><i class="num">' + (p.adr != null ? Math.round(p.adr) : "–") + '</i></div>';
+      }).join("") + '</div>';
+    }).join("") : '';
+    var now = new Date();
+    return '<div class="sec"><h3><span><span class="lv-dot"></span>LIVE</span><small class="lv-upd">обновлено ' + String(now.getHours()).padStart(2, "0") + ':' + String(now.getMinutes()).padStart(2, "0") + ':' + String(now.getSeconds()).padStart(2, "0") + '</small></h3>' +
+      '<div class="box live"><div class="lv-s"><span class="a">' + esc(A.acronym || A.name) + '</span><b class="num">' + esc(sa) + ' : ' + esc(sb) + '</b><span class="b">' + esc(B.acronym || B.name) + '</span></div>' +
+      (mapsHtml ? '<div class="lv-maps">' + mapsHtml + '</div>' : '') +
+      (tables ? '<div class="lv-ts">' + tables + '</div><div class="lv-h">K–D и ADR за текущую карту · bo3.gg</div>' : '') + '</div></div>';
+  }
   function renderMatch(m) {
+    liveStart(m);
     state.scrolls = state.scrolls || {};
     panes().forEach(function (p) { state.scrolls[p.getAttribute("data-key")] = p.scrollTop; });
     var keys = paneKeys();
@@ -2190,6 +2282,7 @@ a.ni { text-decoration: none; color: inherit; }
       });
       return;
     }
+    liveStop();
     state.openId = null;
     if (!(tt || /^(tours|rating|feed|major|r-)/.test(h))) SH = null;
     if (tt) { state.view = "tour:" + tt[1]; showTour(tt[1]); }

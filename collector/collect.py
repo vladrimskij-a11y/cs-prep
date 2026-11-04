@@ -3766,7 +3766,7 @@ def build_detail(m: dict, prev: dict | None) -> dict:
         hist = bo3_history(bid) if bid else []
         bids.append(bid)
         hists.append(hist)
-        teams.append({**t, "players": players, "coach": coach, "form": build_form(bid, hist) if bid else []})
+        teams.append({**t, "bo3_id": bid, "players": players, "coach": coach, "form": build_form(bid, hist) if bid else []})
     detail = {**brief, "teams": teams, "updated": iso(NOW)}
     if len(bids) == 2 and all(bids):
         detail["h2h"] = build_h2h(bids[0], bids[1], hists[0])

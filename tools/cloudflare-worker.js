@@ -17,7 +17,7 @@ export default {
     if (req.method !== "GET") return new Response("method not allowed", { status: 405, headers: cors });
 
     const url = new URL(req.url);
-    if (!/^\/(matches|games)(\/[\w-]+)?$/.test(url.pathname)) {
+    if (!/^\/(matches|games)(\/[\w-]+)?(\/players_stats)?$/.test(url.pathname)) {
       return new Response("not allowed", { status: 403, headers: cors });
     }
 
