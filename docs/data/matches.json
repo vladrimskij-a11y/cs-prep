@@ -1,5 +1,5 @@
 {
- "updated": "2026-11-04T04:10:02Z",
+ "updated": "2026-11-04T07:33:25Z",
  "tiers": [
   "s"
  ],
@@ -12,9 +12,9 @@
    "begin": "2026-11-02T02:00:00Z",
    "end": "2026-11-08T12:30:00Z",
    "prize": "1,250,000 United States Dollar",
-   "matches": 12,
-   "next": "2026-11-04T04:30:00Z",
-   "live": 0,
+   "matches": 10,
+   "next": "2026-11-04T09:30:00Z",
+   "live": 2,
    "hltv": {
     "prize": 1250000,
     "player_share": 300000,
@@ -86,9 +86,14 @@
       "club": 20000,
       "spots": [],
       "other": [],
-      "team": null,
+      "team": "B8",
       "count": 4,
-      "teams": []
+      "teams": [
+       "B8",
+       "HEROIC",
+       "Aurora",
+       "TYLOO"
+      ]
      },
      {
       "place": "13-16th",
@@ -684,7 +689,7 @@
    "begin": "2026-11-11T02:00:00Z",
    "end": "2026-11-15T12:00:00Z",
    "prize": "1,000,000 United States Dollar",
-   "matches": 1,
+   "matches": 3,
    "next": "2026-11-11T02:00:00Z",
    "live": 0
   },
@@ -866,120 +871,9 @@
  ],
  "matches": [
   {
-   "id": 1781467,
-   "begin_at": "2026-11-04T04:30:00Z",
-   "status": "not_started",
-   "bo": 3,
-   "name": "Lower Bracket Semifinal 2: HERO vs FAL",
-   "tournament": "IEM Beijing 2026",
-   "stage": "Group A · Lower Bracket Semifinal 2",
-   "tier": "s",
-   "serie": {
-    "id": 11136,
-    "begin": "2026-11-02T02:00:00Z",
-    "end": "2026-11-08T12:30:00Z",
-    "image": null,
-    "prize": null
-   },
-   "teams": [
-    {
-     "id": 3246,
-     "name": "Heroic",
-     "acronym": "HERO",
-     "slug": "heroic",
-     "image": "https://cdn-api.pandascore.co/images/team/image/3246/680px_heroic_2023_allmode.png",
-     "location": "DK"
-    },
-    {
-     "id": 130564,
-     "name": "Team Falcons",
-     "acronym": "FAL",
-     "slug": "falcons-esports",
-     "image": "https://cdn-api.pandascore.co/images/team/image/130564/team_falconslogo_square.png",
-     "location": "SA"
-    }
-   ],
-   "stream": "https://www.twitch.tv/dmitry_lixxx",
-   "has_detail": true
-  },
-  {
-   "id": 1781466,
-   "begin_at": "2026-11-04T04:30:00Z",
-   "status": "not_started",
-   "bo": 3,
-   "name": "Lower Bracket Semifinal 1: NAVI vs B8",
-   "tournament": "IEM Beijing 2026",
-   "stage": "Group A · Lower Bracket Semifinal 1",
-   "tier": "s",
-   "serie": {
-    "id": 11136,
-    "begin": "2026-11-02T02:00:00Z",
-    "end": "2026-11-08T12:30:00Z",
-    "image": null,
-    "prize": null
-   },
-   "teams": [
-    {
-     "id": 3216,
-     "name": "Natus Vincere",
-     "acronym": "NAVI",
-     "slug": "natus-vincere-cs-go",
-     "image": "https://cdn-api.pandascore.co/images/team/image/3216/1022px_natus_vincere_2021_lightmode.png",
-     "location": "UA"
-    },
-    {
-     "id": 129381,
-     "name": "B8",
-     "acronym": "B8",
-     "slug": "b8-cs-go",
-     "image": "https://cdn-api.pandascore.co/images/team/image/129381/b8_lightmode.png",
-     "location": "UA"
-    }
-   ],
-   "stream": "https://www.twitch.tv/kabrafps",
-   "has_detail": true
-  },
-  {
-   "id": 1781476,
-   "begin_at": "2026-11-04T07:00:00Z",
-   "status": "not_started",
-   "bo": 3,
-   "name": "Lower Bracket Final: TL vs BB",
-   "tournament": "IEM Beijing 2026",
-   "stage": "Group B · Lower Bracket Final",
-   "tier": "s",
-   "serie": {
-    "id": 11136,
-    "begin": "2026-11-02T02:00:00Z",
-    "end": "2026-11-08T12:30:00Z",
-    "image": null,
-    "prize": null
-   },
-   "teams": [
-    {
-     "id": 3213,
-     "name": "Liquid",
-     "acronym": "TL",
-     "slug": "liquid-cs-go",
-     "image": "https://cdn-api.pandascore.co/images/team/image/3213/463px_team_liquid_2024_full_lightmode.png",
-     "location": "US"
-    },
-    {
-     "id": 133458,
-     "name": "BetBoom Team",
-     "acronym": "BB",
-     "slug": "betboom-team-cs-go",
-     "image": "https://cdn-api.pandascore.co/images/team/image/133458/bet_boom_team_2024_allmode.png",
-     "location": "RU"
-    }
-   ],
-   "stream": "https://www.twitch.tv/ESLCS",
-   "has_detail": true
-  },
-  {
    "id": 1781471,
-   "begin_at": "2026-11-04T07:00:00Z",
-   "status": "not_started",
+   "begin_at": "2026-11-04T07:03:25Z",
+   "status": "running",
    "bo": 3,
    "name": "Upper Bracket Final: MOUZ vs PRV",
    "tournament": "IEM Beijing 2026",
@@ -1010,7 +904,44 @@
      "location": "RU"
     }
    ],
-   "stream": "https://www.twitch.tv/ESLCS",
+   "stream": "https://www.twitch.tv/watchfulTV",
+   "has_detail": true
+  },
+  {
+   "id": 1781476,
+   "begin_at": "2026-11-04T07:04:32Z",
+   "status": "running",
+   "bo": 3,
+   "name": "Lower Bracket Final: TL vs BB",
+   "tournament": "IEM Beijing 2026",
+   "stage": "Group B · Lower Bracket Final",
+   "tier": "s",
+   "serie": {
+    "id": 11136,
+    "begin": "2026-11-02T02:00:00Z",
+    "end": "2026-11-08T12:30:00Z",
+    "image": null,
+    "prize": null
+   },
+   "teams": [
+    {
+     "id": 3213,
+     "name": "Liquid",
+     "acronym": "TL",
+     "slug": "liquid-cs-go",
+     "image": "https://cdn-api.pandascore.co/images/team/image/3213/463px_team_liquid_2024_full_lightmode.png",
+     "location": "US"
+    },
+    {
+     "id": 133458,
+     "name": "BetBoom Team",
+     "acronym": "BB",
+     "slug": "betboom-team-cs-go",
+     "image": "https://cdn-api.pandascore.co/images/team/image/133458/bet_boom_team_2024_allmode.png",
+     "location": "RU"
+    }
+   ],
+   "stream": "https://www.twitch.tv/bysl4m",
    "has_detail": true
   },
   {
@@ -1018,7 +949,7 @@
    "begin_at": "2026-11-04T09:30:00Z",
    "status": "not_started",
    "bo": 3,
-   "name": "Lower Bracket Final: TBD vs TBD",
+   "name": "Lower Bracket Final: NAVI vs FAL",
    "tournament": "IEM Beijing 2026",
    "stage": "Group A · Lower Bracket Final",
    "tier": "s",
@@ -1029,9 +960,26 @@
     "image": null,
     "prize": null
    },
-   "teams": [],
+   "teams": [
+    {
+     "id": 3216,
+     "name": "Natus Vincere",
+     "acronym": "NAVI",
+     "slug": "natus-vincere-cs-go",
+     "image": "https://cdn-api.pandascore.co/images/team/image/3216/1022px_natus_vincere_2021_lightmode.png",
+     "location": "UA"
+    },
+    {
+     "id": 130564,
+     "name": "Team Falcons",
+     "acronym": "FAL",
+     "slug": "falcons-esports",
+     "image": "https://cdn-api.pandascore.co/images/team/image/130564/team_falconslogo_square.png",
+     "location": "SA"
+    }
+   ],
    "stream": "https://www.twitch.tv/ESLCS",
-   "has_detail": false
+   "has_detail": true
   },
   {
    "id": 1781463,
@@ -1067,7 +1015,7 @@
      "location": "BR"
     }
    ],
-   "stream": "https://www.twitch.tv/ESLCS",
+   "stream": "https://www.twitch.tv/watchfulTVb",
    "has_detail": true
   },
   {
@@ -1226,21 +1174,95 @@
    ],
    "stream": "https://www.twitch.tv/betboom_cs_ru",
    "has_detail": false
+  },
+  {
+   "id": 1762451,
+   "begin_at": "2026-11-11T04:30:00Z",
+   "status": "not_started",
+   "bo": 3,
+   "name": "VIT vs FAL",
+   "tournament": "BLAST Rivals Fall 2026",
+   "stage": "Group A",
+   "tier": "s",
+   "serie": {
+    "id": 11137,
+    "begin": "2026-11-11T02:00:00Z",
+    "end": "2026-11-15T12:00:00Z",
+    "image": null,
+    "prize": null
+   },
+   "teams": [
+    {
+     "id": 3455,
+     "name": "Vitality",
+     "acronym": "VIT",
+     "slug": "vitality-cs-go",
+     "image": "https://cdn-api.pandascore.co/images/team/image/3455/team_vitalitylogo_square.png",
+     "location": "FR"
+    },
+    {
+     "id": 130564,
+     "name": "Team Falcons",
+     "acronym": "FAL",
+     "slug": "falcons-esports",
+     "image": "https://cdn-api.pandascore.co/images/team/image/130564/team_falconslogo_square.png",
+     "location": "SA"
+    }
+   ],
+   "stream": "https://www.twitch.tv/betboom_cs_ru",
+   "has_detail": false
+  },
+  {
+   "id": 1762459,
+   "begin_at": "2026-11-11T07:00:00Z",
+   "status": "not_started",
+   "bo": 3,
+   "name": "TS vs FUT",
+   "tournament": "BLAST Rivals Fall 2026",
+   "stage": "Group B",
+   "tier": "s",
+   "serie": {
+    "id": 11137,
+    "begin": "2026-11-11T02:00:00Z",
+    "end": "2026-11-15T12:00:00Z",
+    "image": null,
+    "prize": null
+   },
+   "teams": [
+    {
+     "id": 124523,
+     "name": "Spirit",
+     "acronym": "TS",
+     "slug": "spirit",
+     "image": "https://cdn-api.pandascore.co/images/team/image/124523/153px_team_spirit_2022_lightmode.png",
+     "location": "RU"
+    },
+    {
+     "id": 136955,
+     "name": "FUT Esports",
+     "acronym": "FUT",
+     "slug": "fut-esports-cs-go",
+     "image": "https://cdn-api.pandascore.co/images/team/image/136955/fut_esportslogo_square.png",
+     "location": "TR"
+    }
+   ],
+   "stream": "https://www.twitch.tv/betboom_cs_ru",
+   "has_detail": false
   }
  ],
  "meta": {
-  "panda_requests": 16,
-  "bo3_requests": 52,
-  "liquipedia_requests": 0,
+  "panda_requests": 14,
+  "bo3_requests": 43,
+  "liquipedia_requests": 2,
   "translations": 3,
   "warnings": [
-   "GigaChat картинка: URLError(TimeoutError('timed out'))",
+   "GigaChat: URLError(TimeoutError('timed out'))",
    "HLTV /events/8302/pgl-major-singapore-2026: <HTTPError 403: 'Forbidden'>"
   ],
-  "hltv_requests": 2,
-  "dust2_requests": 26,
-  "giga_calls": 71,
-  "giga_tokens": 51372,
-  "giga_vision": 20
+  "hltv_requests": 3,
+  "dust2_requests": 20,
+  "giga_calls": 74,
+  "giga_tokens": 57223,
+  "giga_vision": 19
  }
 }
