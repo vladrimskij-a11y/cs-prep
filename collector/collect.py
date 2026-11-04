@@ -2174,15 +2174,20 @@ def hltv_team_for(t: dict) -> dict | None:
 
 
 def hltv_team_matches(team: dict) -> list[dict]:
-    key = f"results:{team['id']}"
+    key = f"results2:{team['id']}"
     c = veto_cache.get(key)
     if c and (parse_iso(c.get("t")) or NOW) > NOW - timedelta(hours=12):
         return c["data"]
-    h = d2_get(f"/results?team={team['id']}")
+    # dust2.us перестал фильтровать результаты по команде — список матчей берём с HLTV (страница результатов открыта),
+    # а само вето по-прежнему со страницы матча dust2 (тот же id)
+    h = hltv_get(f"/results?team={team['id']}")
     if not h:
         return c["data"] if c else []
     out = []
+    own = norm(team.get("slug") or team.get("name"))
     for mid, slug in re.findall(r'href="/matches/(\d+)/([^"#?]+)"', h):
+        if own and own not in norm(slug):
+            continue  # блоки «избранное» и чужие матчи на странице
         if mid not in [x["id"] for x in out]:
             out.append({"id": mid, "slug": slug})
         if len(out) >= VETO_MATCHES:
