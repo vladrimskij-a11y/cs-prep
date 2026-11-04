@@ -1,5 +1,5 @@
 {
- "updated": "2026-11-04T08:36:13Z",
+ "updated": "2026-11-04T08:48:34Z",
  "tiers": [
   "s"
  ],
@@ -12,9 +12,9 @@
    "begin": "2026-11-02T02:00:00Z",
    "end": "2026-11-08T12:30:00Z",
    "prize": "1,250,000 United States Dollar",
-   "matches": 10,
+   "matches": 9,
    "next": "2026-11-04T09:30:00Z",
-   "live": 2,
+   "live": 1,
    "hltv": {
     "prize": 1250000,
     "player_share": 300000,
@@ -680,7 +680,7 @@
     "hltv": "https://www.hltv.org/events/8245/iem-beijing-2026"
    },
    "prize_usd": 1250000,
-   "results": 20
+   "results": 21
   },
   {
    "id": "11137",
@@ -871,43 +871,6 @@
   }
  ],
  "matches": [
-  {
-   "id": 1781471,
-   "begin_at": "2026-11-04T07:03:25Z",
-   "status": "running",
-   "bo": 3,
-   "name": "Upper Bracket Final: MOUZ vs PRV",
-   "tournament": "IEM Beijing 2026",
-   "stage": "Group B · Upper Bracket Final",
-   "tier": "s",
-   "serie": {
-    "id": 11136,
-    "begin": "2026-11-02T02:00:00Z",
-    "end": "2026-11-08T12:30:00Z",
-    "image": null,
-    "prize": null
-   },
-   "teams": [
-    {
-     "id": 3240,
-     "name": "MOUZ",
-     "acronym": "MOUZ",
-     "slug": "mousesports-cs-go",
-     "image": "https://cdn-api.pandascore.co/images/team/image/3240/208px_mouz_2021_allmode.png",
-     "location": "DE"
-    },
-    {
-     "id": 133719,
-     "name": "PARIVISION",
-     "acronym": "PRV",
-     "slug": "parivision",
-     "image": "https://cdn-api.pandascore.co/images/team/image/133719/250px_parivision_allmode.png",
-     "location": "RU"
-    }
-   ],
-   "stream": "https://www.twitch.tv/watchfulTV",
-   "has_detail": true
-  },
   {
    "id": 1781476,
    "begin_at": "2026-11-04T07:04:32Z",
@@ -1469,19 +1432,17 @@
   }
  ],
  "meta": {
-  "panda_requests": 14,
-  "bo3_requests": 155,
+  "panda_requests": 12,
+  "bo3_requests": 42,
   "liquipedia_requests": 0,
-  "translations": 3,
+  "translations": 5,
   "warnings": [
-   "GigaChat загрузка картинки: URLError(TimeoutError('timed out'))",
-   "GigaChat загрузка картинки: URLError(TimeoutError('timed out'))",
-   "HLTV /team/5973/liquid: <HTTPError 403: 'Forbidden'>"
+   "GigaChat: URLError(TimeoutError('timed out'))",
+   "HLTV /team/4608/natus-vincere: <HTTPError 403: 'Forbidden'>"
   ],
-  "hltv_requests": 5,
-  "dust2_requests": 16,
-  "giga_vision": 10,
-  "giga_calls": 53,
-  "giga_tokens": 83909
+  "hltv_requests": 4,
+  "dust2_requests": 12,
+  "giga_calls": 48,
+  "giga_tokens": 69041
  }
 }
