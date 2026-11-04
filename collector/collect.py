@@ -597,6 +597,17 @@ def lp_roster(t: dict) -> dict | None:
     return data
 
 
+NAME_FIX = {"im": ("Mihai", "Ivan", "Михай Иван")}   # порядок имени и фамилии, где источники путают
+
+
+def fix_names(people: list[dict]) -> None:
+    for p in people:
+        f = NAME_FIX.get(norm(p.get("nick")))
+        if f:
+            p["first_name"], p["last_name"], p["name_ru"] = f[0], f[1], f[2]
+            p.pop("_pk", None)
+
+
 def merge_roster(panda_players: list[dict], lp: dict | None) -> tuple[list[dict], list[dict]]:
     """Состав: берём активный состав Liquipedia (он точнее), дополняем данными PandaScore."""
     if not lp or not lp.get("players"):
@@ -1238,11 +1249,12 @@ def build_results(tr: dict) -> dict | None:
     for st in sorted(T.get("stages") or [], key=lambda x: x.get("sequence_number") or 0):
         stage = re.sub(re.escape(T.get("name") or "") + r"\s*", "", st.get("title") or "").strip() or None
         rounds = []
-        for rd in sorted(st.get("rounds") or [], key=lambda x: (x.get("bracket_type") or "", x.get("round_index") or 0)):
+        for rd in sorted(st.get("rounds") or [], key=lambda x: ({"upper": 0, "lower": 1}.get(x.get("bracket_type") or "", 2), x.get("round_index") or 0)):
             ms = []
             for m in sorted(rd.get("matches") or [], key=lambda x: x.get("position") or 0):
                 t1, t2 = m.get("team1") or {}, m.get("team2") or {}
-                ms.append({"id": m.get("id"), "a": t1.get("name"), "b": t2.get("name"), "sa": m.get("team1_score"), "sb": m.get("team2_score"),
+                ms.append({"id": m.get("id"), "a": t1.get("name"), "b": t2.get("name"), "la": t1.get("image_url"), "lb": t2.get("image_url"),
+                           "sa": m.get("team1_score"), "sb": m.get("team2_score"),
                            "st": m.get("status"), "date": m.get("start_date"), "bo": m.get("bo_type"),
                            "w": 0 if m.get("winner_team_id") and m.get("winner_team_id") == m.get("team1_id") else 1 if m.get("winner_team_id") and m.get("winner_team_id") == m.get("team2_id") else None})
             rounds.append({"name": round_ru(rd.get("name")), "bracket": rd.get("bracket_type"), "matches": ms})
@@ -1282,6 +1294,11 @@ VRS_REGION = {"europe": "Европа", "americas": "Америка", "eu": "Е�
 
 def parse_ranked(h: str) -> list[dict]:
     """Страница рейтинга HLTV (Valve или собственный): место, название, очки, регион, id команды."""
+    logos = {}
+    for blk in re.sub(r"\s+", " ", h).split('class="ranked-team standard-box"')[1:]:
+        lg = re.search(r'<span class="team-logo"><img alt="([^"]+)" src="([^"]+)"', blk)
+        if lg:
+            logos[strip_html(lg.group(1))] = _html.unescape(lg.group(2))
     b = hclean(h)
     out = []
     for blk in b.split('<div class="ranked-team standard-box">')[1:]:
@@ -1294,7 +1311,8 @@ def parse_ranked(h: str) -> list[dict]:
             continue
         out.append({"rank": int(pos.group(1)), "name": strip_html(nm.group(1)), "points": int(pts.group(1)),
                     "region": (VRS_REGION.get(reg.group(1)) or VRS_REGION.get(reg.group(2).strip().lower()) or reg.group(2)) if reg else None,
-                    "hltv": {"id": int(tid.group(1)), "slug": tid.group(2)} if tid else None})
+                    "hltv": {"id": int(tid.group(1)), "slug": tid.group(2)} if tid else None,
+                    "logo": logos.get(strip_html(nm.group(1)))})
     seen: dict = {}
     for r in out:  # место внутри своего региона
         seen[r.get("region")] = seen.get(r.get("region"), 0) + 1
@@ -1307,7 +1325,7 @@ def vrs_table() -> list[dict]:
     def fn():
         h = hltv_get("/valve-ranking/teams")
         return parse_ranked(h) if h else None
-    return hltv_cached("vrs2", fn) or []
+    return hltv_cached("vrs3", fn) or []
 
 
 def hltv_world_ranking() -> list[dict]:
@@ -1773,6 +1791,8 @@ CURRENT_TOURS: list[str] = []   # турниры из нашего распис�
 
 
 def tg_keep(info: dict, p: dict) -> bool:
+    if p.get("video") == "tg":
+        return False  # видео слишком большое для веб-версии Telegram — внутри приложения не запустится
     text = (info.get("title") or "") + "\n" + (p["text"] or "") + "\n" + (info.get("ocr") or "")
     if AD.search(text[:600]) or SPAM.search(info.get("title") or "") or SPAM.search((p["text"] or "")[:200]):
         return False
@@ -3216,12 +3236,14 @@ def build_news(teams: list[dict]) -> dict:
 
 # ---------------------------------------------------------------- факты для эфира
 
-FACTS_CACHE_F = CACHE / "facts_v10.json"
+FACTS_CACHE_F = CACHE / "facts_v11.json"
 facts_cache: dict = load_json(FACTS_CACHE_F, {})
 FACTS_TTL_H = 6
 FACTS_SYSTEM = """Ты помогаешь русскоязычному комментатору CS2 подготовиться к матчу.
 Тебе дают новости недели о командах и игроках матча (из Telegram-каналов) и список ников.
-Составь до 15 фактов для эфира ТОЛЬКО из этих новостей: цитаты и заявления, интервью, трансферы и замены, слухи, конфликты,
+Выбери из этих новостей до 10 САМЫХ интересных и необычных фактов для эфира — то, что зритель вряд ли знает и что стоит сказать вслух.
+Обычные новости (результат матча, «команда готовится», рядовая статистика, анонсы) пропускай. Лучше 3 сильных факта, чем 10 проходных.
+Факты бери ТОЛЬКО из этих новостей: цитаты и заявления, интервью, трансферы и замены, слухи, конфликты,
 травмы, достижения и интересные особенности из новостей. Каждая важная новость — отдельный факт.
 Строгие правила:
 - Только то, что прямо написано в новостях. Ничего не добавляй от себя.
@@ -3418,7 +3440,7 @@ def build_facts(d: dict, prev: dict | None) -> list | None:
                 continue  # ход матча (камбэки, эко, счёт по раундам) — не факт для эфира
             tag = f.get("tag") if f.get("tag") in ("Новости", "Цитата", "Интервью", "Трансфер", "Слухи", "Конфликт", "Достижения", "Особенности") else "Новости"
             story.append({"tag": tag, "text": f["text"].strip(), "src": fact_source(f, news_items)})
-        story = story[:15]
+        story = story[:10]
         if failed:
             story = (c or {}).get("story")  # GigaChat не ответил — оставим прошлое и попробуем в следующий раз
         else:
@@ -3443,28 +3465,33 @@ def build_facts(d: dict, prev: dict | None) -> list | None:
 _mvp_new = [0]
 
 
-def hltv_mvps(nick: str) -> int | None:
-    """Сколько медалей MVP у игрока (трофеи на странице игрока HLTV). Кэш на неделю, до 10 новых страниц за запуск."""
+def hltv_player_info(nick: str) -> dict | None:
+    """Со страницы игрока HLTV: медали MVP, сколько мейджоров сыграл и выиграл. Кэш на неделю, до 12 новых страниц за запуск."""
     pl = hltv_player_ids.get(norm(nick))
     if not pl:
         return None
-    key = f"mvp:{pl['id']}"
+    key = f"pinfo:{pl['id']}"
     c = hltv_cache.get(key)
     if c and (parse_iso(c.get("t")) or NOW) > NOW - timedelta(days=7):
         return c["data"]
-    if _mvp_new[0] >= 10 or _hltv_blocked[0] or STATS:
+    if _mvp_new[0] >= 12 or _hltv_blocked[0] or STATS:
         return c["data"] if c else None
     _mvp_new[0] += 1
     h = hltv_get(f"/player/{pl['id']}/{pl['slug']}")
     if not h:
         return c["data"] if c else None
-    titles = set()
-    for rx in (r'<[^>]*class="[^"]*(?:trophy|mvp)[^"]*"[^>]*(?:title|alt)="([^"]*MVP[^"]*)"',
-               r'<[^>]*(?:title|alt)="([^"]*MVP[^"]*)"[^>]*class="[^"]*(?:trophy|mvp)[^"]*"'):
-        titles |= {strip_html(x) for x in re.findall(rx, h, re.IGNORECASE)}
-    n = len(titles)
-    hltv_cache[key] = {"t": iso(NOW), "data": n}
-    return n
+    b = re.sub(r"\s+", " ", h)
+    mvp = 0
+    m = re.search(r'title="MVP winner at:[^"]*"[^>]*>(?:<img[^>]*>)?\s*<div class="mvp-count">(\d+)</div>', b)
+    if m:
+        mvp = int(m.group(1))
+    elif re.search(r'title="MVP winner at:', b):
+        mvp = 1
+    pm = re.search(r'<div class="stat">(\d+)</div><div class="description">Majors? played', b)
+    wm = re.search(r'<div class="stat">(\d+)</div><div class="description">Majors? won', b)
+    d = {"mvp": mvp, "majors": int(pm.group(1)) if pm else 0, "major_wins": int(wm.group(1)) if wm else 0}
+    hltv_cache[key] = {"t": iso(NOW), "data": d}
+    return d
 
 
 def attach_veto(sd: dict) -> None:
@@ -3609,6 +3636,7 @@ def build_detail(m: dict, prev: dict | None) -> dict:
             add_pronunciation(players + coach)
         except Exception as e:
             warn(f"Произношение: {e!r}")
+        fix_names(players)
         bid = bo3_team_id({**t, "slug": full.get("slug") or t.get("slug")})
         add_alias(bid, t.get("name"), t.get("acronym"), t.get("slug"), full.get("name"), full.get("acronym"))
         hist = bo3_history(bid) if bid else []
@@ -3634,12 +3662,12 @@ def build_detail(m: dict, prev: dict | None) -> dict:
         t["stats"] = build_player_stats(t, bid, hist)
         for p in t.get("players") or []:
             try:
-                n = hltv_mvps(p.get("nick") or "")
+                info = hltv_player_info(p.get("nick") or "")
             except Exception as e:
-                warn(f"MVP {p.get('nick')}: {e!r}")
-                n = None
-            if n:
-                p["mvp"] = n
+                warn(f"Игрок HLTV {p.get('nick')}: {e!r}")
+                info = None
+            if info:
+                p.update({k: v for k, v in info.items() if v})
     # подробности по каждой серии из «Формы» — открываются по нажатию
     series = {}
     for bid, hist in zip(bids, hists):
@@ -3722,6 +3750,7 @@ def build_detail(m: dict, prev: dict | None) -> dict:
 
 
 TEAM_GAMES_NEW = [0]
+_team_lp_new = [0]
 
 
 def team_by_name(name: str) -> int | None:
@@ -3755,6 +3784,21 @@ def build_team_page(r: dict) -> dict | None:
     for row in maps.get("table") or []:
         row["teams"] = row["teams"][:1]
     players = list((bo3_team_players(bid, hist) or {}).values())
+    roster, coach = [], []
+    key = "n:" + norm(r["name"])
+    if roster_cache.get(key) or _team_lp_new[0] < 10:
+        if not roster_cache.get(key):
+            _team_lp_new[0] += 1
+        try:
+            roster, coach = merge_roster([], lp_roster({"id": key, "name": r["name"]}))
+            fix_names(roster)
+            for p in roster:
+                full = " ".join(x for x in (p.get("first_name"), p.get("last_name")) if x)
+                pc = pron_cache.get(norm(p.get("nick")) + "|" + norm(full)) or {}
+                if pc.get("name_ru") and not p.get("name_ru"):
+                    p["name_ru"] = pc["name_ru"]
+        except Exception as e:
+            warn(f"Состав {r['name']}: {e!r}")
     ach = []
     if r.get("hltv") and (hltv_cache.get(f"ach:{r['hltv']['id']}") or TEAM_GAMES_NEW[0] < 6):
         TEAM_GAMES_NEW[0] += 1
@@ -3763,7 +3807,8 @@ def build_team_page(r: dict) -> dict | None:
         except Exception as e:
             warn(f"Призовые {r['name']}: {e!r}")
     return {"updated": iso(NOW), "name": r["name"], "vrs": {k: r.get(k) for k in ("rank", "points", "region", "reg_rank", "hltv_rank")},
-            "players": players or r.get("roster") or [], "form": form, "series": series,
+            "players": players or r.get("roster") or [], "roster": roster, "coach": coach, "logo": r.get("logo"),
+            "form": form, "series": series,
             "maps": {"window_days": maps.get("window_days"), "table": maps.get("table") or []}, "prizes": ach}
 
 
