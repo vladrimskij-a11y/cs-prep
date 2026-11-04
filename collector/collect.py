@@ -2531,8 +2531,10 @@ def hltv_veto(match: dict) -> dict | None:
         act = "ban" if "BAN" in t else "pick" if "PICK" in t else "decider"
         steps.append({"n": n, "team": strip_html(team.group(1)) if team and act != "decider" else None, "act": act,
                       "map": strip_html(nm.group(1))})
-    dm = re.search(r'data-unix="(\d+)"', b)
+    dm = re.search(r'data-(?:unix|date)="(\d{12,})"', b)
     d = {"date": iso(datetime.fromtimestamp(int(dm.group(1)) / 1000, tz=timezone.utc)) if dm else None, "steps": steps}
+    if not d["date"] and match.get("date"):
+        d["date"] = match["date"]  # дата из ленты dust2
     if not d["date"] and match.get("day"):
         d["date"] = match["day"] + "T12:00:00Z"
     if steps:
@@ -3691,12 +3693,14 @@ _d2_recent: list = []
 def d2_recent_matches() -> list[dict]:
     """Лента результатов dust2.us за последний месяц (одна страница, ~350 матчей): id и slug. Без HLTV."""
     if not _d2_recent:
-        h = d2_get("/results") or ""
+        h = re.sub(r"\s+", " ", d2_get("/results") or "")
+        dates = {mid: int(ms) for mid, ms in re.findall(r'href="/matches/(\d+)/[^"#?]+" class="match-time-info">.{0,300}?data-date="(\d{12,})"', h)}
         seen = set()
         for mid, slug in re.findall(r'href="/matches/(\d+)/([^"#?]+)"', h):
             if mid not in seen:
                 seen.add(mid)
-                _d2_recent.append({"id": mid, "slug": slug, "day": None})
+                dt = iso(datetime.fromtimestamp(dates[mid] / 1000, tz=timezone.utc)) if mid in dates else None
+                _d2_recent.append({"id": mid, "slug": slug, "day": None, "date": dt})
         _d2_recent.append(None)  # метка «уже загружали», даже если пусто
     return [x for x in _d2_recent if x]
 
@@ -3721,6 +3725,8 @@ def attach_veto(sd: dict) -> None:
             v = veto_cache.get(f"match:{mt['id']}")
             if not (v and any(x.get("team") for x in v.get("steps") or [])):
                 v = hltv_veto(mt)
+            if v and not v.get("date") and mt.get("date"):
+                v["date"] = mt["date"]  # в кэше вето без даты — берём из ленты
             vd = parse_iso((v or {}).get("date"))
             if v and v.get("steps") and vd and abs((vd - d0).total_seconds()) < 40 * 3600:
                 sd["veto"] = v["steps"]

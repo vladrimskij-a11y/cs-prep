@@ -11,12 +11,12 @@ jobs:
           import sys, json, re
           sys.path.insert(0, "collector")
           import collect as c
-          h = c.d2_get("/results") or ""
-          b = re.sub(r"\s+", " ", h)
-          i = b.find('class="match-date"')
-          print("PR| feed-date", b[i - 300:i + 400].replace('"PR', ''))
-          m = c.d2_get("/matches/2400004/natus-vincere-vs-falcons") or ""
-          m = re.sub(r"\s+", " ", m)
-          for pat in (r'data-unix="\d+"', r'class="[^"]*date[^"]*"[^>]*>[^<]{0,40}', r'class="[^"]*time[^"]*"[^>]*>[^<]{0,40}', r'\d{1,2}(?:st|nd|rd|th)? of \w+ \d{4}', r'datetime="[^"]+"'):
-              print("PR| page", pat[:25], re.findall(pat, m)[:3])
+          d = json.load(open("docs/data/results/11136.json"))
+          ok = 0
+          for sd in d["matches"]:
+              sd.pop("veto", None)
+              c.attach_veto(sd)
+              ok += bool(sd.get("veto"))
+              print("PR|", sd["date"][:16], [t["name"] for t in sd["teams"]], "V" if sd.get("veto") else "-")
+          print("PR| total", ok, "/", len(d["matches"]))
           X
