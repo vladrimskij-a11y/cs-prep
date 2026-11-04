@@ -5,11 +5,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: |
-          curl -s https://api.github.com/repos/ghostcap-gaming/cs2-map-images | python3 -c "import json,sys;d=json.load(sys.stdin);print('PR| repo', d.get('full_name'), (d.get('license') or {}).get('spdx_id'), d.get('default_branch'))"
-          curl -s "https://api.github.com/repos/ghostcap-gaming/cs2-map-images/git/trees/main?recursive=1" > /tmp/t.json
-          python3 -c "
-          import json;d=json.load(open('/tmp/t.json'))
-          ps=[t['path']+' '+str(t.get('size')) for t in d.get('tree',[]) if any(k in t['path'] for k in ('mirage','inferno','nuke','ancient','anubis','dust2','train','overpass','vertigo'))]
-          print('PR| files', len(ps))
-          for p in ps[:40]: print('PR|  ', p)"
-          for u in "https://raw.githubusercontent.com/ghostcap-gaming/cs2-map-images/main/cs2/de_mirage.png" "https://www.hltv.org/img/static/maps/mirage.png"; do curl -s -o /tmp/x -w "PR| %{http_code} %{content_type} %{size_download} $u\n" "$u"; done
+          pip install -q pillow
+          python3 - <<'X'
+          import io, base64, urllib.request
+          from PIL import Image
+          for m in ("ancient", "anubis", "dust2", "inferno", "mirage", "nuke", "overpass", "train", "vertigo"):
+              raw = urllib.request.urlopen(f"https://raw.githubusercontent.com/ghostcap-gaming/cs2-map-images/main/cs2/de_{m}.png", timeout=60).read()
+              im = Image.open(io.BytesIO(raw)).convert("RGB")
+              im.thumbnail((480, 480))
+              buf = io.BytesIO(); im.save(buf, "WEBP", quality=58)
+              b = base64.b64encode(buf.getvalue()).decode()
+              print(f"IMG|{m}|{len(buf.getvalue())}")
+              for i in range(0, len(b), 3000):
+                  print(f"B64|{m}|{i // 3000}|{b[i:i + 3000]}")
+          X
