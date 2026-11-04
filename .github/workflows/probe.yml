@@ -5,17 +5,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: |
-          pip install -q pillow
           python3 - <<'X'
-          import io, base64, urllib.request
-          from PIL import Image
-          for m in ("ancient", "anubis", "dust2", "inferno", "mirage", "nuke", "overpass", "train", "vertigo"):
-              raw = urllib.request.urlopen(f"https://raw.githubusercontent.com/ghostcap-gaming/cs2-map-images/main/cs2/de_{m}.png", timeout=60).read()
-              im = Image.open(io.BytesIO(raw)).convert("RGB")
-              im.thumbnail((480, 480))
-              buf = io.BytesIO(); im.save(buf, "WEBP", quality=58)
-              b = base64.b64encode(buf.getvalue()).decode()
-              print(f"IMG|{m}|{len(buf.getvalue())}")
-              for i in range(0, len(b), 3000):
-                  print(f"B64|{m}|{i // 3000}|{b[i:i + 3000]}")
+          import json, urllib.request
+          B = "https://api.bo3.gg/api/v1"
+          def get(u):
+              r = urllib.request.urlopen(urllib.request.Request(u, headers={"Accept": "application/json", "User-Agent": "Mozilla/5.0"}), timeout=30)
+              return json.loads(r.read())
+          j = get(f"{B}/tournaments?page[limit]=25&sort=-start_date&filter[tournaments.tier][in]=s,a&filter[tournaments.status][in]=upcoming,current,finished")
+          for t in j["results"]:
+              print("PR|", t["name"], "| banner", t.get("banner_image_url"), "| img", t.get("image_url"), "| bv", json.dumps(t.get("banner_image_versions"))[:160])
           X
