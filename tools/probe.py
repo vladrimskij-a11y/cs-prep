@@ -35,14 +35,13 @@ for path in [f"/matches/{m['slug']}", f"/matches/{m['id']}", f"/matches/{m['slug
             for k in ("picks_bans", "vetoes", "map_picks", "match_maps", "veto"):
                 if isinstance(j, dict) and k in j: print("  ", k, json.dumps(j[k], ensure_ascii=False)[:1500])
         except Exception as e: print("  notjson", e)
+
+for x in [mm for st in T.get("stages") or [] for rd in st.get("rounds") or [] for mm in rd.get("matches") or [] if mm.get("status") == "finished"][:8]:
+    j = json.loads(get(B + "/matches/" + x["slug"])); time.sleep(0.4)
+    print("MM", x["slug"], json.dumps(j.get("match_maps"), ensure_ascii=False)[:600])
 LP = "https://liquipedia.net/counterstrike/api.php"
-for title in ["Intel_Extreme_Masters/2026/Beijing", "IEM/2026/Beijing", "Intel_Extreme_Masters/Season_XXI/Beijing"]:
-    r = get(LP + "?" + urllib.parse.urlencode({"action": "parse", "page": title, "prop": "wikitext", "format": "json", "redirects": 1}))
-    print("===== LP", title, len(r), r[:150])
-    if '"wikitext"' in r:
-        wt = json.loads(r)["parse"]["wikitext"]["*"]
-        print("  subpages/templates:", re.findall(r"\{\{(?:Match|Bracket|Matchlist)[^\n|]*", wt)[:10])
-        i = wt.find("mapveto"); print("  VETO CTX:", wt[max(0, i-300):i+800] if i >= 0 else "no mapveto")
-        print("  links:", re.findall(r"\[\[(Intel_Extreme_Masters/2026/Beijing/[^\]|]+)", wt)[:10])
-        break
-    time.sleep(3)
+r = get(LP + "?" + urllib.parse.urlencode({"action": "parse", "page": "Intel_Extreme_Masters/2026/Beijing", "prop": "wikitext", "format": "json"}))
+wt = json.loads(r)["parse"]["wikitext"]["*"]
+i = wt.find("{{Match")
+print("LP MATCH BLOCK:\n", wt[i:i+2500])
+print("veto words:", sorted(set(re.findall(r"\|\s*(\w*veto\w*|\w*ban\w*|\w*pick\w*)\s*=", wt)))[:30])
