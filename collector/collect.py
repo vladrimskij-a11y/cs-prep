@@ -230,6 +230,34 @@ def match_brief(m: dict) -> dict:
     }
 
 
+# ---------------------------------------------------------------- тир-2: только турниры, где не меньше половины команд — уровня тир-1
+TIER1_TOP = int(os.environ.get("TIER1_TOP", "25"))     # «уровень тир-1» = топ-25 рейтинга Valve
+TIER2_SHARE = float(os.environ.get("TIER2_SHARE", "0.5"))
+_top_teams: list = []
+
+
+def top_teams() -> list[str]:
+    if not _top_teams:
+        rk = ((load_json(OUT / "ranking.json", {}) or {}).get("vrs") or {}).get("teams") or []
+        _top_teams.extend(norm(t.get("name")) for t in rk if (t.get("rank") or 999) <= TIER1_TOP and t.get("name"))
+    return _top_teams
+
+
+def is_top(name: str | None) -> bool:
+    n = norm(name)
+    return bool(n) and any(n == k or (min(len(n), len(k)) >= 3 and (n in k or k in n)) for k in top_teams())
+
+
+def tier2_ok(teams) -> bool:
+    """Турнир тир-2 показываем, если хотя бы половина участников — из топ-25 рейтинга Valve."""
+    names = {norm(t) for t in teams or [] if norm(t)}
+    if not top_teams():
+        return True   # рейтинга ещё нет — ничего не прячем
+    if not names:
+        return False  # участники неизвестны — подождём, пока объявят
+    return sum(1 for n in names if is_top(n)) / len(names) >= TIER2_SHARE
+
+
 # ---------------------------------------------------------------- PandaScore: матчи и составы
 
 def fetch_upcoming() -> list[dict]:
@@ -260,8 +288,17 @@ def fetch_upcoming() -> list[dict]:
 TOURS_MONTHS_AHEAD = 3
 
 
+_future_cache: list = []
+
+
 def fetch_future_tournaments() -> list[dict]:
     """Идущие и будущие турниры тир-1 на TOURS_MONTHS_AHEAD месяцев вперёд, сгруппированные по серии (событию)."""
+    if not _future_cache:
+        _future_cache.append(_fetch_future_tournaments())
+    return [dict(x) for x in _future_cache[0]]
+
+
+def _fetch_future_tournaments() -> list[dict]:
     end = NOW + timedelta(days=31 * TOURS_MONTHS_AHEAD)
     stages: list[dict] = []
     for path in ("/csgo/tournaments/running", "/csgo/tournaments/upcoming"):
@@ -285,7 +322,8 @@ def fetch_future_tournaments() -> list[dict]:
         name = " ".join(x for x in (lg.get("name"), se.get("full_name") or se.get("name")) if x).strip()
         cur = series.setdefault(sid, {"id": sid, "name": name, "tier": (t.get("tier") or "").lower(), "image": lg.get("image_url"),
                                       "begin": se.get("begin_at") or t.get("begin_at"), "end": se.get("end_at") or t.get("end_at"),
-                                      "prize": t.get("prizepool"), "matches": 0, "next": None, "live": 0})
+                                      "prize": t.get("prizepool"), "matches": 0, "next": None, "live": 0, "teams": []})
+        cur["teams"] += [x.get("name") for x in t.get("teams") or [] if x.get("name") and x.get("name") not in cur["teams"]]
         for k, f in (("begin", min), ("end", max)):
             vals = [x for x in (cur.get(k), t.get("begin_at" if k == "begin" else "end_at")) if x]
             cur[k] = f(vals) if vals else None
@@ -305,6 +343,21 @@ def tour_same(a: str, b_norm: str) -> bool:
     return bool(ta) and len(ta & tb) / len(ta | tb) >= 0.6
 
 
+def bo3_tour_teams(t: dict) -> list[str]:
+    """Участники турнира bo3.gg (из карточки турнира)."""
+    try:
+        d = bo3(f"/tournaments/{t['slug']}")
+    except Exception as e:
+        warn(f"bo3 участники {t.get('slug')}: {e!r}")
+        return []
+    out = []
+    for x in d.get("teams") or []:
+        x = x.get("team") if isinstance(x.get("team"), dict) else x
+        if x.get("name"):
+            out.append(x["name"])
+    return out
+
+
 def fetch_bo3_tournaments() -> list[dict]:
     """Ближайшие турниры тир-1 с bo3.gg — подстраховка, если PandaScore ещё не завёл турнир (например, мейджор)."""
     end = iso(NOW + timedelta(days=31 * TOURS_MONTHS_AHEAD))
@@ -317,6 +370,8 @@ def fetch_bo3_tournaments() -> list[dict]:
         return out
     for t in j.get("results") or []:
         if (t.get("tier") or "").lower() not in TIERS or (t.get("start_date") or "") > end:
+            continue
+        if (t.get("tier") or "").lower() != "s" and not tier2_ok(bo3_tour_teams(t)):
             continue
         name = (t.get("name") or "").replace("Intel Extreme Masters", "IEM")
         out.append({"id": "bo3-" + str(t["id"]), "name": name, "tier": (t.get("tier") or "").lower(), "image": t.get("image_url"),
@@ -4009,6 +4064,11 @@ def finished_tournaments() -> list[dict]:
         b, e = parse_iso(t.get("start_date")), parse_iso(t.get("end_date"))
         if not b or b.year != NOW.year:
             continue
+        if (t.get("tier") or "").lower() != "s":
+            rj = load_json(OUT / "results" / f"bo3-{t['id']}.json", {}) or {}
+            tms = [x.get("name") for m in rj.get("matches") or [] for x in m.get("teams") or []]
+            if not tier2_ok(tms or bo3_tour_teams(t)):
+                continue
         out.append({"id": "bo3-" + str(t["id"]), "name": (t.get("name") or "").replace("Intel Extreme Masters", "IEM"),
                     "tier": (t.get("tier") or "").lower(), "begin": iso(b), "end": iso(e) if e else None,
                     "prize": None, "prize_usd": t.get("prize"), "matches": 0, "next": None, "live": 0, "finished": True})
@@ -4032,6 +4092,22 @@ def main() -> int:
         _hltv_blocked[0] = _lp_blocked[0] = _d2_blocked[0] = True
         _giga["off"] = _gem["off"] = True
     matches = fetch_upcoming()
+    # тир-2: оставляем только турниры, где половина участников — уровня тир-1
+    ps_teams = {str(x["id"]): x.get("teams") or [] for x in fetch_future_tournaments()}
+    for m in matches:
+        sid = str((m.get("serie") or {}).get("id") or "")
+        if sid and not ps_teams.get(sid):
+            ps_teams.setdefault(sid, [])
+            for o in m.get("opponents") or []:
+                nm = (o.get("opponent") or {}).get("name")
+                if nm and nm not in ps_teams[sid]:
+                    ps_teams[sid].append(nm)
+    t2_ok = {sid: tier2_ok(v) for sid, v in ps_teams.items()}
+    n0 = len(matches)
+    matches = [m for m in matches if ((m.get("tournament") or {}).get("tier") or "").lower() == "s"
+               or t2_ok.get(str((m.get("serie") or {}).get("id") or ""), False)]
+    if n0 != len(matches):
+        print(f"Тир-2 без команд уровня тир-1 — скрыто матчей: {n0 - len(matches)}")
     CURRENT_TOURS[:] = list(dict.fromkeys(tournament_label(m) for m in matches))
     # id игроков HLTV из составов на страницах ближайших турниров (нужны для Rating 3.0)
     seen_tours = set()
@@ -4104,7 +4180,9 @@ def main() -> int:
         if b.get("status") != "running" and (tr["next"] is None or (b["begin_at"] or "") < tr["next"]):
             tr["next"] = b["begin_at"]
     # турниры без матчей в ближайшую неделю — по расписанию турниров PandaScore и bo3.gg на 3 месяца вперёд
-    future = fetch_future_tournaments()
+    future = [t for t in fetch_future_tournaments() if t.get("tier") == "s" or tier2_ok(t.get("teams"))]
+    for t in future:
+        t.pop("teams", None)
     have = {tour_norm(t["name"]) for t in list(tours.values()) + future}
     for tr in fetch_bo3_tournaments():
         if not any(tour_same(tr["name"], h) for h in have):
