@@ -3743,6 +3743,9 @@ def build_facts(d: dict, prev: dict | None) -> list | None:
 _mvp_new = [0]
 
 
+_ach_dumped = [False]
+
+
 def hltv_player_info(nick: str) -> dict | None:
     """Со страницы игрока HLTV: медали MVP, сколько мейджоров сыграл и выиграл. Кэш на неделю, до 12 новых страниц за запуск."""
     pl = hltv_player_ids.get(norm(nick))
@@ -3786,6 +3789,11 @@ def hltv_player_info(nick: str) -> dict | None:
         mvp = max(mvp, len(ev))
     pm = re.search(r'<div class="stat">(\d+)</div><div class="description">Majors? played', b)
     wm = re.search(r'<div class="stat">(\d+)</div><div class="description">Majors? won', b)
+    if not _ach_dumped[0]:  # один образец за запуск — чтобы по логу сверить разметку таблицы мест (запросов не добавляет)
+        _ach_dumped[0] = True
+        for mark in ("achievement-table", "Achievements", "majorAchievement", "trophy-row"):
+            k0 = b.find(mark)
+            print(f"HLTV-ОБРАЗЕЦ {nick} [{mark}] @{k0}: " + (b[max(0, k0 - 200):k0 + 1800] if k0 >= 0 else "нет"))
     # места на турнирах — таблица .achievement-table (так её разбирают gigobyte/HLTV и hltv-scraper-api):
     # строка .team, место в .achievement, турнир в .tournament-name-cell a
     mj, wins = [], []
