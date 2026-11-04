@@ -1,5 +1,5 @@
 {
- "updated": "2026-11-04T08:48:34Z",
+ "updated": "2026-11-04T08:57:46Z",
  "tiers": [
   "s"
  ],
@@ -1433,16 +1433,15 @@
  ],
  "meta": {
   "panda_requests": 12,
-  "bo3_requests": 42,
+  "bo3_requests": 27,
   "liquipedia_requests": 0,
-  "translations": 5,
+  "translations": 6,
   "warnings": [
-   "GigaChat: URLError(TimeoutError('timed out'))",
    "HLTV /team/4608/natus-vincere: <HTTPError 403: 'Forbidden'>"
   ],
-  "hltv_requests": 4,
+  "hltv_requests": 2,
   "dust2_requests": 12,
-  "giga_calls": 48,
-  "giga_tokens": 69041
+  "giga_calls": 51,
+  "giga_tokens": 75969
  }
 }
