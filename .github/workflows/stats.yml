@@ -12,7 +12,7 @@ permissions:
   id-token: write
 
 concurrency:
-  group: collect
+  group: collect-stats
   cancel-in-progress: false
 
 jobs:
@@ -53,19 +53,12 @@ jobs:
           path: cache
           key: collector-cache-${{ github.run_id }}
 
-      - name: Сохранить данные (ветка data, без истории)
-        run: |
-          cd docs/data
-          git init -q -b data
-          git config user.name "cs-prep-bot"
-          git config user.email "cs-prep-bot@users.noreply.github.com"
-          git add -A
-          git commit -qm "Данные: $(date -u +'%Y-%m-%d %H:%M') UTC"
-          git push -f -q "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" data
-          rm -rf .git
+      - name: Сохранить данные (ветка data, слияние с параллельными сборами)
+        run: python collector/save_data.py stats "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
 
       - uses: actions/upload-pages-artifact@v3
         with:
           path: docs
 
       - uses: actions/deploy-pages@v4
+        continue-on-error: true   # если параллельно публикует другой сбор — сайт обновит следующий

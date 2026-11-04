@@ -12,7 +12,7 @@ permissions:
   id-token: write
 
 concurrency:
-  group: collect
+  group: pages-publish
   cancel-in-progress: false
 
 jobs:
@@ -30,3 +30,4 @@ jobs:
         with:
           path: docs
       - uses: actions/deploy-pages@v4
+        continue-on-error: true   # если параллельно публикует другой сбор — сайт обновит следующий
