@@ -1,0 +1,10 @@
+name: probe
+on: { workflow_dispatch: {} }
+jobs:
+  p:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python tools/probe.py
+        env:
+          PANDASCORE_TOKEN: ${{ secrets.PANDASCORE_TOKEN }}
