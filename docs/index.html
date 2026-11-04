@@ -336,6 +336,7 @@ html { overflow-anchor: none; }
 .ptab td.mn { max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ptab small { font-size: 10px; }
 .rt2 { font-weight: 700; }
+.face .acr.sm { font-size: 18px; overflow-wrap: anywhere; }
 
 /* лента */
 .hometabs { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
@@ -1056,13 +1057,15 @@ a.ni { text-decoration: none; color: inherit; }
   function country(cc) { if (!cc || cc.length !== 2) return ""; try { return REGNAMES ? REGNAMES.of(cc.toUpperCase()) : cc; } catch (e) { return cc; } }
   var PLACE_RU = { "1st": "1 место", "2nd": "2 место", "3rd": "3 место", "3-4th": "3–4 место", "4th": "4 место" };
   var MEDAL = { "1st": "🥇", "2nd": "🥈", "3rd": "🥉", "3-4th": "🥉", "4th": "4" };
+  var REG_FIX = { AM: "Америка", EU: "Европа", AS: "Азия", NA: "Америка", SA: "Америка" };
   function vrsLine(t) {
     var v = t.vrs;
+    if (v && REG_FIX[v.region]) v.region = REG_FIX[v.region];
     if (!v) return "";
     return [v.region, "#" + v.rank + " VRS", v.points + " очк."].filter(Boolean).join(" · ");
   }
 
-  function heroVrs(t) { var v = t.vrs; return v ? '<span class="tvrs">' + esc(v.region || "") + '<br>#' + esc(v.rank) + ' VRS · ' + esc(v.points) + '</span>' : ''; }
+  function heroVrs(t) { vrsLine(t); var v = t.vrs; return v ? '<span class="tvrs">' + esc(v.region || "") + '<br>#' + esc(v.rank) + ' VRS · ' + esc(v.points) + '</span>' : ''; }
   function personRow(p, roles, real, extra, statsHtml, attrs) {
     var info = [esc(country(p.nationality || p.flag)), real ? esc(real) + (p.name_ru ? ' <span class="pron">[' + esc(plain(p.name_ru)) + ']</span>' : '') : (p.name_ru ? esc(plain(p.name_ru)) : ""),
       p.age ? esc(p.age) + " " + years(p.age) : ""].concat(extra || []).filter(Boolean);
@@ -1161,9 +1164,9 @@ a.ni { text-decoration: none; color: inherit; }
     var rows = sel < 0 ? S.players : maps[sel].players;
     var html = '<div class="pin"><div class="ovtop">' + (TG ? '' : '<button class="back" data-close>' + ARROW + esc(backLabel) + '</button>') + '</div>' +
       '<div class="rd-meta">' + esc([S.tournament, S.stage, S.round].filter(Boolean).join(" · ")) + (S.date ? ' · ' + esc(dmy(S.date)) : '') + '</div>' +
-      '<section class="hero sres"><div class="face"><div class="tm a"><span class="acr">' + esc(A.acronym || A.name) + '</span><span class="full">' + esc(A.name) + '</span></div>' +
+      '<section class="hero sres"><div class="face"><div class="tm a"><span class="acr' + ((A.acronym || A.name || "").length > 6 ? ' sm' : '') + '">' + esc(A.acronym || A.name) + '</span><span class="full">' + esc(A.name) + '</span></div>' +
       '<div class="mid"><b class="num">' + esc(A.score) + ' : ' + esc(B.score) + '</b>BO' + esc(S.bo || "?") + '</div>' +
-      '<div class="tm b"><span class="acr">' + esc(B.acronym || B.name) + '</span><span class="full">' + esc(B.name) + '</span></div></div>' +
+      '<div class="tm b"><span class="acr' + ((B.acronym || B.name || "").length > 6 ? ' sm' : '') + '">' + esc(B.acronym || B.name) + '</span><span class="full">' + esc(B.name) + '</span></div></div>' +
       (maps.length ? '<div class="smaps">' + maps.map(function (g) {
         return '<div class="smap"><span>' + esc(g.map || "?") + '</span><b class="num"><span class="' + (g.winner === 0 ? "a" : "") + '">' + esc(g.score ? g.score[0] : "–") + '</span>:<span class="' + (g.winner === 1 ? "b" : "") + '">' + esc(g.score ? g.score[1] : "–") + '</span></b></div>';
       }).join("") + '</div>' : '') + '</section>';
@@ -1176,7 +1179,7 @@ a.ni { text-decoration: none; color: inherit; }
           (rows[i] || []).map(function (r) {
             var diff = r[1] - r[2];
             return '<tr><td class="mn">' + esc(r[0]) + '</td><td class="r num">' + r[1] + '–' + r[2] + ' <small class="' + (diff > 0 ? "up" : diff < 0 ? "dn" : "") + '">' + (diff > 0 ? "+" : "") + diff + '</small></td>' +
-              '<td class="r num">' + Number(r[3]).toFixed(1) + '</td><td class="r num">' + r[4] + '%</td><td class="r num rt2 ' + (r[5] >= 1.1 ? "up" : r[5] <= 0.9 ? "dn" : "") + '">' + Number(r[5]).toFixed(2) + '</td></tr>';
+              '<td class="r num">' + Number(r[3]).toFixed(1) + '</td><td class="r num">' + r[4] + '%</td><td class="r num rt2 ' + (r[5] >= (r[5] > 3 ? 7 : 1.1) ? "up" : r[5] <= (r[5] > 3 ? 5.5 : 0.9) ? "dn" : "") + '">' + Number(r[5]).toFixed(2) + '</td></tr>';
           }).join("") + '</tbody></table></div></div>';
       });
       html += '<div class="upd" style="text-align:center;margin-top:12px">Статистика bo3.gg · рейтинг bo3</div>';

@@ -1267,7 +1267,7 @@ def vrs_table() -> list[dict]:
             if not (pos and nm and pts):
                 continue
             out.append({"rank": int(pos.group(1)), "name": strip_html(nm.group(1)), "points": int(pts.group(1)),
-                        "region": VRS_REGION.get(reg.group(1), reg.group(2)) if reg else None,
+                        "region": (VRS_REGION.get(reg.group(1)) or VRS_REGION.get(reg.group(2).strip().lower()) or reg.group(2)) if reg else None,
                         "hltv": {"id": int(tid.group(1)), "slug": tid.group(2)} if tid else None})
         return out or None
     return hltv_cached("vrs", fn) or []
@@ -1347,7 +1347,9 @@ def prize_places(hltv_team: dict | None, hist: list[dict], days: int = 92) -> li
     for a in ach:
         if not PLACE_TOP.match(a["place"]):
             continue
-        hit = next((d for n, d in tours.items() if tour_same(a["event"], tour_norm(n)) or tour_same(n, tour_norm(a["event"]))), None)
+        ya = re.findall(r"20\d\d", a["event"])
+        hit = next((d for n, d in tours.items() if (tour_same(a["event"], tour_norm(n)) or tour_same(n, tour_norm(a["event"])))
+                    and (not ya or not re.findall(r"20\d\d", n) or ya[-1] == re.findall(r"20\d\d", n)[-1])), None)
         if hit:
             out.append({"place": a["place"], "event": a["event"], "date": hit})
     return out
@@ -1529,6 +1531,10 @@ TG_CLASSIFY_LIMIT = int(os.environ.get("TG_CLASSIFY_LIMIT", "400"))  # пост�
 AD = re.compile(r"промокод|реклама|#ad\b|erid|казино|casino|ставк\w*|букмекер|розыгрыш|giveaway|подпишись|cs\.? ?money|csmoney"
                 r"|освежи\w* инвент|инвентар\w*|обмен\w* скин\w*|скин\w* (?:на|за) |кейс\w* (?:на|за|с) |фрибет\w*|freebet|бонус\w* (?:за|при|на)"
                 r"|депозит\w*|по ссылке|переходи\w*|забирай\w*|скидк\w*|маркетплейс\w*|market\b", re.IGNORECASE)
+MOMENT = re.compile(r"клатч\w*|clutch|\b1 ?(?:v|vs|на|в|x|х) ?[2-5]\b|квадр\w*|\bэйс\w*|\bace\b|мультикилл\w*|тройк\w*|\b[345]k\b|флик\w*|"
+                    r"переворач\w+ раунд|лучш\w+ (?:карт|перфоманс|раунд)|худш\w+ карт|за карту|на карте|раунд\w*", re.IGNORECASE)
+SERIES_RESULT = re.compile(r"плей-?офф|playoff|вылет\w*|покида\w+|выбыва\w+|финал\w*|сетк\w*|чемпион\w*|выигра\w+ (?:турнир|ivent|ивент)|"
+                           r"трофе\w*|титул\w*|проход\w+|выход\w* в|вышл\w+|отбор\w*|квалиф\w*|мейджор\w*|major", re.IGNORECASE)
 UNIQUE_PLAY = re.compile(r"\bнож\w*|knife|гранат\w*|молотов\w*|зевс\w*|\bzeus\b|тейзер\w*|через смок\w*|wallbang|ноускоп\w*|no-?scope"
                          r"|в прыжке|jump ?shot|впервые в истории|историческ\w+ момент", re.IGNORECASE)
 
@@ -1596,11 +1602,18 @@ def tg_keep(info: dict, p: dict) -> bool:
         return False  # превью уже сыгранного матча
     cat = info.get("cat") if info.get("v") == 3 else None
     if cat:
+        if cat in ("highlight", "unique_play"):
+            return bool(UNIQUE_PLAY.search(text[:400]))  # клатчи, эйсы, квадро — нет; нож, граната, зевс — да
         if cat not in TG_KEEP:
-            return cat == "highlight" and bool(UNIQUE_PLAY.search(text[:400]))
-        if cat == "unique_play":
-            return True
+            return False
+        rec = re.search(r"рекорд|антирекорд|впервые|худш\w+ (?:в|за) (?:карьер|истори|год)|лучш\w+ (?:в|за) (?:карьер|истори|год)|карьер\w*", text[:400], re.I)
+        if MOMENT.search(text[:300]) and not rec and not UNIQUE_PLAY.search(text[:400]) and cat not in ("quote", "interview", "transfer", "rumor", "conflict"):
+            return False  # «квадро», «клатч 1v3», «лучшая карта» под видом MVP или итога
+        if cat in ("result", "mvp", "record") and is_live_noise(text) and not rec:
+            return False  # счёт карты, «размочили счёт», «разгромили на Mirage» — ход матча
         if cat == "result":
+            if not SERIES_RESULT.search(text[:400]):
+                return False  # итог только серии/турнира: вышли в плей-офф, вылетели, финал
             tour = info.get("tour")
             return not tour or any(tour_same(tour, tour_norm(t)) or tour_same(t, tour_norm(tour)) for t in CURRENT_TOURS)
         return True
@@ -1609,7 +1622,7 @@ def tg_keep(info: dict, p: dict) -> bool:
         return False
     if UNIQUE_PLAY.search(text[:400]):
         return True
-    return not is_live_noise(text)
+    return not is_live_noise(text) and not (MOMENT.search(text[:300]) and not HAS_SUBSTANCE.search(text[:300]))
 
 
 def tg_posts() -> list[dict]:
