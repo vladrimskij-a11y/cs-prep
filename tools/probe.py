@@ -8,12 +8,5 @@ def get(u):
 h = get("https://www.hltv.org/player/7998/s1mple")
 print("PLAYER", len(h), h[:40])
 b = re.sub(r"\s+", " ", h)
-for k in ("MVP", "majorAchievement", "Major", "trophy"):
-    ms = list(re.finditer(k, b))
-    print("==", k, len(ms))
-    for m in ms[:3]:
-        print("   ", re.sub(r"<svg.*?</svg>", "", b[max(0, m.start()-250):m.start()+350]))
-i = b.find('id="majorAchievement"'); print("MAJOR TABLE:", b[i:i+1500] if i >= 0 else "none")
-time.sleep(3)
-r = get("https://www.hltv.org/valve-ranking/teams")
-i = r.find('class="ranked-team standard-box"'); print("RANK LOGO:", re.sub(r"\s+", " ", r[i:i+700]))
+i = b.find("MVP winner at"); print("TROPHY:", b[i-300:i+2500])
+j = b.find("EVP", i); print("EVP:", b[j-200:j+400] if j > 0 else "-")
