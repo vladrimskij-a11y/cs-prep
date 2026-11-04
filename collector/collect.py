@@ -3474,7 +3474,7 @@ def hltv_player_info(nick: str) -> dict | None:
     pl = hltv_player_ids.get(norm(nick))
     if not pl:
         return None
-    key = f"pinfo:{pl['id']}"
+    key = f"pinfo2:{pl['id']}"
     c = hltv_cache.get(key)
     if c and (parse_iso(c.get("t")) or NOW) > NOW - timedelta(days=7):
         return c["data"]
@@ -3491,9 +3491,23 @@ def hltv_player_info(nick: str) -> dict | None:
         mvp = int(m.group(1))
     elif re.search(r'title="MVP winner at:', b):
         mvp = 1
+    tm = re.search(r'<div class="stat">(\d+)</div><div class="description">Total MVPs', b)
+    if tm:
+        mvp = int(tm.group(1))
+    ev = []
+    i = b.find('id="MVPs"')
+    if i >= 0:
+        seg = b[i:i + 40000]
+        j = seg.find("</table>")
+        for e in re.findall(r'<div class="trophy-event"><a [^>]*>([^<]+)</a>', seg[:j if j > 0 else None]):
+            e = _html.unescape(e).strip()
+            if e and e not in ev:
+                ev.append(e)
+    if ev:
+        mvp = max(mvp, len(ev))
     pm = re.search(r'<div class="stat">(\d+)</div><div class="description">Majors? played', b)
     wm = re.search(r'<div class="stat">(\d+)</div><div class="description">Majors? won', b)
-    d = {"mvp": mvp, "majors": int(pm.group(1)) if pm else 0, "major_wins": int(wm.group(1)) if wm else 0}
+    d = {"mvp": mvp, "mvp_events": ev, "majors": int(pm.group(1)) if pm else 0, "major_wins": int(wm.group(1)) if wm else 0}
     hltv_cache[key] = {"t": iso(NOW), "data": d}
     return d
 
