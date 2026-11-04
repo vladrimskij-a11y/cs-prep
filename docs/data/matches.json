@@ -1,9 +1,233 @@
 {
- "updated": "2026-11-04T10:20:59Z",
+ "updated": "2026-11-04T13:24:16Z",
  "tiers": [
   "s"
  ],
  "tournaments": [
+  {
+   "id": "bo3-5067",
+   "name": "IEM Kraków 2026",
+   "tier": "s",
+   "begin": "2026-01-31T13:00:00Z",
+   "end": "2026-02-08T22:00:00Z",
+   "prize": null,
+   "prize_usd": 1222000,
+   "matches": 0,
+   "next": null,
+   "live": 0,
+   "finished": true,
+   "results": 30
+  },
+  {
+   "id": "bo3-4200",
+   "name": "PGL Cluj-Napoca 2026",
+   "tier": "s",
+   "begin": "2026-02-14T07:00:00Z",
+   "end": "2026-02-22T22:00:00Z",
+   "prize": null,
+   "prize_usd": 1250000,
+   "matches": 0,
+   "next": null,
+   "live": 0,
+   "finished": true,
+   "results": 41
+  },
+  {
+   "id": "bo3-4550",
+   "name": "ESL Pro League Season 23",
+   "tier": "s",
+   "begin": "2026-03-12T23:00:00Z",
+   "end": "2026-03-15T22:00:00Z",
+   "prize": null,
+   "prize_usd": 776000,
+   "matches": 0,
+   "next": null,
+   "live": 0,
+   "finished": true,
+   "results": 8
+  },
+  {
+   "id": "bo3-4201",
+   "name": "BLAST Open Spring 2026",
+   "tier": "s",
+   "begin": "2026-03-18T11:00:00Z",
+   "end": "2026-03-29T16:00:00Z",
+   "prize": null,
+   "prize_usd": 1100000,
+   "matches": 0,
+   "next": null,
+   "live": 0,
+   "finished": true,
+   "results": 29
+  },
+  {
+   "id": "bo3-5107",
+   "name": "IEM Rio 2026",
+   "tier": "s",
+   "begin": "2026-04-13T14:00:00Z",
+   "end": "2026-04-18T22:00:00Z",
+   "prize": null,
+   "prize_usd": 1000000,
+   "matches": 0,
+   "next": null,
+   "live": 0,
+   "finished": true,
+   "results": 30
+  },
+  {
+   "id": "bo3-4207",
+   "name": "PGL Astana 2026",
+   "tier": "s",
+   "begin": "2026-05-09T05:00:00Z",
+   "end": "2026-05-17T17:00:00Z",
+   "prize": null,
+   "prize_usd": 1600000,
+   "matches": 0,
+   "next": null,
+   "live": 0,
+   "finished": true,
+   "results": 41
+  },
+  {
+   "id": "bo3-5108",
+   "name": "IEM Atlanta 2026",
+   "tier": "s",
+   "begin": "2026-05-11T15:30:00Z",
+   "end": "2026-05-16T22:00:00Z",
+   "prize": null,
+   "prize_usd": 1000000,
+   "matches": 0,
+   "next": null,
+   "live": 0,
+   "finished": true,
+   "results": 30
+  },
+  {
+   "id": "bo3-4208",
+   "name": "CS Asia Championships 2026",
+   "tier": "s",
+   "begin": "2026-05-20T03:00:00Z",
+   "end": "2026-05-24T11:00:00Z",
+   "prize": null,
+   "prize_usd": 1000000,
+   "matches": 0,
+   "next": null,
+   "live": 0,
+   "finished": true,
+   "results": 30
+  },
+  {
+   "id": "bo3-4209",
+   "name": "IEM Cologne Major 2026",
+   "tier": "s",
+   "begin": "2026-06-11T06:00:00Z",
+   "end": "2026-06-21T20:00:00Z",
+   "prize": null,
+   "prize_usd": 1170000,
+   "matches": 0,
+   "next": null,
+   "live": 0,
+   "finished": true,
+   "results": 40
+  },
+  {
+   "id": "bo3-4211",
+   "name": "BLAST Bounty Summer 2026",
+   "tier": "s",
+   "begin": "2026-07-30T13:00:00Z",
+   "end": "2026-08-02T15:00:00Z",
+   "prize": null,
+   "prize_usd": 740000,
+   "matches": 0,
+   "next": null,
+   "live": 0,
+   "finished": true,
+   "results": 7
+  },
+  {
+   "id": "bo3-4214",
+   "name": "Esports World Cup 2026",
+   "tier": "s",
+   "begin": "2026-08-12T06:00:00Z",
+   "end": "2026-08-23T17:00:00Z",
+   "prize": null,
+   "prize_usd": 2000000,
+   "matches": 0,
+   "next": null,
+   "live": 0,
+   "finished": true,
+   "results": 56
+  },
+  {
+   "id": "bo3-4204",
+   "name": "FISSURE Playground 3",
+   "tier": "s",
+   "begin": "2026-09-07T23:00:00Z",
+   "end": "2026-09-13T20:55:00Z",
+   "prize": null,
+   "prize_usd": 1000000,
+   "matches": 0,
+   "next": null,
+   "live": 0,
+   "finished": true,
+   "results": 29
+  },
+  {
+   "id": "bo3-5109",
+   "name": "StarLadder StarSeries Fall 2026",
+   "tier": "s",
+   "begin": "2026-09-17T06:00:00Z",
+   "end": "2026-09-20T20:00:00Z",
+   "prize": null,
+   "prize_usd": 500000,
+   "matches": 0,
+   "next": null,
+   "live": 0,
+   "finished": true,
+   "results": 14
+  },
+  {
+   "id": "bo3-5110",
+   "name": "ESL Pro League Season 24",
+   "tier": "s",
+   "begin": "2026-10-03T06:00:00Z",
+   "end": "2026-10-11T20:00:00Z",
+   "prize": null,
+   "prize_usd": 1000000,
+   "matches": 0,
+   "next": null,
+   "live": 0,
+   "finished": true,
+   "results": 41
+  },
+  {
+   "id": "bo3-5111",
+   "name": "Thunderpick World Championship 2026",
+   "tier": "s",
+   "begin": "2026-10-13T22:00:00Z",
+   "end": "2026-10-18T20:00:00Z",
+   "prize": null,
+   "prize_usd": 1000000,
+   "matches": 0,
+   "next": null,
+   "live": 0,
+   "finished": true,
+   "results": 14
+  },
+  {
+   "id": "bo3-5338",
+   "name": "PGL Masters Bucharest 2026",
+   "tier": "s",
+   "begin": "2026-10-24T07:00:00Z",
+   "end": "2026-10-31T16:00:00Z",
+   "prize": null,
+   "prize_usd": 1250000,
+   "matches": 0,
+   "next": null,
+   "live": 0,
+   "finished": true,
+   "results": 41
+  },
   {
    "id": "11136",
    "name": "IEM Beijing 2026",
@@ -12,9 +236,9 @@
    "begin": "2026-11-02T02:00:00Z",
    "end": "2026-11-08T12:30:00Z",
    "prize": "1,250,000 United States Dollar",
-   "matches": 8,
+   "matches": 6,
    "next": "2026-11-06T06:30:00Z",
-   "live": 2,
+   "live": 0,
    "hltv": {
     "prize": 1250000,
     "player_share": 300000,
@@ -680,7 +904,7 @@
     "hltv": "https://www.hltv.org/events/8245/iem-beijing-2026"
    },
    "prize_usd": 1250000,
-   "results": 22
+   "results": 24
   },
   {
    "id": "11137",
@@ -872,85 +1096,11 @@
  ],
  "matches": [
   {
-   "id": 1781463,
-   "begin_at": "2026-11-04T09:33:22Z",
-   "status": "running",
-   "bo": 3,
-   "name": "Upper Bracket Final: MGLZ vs FURIA",
-   "tournament": "IEM Beijing 2026",
-   "stage": "Group A · Upper Bracket Final",
-   "tier": "s",
-   "serie": {
-    "id": 11136,
-    "begin": "2026-11-02T02:00:00Z",
-    "end": "2026-11-08T12:30:00Z",
-    "image": null,
-    "prize": null
-   },
-   "teams": [
-    {
-     "id": 3272,
-     "name": "TheMongolz",
-     "acronym": "MGLZ",
-     "slug": "themongolz",
-     "image": "https://cdn-api.pandascore.co/images/team/image/3272/702px_the_mongol_z_2024_03_allmode.png",
-     "location": "MN"
-    },
-    {
-     "id": 124530,
-     "name": "FURIA",
-     "acronym": "FURIA",
-     "slug": "furia",
-     "image": "https://cdn-api.pandascore.co/images/team/image/124530/8297.png",
-     "location": "BR"
-    }
-   ],
-   "stream": "https://www.twitch.tv/watchfulTVb",
-   "has_detail": true
-  },
-  {
-   "id": 1781468,
-   "begin_at": "2026-11-04T10:20:41Z",
-   "status": "running",
-   "bo": 3,
-   "name": "Lower Bracket Final: NAVI vs FAL",
-   "tournament": "IEM Beijing 2026",
-   "stage": "Group A · Lower Bracket Final",
-   "tier": "s",
-   "serie": {
-    "id": 11136,
-    "begin": "2026-11-02T02:00:00Z",
-    "end": "2026-11-08T12:30:00Z",
-    "image": null,
-    "prize": null
-   },
-   "teams": [
-    {
-     "id": 3216,
-     "name": "Natus Vincere",
-     "acronym": "NAVI",
-     "slug": "natus-vincere-cs-go",
-     "image": "https://cdn-api.pandascore.co/images/team/image/3216/1022px_natus_vincere_2021_lightmode.png",
-     "location": "UA"
-    },
-    {
-     "id": 130564,
-     "name": "Team Falcons",
-     "acronym": "FAL",
-     "slug": "falcons-esports",
-     "image": "https://cdn-api.pandascore.co/images/team/image/130564/team_falconslogo_square.png",
-     "location": "SA"
-    }
-   ],
-   "stream": "https://www.twitch.tv/strogo",
-   "has_detail": true
-  },
-  {
    "id": 1781482,
    "begin_at": "2026-11-06T06:30:00Z",
    "status": "not_started",
    "bo": 3,
-   "name": "Quarterfinal 1: TBD vs TBD",
+   "name": "Quarterfinal 1: PRV vs NAVI",
    "tournament": "IEM Beijing 2026",
    "stage": "Playoffs · Quarterfinal 1",
    "tier": "s",
@@ -961,16 +1111,33 @@
     "image": null,
     "prize": "1,250,000 United States Dollar"
    },
-   "teams": [],
+   "teams": [
+    {
+     "id": 133719,
+     "name": "PARIVISION",
+     "acronym": "PRV",
+     "slug": "parivision",
+     "image": "https://cdn-api.pandascore.co/images/team/image/133719/250px_parivision_allmode.png",
+     "location": "RU"
+    },
+    {
+     "id": 3216,
+     "name": "Natus Vincere",
+     "acronym": "NAVI",
+     "slug": "natus-vincere-cs-go",
+     "image": "https://cdn-api.pandascore.co/images/team/image/3216/1022px_natus_vincere_2021_lightmode.png",
+     "location": "UA"
+    }
+   ],
    "stream": "https://www.twitch.tv/ESLCS",
-   "has_detail": false
+   "has_detail": true
   },
   {
    "id": 1781483,
    "begin_at": "2026-11-06T09:45:00Z",
    "status": "not_started",
    "bo": 3,
-   "name": "Quarterfinal 2: TBD vs TBD",
+   "name": "Quarterfinal 2: FURIA vs BB",
    "tournament": "IEM Beijing 2026",
    "stage": "Playoffs · Quarterfinal 2",
    "tier": "s",
@@ -981,16 +1148,33 @@
     "image": null,
     "prize": "1,250,000 United States Dollar"
    },
-   "teams": [],
+   "teams": [
+    {
+     "id": 124530,
+     "name": "FURIA",
+     "acronym": "FURIA",
+     "slug": "furia",
+     "image": "https://cdn-api.pandascore.co/images/team/image/124530/8297.png",
+     "location": "BR"
+    },
+    {
+     "id": 133458,
+     "name": "BetBoom Team",
+     "acronym": "BB",
+     "slug": "betboom-team-cs-go",
+     "image": "https://cdn-api.pandascore.co/images/team/image/133458/bet_boom_team_2024_allmode.png",
+     "location": "RU"
+    }
+   ],
    "stream": "https://www.twitch.tv/ESLCS",
-   "has_detail": false
+   "has_detail": true
   },
   {
    "id": 1781484,
    "begin_at": "2026-11-07T06:30:00Z",
    "status": "not_started",
    "bo": 3,
-   "name": "Semifinal 1: TBD vs TBD",
+   "name": "Semifinal 1: TBD vs MGLZ",
    "tournament": "IEM Beijing 2026",
    "stage": "Playoffs · Semifinal 1",
    "tier": "s",
@@ -1001,7 +1185,16 @@
     "image": null,
     "prize": "1,250,000 United States Dollar"
    },
-   "teams": [],
+   "teams": [
+    {
+     "id": 3272,
+     "name": "TheMongolz",
+     "acronym": "MGLZ",
+     "slug": "themongolz",
+     "image": "https://cdn-api.pandascore.co/images/team/image/3272/702px_the_mongol_z_2024_03_allmode.png",
+     "location": "MN"
+    }
+   ],
    "stream": "https://www.twitch.tv/ESLCS",
    "has_detail": false
   },
@@ -1010,7 +1203,7 @@
    "begin_at": "2026-11-07T09:45:00Z",
    "status": "not_started",
    "bo": 3,
-   "name": "Semifinal 2: TBD vs TBD",
+   "name": "Semifinal 2: TBD vs MOUZ",
    "tournament": "IEM Beijing 2026",
    "stage": "Playoffs · Semifinal 2",
    "tier": "s",
@@ -1021,7 +1214,16 @@
     "image": null,
     "prize": "1,250,000 United States Dollar"
    },
-   "teams": [],
+   "teams": [
+    {
+     "id": 3240,
+     "name": "MOUZ",
+     "acronym": "MOUZ",
+     "slug": "mousesports-cs-go",
+     "image": "https://cdn-api.pandascore.co/images/team/image/3240/208px_mouz_2021_allmode.png",
+     "location": "DE"
+    }
+   ],
    "stream": "https://www.twitch.tv/ESLCS",
    "has_detail": false
   },
@@ -1396,16 +1598,17 @@
  ],
  "meta": {
   "panda_requests": 10,
-  "bo3_requests": 26,
-  "liquipedia_requests": 0,
+  "bo3_requests": 2065,
+  "liquipedia_requests": 2,
   "translations": 2,
   "warnings": [
    "GigaChat: URLError(TimeoutError('timed out'))",
-   "HLTV /team/4608/natus-vincere: <HTTPError 403: 'Forbidden'>"
+   "HLTV /events/8302/pgl-major-singapore-2026: <HTTPError 403: 'Forbidden'>",
+   "bo3: не нашёл команду BETBOOM"
   ],
   "hltv_requests": 4,
-  "dust2_requests": 6,
-  "giga_calls": 47,
-  "giga_tokens": 66697
+  "dust2_requests": 3,
+  "giga_calls": 30,
+  "giga_tokens": 54153
  }
 }
