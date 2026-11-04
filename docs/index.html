@@ -1570,7 +1570,7 @@ a.ni { text-decoration: none; color: inherit; }
         '<span class="vr-c"><b class="num">#' + t.vrs.rank + '</b><small class="num">' + t.vrs.points + '</small></span>' +
         cell(O.win0[i]) + cell(O.win1[i]) + '</div>';
     });
-    return html + '<div class="note">' + (O.model === "valve" ? 'Оценка по модели Valve: победа даёт очки за личную встречу и за силу побеждённого (баунти, сеть соперников, LAN). От HLTV может отличаться на 10–20 очков.' : 'Оценка только по личной встрече.') + '</div></div></div>';
+    return html + '<div class="note">' + (O.model === "valve" ? 'Оценка по модели Valve: победа даёт очки за личную встречу и за силу побеждённого (баунти, сеть соперников, LAN). Считается по коду рейтинга Valve с учётом матчей идущего турнира; от прогноза HLTV обычно отличается на 1–5 очков.' : 'Оценка только по личной встрече.') + '</div></div></div>';
   }
 
   function newsFor(m, who) {
