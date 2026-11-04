@@ -697,14 +697,26 @@ a.ni { text-decoration: none; color: inherit; }
   }
 
   // ---------- данные
+  // Данные читаем прямо из ветки data (обновляется сразу после каждого сбора); если недоступна — копия, опубликованная с сайтом
+  var RAW = "https://raw.githubusercontent.com/vladrimskij-a11y/cs-prep/data/";
+  var rawOk = true;
+  function dfetch(u) {
+    var local = function () { return fetch(u); };
+    if (!rawOk || location.protocol === "file:") return local();
+    return fetch(RAW + u.slice(5), { cache: "no-store" }).then(function (r) {
+      if (r.ok) return r;
+      if (r.status === 404) return r;  // файла нет и в ветке — так и отвечаем
+      return local();
+    }, function () { rawOk = false; return local(); });
+  }
   function bust() { return "?t=" + Math.floor(Date.now() / 60000); }
   function getList() {
     if (DEMO) return Promise.resolve(DEMO.list);
-    return fetch("data/matches.json" + bust()).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); });
+    return dfetch("data/matches.json" + bust()).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); });
   }
   function getDetail(id) {
     if (state.details[id]) return Promise.resolve(state.details[id]);
-    var p = DEMO ? Promise.resolve(DEMO.details[id]) : fetch("data/match/" + id + ".json" + bust()).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); });
+    var p = DEMO ? Promise.resolve(DEMO.details[id]) : dfetch("data/match/" + id + ".json" + bust()).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); });
     return p.then(function (x) { if (!x) throw new Error("нет данных"); state.details[id] = x; return x; });
   }
 
@@ -752,7 +764,7 @@ a.ni { text-decoration: none; color: inherit; }
   function getFeed() {
     if (DEMO) return Promise.resolve(DEMO.feed || { items: [] });
     if (state.feed) return Promise.resolve(state.feed);
-    return fetch("data/feed.json" + bust()).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+    return dfetch("data/feed.json" + bust()).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
       .then(function (f) { state.feed = f; return f; });
   }
 
@@ -1017,7 +1029,7 @@ a.ni { text-decoration: none; color: inherit; }
   var REG_ABBR = { "Европа": "EU", "Америка": "AM", "Азия": "AS" };
   function getRanking() {
     if (state.ranking) return Promise.resolve(state.ranking);
-    return fetch("data/ranking.json" + bust()).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); }).then(function (j) { state.ranking = j; ((j.vrs || {}).teams || []).forEach(function (t) { rememberLogo(t.name, t.logo); }); return j; });
+    return dfetch("data/ranking.json" + bust()).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); }).then(function (j) { state.ranking = j; ((j.vrs || {}).teams || []).forEach(function (t) { rememberLogo(t.name, t.logo); }); return j; });
   }
   function ratingPane(R, sub) {
     if (!R) return '<div class="empty">' + (state.rankingErr ? '<strong>Рейтинг ещё не собран</strong>Появится после ближайшего полного обновления.' : 'Загружаю рейтинг…') + '</div>';
@@ -1043,7 +1055,7 @@ a.ni { text-decoration: none; color: inherit; }
   function getTeam(slug) {
     state.teams = state.teams || {};
     if (state.teams[slug]) return Promise.resolve(state.teams[slug]);
-    return fetch("data/team/" + encodeURIComponent(slug) + ".json" + bust()).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); }).then(function (j) { state.teams[slug] = j; return j; });
+    return dfetch("data/team/" + encodeURIComponent(slug) + ".json" + bust()).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); }).then(function (j) { state.teams[slug] = j; return j; });
   }
   function prizesLine(pr) {
     pr = (pr || []).filter(function (x) { return MEDAL[x.place]; });
@@ -1082,7 +1094,7 @@ a.ni { text-decoration: none; color: inherit; }
     state.results = state.results || {};
     if (state.results[id]) return Promise.resolve(state.results[id]);
     if (DEMO) return Promise.resolve((DEMO.results || {})[id] || null);
-    return fetch("data/results/" + String(id).replace(/[^\w-]/g, "-") + ".json" + bust()).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+    return dfetch("data/results/" + String(id).replace(/[^\w-]/g, "-") + ".json" + bust()).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
       .then(function (j) { state.results[id] = j; (j.matches || []).forEach(function (x) { (x.teams || []).forEach(function (t) { rememberLogo(t.name, t.logo); }); }); (j.stages || []).forEach(function (st) { st.rounds.forEach(function (rd) { rd.matches.forEach(function (x) { rememberLogo(x.a, x.la); rememberLogo(x.b, x.lb); }); }); }); return j; });
   }
 
@@ -1296,7 +1308,7 @@ a.ni { text-decoration: none; color: inherit; }
   function getMajor() {
     if (state.major) return Promise.resolve(state.major);
     if (DEMO) return Promise.resolve(DEMO.major || null);
-    return fetch("data/major.json" + bust()).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+    return dfetch("data/major.json" + bust()).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
       .then(function (j) { state.major = j; return j; });
   }
   var REG_RU = { Europe: "Европа", Americas: "Америка", Asia: "Азия" };
@@ -2242,7 +2254,7 @@ a.ni { text-decoration: none; color: inherit; }
   // само обновляется: раз в минуту проверяем, не пришли ли свежие данные
   setInterval(function () {
     if (document.hidden || !state.list || state.ovl || state.pop || state.refreshing || sw || ss || pr) return;
-    fetch("data/matches.json?t=" + Date.now()).then(function (r) { return r.ok ? r.json() : null; }).then(function (L) {
+    dfetch("data/matches.json?t=" + Date.now()).then(function (r) { return r.ok ? r.json() : null; }).then(function (L) {
       if (!L || L.updated === state.list.updated || state.ovl || sw || ss) return;
       var feedOld = state.feed;
       state.list = L; state.details = {}; state.results = {};

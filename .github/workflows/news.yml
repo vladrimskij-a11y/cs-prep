@@ -7,8 +7,6 @@ on:
 
 permissions:
   contents: write
-  pages: write
-  id-token: write
 
 concurrency:
   group: collect-news
@@ -18,8 +16,6 @@ jobs:
   run:
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    environment:
-      name: github-pages
     steps:
       - uses: actions/checkout@v4
 
@@ -55,10 +51,3 @@ jobs:
 
       - name: Сохранить данные (ветка data, слияние с параллельными сборами)
         run: python collector/save_data.py news "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
-
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: docs
-
-      - uses: actions/deploy-pages@v4
-        continue-on-error: true   # если параллельно публикует другой сбор — сайт обновит следующий
