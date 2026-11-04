@@ -434,7 +434,7 @@ html { overflow-anchor: none; }
 .bm .bt > span { flex: 1; min-width: 0; }
 .bm .bt > b { margin-left: auto; }
 .bm .bl { display: block; font-style: normal; font-size: 10.5px; color: var(--muted); padding: 4px 8px 0; }
-.snav { left: 50%; right: auto; transform: translateX(-50%); bottom: calc(34px + env(safe-area-inset-bottom, 0px)); flex-direction: row; gap: 16px; }
+.snav { left: 75%; right: auto; transform: translateX(-50%); bottom: calc(34px + env(safe-area-inset-bottom, 0px)); flex-direction: column; gap: 12px; }
 .snav button { width: 54px; height: 54px; font-size: 24px; }
 .match .vs .row .lg { margin-right: 0; }
 .lg.big { width: 34px; height: 34px; margin: 0 0 4px; }
@@ -445,6 +445,35 @@ html { overflow-anchor: none; }
 .swn { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .swr.q b { color: var(--win); } .swr.out { opacity: .55; } .swr.out b { color: var(--loss); }
 .brk-row.nolines .brk-ms { justify-content: flex-start; }
+.medals { display: inline-flex; gap: 4px; flex-wrap: wrap; grid-column: auto; margin: 0; }
+.medal { display: inline-flex; align-items: center; gap: 2px; padding: 1px 6px; border-radius: 6px; background: var(--sunk); font-size: 13px; }
+.medal b { font-size: 12px; font-weight: 700; }
+.medal.mvp { background: var(--t-soft); color: var(--t); }
+.roster .hd .medals { justify-self: end; }
+.pop { position: fixed; inset: 0; z-index: 50; }
+.pop-in { position: fixed; max-width: min(320px, calc(100vw - 24px)); max-height: 50vh; overflow: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0,0,0,.35); padding: 10px 12px; font-size: 13px; }
+.pop-in b { display: block; margin-bottom: 6px; }
+.pop-in ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 3px; color: var(--muted); }
+.pop-in p { margin: 0; color: var(--muted); }
+.prz-g { padding: 8px 12px 2px; font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; border-top: 1px solid var(--line); }
+.prz-g:first-child { border-top: 0; }
+.tours.center { min-height: calc(var(--tg-viewport-stable-height, 100dvh) - var(--shh, 150px) - 60px); justify-content: center; }
+.mini .mo { display: flex; gap: 3px; flex-wrap: nowrap; }
+.mini .mo i { font-style: normal; font-family: var(--mono); font-size: 9.5px; padding: 1px 4px; border-radius: 4px; color: #0b0d12; }
+.mo i.g { background: #4cc283; } .mo i.y { background: #e3c545; } .mo i.o { background: #e39a45; } .mo i.r { background: #ff6b62; }
+.mini small { letter-spacing: 0; }
+.ovl.sov { overflow: hidden; display: flex; flex-direction: column; }
+.ov-head { flex: none; }
+.ov-head > .pin { padding-bottom: 6px; }
+.ov-vp { flex: 1; min-height: 0; overflow: hidden; }
+.ov-track { display: flex; height: 100%; will-change: transform; }
+.opane { flex: 0 0 100%; width: 100%; height: 100%; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+.opane > .pin { max-width: 640px; margin: 0 auto; padding: 0 max(16px, env(safe-area-inset-right, 0px)) calc(48px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); }
+.sres .pp-maps { padding: 0; }
+.pp-m.left { background: transparent; border: 1px dashed var(--line); }
+.st-h .lg { margin-right: 6px; }
+
 
 
 
@@ -872,15 +901,24 @@ a.ni { text-decoration: none; color: inherit; }
     if (!SH || !q(".sshell") || state.ovl || e.touches.length !== 1) return;
     var x = e.touches[0].clientX;
     if (x < 20 || x > window.innerWidth - 20 || e.target.closest("video, input")) return;
-    var sc = e.target.closest(".filt, .bracket");
-    if (sc && sc.scrollWidth > sc.clientWidth + 2) return;
-    ss = { x: x, y: e.touches[0].clientY, t: Date.now(), dx: 0, lock: null, i: SH.keys.indexOf(SH.key) };
+    var sc = e.target.closest(".filt, .bracket"), edge = null;
+    if (sc && sc.scrollWidth > sc.clientWidth + 2) {
+      if (!sc.classList.contains("bracket")) return;
+      edge = sc;  // сетка: свайп за её край переключает вкладку
+    }
+    ss = { edge: edge, x: x, y: e.touches[0].clientY, t: Date.now(), dx: 0, lock: null, i: SH.keys.indexOf(SH.key) };
   }, { passive: true });
   document.addEventListener("touchmove", function (e) {
     if (!ss || ss.lock === "v") return;
     var dx = e.touches[0].clientX - ss.x, dy = e.touches[0].clientY - ss.y;
     if (!ss.lock) {
-      if (Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy) * 1.5) ss.lock = "h";
+      if (Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+        if (ss.edge) {
+          var atL = ss.edge.scrollLeft <= 1, atR = ss.edge.scrollLeft + ss.edge.clientWidth >= ss.edge.scrollWidth - 2;
+          if (!((dx > 0 && atL) || (dx < 0 && atR))) { ss = null; return; }
+        }
+        ss.lock = "h";
+      }
       else if (Math.abs(dy) > 10) { ss.lock = "v"; return; }
       else return;
     }
@@ -947,7 +985,7 @@ a.ni { text-decoration: none; color: inherit; }
   function toursPane(c, sub) {
     var today = dayKey(new Date().toISOString()), list = c[sub], html = "";
     if (!list.length) return '<div class="empty"><strong>' + (sub === "live" ? "Сейчас турниров нет" : sub === "up" ? "Ближайших турниров нет" : "Завершённых турниров пока нет") + '</strong></div>';
-    if (sub !== "up") return '<div class="tours" style="margin-top:8px">' + list.map(function (t) { return tourCard(t, today, ""); }).join("") + '</div>';
+    if (sub !== "up") return '<div class="tours center">' + list.map(function (t) { return tourCard(t, today, ""); }).join("") + '</div>';
     var months = {};  // турнир — в месяце начала; «продолжится в…», если заходит на следующий
     list.forEach(function (t) {
       var b = t.begin || t.next, e = t.end || b;
@@ -1169,12 +1207,12 @@ a.ni { text-decoration: none; color: inherit; }
     var sub = t ? '<span class="pill ' + esc(t.tier) + '">' + esc((t.tier || "?").toUpperCase()) + '</span>' + (t.begin ? esc(dm(t.begin) + (t.end ? " – " + dm(t.end) : "")) : "") + (t.prize_usd ? " · " + esc(usd(t.prize_usd)) : t.prize ? " · " + esc(prize(t.prize)) : "") : "";
     setTimeout(drawBrackets, 0);
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { if (q(".brk-row")) drawBrackets(); });
-    renderShell({ id: "tour:" + id, back: "Турниры", title: esc(t ? t.name : "Турнир") + '<span class="upd shsub">' + sub + '</span>', tabs: tabs,
+    renderShell({ id: "tour:" + id, back: "Турниры", def: tabs.some(function (x) { return x.key === "matches"; }) ? "matches" : undefined, title: esc(t ? t.name : "Турнир") + '<span class="upd shsub">' + sub + '</span>', tabs: tabs,
       pane: function (k) {
         if (k === "overview") {
           var R0 = (state.results || {})[id];
           if (!R0) { getResults(id).then(function () { if (state.view === "tour:" + id) showTour(id); }).catch(function () {}); return '<div class="empty">Загружаю сетку…</div>'; }
-          return bracketHtml(R0);
+          return bracketHtml(R0) + (t && t.hltv ? prizeBlock(t.hltv) : '');
         }
         if (k === "done") {
           var R = (state.results || {})[id];
@@ -1195,7 +1233,7 @@ a.ni { text-decoration: none; color: inherit; }
         if (ms.length) out += byDays(ms, false) + mj;
         else out += mj + (mj ? '<div class="note" style="padding:12px 0 0">Расписание матчей пока не опубликовано — появится здесь, как только организаторы его объявят.</div>'
           : '<div class="empty"><strong>Расписание пока не опубликовано</strong>Матчи появятся здесь, как только организаторы их объявят.</div>');
-        if (t && t.hltv) out += prizeBlock(t.hltv);
+        if (t && t.hltv && !t.bracket) out += prizeBlock(t.hltv);
         return out;
       } });
   }
@@ -1235,15 +1273,19 @@ a.ni { text-decoration: none; color: inherit; }
     });
     html += '</div></div>';
     if ((h.teams || []).length) {
-      html += '<div class="sec"><h3>Участники <span>как попали</span></h3><div class="box">' + h.teams.map(function (t) {
-        return '<div class="prz-row"><span class="prz-pl">' + esc(t.name) + '</span><span class="prz-spot" style="grid-column:auto">' + esc(howRu(t.how)) + '</span></div>';
+      var ord = function (t) { var x = String(t.how || ""); return /^Invited|приглаш/i.test(x) ? 0 : /VRS \(Global\)/.test(x) ? 1 : /^VRS/.test(x) ? 2 : /Closed/i.test(x) ? 4 : /Open/i.test(x) ? 5 : 3; };
+      var list = h.teams.map(function (t, i) { return [t, i]; }).sort(function (a, b) { return ord(a[0]) - ord(b[0]) || String(a[0].how).localeCompare(String(b[0].how)) || a[1] - b[1]; }).map(function (x) { return x[0]; });
+      var cur = null;
+      html += '<div class="sec"><h3>Участники <span>как попали</span></h3><div class="box">' + list.map(function (t) {
+        var g = howRu(t.how), head = g !== cur ? (cur = g, '<div class="prz-g">' + esc(g) + '</div>') : '';
+        return head + '<div class="prz-row"><span class="prz-pl">' + logo(t.name) + esc(t.name) + '</span></div>';
       }).join("") + '</div></div>';
     }
     return html;
   }
   function howRu(s) {
-    return String(s || "").replace(/^VRS \(Global\)/, "по рейтингу VRS (мир)").replace(/^VRS \(Europe\)/, "по рейтингу VRS (Европа)")
-      .replace(/^VRS \(Americas\)/, "по рейтингу VRS (Америка)").replace(/^VRS \(Asia\)/, "по рейтингу VRS (Азия)")
+    return String(s || "").replace(/^VRS \(Global\).*/, "VRS мир").replace(/^VRS \(Europe\).*/, "VRS Европа")
+      .replace(/^VRS \(Americas\).*/, "VRS Америка").replace(/^VRS \(Asia\).*/, "VRS Азия")
       .replace(/Closed Qualifier/, "закрытая квалификация").replace(/Open Qualifier/, "открытая квалификация").replace(/^Invited$/, "приглашение");
   }
 
@@ -1467,7 +1509,8 @@ a.ni { text-decoration: none; color: inherit; }
     var P = m.prediction;
     if (!P || !(P.outcomes || []).length) return "";
     var o = P.outcomes.slice().sort(function (a, b) { var x = a.score.split(":"), y = b.score.split(":"); return (y[0] - y[1]) - (x[0] - x[1]); });
-    return '<small class="mo">' + o.map(function (x) { return esc(x.score) + ' ' + esc(x.p) + '%'; }).join(" · ") + '</small>';
+    var rank = P.outcomes.map(function (x) { return x.score; }), cls = ["g", "y", "o", "r"];
+    return '<span class="mo">' + o.map(function (x) { var r = rank.indexOf(x.score), c = r === 0 ? "g" : r === rank.length - 1 ? "r" : cls[Math.min(r, 2)]; return '<i class="' + c + '">' + esc(x.score) + ' ' + esc(x.p) + '%</i>'; }).join("") + '</span>';
   }
   function heroOutcomes(m) {
     var P = m.prediction;
@@ -1546,28 +1589,47 @@ a.ni { text-decoration: none; color: inherit; }
   }
 
   function vrsShort(t) { vrsLine(t); var v = t.vrs; return v ? 'Мир #' + esc(v.rank) + (v.region ? ' · ' + esc(REG_ABBR[v.region] || v.region) + (v.reg_rank ? ' #' + esc(v.reg_rank) : '') : '') : ''; }
-  function miniVrs(t) { var x = vrsShort(t); return x ? '<small>' + x + '</small>' : ''; }
+  function miniVrs(t) { vrsLine(t); var v = t.vrs; return v ? '<small>Мир#' + esc(v.rank) + (v.region ? ' ' + esc(REG_ABBR[v.region] || v.region) + '#' + esc(v.reg_rank || "") : '') + '</small>' : ''; }
   function heroVrs(t) { var x = vrsShort(t); return x ? '<span class="tvrs">' + x + '</span>' : ''; }
   function personRow(p, roles, real, extra, statsHtml, attrs) {
     var info = [real ? esc(real) + (p.name_ru ? ' <span class="pron">[' + esc(plain(p.name_ru)) + ']</span>' : '') : (p.name_ru ? esc(plain(p.name_ru)) : ""),
       p.age ? esc(p.age) + " " + years(p.age) : ""].concat(extra || []).filter(Boolean);
     var maj = p.majors ? '<span class="pmaj">Мейджоры: <b>' + esc(p.majors) + '</b>' + (p.major_wins ? ' · выиграл <b>' + esc(p.major_wins) + '</b>' : '') + '</span>' : '';
-    return '<' + (attrs ? 'button class="pl"' + attrs : 'div class="pl"') + '><span class="nickline"><span class="pflag">' + esc(flag(p.nationality || p.flag)) + '</span><span class="nick">' + esc(p.nick) + '</span>' + (p.mvp ? '<span class="mvp" title="медали MVP на HLTV">🏅 ' + esc(p.mvp) + ' MVP</span>' : '') + '</span>' +
+    return '<' + (attrs ? 'button class="pl"' + attrs : 'div class="pl"') + '><span class="nickline"><span class="pflag">' + esc(flag(p.nationality || p.flag)) + '</span><span class="nick">' + esc(p.nick) + '</span>' + mvpBadge(p) + '</span>' +
       (roles.length ? '<span class="rcol">' + roles.map(function (r) { return '<span class="rt ' + r[1] + '">' + esc(r[0]) + '</span>'; }).join("") + '</span>' : '') +
       '<span class="rn">' + info.join(" · ") + '</span>' + maj + (statsHtml || "") + '</' + (attrs ? 'button' : 'div') + '>';
   }
 
   // медали по столбцам: золото, серебро, бронза — под каждой турниры
+  // медали компактно; нажатие — окошко со списком турниров
   function medalsHtml(pr) {
     pr = (pr || []).filter(function (x) { return MEDAL[x.place]; });
     if (!pr.length) return "";
-    var cols = [["🥇", ["1st"]], ["🥈", ["2nd"]], ["🥉", ["3rd", "3-4th"]]];
-    return '<div class="medals">' + cols.map(function (c) {
+    var cols = [["🥇", ["1st"], "Победы"], ["🥈", ["2nd"], "Вторые места"], ["🥉", ["3rd", "3-4th"], "Третьи–четвёртые места"]];
+    return '<span class="medals">' + cols.map(function (c) {
       var ev = pr.filter(function (x) { return c[1].indexOf(x.place) >= 0; });
-      return '<div class="mcol"><span class="mic">' + c[0] + ' <b>' + ev.length + '</b></span>' + (ev.length ? ev.map(function (x) { return '<span class="mev">' + esc(x.event) + '</span>'; }).join("") : '<span class="mev none">—</span>') + '</div>';
-    }).join("") + '</div>';
+      if (!ev.length) return "";
+      return '<button class="medal" data-pop="' + esc(JSON.stringify({ t: c[0] + " " + c[2] + " с 1 января", l: ev.map(function (x) { return x.event; }) })) + '">' + c[0] + '<b>' + ev.length + '</b></button>';
+    }).join("") + '</span>';
   }
-  function trophyCount(pr) { var n = (pr || []).filter(function (x) { return MEDAL[x.place]; }).length; return n ? '<span class="tcount" title="призовые места с 1 января">🏆 ' + n + '</span>' : ''; }
+  function trophyCount(pr) { return ""; }
+  function mvpBadge(p) {
+    if (!p.mvp) return "";
+    return '<button class="medal mvp" data-pop="' + esc(JSON.stringify({ t: "🏅 MVP на HLTV: " + p.mvp, l: p.mvp_events || [] })) + '">🏅<b>' + esc(p.mvp) + '</b></button>';
+  }
+  function openPop(data, anchor) {
+    closePop();
+    var d = JSON.parse(data), el = document.createElement("div");
+    el.className = "pop";
+    el.innerHTML = '<div class="pop-in"><b>' + esc(d.t) + '</b>' + ((d.l || []).length ? '<ul>' + d.l.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join("") + '</ul>' : '<p>Список турниров появится после обновления данных.</p>') + '</div>';
+    document.body.appendChild(el);
+    var r = anchor.getBoundingClientRect(), box = el.firstChild, W = window.innerWidth;
+    var top = r.bottom + 6, left = Math.min(Math.max(12, r.left), W - box.offsetWidth - 12);
+    if (top + box.offsetHeight > window.innerHeight - 12) top = Math.max(12, r.top - box.offsetHeight - 6);
+    box.style.top = top + "px"; box.style.left = left + "px";
+    state.pop = el;
+  }
+  function closePop() { if (state.pop) { state.pop.remove(); state.pop = null; } }
   function rosterRows(players, coach, statsTeam, clickable) {
     var html = "";
     function prank(p) {
@@ -1653,41 +1715,47 @@ a.ni { text-decoration: none; color: inherit; }
 
   // подробности серии: карты, счёт, статистика игроков (вся серия или отдельная карта)
   function seriesView(S, backLabel) {
-    var A = S.teams[0] || {}, B = S.teams[1] || {}, sel = state.seriesMap == null ? -1 : state.seriesMap;
+    var A = S.teams[0] || {}, B = S.teams[1] || {};
     var maps = S.maps || [];
-    if (sel >= maps.length || (sel >= 0 && !maps[sel].players)) sel = -1;
-    var rows = sel < 0 ? S.players : maps[sel].players;
     var dec = (S.veto || []).find(function (v) { return v.act === "decider"; });
-    var html = '<div class="pin"><div class="ovtop">' + (TG ? '' : '<button class="back" data-close>' + ARROW + esc(backLabel) + '</button>') + '</div>' +
+    var keys = S.players ? [-1].concat(maps.map(function (g, i) { return g.players ? i : null; }).filter(function (x) { return x != null; })) : [];
+    var head = '<div class="ovtop">' + (TG ? '' : '<button class="back" data-close>' + ARROW + esc(backLabel) + '</button>') + '</div>' +
       '<div class="rd-meta">' + esc([S.tournament, S.stage, S.round].filter(Boolean).join(" · ")) + (S.date ? ' · ' + esc(dmy(S.date)) : '') + '</div>' +
-      '<section class="hero sres"><div class="face"><div class="tm a">' + logo(A.name, A.logo).replace('class="lg"', 'class="lg big"') + '<span class="acr' + ((A.acronym || A.name || "").length > 6 ? ' sm' : '') + '">' + esc(A.acronym || A.name) + '</span><span class="full">' + esc(A.name) + '</span></div>' +
+      '<section class="hero sres"><div class="face"><div class="tm a">' + logo(A.name, A.logo).replace('class="lg"', 'class="lg big"') + '<span class="acr' + ((A.acronym || A.name || "").length > 6 ? ' sm' : '') + '">' + esc(A.acronym || A.name) + '</span></div>' +
       '<div class="mid"><b class="num">' + esc(A.score) + ' : ' + esc(B.score) + '</b>BO' + esc(S.bo || "?") + '</div>' +
-      '<div class="tm b">' + logo(B.name, B.logo).replace('class="lg"', 'class="lg big"') + '<span class="acr' + ((B.acronym || B.name || "").length > 6 ? ' sm' : '') + '">' + esc(B.acronym || B.name) + '</span><span class="full">' + esc(B.name) + '</span></div></div>' +
-      (maps.length ? '<div class="smaps">' + maps.map(function (g) {
-        return '<div class="smap"><span>' + esc(g.map || "?") + '</span><b class="num"><span class="' + (g.winner === 0 ? "a" : "") + '">' + esc(g.score ? g.score[0] : "–") + '</span>:<span class="' + (g.winner === 1 ? "b" : "") + '">' + esc(g.score ? g.score[1] : "–") + '</span></b></div>';
-      }).join("") + (dec && maps.length < (S.bo || 3) ? '<div class="smap left"><span>' + esc(dec.map) + '</span><b>не сыграна</b></div>' : '') + '</div>' : '') + '</section>';
-    if ((S.veto || []).length) {
-      html += '<div class="sec"><h3>Вето</h3><div class="box veto">' + S.veto.map(function (v, i) {
-        var who = v.team ? ([A, B].findIndex(function (t) { return t && t.name && (t.name.toLowerCase().indexOf(v.team.toLowerCase()) >= 0 || v.team.toLowerCase().indexOf(String(t.name).toLowerCase()) >= 0); })) : -1;
-        return '<div class="vt"><span class="vt-n num">' + (i + 1) + '</span><span class="vt-t ' + (who === 0 ? "a" : who === 1 ? "b" : "") + '">' + esc(v.team || "") + '</span>' +
-          '<span class="vt-a ' + esc(v.act) + '">' + (v.act === "ban" ? "бан" : v.act === "pick" ? "пик" : "осталась") + '</span><b>' + esc(v.map) + '</b></div>';
-      }).join("") + '</div></div>';
-    }
-    if (rows) {
-      html += '<div class="filt sfilt" role="group" aria-label="Карта"><button class="chip" data-smap="-1" aria-pressed="' + (sel < 0) + '">Вся серия</button>' +
-        maps.map(function (g, i) { return g.players ? '<button class="chip" data-smap="' + i + '" aria-pressed="' + (sel === i) + '">' + esc(g.map || ("Карта " + (i + 1))) + '</button>' : ''; }).join("") + '</div>';
-      [0, 1].forEach(function (i) {
+      '<div class="tm b">' + logo(B.name, B.logo).replace('class="lg"', 'class="lg big"') + '<span class="acr' + ((B.acronym || B.name || "").length > 6 ? ' sm' : '') + '">' + esc(B.acronym || B.name) + '</span></div></div>' +
+      (maps.length ? '<div class="pp-maps">' + maps.map(function (g, i) {
+        return '<div class="pp-m ' + (g.winner === 0 ? "a" : g.winner === 1 ? "b" : "n") + '"><span class="pp-n">Карта ' + (i + 1) + '</span><b>' + esc(g.map || "?") + '</b><span class="num pp-s"><span class="a">' + esc(g.score ? g.score[0] : "–") + '</span>:<span class="b">' + esc(g.score ? g.score[1] : "–") + '</span></span></div>';
+      }).join("") + (dec && maps.length < (S.bo || 3) ? '<div class="pp-m n left"><span class="pp-n">Карта ' + (maps.length + 1) + '</span><b>' + esc(dec.map) + '</b><small>не сыграна</small></div>' : '') + '</div>' : '') + '</section>' +
+      (keys.length > 1 ? '<div class="filt sfilt" role="tablist">' + keys.map(function (k, j) { return '<button class="chip" data-smap="' + j + '" aria-pressed="' + (j === 0) + '">' + (k < 0 ? "Вся серия" : esc(maps[k].map || ("Карта " + (k + 1)))) + '</button>'; }).join("") + '</div>' : '');
+    var vetoHtml = (S.veto || []).length ? '<div class="sec"><h3>Вето</h3><div class="box veto">' + S.veto.map(function (v, i) {
+      var who = v.team ? ([A, B].findIndex(function (t) { return t && t.name && (t.name.toLowerCase().indexOf(v.team.toLowerCase()) >= 0 || v.team.toLowerCase().indexOf(String(t.name).toLowerCase()) >= 0); })) : -1;
+      return '<div class="vt"><span class="vt-n num">' + (i + 1) + '</span><span class="vt-t ' + (who === 0 ? "a" : who === 1 ? "b" : "") + '">' + esc(v.team || "") + '</span>' +
+        '<span class="vt-a ' + esc(v.act) + '">' + (v.act === "ban" ? "бан" : v.act === "pick" ? "пик" : "осталась") + '</span><b>' + esc(v.map) + '</b></div>';
+    }).join("") + '</div></div>' : '';
+    function tables(rows) {
+      return [0, 1].map(function (i) {
         var t = S.teams[i] || {};
-        html += '<div class="sec"><div class="box"><div class="st-h ' + (i ? "b" : "a") + '">' + esc(t.name) + '</div><table class="mtab ptab"><thead><tr><th>Игрок</th><th class="r">K–D</th><th class="r">ADR</th><th class="r">KAST</th><th class="r">Рейт.</th></tr></thead><tbody>' +
+        return '<div class="sec"><div class="box"><div class="st-h ' + (i ? "b" : "a") + '">' + logo(t.name, t.logo) + esc(t.name) + '</div><table class="mtab ptab"><thead><tr><th>Игрок</th><th class="r">K–D</th><th class="r">ADR</th><th class="r">KAST</th><th class="r">Рейт.</th></tr></thead><tbody>' +
           (rows[i] || []).map(function (r) {
             var diff = r[1] - r[2];
             return '<tr><td class="mn">' + esc(r[0]) + '</td><td class="r num">' + r[1] + '–' + r[2] + ' <small class="' + (diff > 0 ? "up" : diff < 0 ? "dn" : "") + '">' + (diff > 0 ? "+" : "") + diff + '</small></td>' +
               '<td class="r num">' + Number(r[3]).toFixed(1) + '</td><td class="r num">' + r[4] + '%</td><td class="r num rt2 ' + (r[5] >= (r[5] > 3 ? 7 : 1.1) ? "up" : r[5] <= (r[5] > 3 ? 5.5 : 0.9) ? "dn" : "") + '">' + Number(r[5]).toFixed(2) + '</td></tr>';
           }).join("") + '</tbody></table></div></div>';
-      });
-      html += '<div class="upd" style="text-align:center;margin-top:12px">Статистика bo3.gg · рейтинг bo3</div>';
-    } else html += '<div class="box note" style="margin-top:12px">Статистики игроков по этому матчу пока нет.</div>';
-    return html + '</div>';
+      }).join("") + '<div class="upd" style="text-align:center;margin-top:12px">Статистика bo3.gg · рейтинг bo3</div>';
+    }
+    var panes = keys.length ? keys.map(function (k) { return '<div class="opane"><div class="pin">' + (k < 0 ? vetoHtml : '') + tables(k < 0 ? S.players : maps[k].players) + '</div></div>'; }).join("")
+      : '<div class="opane"><div class="pin">' + vetoHtml + '<div class="box note" style="margin-top:12px">Статистики игроков по этому матчу пока нет.</div></div></div>';
+    return '<div class="ov-head"><div class="pin">' + head + '</div></div><div class="ov-vp"><div class="ov-track">' + panes + '</div></div>';
+  }
+  function ovTrackTo(i, anim) {
+    var O = state.ovl, tr = O && O.el.querySelector(".ov-track");
+    if (!tr) return;
+    var n = tr.children.length; i = Math.max(0, Math.min(n - 1, i)); O.i = i;
+    tr.style.transition = anim ? "transform .24s cubic-bezier(.2,.7,.3,1)" : "none";
+    tr.style.transform = "translate3d(" + (-i * O.el.clientWidth) + "px,0,0)";
+    O.el.querySelectorAll("[data-smap]").forEach(function (b) { b.setAttribute("aria-pressed", String(Number(b.getAttribute("data-smap")) === i)); });
+    revealSel(O.el.querySelector(".sfilt"));
   }
 
   function keepFilterScroll(render) {
@@ -2033,7 +2101,7 @@ a.ni { text-decoration: none; color: inherit; }
     var h = location.hash.replace("#", "");
     try { TG && (state.ovl || h ? TG.BackButton.show() : TG.BackButton.hide()); } catch (e) {}
   }
-  function openSeries(S, label) { state.seriesMap = -1; openOverlay("series", S, seriesView(S, label)); }
+  function openSeries(S, label) { openOverlay("series", S, seriesView(S, label)); state.ovl.el.classList.add("sov"); state.ovl.i = 0; ovTrackTo(0, false); }
 
   // свайп вправо по открытой новости/серии — назад; под ней видно экран, на который вернёмся
   var rs = null;
@@ -2042,16 +2110,25 @@ a.ni { text-decoration: none; color: inherit; }
     if (!state.ovl || e.touches.length !== 1 || e.target.closest("video")) return;
     var sc = e.target.closest(".filt");
     if (sc && sc.scrollWidth > sc.clientWidth + 2) return;
-    rs = { x: e.touches[0].clientX, y: e.touches[0].clientY, t: Date.now(), dx: 0, lock: null, v: state.ovl.el };
+    rs = { x: e.touches[0].clientX, y: e.touches[0].clientY, t: Date.now(), dx: 0, lock: null, v: state.ovl.el, tr: state.ovl.el.querySelector(".ov-track"), i: state.ovl.i || 0 };
   }, { passive: true });
   document.addEventListener("touchmove", function (e) {
     if (!rs || rs.lock === "v") return;
     var dx = e.touches[0].clientX - rs.x, dy = e.touches[0].clientY - rs.y;
     if (!rs.lock) {
-      if (dx > 10 && dx > Math.abs(dy) * 1.5) rs.lock = "h";
+      var n0 = rs.tr ? rs.tr.children.length : 1;
+      if (Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy) * 1.5 && (dx > 0 || n0 > 1)) rs.lock = "h";
       else if (Math.abs(dy) > 10 || dx < -10) { rs.lock = "v"; return; }
       else return;
     }
+    var n = rs.tr ? rs.tr.children.length : 1, next = rs.i + (dx < 0 ? 1 : -1);
+    if (rs.tr && n > 1 && next >= 0) {  // листаем карты; шапка стоит
+      rs.mode = "track"; rs.dx = next >= n ? dx * 0.25 : dx;
+      rs.tr.style.transition = "none";
+      rs.tr.style.transform = "translate3d(" + (-rs.i * rs.v.clientWidth + rs.dx) + "px,0,0)";
+      return;
+    }
+    rs.mode = "close";
     rs.dx = Math.max(0, dx);
     rs.v.style.transition = "none";
     rs.v.style.transform = "translate3d(" + rs.dx + "px,0,0)";
@@ -2060,7 +2137,12 @@ a.ni { text-decoration: none; color: inherit; }
     if (!rs) return;
     var r0 = rs; rs = null;
     if (r0.lock !== "h") return;
-    var W = document.documentElement.clientWidth, v = r0.dx / Math.max(1, Date.now() - r0.t);
+    var W = document.documentElement.clientWidth, v = Math.abs(r0.dx) / Math.max(1, Date.now() - r0.t);
+    if (r0.mode === "track") {
+      var far = Math.abs(r0.dx) > W * 0.22 || (v > 0.45 && Math.abs(r0.dx) > 35);
+      ovTrackTo(far ? r0.i + (r0.dx < 0 ? 1 : -1) : r0.i, true);
+      return;
+    }
     if (r0.dx > W * 0.25 || (v > 0.4 && r0.dx > 30)) {
       closeOverlay(false);
       try { TG && TG.HapticFeedback && TG.HapticFeedback.impactOccurred("light"); } catch (err) {}
@@ -2154,6 +2236,18 @@ a.ni { text-decoration: none; color: inherit; }
   }
   document.addEventListener("touchend", ptrEnd, { passive: true });
   document.addEventListener("touchcancel", ptrEnd, { passive: true });
+  // само обновляется: раз в минуту проверяем, не пришли ли свежие данные
+  setInterval(function () {
+    if (document.hidden || !state.list || state.ovl || state.pop || state.refreshing || sw || ss || pr) return;
+    fetch("data/matches.json?t=" + Date.now()).then(function (r) { return r.ok ? r.json() : null; }).then(function (L) {
+      if (!L || L.updated === state.list.updated || state.ovl || sw || ss) return;
+      var feedOld = state.feed;
+      state.list = L; state.details = {}; state.results = {};
+      if (state.view === "feed" || feedOld) { state.feed = null; }
+      if (state.view === "rating") state.ranking = null;
+      route();
+    }).catch(function () {});
+  }, 60000);
   function refreshAll() {
     state.refreshing = true;
     ptrShow(56, "Обновляю…", true);
@@ -2166,8 +2260,10 @@ a.ni { text-decoration: none; color: inherit; }
 
   // ---------- клики
   document.addEventListener("click", function (e) {
-    var t = e.target.closest("[data-vplay],[data-snav],[data-goto],[data-sk],[data-team],[data-tseries],[data-fread],[data-close],#facts-more,[data-home],[data-feedch],[data-tg],[data-reader],[data-open],[data-tour],[data-tab],[data-map],[data-nf],[data-player],[data-link],[data-read],[data-series],[data-rseries],[data-smap],[data-ttab],#back");
+    if (state.pop && !e.target.closest(".pop-in")) { closePop(); if (!e.target.closest("[data-pop]")) { e.preventDefault(); e.stopPropagation(); return; } }
+    var t = e.target.closest("[data-pop],[data-vplay],[data-snav],[data-goto],[data-sk],[data-team],[data-tseries],[data-fread],[data-close],#facts-more,[data-home],[data-feedch],[data-tg],[data-reader],[data-open],[data-tour],[data-tab],[data-map],[data-nf],[data-player],[data-link],[data-read],[data-series],[data-rseries],[data-smap],[data-ttab],#back");
     if (!t) return;
+    if (t.hasAttribute("data-pop")) { e.stopPropagation(); e.preventDefault(); openPop(t.getAttribute("data-pop"), t); return; }
     if (t.hasAttribute("data-vplay")) { var vv = t.parentNode.querySelector("video"); if (vv) { t.remove(); vv.play().catch(function () {}); } return; }
     if (t.hasAttribute("data-snav")) { statsNav(Number(t.getAttribute("data-snav"))); return; }
     if (t.hasAttribute("data-goto")) { go("#" + t.getAttribute("data-goto")); return; }
@@ -2201,14 +2297,7 @@ a.ni { text-decoration: none; color: inherit; }
       if (S2) openSeries(S2, "Завершённые");
       return;
     }
-    if (t.hasAttribute("data-smap")) {
-      if (!state.ovl || state.ovl.kind !== "series") return;
-      state.seriesMap = Number(t.getAttribute("data-smap"));
-      var el = state.ovl.el, f = el.querySelector(".sfilt"), sl = f ? f.scrollLeft : 0, top = el.scrollTop;
-      el.innerHTML = seriesView(state.ovl.key, state.openId ? "Статистика" : "Завершённые");
-      el.scrollTop = top; f = el.querySelector(".sfilt"); if (f) { f.scrollLeft = sl; revealSel(f); }
-      return;
-    }
+    if (t.hasAttribute("data-smap")) { if (state.ovl && state.ovl.kind === "series") ovTrackTo(Number(t.getAttribute("data-smap")), true); return; }
     if (t.hasAttribute("data-read")) { if (TG) { e.preventDefault(); try { TG.openLink(t.getAttribute("data-read"), { try_instant_view: true }); } catch (x) { openLink(t.getAttribute("data-read")); } } return; }
     if (t.hasAttribute("data-link")) { if (TG) { e.preventDefault(); openLink(t.getAttribute("data-link")); } return; }
     if (t.hasAttribute("data-open")) { go("#m-" + t.getAttribute("data-open")); return; }
