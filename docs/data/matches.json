@@ -1,5 +1,5 @@
 {
- "updated": "2026-11-04T08:57:46Z",
+ "updated": "2026-11-04T10:20:59Z",
  "tiers": [
   "s"
  ],
@@ -12,9 +12,9 @@
    "begin": "2026-11-02T02:00:00Z",
    "end": "2026-11-08T12:30:00Z",
    "prize": "1,250,000 United States Dollar",
-   "matches": 9,
-   "next": "2026-11-04T09:30:00Z",
-   "live": 1,
+   "matches": 8,
+   "next": "2026-11-06T06:30:00Z",
+   "live": 2,
    "hltv": {
     "prize": 1250000,
     "player_share": 300000,
@@ -680,7 +680,7 @@
     "hltv": "https://www.hltv.org/events/8245/iem-beijing-2026"
    },
    "prize_usd": 1250000,
-   "results": 21
+   "results": 22
   },
   {
    "id": "11137",
@@ -872,83 +872,9 @@
  ],
  "matches": [
   {
-   "id": 1781476,
-   "begin_at": "2026-11-04T07:04:32Z",
-   "status": "running",
-   "bo": 3,
-   "name": "Lower Bracket Final: TL vs BB",
-   "tournament": "IEM Beijing 2026",
-   "stage": "Group B · Lower Bracket Final",
-   "tier": "s",
-   "serie": {
-    "id": 11136,
-    "begin": "2026-11-02T02:00:00Z",
-    "end": "2026-11-08T12:30:00Z",
-    "image": null,
-    "prize": null
-   },
-   "teams": [
-    {
-     "id": 3213,
-     "name": "Liquid",
-     "acronym": "TL",
-     "slug": "liquid-cs-go",
-     "image": "https://cdn-api.pandascore.co/images/team/image/3213/463px_team_liquid_2024_full_lightmode.png",
-     "location": "US"
-    },
-    {
-     "id": 133458,
-     "name": "BetBoom Team",
-     "acronym": "BB",
-     "slug": "betboom-team-cs-go",
-     "image": "https://cdn-api.pandascore.co/images/team/image/133458/bet_boom_team_2024_allmode.png",
-     "location": "RU"
-    }
-   ],
-   "stream": "https://www.twitch.tv/bysl4m",
-   "has_detail": true
-  },
-  {
-   "id": 1781468,
-   "begin_at": "2026-11-04T09:30:00Z",
-   "status": "not_started",
-   "bo": 3,
-   "name": "Lower Bracket Final: NAVI vs FAL",
-   "tournament": "IEM Beijing 2026",
-   "stage": "Group A · Lower Bracket Final",
-   "tier": "s",
-   "serie": {
-    "id": 11136,
-    "begin": "2026-11-02T02:00:00Z",
-    "end": "2026-11-08T12:30:00Z",
-    "image": null,
-    "prize": null
-   },
-   "teams": [
-    {
-     "id": 3216,
-     "name": "Natus Vincere",
-     "acronym": "NAVI",
-     "slug": "natus-vincere-cs-go",
-     "image": "https://cdn-api.pandascore.co/images/team/image/3216/1022px_natus_vincere_2021_lightmode.png",
-     "location": "UA"
-    },
-    {
-     "id": 130564,
-     "name": "Team Falcons",
-     "acronym": "FAL",
-     "slug": "falcons-esports",
-     "image": "https://cdn-api.pandascore.co/images/team/image/130564/team_falconslogo_square.png",
-     "location": "SA"
-    }
-   ],
-   "stream": "https://www.twitch.tv/ESLCS",
-   "has_detail": true
-  },
-  {
    "id": 1781463,
-   "begin_at": "2026-11-04T09:30:00Z",
-   "status": "not_started",
+   "begin_at": "2026-11-04T09:33:22Z",
+   "status": "running",
    "bo": 3,
    "name": "Upper Bracket Final: MGLZ vs FURIA",
    "tournament": "IEM Beijing 2026",
@@ -980,6 +906,43 @@
     }
    ],
    "stream": "https://www.twitch.tv/watchfulTVb",
+   "has_detail": true
+  },
+  {
+   "id": 1781468,
+   "begin_at": "2026-11-04T10:20:41Z",
+   "status": "running",
+   "bo": 3,
+   "name": "Lower Bracket Final: NAVI vs FAL",
+   "tournament": "IEM Beijing 2026",
+   "stage": "Group A · Lower Bracket Final",
+   "tier": "s",
+   "serie": {
+    "id": 11136,
+    "begin": "2026-11-02T02:00:00Z",
+    "end": "2026-11-08T12:30:00Z",
+    "image": null,
+    "prize": null
+   },
+   "teams": [
+    {
+     "id": 3216,
+     "name": "Natus Vincere",
+     "acronym": "NAVI",
+     "slug": "natus-vincere-cs-go",
+     "image": "https://cdn-api.pandascore.co/images/team/image/3216/1022px_natus_vincere_2021_lightmode.png",
+     "location": "UA"
+    },
+    {
+     "id": 130564,
+     "name": "Team Falcons",
+     "acronym": "FAL",
+     "slug": "falcons-esports",
+     "image": "https://cdn-api.pandascore.co/images/team/image/130564/team_falconslogo_square.png",
+     "location": "SA"
+    }
+   ],
+   "stream": "https://www.twitch.tv/strogo",
    "has_detail": true
   },
   {
@@ -1432,16 +1395,17 @@
   }
  ],
  "meta": {
-  "panda_requests": 12,
-  "bo3_requests": 27,
+  "panda_requests": 10,
+  "bo3_requests": 26,
   "liquipedia_requests": 0,
-  "translations": 6,
+  "translations": 2,
   "warnings": [
+   "GigaChat: URLError(TimeoutError('timed out'))",
    "HLTV /team/4608/natus-vincere: <HTTPError 403: 'Forbidden'>"
   ],
-  "hltv_requests": 2,
-  "dust2_requests": 12,
-  "giga_calls": 51,
-  "giga_tokens": 75969
+  "hltv_requests": 4,
+  "dust2_requests": 6,
+  "giga_calls": 47,
+  "giga_tokens": 66697
  }
 }
