@@ -1380,12 +1380,12 @@ def valve_links() -> dict:
             m = re.search(r"\((details/[^)]+)\)", line)
             if len(c) > 4 and c[1].isdigit() and m:
                 out.setdefault(norm(c[3]), f"{NOW.year}/" + m.group(1))
-        return out or None
-    return hltv_cached("valvelinks", fn) or {}
+        return {"date": glob[17:27].replace("_", "-"), "links": out} if out else None
+    return hltv_cached("valvelinks2", fn) or {}
 
 
 def valve_detail(name: str) -> dict | None:
-    links = valve_links()
+    links = valve_links().get("links") or {}
     path = links.get(norm(name)) or next((v for k, v in links.items() if len(k) >= 3 and (k in norm(name) or norm(name) in k)), None)
     if not path:
         return None
@@ -1412,22 +1412,37 @@ def valve_detail(name: str) -> dict | None:
     return hltv_cached("valvedet:" + path, fn)
 
 
-def vrs_outcomes_valve(a: dict, b: dict, table: list[dict], lan: bool = True) -> dict | None:
+def vrs_outcomes_valve(a: dict, b: dict, table: list[dict], lan: bool = True, hists: list | None = None, bids: list | None = None) -> dict | None:
     """Как HLTV: победитель получает очки за личную встречу и за улучшение своих факторов (баунти, сеть соперников, LAN),
     проигравший — только поправку за личную встречу. Факторы — из официального разбора Valve на начало месяца."""
     da, db = valve_detail(a["name"]), valve_detail(b["name"])
     if not da or not db:
         return None
-    def top(vals, v):
-        return sum(sorted(vals + [v], reverse=True)[:10]) / 10
+    da, db = dict(da, bc=list(da["bc"]), net=list(da["net"]), lanl=list(da["lanl"])), dict(db, bc=list(db["bc"]), net=list(db["net"]), lanl=list(db["lanl"]))
+    def top(vals, v=None):
+        return sum(sorted(vals + ([v] if v is not None else []), reverse=True)[:10]) / 10
+    def seed_of(W, extra=None):
+        bc = valve_curve(top(W["bc"], extra and extra[0]))
+        net = top(W["net"], extra and extra[1])
+        ln = top(W["lanl"], extra and extra[2])
+        avg = (W["offered"] + bc + net + ln) / 4
+        return min(2000.0, 400 + (avg - W["min"]) / max(1e-6, W["max"] - W["min"]) * 1600)
+    # победы после снимка Valve (например, на идущем турнире) — добавляем, чтобы факторы были как сейчас
+    snap = (valve_links().get("date") or "")
+    for W, bid, hist in zip((da, db), bids or [None, None], hists or [[], []]):
+        if not bid:
+            continue
+        for m in hist or []:
+            if (m.get("start_date") or "")[:10] <= snap or m.get("winner_team_id") != bid:
+                continue
+            opp = valve_detail(opp_of(m, bid).get("name") or "")
+            if opp:
+                W["bc"].append(opp["offered"]); W["net"].append(opp["network"])
+                W["lanl"].append(1.0 if (m.get("tier") or "").lower() == "s" else 0.0)
+        W["seed0"] = seed_of(W)
     def gain(W, L):
-        bc = valve_curve(top(W["bc"], L["offered"]))
-        net = top(W["net"], L["network"])
-        ln = top(W["lanl"], 1.0) if lan else W["lan"]
-        avg = (W["offered"] + max(bc, W["collected"]) + max(net, W["network"]) + max(ln, W["lan"])) / 4
-        seed = 400 + (avg - W["min"]) / max(1e-6, W["max"] - W["min"]) * 1600
-        return max(0.0, min(2000.0, seed) - W["seed"])
-    ea = 1 / (1 + 10 ** ((db["seed"] - da["seed"]) / 400))
+        return max(0.0, seed_of(W, (L["offered"], L["network"], 1.0 if lan else 0.0)) - W["seed0"])
+    ea = 1 / (1 + 10 ** ((db["seed0"] - da["seed0"]) / 400))
     res = {}
     for win in (0, 1):
         if win == 0:
@@ -3677,7 +3692,7 @@ def build_detail(m: dict, prev: dict | None) -> dict:
             warn(f"Призовые места {t.get('name')}: {e!r}")
     if len(rows) == 2 and all(rows):
         try:
-            detail["vrs_outcomes"] = vrs_outcomes_valve(rows[0], rows[1], table) or vrs_outcomes(rows[0], rows[1], table)
+            detail["vrs_outcomes"] = vrs_outcomes_valve(rows[0], rows[1], table, hists=hists, bids=bids) or vrs_outcomes(rows[0], rows[1], table)
         except Exception as e:
             warn(f"VRS прогноз: {e!r}")
             detail["vrs_outcomes"] = vrs_outcomes(rows[0], rows[1], table)
