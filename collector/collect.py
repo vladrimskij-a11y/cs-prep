@@ -2373,7 +2373,7 @@ def attach_major(tour_list: list, rosters: dict) -> None:
 
 VETO_CACHE_F = CACHE / "hltv_vetoes.json"
 veto_cache: dict = load_json(VETO_CACHE_F, {})   # "match:<id>" → вето навсегда; "results:<team>" → список матчей на 12 ч
-VETO_NEW_LIMIT = int(os.environ.get("VETO_NEW_LIMIT", "60"))  # вето берём с dust2.us (сайт-партнёр HLTV, та же база)
+VETO_NEW_LIMIT = int(os.environ.get("VETO_NEW_LIMIT", "120"))  # вето берём с dust2.us (сайт-партнёр HLTV, та же база)
 D2 = "https://www.dust2.us"
 _d2_blocked = [False]
 _d2_last = [0.0]
@@ -2397,7 +2397,8 @@ def d2_get(path: str) -> str | None:
     except Exception as e:
         warn(f"dust2 {path}: {e!r}")
     return None
-VETO_MATCHES = 20
+VETO_MATCHES = 20    # для сводки «что пикает / банит» хватает последних 20
+VETO_LIST = 100      # а для вето прошедших серий берём всю первую страницу результатов HLTV (~полгода)
 _veto_new = [0]
 hltv_team_ids: dict = {}   # norm(название) → {"id","slug","name"}
 
@@ -2415,7 +2416,7 @@ def hltv_team_for(t: dict) -> dict | None:
 
 
 def hltv_team_matches(team: dict) -> list[dict]:
-    key = f"results3:{team['id']}"
+    key = f"results4:{team['id']}"
     c = veto_cache.get(key)
     if c and (parse_iso(c.get("t")) or NOW) > NOW - timedelta(hours=12):
         return c["data"]
@@ -2442,7 +2443,7 @@ def hltv_team_matches(team: dict) -> list[dict]:
                 except ValueError:
                     day = None
             out.append({"id": mid, "slug": slug, "day": day})
-        if len(out) >= VETO_MATCHES:
+        if len(out) >= VETO_LIST:
             break
     veto_cache[key] = {"t": iso(NOW), "data": out}
     return out
@@ -2493,7 +2494,7 @@ def build_veto(teams: list[dict]) -> dict | None:
             res.append(None)
             continue
         picks, bans, first_bans, n, deciders = {}, {}, {}, 0, {}
-        for mt in hltv_team_matches(ht):
+        for mt in hltv_team_matches(ht)[:VETO_MATCHES]:
             v = hltv_veto(mt)
             if not v or not v.get("steps"):
                 continue
@@ -4045,6 +4046,13 @@ def main() -> int:
                 hltv_player_ids[norm(p["nick"])] = {"id": p["id"], "slug": p["slug"]}
         for tn, ti in (ex.get("team_ids") or {}).items():
             hltv_team_ids[norm(tn)] = {**ti, "name": tn}
+    if not STATS:  # команды из рейтинга Valve тоже: нужны для вето прошедших турниров
+        try:
+            for r in vrs_table():
+                if r.get("hltv") and r.get("name"):
+                    hltv_team_ids.setdefault(norm(r["name"]), {**r["hltv"], "name": r["name"]})
+        except Exception as e:
+            warn(f"VRS для вето: {e!r}")
     listing = []
     keep_ids = set()
     for m in matches:
@@ -4133,8 +4141,21 @@ def main() -> int:
         fid = re.sub(r"[^\w-]", "-", str(tr["id"]))
         path = OUT / "results" / f"{fid}.json"
         if e and e < NOW - timedelta(days=2) and path.exists():
-            keep_res.add(path.name)  # итоги давно закончившегося турнира уже не меняются
-            tr["results"] = len((load_json(path, {}) or {}).get("matches") or [])
+            keep_res.add(path.name)  # итоги давно закончившегося турнира уже не меняются, кроме недостающего вето
+            rj = load_json(path, {}) or {}
+            if not STATS:
+                added = 0
+                for sd in rj.get("matches") or []:
+                    if not sd.get("veto"):
+                        sd.pop("veto", None)
+                        try:
+                            attach_veto(sd)
+                        except Exception as ex:
+                            warn(f"Вето итога: {ex!r}")
+                        added += bool(sd.get("veto"))
+                if added:
+                    save_json(path, rj)
+            tr["results"] = len(rj.get("matches") or [])
             continue
         try:
             res = build_results(tr)
