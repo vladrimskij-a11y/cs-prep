@@ -11,32 +11,25 @@ def get(url, h=None):
         return "ERR " + repr(e)
 def show(title, s, n=1500):
     print("=====", title); print(s[:n]); print()
-G = "https://api.github.com/repos/ValveSoftware/counter-strike_regional_standings/contents/live/2026"
-L = json.loads(get(G))
-names = sorted(x["name"] for x in L if x["type"] == "file")
-print("NEWEST", names[-8:])
-glob = [n for n in names if "global" in n][-1]
-md = get("https://raw.githubusercontent.com/ValveSoftware/counter-strike_regional_standings/main/live/2026/" + glob)
-show("global md", md, 2500)
-eu = [n for n in names if "europe" in n][-1]
-show("europe md", get("https://raw.githubusercontent.com/ValveSoftware/counter-strike_regional_standings/main/live/2026/" + eu), 1200)
-D = json.loads(get(G + "/details"))
-print("DETAILS", [x["name"] for x in D][-5:], len(D))
-if D:
-    last = sorted(x["name"] for x in D)[-1]
-    sub = json.loads(get(G + "/details/" + last)) if not last.endswith(".md") else None
-    if isinstance(sub, list):
-        print("SUB", [x["name"] for x in sub][:10], len(sub))
-        f = [x for x in sub if x["type"] == "file"][0]
-        show("detail file", get(f["download_url"]), 5000)
-    else:
-        show("detail", get(D[-1]["download_url"] or ""), 5000)
-h = get("https://www.hltv.org/valve-ranking/teams")
-i = h.find("ranked-team")
-show("hltv vrs block", re.sub(r"\s+", " ", h[i-200:i+3500]), 3700)
+def ctx(h, pat, w=1500, k=3):
+    out = []
+    for m in list(re.finditer(pat, h))[:k]:
+        out.append(re.sub(r"\s+", " ", h[max(0, m.start()-300):m.start()+w]))
+    return "\n---\n".join(out)
 t = get("https://www.hltv.org/team/9565/vitality")
-print("TEAM LEN", len(t), t[:80])
-j = t.find("achievement")
-show("hltv team achievements", re.sub(r"\s+", " ", t[j:j+3000]), 3000)
-B = "https://api.bo3.gg/api/v1"
-show("bo3 tournament stage rounds names", re.sub(r'"bet_updates":\{.*?\]\},', '', get(B + "/tournaments/intel-extreme-masters-beijing-2026"))[4000:9000], 5000)
+i = t.find('id="achievementsBox"')
+show("achievements box", re.sub(r"<img[^>]*>", "", re.sub(r"\s+", " ", t[i:i+6000])), 6000)
+links = re.findall(r'href="(/matches/\d+/[^"]+)"', t)
+print("MATCH LINKS", links[:5])
+time = __import__("time")
+for L in links[:1]:
+    time.sleep(3)
+    h = get("https://www.hltv.org" + L)
+    print("MATCH", L, len(h), h[:60])
+    show("vrs ctx", ctx(h, r"(?i)vrs|valve ranking|points", 1200, 5), 8000)
+time.sleep(3)
+h = get("https://www.hltv.org/results?event=8000")
+print("RESULTS", len(h), h[:60])
+time.sleep(3)
+h = get("https://www.hltv.org/matches")
+print("MATCHES", len(h), h[:60])
