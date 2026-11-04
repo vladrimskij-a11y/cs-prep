@@ -2453,7 +2453,7 @@ def d2_get(path: str) -> str | None:
         warn(f"dust2 {path}: {e!r}")
     return None
 VETO_MATCHES = 20    # для сводки «что пикает / банит» хватает последних 20
-VETO_LIST = 100      # а для вето прошедших серий берём всю первую страницу результатов HLTV (~полгода)
+VETO_LIST = VETO_MATCHES
 _veto_new = [0]
 hltv_team_ids: dict = {}   # norm(название) → {"id","slug","name"}
 
@@ -3725,26 +3725,7 @@ def attach_veto(sd: dict) -> None:
             if v and v.get("steps") and vd and abs((vd - d0).total_seconds()) < 40 * 3600:
                 sd["veto"] = v["steps"]
                 return
-    # 2) старше — список матчей команды с HLTV
-    for i in (0, 1):
-        ht = hltv_team_for({"name": names[i]})
-        if not ht:
-            continue
-        opp = norm(names[1 - i])
-        opp2 = norm(re.sub(r"^(the|team)\s+|\s+(team|esports|gaming)$", "", names[1 - i], flags=re.IGNORECASE))
-        for mt in hltv_team_matches(ht):
-            sl = norm(mt.get("slug"))
-            if not ((opp and opp in sl) or (opp2 and len(opp2) >= 3 and opp2 in sl)):
-                continue
-            v = veto_cache.get(f"match:{mt['id']}")
-            if not (v and any(x.get("team") for x in v.get("steps") or [])):
-                v = None if STATS else hltv_veto(mt)
-            vd = parse_iso((v or {}).get("date"))
-            if not vd and mt.get("day"):
-                vd = parse_iso(mt["day"] + "T12:00:00Z")
-            if v and v.get("steps") and vd and abs((vd - d0).total_seconds()) < 40 * 3600:
-                sd["veto"] = v["steps"]
-                return
+    # старше месяца не ищем: владельцу не нужно, а это лишние запросы к HLTV
 
 
 def bo3_odds(bids: list) -> dict | None:
