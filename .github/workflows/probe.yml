@@ -4,21 +4,32 @@ jobs:
   p:
     runs-on: ubuntu-latest
     steps:
-      - env:
-          T: ${{ secrets.PANDASCORE_TOKEN }}
-        run: |
+      - run: |
           python3 - <<'X'
-          import json, os, urllib.request
-          def get(u, h={}):
-              r = urllib.request.urlopen(urllib.request.Request(u, headers={"Accept": "application/json", "User-Agent": "Mozilla/5.0", **h}), timeout=30)
-              return json.loads(r.read())
-          H = {"Authorization": "Bearer " + os.environ["T"]}
-          for path in ("running", "upcoming"):
-              for t in get(f"https://api.pandascore.co/csgo/tournaments/{path}?per_page=100", H):
-                  if (t.get("tier") or "").lower() not in ("s", "a"): continue
-                  tm = t.get("teams")
-                  print("PR: PS", path, t.get("tier"), (t.get("league") or {}).get("name"), (t.get("serie") or {}).get("full_name"), "|", t.get("name"), "| teams", None if tm is None else len(tm), [x.get("name") for x in (tm or [])][:4], "| serie", t.get("serie_id"))
-          j = get("https://api.bo3.gg/api/v1/tournaments?page[limit]=30&sort=start_date&filter[tournaments.tier][in]=a,s&filter[tournaments.status][in]=upcoming,current")
-          for t in j.get("results") or []:
-              print("PR: BO3", t.get("tier"), t.get("name"), t.get("start_date", "")[:10], "keys", [k for k in t if "team" in k])
+          import json, urllib.request
+          B = "https://api.bo3.gg/api/v1"
+          def get(u):
+              try:
+                  r = urllib.request.urlopen(urllib.request.Request(u, headers={"Accept": "application/json", "User-Agent": "Mozilla/5.0"}), timeout=30)
+                  return json.loads(r.read())
+              except Exception as e:
+                  print("PR: ERR", u, e); return None
+          for tid in (5109, 5111, 4204, 5338):
+              j = get(f"{B}/tournaments?filter[tournaments.id][eq]={tid}")
+              t = ((j or {}).get("results") or [{}])[0]
+              print("PR: PAST", tid, t.get("name"), "tier", t.get("tier"), "tier_rank", t.get("tier_rank"))
+          j = get(f"{B}/tournaments?page[limit]=30&sort=start_date&filter[tournaments.tier][in]=a&filter[tournaments.status][in]=upcoming,current")
+          for t in (j or {}).get("results") or []:
+              print("PR: A", t.get("id"), t.get("slug"), t.get("name"), "tp", json.dumps(t.get("teams_prize"))[:200])
+              d = get(f"{B}/tournaments/{t.get('slug')}")
+              if d:
+                  print("PR:   keys", sorted(d.keys()))
+                  for k in d:
+                      if "team" in k or "partic" in k:
+                          print("PR:  ", k, json.dumps(d[k])[:300])
+              for u in (f"{B}/tournaments/{t.get('slug')}/teams", f"{B}/teams?filter[teams.tournament_id][eq]={t.get('id')}&page[limit]=5",
+                        f"{B}/tournament_teams?filter[tournament_teams.tournament_id][eq]={t.get('id')}&page[limit]=40"):
+                  x = get(u)
+                  if x: print("PR:   OK", u, json.dumps(x)[:400])
+              break
           X
