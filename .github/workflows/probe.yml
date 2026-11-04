@@ -1,0 +1,27 @@
+name: probe
+on: { workflow_dispatch: {} }
+jobs:
+  p:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          python3 - <<'X'
+          import re, time, urllib.request
+          UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
+          def get(p):
+              time.sleep(1.2)
+              try:
+                  r = urllib.request.urlopen(urllib.request.Request("https://www.dust2.us" + p, headers={"User-Agent": UA, "Accept": "text/html", "Accept-Language": "en-US,en;q=0.9"}), timeout=40)
+                  return r.status, r.read().decode("utf-8", "replace")
+              except Exception as e:
+                  return str(e), ""
+          for p in ("/results", "/results?offset=100", "/results?offset=1000", "/results?offset=4000", "/results?offset=8000", "/results?page=2"):
+              st, h = get(p)
+              ids = re.findall(r'href="/matches/(\d+)/([^"#?]+)"', h)
+              heads = re.findall(r'Results for (\w+ \d+\w* \d{4})', h)
+              unix = re.findall(r'data-unix="(\d+)"', h)
+              print("PR|", p, st, "len", len(h), "matches", len(ids), "heads", heads[:1], heads[-1:], "unix", unix[:1], unix[-1:], "ex", ids[:2])
+          st, h = get("/results")
+          i = h.find('/matches/')
+          print("PR| snippet", re.sub(r"\s+", " ", h[max(0, i - 600):i + 900]))
+          X
