@@ -1,11 +1,12 @@
 import sys, json
 sys.path.insert(0, "collector")
 import collect as c
-tab = [{"name": "PARIVISION", "points": 1661, "rank": 11}, {"name": "Natus Vincere", "points": 1731, "rank": 8}, {"name": "FURIA", "points": 1938, "rank": 2}, {"name": "BETBOOM", "points": 1840, "rank": 5}]
-for i in range(30): tab.append({"name": f"x{i}", "points": 2000 - i * 15, "rank": 0})
-def bid(n):
-    return c.bo3_team_id({"id": "n:" + n, "name": n})
-for a, b in ((0, 1), (2, 3)):
-    ids = [bid(tab[a]["name"]), bid(tab[b]["name"])]
-    hs = [c.bo3_history(x, pages=1) if x else [] for x in ids]
-    print(tab[a]["name"], tab[b]["name"], ids, json.dumps(c.vrs_outcomes_valve(tab[a], tab[b], tab, hists=hs, bids=ids), ensure_ascii=False))
+for n in ("PARIVISION", "Natus Vincere"):
+    d = c.valve_detail(n)
+    print(n, d["seed"], d["collected"], d["network"], d["lan"], "bc", sorted(d["bc"], reverse=True)[:12], "net", sorted(d["net"], reverse=True)[:12], "lan", sorted(d["lanl"], reverse=True)[:12])
+    top = lambda v: sum(sorted(v, reverse=True)[:10]) / 10
+    avg = (d["offered"] + c.valve_curve(top(d["bc"])) + top(d["net"]) + top(d["lanl"])) / 4
+    print("  recomputed seed", 400 + (avg - d["min"]) / (d["max"] - d["min"]) * 1600, "curve", c.valve_curve(top(d["bc"])))
+bid = 8171
+for m in c.bo3_history(bid, pages=1)[:8]:
+    print(m.get("start_date"), c.opp_of(m, bid).get("name"), m.get("winner_team_id") == bid, m.get("tier"))

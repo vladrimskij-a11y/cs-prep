@@ -1430,6 +1430,7 @@ def vrs_outcomes_valve(a: dict, b: dict, table: list[dict], lan: bool = True, hi
     # победы после снимка Valve (например, на идущем турнире) — добавляем, чтобы факторы были как сейчас
     snap = (valve_links().get("date") or "")
     for W, bid, hist in zip((da, db), bids or [None, None], hists or [[], []]):
+        W["seed0"] = seed_of(W)
         if not bid:
             continue
         for m in hist or []:
