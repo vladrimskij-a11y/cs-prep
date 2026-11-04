@@ -498,12 +498,12 @@ html { overflow-anchor: none; }
 .mini .mo i { font-style: normal; font-family: var(--mono); font-size: 9.5px; padding: 1px 4px; border-radius: 4px; color: #0b0d12; }
 .mo i.g { background: #4cc283; } .mo i.y { background: #e3c545; } .mo i.o { background: #e39a45; } .mo i.r { background: #ff6b62; }
 .mini small { letter-spacing: 0; }
-.ovl.sov { overflow: hidden; display: flex; flex-direction: column; }
+.ovl.sov { overflow-y: auto; }  /* страница серии листается целиком, шапка уезжает вместе с ней */
 .ov-head { flex: none; }
 .ov-head > .pin { padding-bottom: 6px; }
-.ov-vp { flex: 1; min-height: 0; overflow: hidden; }
-.ov-track { display: flex; height: 100%; will-change: transform; }
-.opane { flex: 0 0 100%; width: 100%; height: 100%; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+.ov-vp { overflow: hidden; }
+.ov-track { display: flex; align-items: flex-start; will-change: transform; }
+.opane { flex: 0 0 100%; width: 100%; }
 .opane > .pin { max-width: 640px; margin: 0 auto; padding: 0 max(16px, env(safe-area-inset-right, 0px)) calc(48px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); }
 .sres .pp-maps { padding: 0; }
 .pp-m.left { background: transparent; border: 1px dashed var(--line); }
@@ -1832,6 +1832,7 @@ a.ni { text-decoration: none; color: inherit; }
     var n = tr.children.length; i = Math.max(0, Math.min(n - 1, i)); O.i = i;
     tr.style.transition = anim ? "transform .24s cubic-bezier(.2,.7,.3,1)" : "none";
     tr.style.transform = "translate3d(" + (-i * O.el.clientWidth) + "px,0,0)";
+    var pn = tr.children[i]; tr.style.height = pn ? pn.offsetHeight + "px" : "";  // высота — по открытой карте, без пустоты снизу
     O.el.querySelectorAll("[data-smap]").forEach(function (b) { b.setAttribute("aria-pressed", String(Number(b.getAttribute("data-smap")) === i)); });
     revealSel(O.el.querySelector(".sfilt"));
   }
@@ -2380,15 +2381,14 @@ a.ni { text-decoration: none; color: inherit; }
     try { TG && (state.ovl || h ? TG.BackButton.show() : TG.BackButton.hide()); } catch (e) {}
   }
   function openSeries(S, label, reload) { openOverlay("series", S, seriesView(S, label)); state.ovl.el.classList.add("sov"); state.ovl.i = 0; state.ovl.label = label; state.ovl.reload = reload || null; ovTrackTo(0, false); }
-  function ovPane() { var O = state.ovl; return O && O.el.querySelectorAll(".opane")[O.i || 0]; }
   function refreshOverlay() {  // потянуть вниз на странице серии — перечитать её, не закрывая
     var O = state.ovl; state.refreshing = true;
     ptrShow(56, "Обновляю…", true);
     O.reload().then(function (S2) {
       if (!S2 || state.ovl !== O) return;
-      var i = O.i || 0, st = ovPane() ? ovPane().scrollTop : 0;
+      var i = O.i || 0, st = O.el.scrollTop;
       O.el.innerHTML = seriesView(S2, O.label); O.key = S2; ovTrackTo(i, false);
-      if (ovPane()) ovPane().scrollTop = st;
+      O.el.scrollTop = st;
     }).catch(function () {}).then(function () { setTimeout(function () { state.refreshing = false; ptrHide(); }, 400); });
   }
 
@@ -2400,16 +2400,15 @@ a.ni { text-decoration: none; color: inherit; }
     var sc = e.target.closest(".filt");
     if (sc && sc.scrollWidth > sc.clientWidth + 2) return;
     rs = { x: e.touches[0].clientX, y: e.touches[0].clientY, t: Date.now(), dx: 0, lock: null, v: state.ovl.el, tr: state.ovl.el.querySelector(".ov-track"), i: state.ovl.i || 0 };
-    if (e.target.closest(".ov-head")) { rs.pane = ovPane(); rs.st = rs.pane ? rs.pane.scrollTop : 0; }  // шапка стоит, но жест по ней листает страницу
   }, { passive: true });
   document.addEventListener("touchmove", function (e) {
     if (!rs) return;
     var dx = e.touches[0].clientX - rs.x, dy = e.touches[0].clientY - rs.y;
-    if (rs.lock === "v") { if (rs.pane) rs.pane.scrollTop = rs.st - dy; return; }
+    if (rs.lock === "v") return;
     if (!rs.lock) {
       var n0 = rs.tr ? rs.tr.children.length : 1;
       if (Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy) * 1.5 && (dx > 0 || n0 > 1)) rs.lock = "h";
-      else if (Math.abs(dy) > 10 || dx < -10) { rs.lock = "v"; if (rs.pane) rs.pane.scrollTop = rs.st - dy; return; }
+      else if (Math.abs(dy) > 10 || dx < -10) { rs.lock = "v"; return; }
       else return;
     }
     var n = rs.tr ? rs.tr.children.length : 1, next = rs.i + (dx < 0 ? 1 : -1);
@@ -2490,7 +2489,7 @@ a.ni { text-decoration: none; color: inherit; }
   // ---------- потянуть вниз в самом верху — обновить данные
   var pr = null, prEl = null;
   function atTop() {
-    if (state.ovl) { var op = state.ovl.reload && ovPane(); return !!op && op.scrollTop <= 0; }
+    if (state.ovl) { return !!state.ovl.reload && state.ovl.el.scrollTop <= 0; }
     if (state.openId) { var p = activePane(); return !!p && p.scrollTop <= 0; }
     if (SH && q(".sshell")) { var sp = shellPane(); return !!sp && sp.scrollTop <= 0; }
     return window.scrollY <= 0;
