@@ -794,7 +794,12 @@ a.ni { text-decoration: none; color: inherit; }
     return dm(s);
   }
   function abbr(t) { return t ? (t.acronym || t.name || "TBD") : "TBD"; }
+  var CC_FIX = { UK: "GB", EN: "GB", EL: "GR" };  // источники пишут UK — у флага Британии код GB
+  var CC_SUB = { "GB-ENG": "\uD83C\uDFF4\uDB40\uDC67\uDB40\uDC62\uDB40\uDC65\uDB40\uDC6E\uDB40\uDC67\uDB40\uDC7F", "GB-SCT": "\uD83C\uDFF4\uDB40\uDC67\uDB40\uDC62\uDB40\uDC73\uDB40\uDC63\uDB40\uDC74\uDB40\uDC7F", "GB-WLS": "\uD83C\uDFF4\uDB40\uDC67\uDB40\uDC62\uDB40\uDC77\uDB40\uDC6C\uDB40\uDC73\uDB40\uDC7F" };
   function flag(cc) {
+    cc = String(cc || "").toUpperCase();
+    if (CC_SUB[cc]) return CC_SUB[cc];
+    cc = CC_FIX[cc] || cc;
     if (!cc || cc.length !== 2) return "";
     return String.fromCodePoint.apply(null, cc.toUpperCase().split("").map(function (c) { return 127397 + c.charCodeAt(0); }));
   }

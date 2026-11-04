@@ -1731,6 +1731,8 @@ def prize_places(hltv_team: dict | None, hist: list[dict], days: int = 92) -> li
                     and (not ya or not re.findall(r"20\d\d", n) or ya[-1] == re.findall(r"20\d\d", n)[-1])), None)
         if hit:
             out.append({"place": a["place"], "event": a["event"], "date": hit})
+        elif ya and ya[-1] == str(NOW.year):  # турнира нет в истории bo3, но по названию он этого года — трофей всё равно засчитываем
+            out.append({"place": a["place"], "event": a["event"], "date": f"{NOW.year}-01-01"})
     return out
 
 
@@ -4093,6 +4095,7 @@ def build_detail(m: dict, prev: dict | None) -> dict:
 
 
 TEAM_GAMES_NEW = [0]
+_team_pron_new = [0]  # команд за сбор, для которых просим у нейросети русские имена
 _team_lp_new = [0]
 
 
@@ -4163,6 +4166,15 @@ def build_team_page(r: dict) -> dict | None:
                     p["name_ru"] = pc["name_ru"]
         except Exception as e:
             warn(f"Состав {r['name']}: {e!r}")
+    # имена по-русски для всех, у кого есть настоящее имя (нейросеть один раз на человека, дальше — кэш навсегда)
+    if roster and not STATS and _team_pron_new[0] < 30:
+        need = [p for p in roster + coach if (p.get("first_name") or p.get("last_name") or p.get("name")) and not p.get("name_ru")]
+        if need:
+            _team_pron_new[0] += 1
+            try:
+                add_pronunciation(need)
+            except Exception as e:
+                warn(f"Имена по-русски {r['name']}: {e!r}")
     if not roster and players:  # состава с Liquipedia нет — строим строки из игроков bo3, чтобы было как во вкладке «Игроки»
         roster = [{"nick": n if isinstance(n, str) else (n.get("nick") or "")} for n in players]
         roster = [p for p in roster if p["nick"]]
