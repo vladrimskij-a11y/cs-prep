@@ -1300,6 +1300,8 @@ def build_results(tr: dict) -> dict | None:
     T = bo3_tournament_for(tr["name"])
     if not T:
         return None
+    prev_res = load_json(OUT / "results" / (re.sub(r"[^\w-]", "-", str(tr["id"])) + ".json"), {}) or {}
+    prev_veto = {str(x.get("id")): x["veto"] for x in prev_res.get("matches") or [] if x.get("veto")}  # найденное вето не теряем
     out, stages = [], []
     for st in sorted(T.get("stages") or [], key=lambda x: x.get("sequence_number") or 0):
         stage = re.sub(re.escape(T.get("name") or "") + r"\s*", "", st.get("title") or "").strip() or None
@@ -1330,6 +1332,8 @@ def build_results(tr: dict) -> dict | None:
                     warn(f"Итог матча {m.get('id')}: {e!r}")
                     d = None
                 if d:
+                    if prev_veto.get(str(d.get("id"))):
+                        d["veto"] = prev_veto[str(d.get("id"))]
                     try:
                         attach_veto(d)
                     except Exception as e:
@@ -4109,7 +4113,7 @@ def main() -> int:
         print("Нет PANDASCORE_TOKEN. Добавь его в Settings → Secrets → Actions.", file=sys.stderr)
         return 1
     if STATS:  # быстрый сбор: только то, что бесплатно и не блокируют
-        _hltv_blocked[0] = _lp_blocked[0] = _d2_blocked[0] = True
+        _hltv_blocked[0] = _lp_blocked[0] = True  # dust2 не блокирует — вето ищем и в быстром сборе
         _giga["off"] = _gem["off"] = True
     matches = fetch_upcoming()
     # тир-2: оставляем только турниры, где половина участников — уровня тир-1
