@@ -501,6 +501,7 @@ html { overflow-anchor: none; }
 [data-tname] { cursor: pointer; } .tlink { text-decoration: none; }
 .toast { position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--fg); color: var(--bg); padding: 10px 16px; border-radius: 12px; font-size: 13px; z-index: 99; max-width: calc(100vw - 32px); transition: opacity .3s; }
 .toast.out { opacity: 0; }
+.vr-ar { font-style: normal; font-size: .72em; margin-right: 3px; vertical-align: 1px; } .vr-ar.up { color: var(--win); } .vr-ar.dn { color: var(--loss); }
 .stake { padding: 4px 14px; }
 .stk { display: grid; grid-template-columns: 22px 1fr; gap: 8px; padding: 10px 0; border-top: 1px solid var(--line); font-size: 14px; line-height: 1.4; }
 .stk:first-child { border-top: 0; }
@@ -1748,15 +1749,16 @@ a.ni { text-decoration: none; color: inherit; }
   function vrsBlock(m) {
     var O = m.vrs_outcomes, A = m.teams[0] || {}, B = m.teams[1] || {};
     if (!O || !A.vrs || !B.vrs) return "";
-    function cell(x) {
-      return '<span class="vr-c"><b class="num">#' + x.rank + '</b><small class="num ' + (x.delta > 0 ? "up" : x.delta < 0 ? "dn" : "") + '">' + (x.delta > 0 ? "+" : x.delta < 0 ? "−" : "±") + Math.abs(x.delta) + '</small></span>';
+    function cell(x, cur) {  // место после матча: стрелка вверх зелёная, вниз красная
+      var mv = cur && x.rank !== cur ? (x.rank < cur ? '<i class="vr-ar up" aria-label="поднимется">▲</i>' : '<i class="vr-ar dn" aria-label="опустится">▼</i>') : '';
+      return '<span class="vr-c"><b class="num">' + mv + '#' + x.rank + '</b><small class="num ' + (x.delta > 0 ? "up" : x.delta < 0 ? "dn" : "") + '">' + (x.delta > 0 ? "+" : x.delta < 0 ? "−" : "±") + Math.abs(x.delta) + '</small></span>';
     }
     var html = '<div class="sec"><h3>Рейтинг VRS <span>что будет после матча</span></h3><div class="box vrs">' +
       '<div class="vr-r vr-h"><span></span><span>Сейчас</span><span>Победа ' + esc(abbr(A)) + '</span><span>Победа ' + esc(abbr(B)) + '</span></div>';
     [A, B].forEach(function (t, i) {
       html += '<div class="vr-r ' + (i ? "b" : "a") + '"><span class="vr-t">' + esc(abbr(t)) + '</span>' +
         '<span class="vr-c"><b class="num">#' + t.vrs.rank + '</b><small class="num">' + t.vrs.points + '</small></span>' +
-        cell(O.win0[i]) + cell(O.win1[i]) + '</div>';
+        cell(O.win0[i], t.vrs.rank) + cell(O.win1[i], t.vrs.rank) + '</div>';
     });
     return html + '<div class="note">' + (O.model === "valve" ? 'Оценка по модели Valve: победа даёт очки за личную встречу и за силу побеждённого (баунти, сеть соперников, LAN). Считается по коду рейтинга Valve с учётом матчей идущего турнира; от прогноза HLTV обычно отличается на 1–5 очков.' : 'Оценка только по личной встрече.') + '</div></div></div>';
   }
