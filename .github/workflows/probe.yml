@@ -9,10 +9,6 @@ jobs:
           npm pack hltv >/dev/null 2>&1 && tar -xzf hltv-*.tgz && echo "SRC| hltv npm ok"
           git clone -q --depth 1 https://github.com/M3MONs/hltv-scraper-api m3 && echo "SRC| m3 ok"
           git clone -q --depth 1 https://github.com/Gabrielcnetto/HLTV-api go && echo "SRC| go ok"
-          for f in package/lib/endpoints/getPlayer.js package/lib/endpoints/getTeam.js package/lib/endpoints/getEvent.js; do
-            echo "SRC| ===== $f"
-            grep -n -i -E "major|mvp|achievement|trophy|prize|qualif|spot|placement" $f | head -60 | sed 's/^/SRC| /'
-          done
-          echo "SRC| ===== m3 files"; find m3 -name "*.py" | grep -i -E "player|team|event" | head -20 | sed 's/^/SRC| /'
-          grep -rn -i -E "major|mvp|achievement|trophy" --include=*.py m3 | head -60 | sed 's/^/SRC| /'
-          echo "SRC| ===== go"; grep -rn -i -E "major|mvp|achievement|trophy" --include=*.go go | head -40 | sed 's/^/SRC| /'
+          sed -n '90,135p' package/lib/endpoints/getPlayer.js | sed 's/^/SRC| /'
+          cat m3/hltv_scraper/hltv_scraper/spiders/parsers/player_profile_trophies.py | sed 's/^/SRC| /'
+          grep -n -i -B2 -A6 "trophy\|achiev" m3/hltv_scraper/hltv_scraper/spiders/parsers/team_profile.py | head -40 | sed 's/^/SRC| /'
