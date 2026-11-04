@@ -2428,7 +2428,7 @@ def attach_major(tour_list: list, rosters: dict) -> None:
 
 VETO_CACHE_F = CACHE / "hltv_vetoes.json"
 veto_cache: dict = load_json(VETO_CACHE_F, {})   # "match:<id>" → вето навсегда; "results:<team>" → список матчей на 12 ч
-VETO_NEW_LIMIT = int(os.environ.get("VETO_NEW_LIMIT", "120"))  # вето берём с dust2.us (сайт-партнёр HLTV, та же база)
+VETO_NEW_LIMIT = int(os.environ.get("VETO_NEW_LIMIT", "1500"))  # вето берём с dust2.us (сайт-партнёр HLTV, та же база)
 D2 = "https://www.dust2.us"
 _d2_blocked = [False]
 _d2_last = [0.0]
@@ -2437,7 +2437,7 @@ _d2_last = [0.0]
 def d2_get(path: str) -> str | None:
     if _d2_blocked[0]:
         return None
-    wait = 3.0 - (time.time() - _d2_last[0])
+    wait = 1.0 - (time.time() - _d2_last[0])  # dust2 отвечает без отказов; раз в секунду — бережно, но быстро
     if wait > 0:
         time.sleep(wait)
     _d2_last[0] = time.time()
