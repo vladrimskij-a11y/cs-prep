@@ -3070,20 +3070,20 @@ def gemini_call(system: str | None, parts: list, max_tokens: int = 900, json_mod
             return "".join(p.get("text", "") for p in (cand.get("content") or {}).get("parts") or []) or None
         except urllib.error.HTTPError as e:
             msg = e.read()[:300].decode("utf-8", "replace")
-            if e.code == 400 and "thinking" in msg.lower() and _gem["think"]:
+            if e.code == 400 and _gem["think"]:  # облегчённые модели не принимают thinkingConfig («invalid argument»)
                 _gem["think"] = False
                 continue
-            if e.code == 404 and _gem["model"] == GEMINI_LITE and GEMINI_LITE != "gemini-2.5-flash-lite":
-                _gem["model"] = "gemini-2.5-flash-lite"
+            if e.code == 404 and _gem["model"] == GEMINI_LITE and GEMINI_LITE != "gemini-3.1-flash-lite":
+                _gem["model"] = "gemini-3.1-flash-lite"
                 continue
-            if e.code == 404 and _gem["model"] not in ("gemini-2.5-flash", "gemini-2.5-flash-lite"):
+            if e.code == 404 and _gem["model"] not in ("gemini-2.5-flash", "gemini-3.1-flash-lite"):
                 _gem["model"] = "gemini-2.5-flash"
                 continue
             if e.code in (500, 502, 503, 504):  # модель перегружена: подождать, потом перейти на облегчённую
                 if attempt == 0:
                     time.sleep(8)
                     continue
-                if _gem["model"] not in (GEMINI_LITE, "gemini-2.5-flash-lite"):
+                if _gem["model"] not in (GEMINI_LITE, "gemini-3.1-flash-lite"):
                     warn(f"Gemini {_gem['model']} перегружена — переключаюсь на {GEMINI_LITE}")
                     _gem["model"] = GEMINI_LITE
                     continue
@@ -3096,7 +3096,7 @@ def gemini_call(system: str | None, parts: list, max_tokens: int = 900, json_mod
             if e.code == 429 and attempt == 0:
                 time.sleep(25)
                 continue
-            if e.code == 429 and _gem["model"] not in (GEMINI_LITE, "gemini-2.5-flash-lite"):
+            if e.code == 429 and _gem["model"] not in (GEMINI_LITE, "gemini-3.1-flash-lite"):
                 _gem["model"] = GEMINI_LITE  # у облегчённой модели свой дневной лимит
                 continue
             if e.code in (401, 403, 429):
