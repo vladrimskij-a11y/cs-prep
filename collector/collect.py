@@ -1693,11 +1693,12 @@ def tg_fetch_channel(ch: str) -> tuple[str, list[dict]]:
             tm = re.search(r'<time datetime="([^"]+)"', b)
             if not pm or not tm:
                 continue
-            tx = re.search(r'<div class="tgme_widget_message_text[^"]*"[^>]*>(.*?)</div>', b, re.DOTALL)
+            body = tg_text_html(b)
             text = ""
-            if tx:
-                text = re.sub(r"<br\s*/?>", " ZZBRZZ ", tx.group(1))
-                text = strip_html(text).replace(" ZZBRZZ ", "\n").replace("ZZBRZZ", "\n").strip()
+            if body:
+                body = re.sub(r"<(?:blockquote|/blockquote|/p|p)[^>]*>", "<br/>", body)
+                text = re.sub(r"<br\s*/?>", " ZZBRZZ ", body)
+                text = re.sub(r"\n{3,}", "\n\n", strip_html(text).replace(" ZZBRZZ ", "\n").replace("ZZBRZZ", "\n")).strip()
             photos = re.findall(r"tgme_widget_message_photo_wrap[^>]*background-image:url\('([^']+)'\)", b)
             vthumb = re.findall(r"tgme_widget_message_video_thumb[^>]*background-image:url\('([^']+)'\)", b)
             vsrc = re.search(r'<video[^>]+src="([^"]+)"', b)
@@ -1716,6 +1717,19 @@ def tg_fetch_channel(ch: str) -> tuple[str, list[dict]]:
         time.sleep(1)
     posts = [p for p in posts if p["date"] and p["date"] >= since]
     return title, posts
+
+
+def tg_text_html(b: str) -> str | None:
+    """Весь текст поста: внутри бывают вложенные блоки (цитаты, эмодзи), поэтому ищем парный закрывающий тег."""
+    m = re.search(r'<div class="tgme_widget_message_text[^"]*"[^>]*>', b)
+    if not m:
+        return None
+    depth, i = 1, m.end()
+    for t in re.finditer(r"<(/?)div\b[^>]*>", b[i:]):
+        depth += -1 if t.group(1) else 1
+        if depth == 0:
+            return b[i:i + t.start()]
+    return b[i:]
 
 
 def giga_upload(data: bytes, name: str = "image.jpg") -> str | None:
