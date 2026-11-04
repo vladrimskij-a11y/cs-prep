@@ -3731,11 +3731,11 @@ def hltv_player_info(nick: str) -> dict | None:
     pl = hltv_player_ids.get(norm(nick))
     if not pl:
         return None
-    key = f"pinfo3:{pl['id']}"
+    key = f"pinfo4:{pl['id']}"
     c = hltv_cache.get(key)
     if c and (parse_iso(c.get("t")) or NOW) > NOW - timedelta(days=7):
         return c["data"]
-    c = c or hltv_cache.get(f"pinfo2:{pl['id']}") or hltv_cache.get(f"pinfo:{pl['id']}")  # старая запись (без названий мейджоров) — пока не перечитали
+    c = c or hltv_cache.get(f"pinfo3:{pl['id']}") or hltv_cache.get(f"pinfo2:{pl['id']}") or hltv_cache.get(f"pinfo:{pl['id']}")  # старая запись (без названий мейджоров) — пока не перечитали
     if _mvp_new[0] >= 60 or _hltv_blocked[0] or STATS:
         return c["data"] if c else None
     _mvp_new[0] += 1
@@ -3765,15 +3765,39 @@ def hltv_player_info(nick: str) -> dict | None:
         mvp = max(mvp, len(ev))
     pm = re.search(r'<div class="stat">(\d+)</div><div class="description">Majors? played', b)
     wm = re.search(r'<div class="stat">(\d+)</div><div class="description">Majors? won', b)
-    # названия мейджоров: события со словом Major в достижениях/истории игрока (с годом, как на HLTV)
-    mj = []
-    for e in re.findall(r'<a href="/events/\d+/[^"]+"[^>]*>(?:<[^>]+>)*\s*([^<]*Major[^<]*)<', b):
-        e = _html.unescape(e).strip()
-        if e and re.search(r"20\d\d", e) and e not in mj:
-            mj.append(e)
-    mj.sort(key=lambda x: re.findall(r"20\d\d", x)[-1], reverse=True)
+    # места на турнирах — таблица .achievement-table (так её разбирают gigobyte/HLTV и hltv-scraper-api):
+    # строка .team, место в .achievement, турнир в .tournament-name-cell a
+    mj, wins = [], []
+    k = b.find("achievement-table")
+    if k >= 0:
+        seg = b[k:k + 120000].split("</table>", 1)[0]
+        for row in re.split(r'<tr[^>]*class="[^"]*\bteam\b', seg)[1:]:
+            pl = re.search(r'class="achievement[^"]*"[^>]*>\s*([^<]+?)\s*<', row)
+            ev = re.search(r'class="tournament-name-cell"[^>]*>.*?<a [^>]*href="/events/\d+/[^"]*"[^>]*>(?:<[^>]+>)*\s*([^<]+?)\s*<', row)
+            if not ev:
+                continue
+            name, place = _html.unescape(ev.group(1)).strip(), (pl.group(1).strip() if pl else "")
+            if "major" in name.lower():
+                lab = name + (f" — {place}" if place else "")
+                if lab not in mj:
+                    mj.append(lab)
+            if re.match(r"1st$", place) and name not in wins:
+                wins.append(name)
+    # трофеи игрока: ряд .trophy-row-trophy (название — в title картинки) и подписи span.trophyDescription
+    tro = []
+    for t in re.findall(r'class="trophy-row-trophy"[^>]*>.*?<img[^>]*title="([^"]+)"', b) + re.findall(r'class="trophyDescription"[^>]*title="([^"]+)"', b):
+        t = _html.unescape(t).strip()
+        if t and t not in tro:
+            tro.append(t)
+    if not mj:  # запасной разбор: любые ссылки на события со словом Major
+        for e in re.findall(r'<a href="/events/\d+/[^"]+"[^>]*>(?:<[^>]+>)*\s*([^<]*Major[^<]*)<', b):
+            e = _html.unescape(e).strip()
+            if e and re.search(r"20\d\d", e) and e not in mj:
+                mj.append(e)
+    yr = lambda x: (re.findall(r"20\d\d", x) or ["0"])[-1]
+    mj.sort(key=yr, reverse=True)
     d = {"mvp": mvp, "mvp_events": ev, "majors": int(pm.group(1)) if pm else 0, "major_wins": int(wm.group(1)) if wm else 0,
-         "major_events": mj}
+         "major_events": mj, "trophies": tro[:40], "event_wins": wins[:40]}
     hltv_cache[key] = {"t": iso(NOW), "data": d}
     return d
 

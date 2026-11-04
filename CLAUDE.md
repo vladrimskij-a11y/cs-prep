@@ -66,4 +66,4 @@
 - 6 ноября 2026, 09:30 МСК (PRV–NAVI, IEM Beijing): проверить live-блок на вкладке «Игроки» — счёт, раунды, K–D/ADR совпадают с bo3.gg.
 - MVP у FURIA и BetBoom: HLTV отдавал 403 на страницы игроков; проверить после полных сборов.
 - Новости: владелец должен вставить новый код воркера, добавить секрет GH_TOKEN и крон */5 в Cloudflare. Проверить, что news.yml запускается раз в 5 мин.
-- Названия мажоров у игроков парсятся «вслепую» (ссылки на события со словом Major) — проверить после полных сборов, что `major_events` заполняются.
+- Страница игрока HLTV разбирается по правилам gigobyte/HLTV и hltv-scraper-api: `.achievement-table .team` (место `.achievement`, турнир `.tournament-name-cell a`), трофеи `.trophy-row-trophy img[title]`, `span.trophyDescription[title]` → `major_events` (с местом), `trophies`, `event_wins`; кэш `pinfo4`. Проверить после полных сборов, что поля заполняются.

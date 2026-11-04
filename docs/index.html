@@ -1815,7 +1815,7 @@ a.ni { text-decoration: none; color: inherit; }
       p.age ? esc(p.age) + " " + years(p.age) : ""].concat(extra || []).filter(Boolean);
     var majTxt = 'Мейджоры: <b>' + esc(p.majors) + '</b>' + (p.major_wins ? ' · выиграл <b>' + esc(p.major_wins) + '</b>' : '');
     var maj = !p.majors ? '' : (p.major_events || []).length
-      ? '<span class="pmaj tap" role="button" data-pop="' + esc(JSON.stringify({ t: "🏟 Мейджоры: " + p.majors + (p.major_wins ? ", выиграл " + p.major_wins : ""), l: p.major_events })) + '">' + majTxt + ' ›</span>'
+      ? '<span class="pmaj tap" role="button" data-pop="' + esc(JSON.stringify({ t: "🏟 Мейджоры: " + p.majors + (p.major_wins ? ", выиграл " + p.major_wins : ""), l: p.major_events.map(function (x) { return String(x).replace(/ — (\S+)$/, function (_, pl) { return " — " + placeRu(pl); }); }) })) + '">' + majTxt + ' ›</span>'
       : '<span class="pmaj">' + majTxt + '</span>';
     return '<' + (attrs ? 'button class="pl"' + attrs : 'div class="pl"') + '><span class="nickline"><span class="pflag">' + esc(flag(p.nationality || p.flag)) + '</span><span class="nick">' + esc(p.nick) + '</span>' + mvpBadge(p) + '</span>' +
       (roles.length ? '<span class="rcol">' + roles.map(function (r) { return '<span class="rt ' + r[1] + '">' + esc(r[0]) + '</span>'; }).join("") + '</span>' : '') +
