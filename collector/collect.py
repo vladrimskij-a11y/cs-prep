@@ -136,8 +136,31 @@ def load_json(path: Path, default):
         return default
 
 
+NAME_RU = {  # русские имена, которые владелец поправил вручную (важнее нейросети): ник → «Имя Фамилия»
+    "pr": "Олдрич Новый",
+    "xertion": "Дориан Берман",
+    "sycrone": "Деннис Нильсен",
+}
+
+
+def apply_name_ru(x) -> None:
+    """Ручные русские имена — везде, где в данных встречается человек с ником (игроки, тренеры, статистика)."""
+    if isinstance(x, dict):
+        k = norm(x.get("nick")) if isinstance(x.get("nick"), str) else ""
+        if k in NAME_RU and ("name_ru" in x or "first_name" in x or "name" in x or "role" in x):
+            x["name_ru"] = NAME_RU[k]
+        for v in x.values():
+            if isinstance(v, (dict, list)):
+                apply_name_ru(v)
+    elif isinstance(x, list):
+        for v in x:
+            apply_name_ru(v)
+
+
 def save_json(path: Path, data, pretty: bool = False) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
+    if path.parent.name in ("match", "team") or path.name == "matches.json":
+        apply_name_ru(data)
     if pretty:
         txt = json.dumps(data, ensure_ascii=False, indent=1)
     else:
@@ -1273,6 +1296,18 @@ def round_ru(s: str | None) -> str | None:
 _bo3_tours: dict = {}
 
 
+def bo3_tour_bg(name: str) -> str | None:
+    """Фон карточки турнира: широкий баннер bo3.gg, если есть, иначе обложка турнира."""
+    if _bo3_tours.get("list") is None:
+        bo3_tournament_for("")  # загрузит список турниров
+    nn = tour_norm(name)
+    for t in _bo3_tours.get("list") or []:
+        tn = (t.get("name") or "").replace("Intel Extreme Masters", "IEM")
+        if tour_same(tn, nn) or tour_same(name, tour_norm(tn)):
+            return t.get("banner_image_url") or t.get("image_url")
+    return None
+
+
 def bo3_tournament_for(name: str) -> dict | None:
     """Турнир bo3.gg (со стадиями, раундами и матчами) по нашему названию."""
     if _bo3_tours.get("list") is None:
@@ -1283,6 +1318,8 @@ def bo3_tournament_for(name: str) -> dict | None:
             warn(f"bo3 турниры (итоги): {e!r}")
             _bo3_tours["list"] = []
     res = _bo3_tours["list"]
+    if not name:
+        return None
     nn = tour_norm(name)
     pick = next((t for t in res if tour_same((t.get("name") or "").replace("Intel Extreme Masters", "IEM"), nn)
                  or tour_same(name, tour_norm((t.get("name") or "").replace("Intel Extreme Masters", "IEM")))), None)
@@ -4120,6 +4157,71 @@ def finished_tournaments() -> list[dict]:
     return out
 
 
+# ---------------------------------------------------------------- логотипы: цветные с bo3.gg, потом PandaScore, потом HLTV
+LOGO_LOOKUPS = int(os.environ.get("LOGO_LOOKUPS", "150"))  # поисков команд на bo3.gg за запуск (bo3 — открытый API)
+
+
+def logo_key(name: str | None) -> str:
+    n = re.sub(r"^(the|team)\s+|\s+(team|esports|gaming)$", "", (name or "").lower())
+    return re.sub(r"[^a-z0-9а-я]", "", n)
+
+
+def logo_rank(url: str, src: str) -> int:
+    if src == "bo3":
+        return 0
+    if src == "panda":
+        return 3 if "lightmode" in url else 1  # «lightmode» у PandaScore — тёмный логотип для светлого фона
+    return 2
+
+
+def build_logos() -> None:
+    """data/logos.json: название команды → лучший (цветной) логотип. Недостающие ищем на bo3.gg."""
+    path = OUT / "logos.json"
+    L = load_json(path, {}) or {}
+    logos, srcs, tried = L.get("logos") or {}, L.get("src") or {}, L.get("tried") or {}
+
+    def put(name, url, src):
+        k = logo_key(name)
+        if not k or not url:
+            return
+        if k not in logos or logo_rank(url, src) < logo_rank(logos[k], srcs.get(k, "")) or (src == srcs.get(k) and url != logos[k]):
+            logos[k], srcs[k] = url, src
+
+    names = set()
+    for f in (OUT / "results").glob("*.json"):
+        for m in (load_json(f, {}) or {}).get("matches") or []:
+            for t in m.get("teams") or []:
+                put(t.get("name"), t.get("logo"), "bo3"); names.add(t.get("name"))
+    lst = load_json(OUT / "matches.json", {}) or {}
+    for m in lst.get("matches") or []:
+        for t in m.get("teams") or []:
+            put(t.get("name"), t.get("image"), "panda"); names.add(t.get("name"))
+    for t in (((load_json(OUT / "ranking.json", {}) or {}).get("vrs") or {}).get("teams") or []):
+        put(t.get("name"), t.get("logo"), "hltv"); names.add(t.get("name"))
+    # у кого нет логотипа с bo3 — ищем там по названию (неудачи повторяем раз в неделю)
+    left = LOGO_LOOKUPS
+    for nm in sorted(n for n in names if n):
+        k = logo_key(nm)
+        if srcs.get(k) == "bo3" or left <= 0:
+            continue
+        if (parse_iso(tried.get(k)) or NOW - timedelta(days=30)) > NOW - timedelta(days=7):
+            continue
+        tried[k] = iso(NOW)
+        for params in ({"filter[teams.name][eq]": nm}, {"filter[teams.slug][eq]": re.sub(r"[^a-z0-9]+", "-", nm.lower()).strip("-")}):
+            left -= 1
+            try:
+                res = bo3("/teams", params).get("results") or []
+            except Exception as e:
+                warn(f"bo3 логотип {nm}: {e}")
+                break
+            res = [r for r in res if r.get("image_url")]
+            if len(res) == 1 or (res and logo_key(res[0].get("name")) == k):
+                put(nm, res[0]["image_url"], "bo3")
+                break
+    save_json(path, {"updated": iso(NOW), "logos": logos, "src": srcs, "tried": tried})
+    print(f"Логотипов: {len(logos)}, с bo3: {sum(1 for v in srcs.values() if v == 'bo3')}")
+
+
 def prune_caches() -> None:
     cutoff = iso(NOW - timedelta(days=NEWS_DAYS + 7))
     for k in [k for k, v in tr_cache.items() if (v.get("t") or "") < cutoff]:
@@ -4246,6 +4348,11 @@ def main() -> int:
             tour_list.append(tr)
     tour_list.sort(key=lambda x: (x.get("begin") or x.get("next") or "9999"))
     for tr in tour_list:
+        try:
+            tr["bg"] = tr.get("bg") or bo3_tour_bg(tr["name"])
+        except Exception as e:
+            warn(f"Фон турнира {tr.get('name')}: {e!r}")
+    for tr in tour_list:
         b = parse_iso(tr.get("begin"))
         if (b and b - NOW > timedelta(days=21)) or tr.get("tier") != "s" or tr.get("finished"):
             continue  # призовые и участники с HLTV — только для ближайших, чтобы лишний раз туда не ходить
@@ -4352,6 +4459,17 @@ def main() -> int:
         "major_next": major_next,
         "meta": stats,
     }, pretty=True)
+    try:
+        build_logos()
+    except Exception as e:
+        warn(f"Логотипы: {e!r}")
+    for f in list((OUT / "team").glob("*.json")) + list((OUT / "match").glob("*.json")):  # ручные имена — и в старых файлах
+        d = load_json(f, None)
+        if d is not None and NAME_RU:
+            before = json.dumps(d, ensure_ascii=False)
+            apply_name_ru(d)
+            if json.dumps(d, ensure_ascii=False) != before:
+                save_json(f, d)
     print(f"Готово: {len(listing)} матчей, PandaScore: {stats['panda_requests']}, bo3: {stats['bo3_requests']}, "
           f"переводов: {stats['translations']}, предупреждений: {len(stats['warnings'])}")
     return 0
