@@ -1,0 +1,27 @@
+name: probe
+on: { workflow_dispatch: {} }
+jobs:
+  p:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          mkdir -p docs/data && git fetch -q --depth 1 origin data && git archive FETCH_HEAD | tar -x -C docs/data
+          STATS_ONLY=1 python3 - <<'X'
+          import sys, json, re
+          sys.path.insert(0, "collector")
+          import collect as c
+          feed = c.d2_recent_matches()
+          print("PR| feed", len(feed), [f["slug"] for f in feed if "furia" in f["slug"] or "vincere" in f["slug"]][:8])
+          d = json.load(open("docs/data/results/11136.json"))
+          for sd in d["matches"][:4]:
+              sd.pop("veto", None)
+              names = [t["name"] for t in sd["teams"]]
+              cands = [f for f in feed if all(any(v in c.norm(f["slug"]) for v in {c.norm(n)} ) for n in names)]
+              print("PR| series", sd["date"], names, "cands", [(f["id"], f["slug"]) for f in cands])
+              for f in cands[:2]:
+                  v = c.hltv_veto(f)
+                  print("PR|    veto", f["id"], (v or {}).get("date"), len((v or {}).get("steps") or []))
+              c.attach_veto(sd)
+              print("PR|    attached", bool(sd.get("veto")))
+          X
