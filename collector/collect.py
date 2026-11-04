@@ -3685,6 +3685,22 @@ def hltv_player_info(nick: str) -> dict | None:
     return d
 
 
+_d2_recent: list = []
+
+
+def d2_recent_matches() -> list[dict]:
+    """Лента результатов dust2.us за последний месяц (одна страница, ~350 матчей): id и slug. Без HLTV."""
+    if not _d2_recent:
+        h = d2_get("/results") or ""
+        seen = set()
+        for mid, slug in re.findall(r'href="/matches/(\d+)/([^"#?]+)"', h):
+            if mid not in seen:
+                seen.add(mid)
+                _d2_recent.append({"id": mid, "slug": slug, "day": None})
+        _d2_recent.append(None)  # метка «уже загружали», даже если пусто
+    return [x for x in _d2_recent if x]
+
+
 def attach_veto(sd: dict) -> None:
     """Полное вето серии (dust2.us): кто что банил и пикал, какая карта осталась третьей."""
     if sd.get("veto") is not None:
@@ -3693,6 +3709,23 @@ def attach_veto(sd: dict) -> None:
     d0 = parse_iso(sd.get("date"))
     if len(names) < 2 or not d0:
         return
+    def variants(n):
+        return {x for x in (norm(n), norm(re.sub(r"^(the|team)\s+|\s+(team|esports|gaming)$", "", n, flags=re.IGNORECASE))) if len(x) >= 2}
+    va, vb = variants(names[0]), variants(names[1])
+    # 1) последний месяц — прямо с ленты dust2, без HLTV
+    if NOW - d0 < timedelta(days=28):
+        for mt in d2_recent_matches():
+            sl = norm(mt["slug"])
+            if not (any(x in sl for x in va) and any(x in sl for x in vb)):
+                continue
+            v = veto_cache.get(f"match:{mt['id']}")
+            if not (v and any(x.get("team") for x in v.get("steps") or [])):
+                v = hltv_veto(mt)
+            vd = parse_iso((v or {}).get("date"))
+            if v and v.get("steps") and vd and abs((vd - d0).total_seconds()) < 40 * 3600:
+                sd["veto"] = v["steps"]
+                return
+    # 2) старше — список матчей команды с HLTV
     for i in (0, 1):
         ht = hltv_team_for({"name": names[i]})
         if not ht:
