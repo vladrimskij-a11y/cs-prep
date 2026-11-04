@@ -1,18 +1,18 @@
-import json, re, time, urllib.request, urllib.parse, gzip
-def get(url, h=None):
-    hh = {"User-Agent": "cs-prep/1.0 (https://github.com/vladrimskij-a11y/cs-prep; cs-prep-bot@users.noreply.github.com)", "Accept-Encoding": "gzip"}; hh.update(h or {})
+import re, time, urllib.request, gzip
+UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Safari/537.36"
+def get(url):
     try:
-        with urllib.request.urlopen(urllib.request.Request(url, headers=hh), timeout=30) as r:
-            b = r.read()
-            if r.headers.get("Content-Encoding") == "gzip": b = gzip.decompress(b)
+        with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": UA, "Accept": "text/html", "Accept-Encoding": "gzip", "Accept-Language": "en-US,en;q=0.9"}), timeout=40) as r:
+            b = r.read(); b = gzip.decompress(b) if r.headers.get("Content-Encoding") == "gzip" else b
             return b.decode("utf-8", "replace")
     except Exception as e:
         return "ERR " + repr(e)
-time.sleep(5)
-LP = "https://liquipedia.net/counterstrike/api.php"
-time.sleep(40)
-r = get(LP + "?" + urllib.parse.urlencode({"action": "query", "prop": "revisions", "rvprop": "content", "rvslots": "main", "titles": "Intel_Extreme_Masters/2026/Beijing", "format": "json", "formatversion": 2}))
-print(r[:200]); wt = json.loads(r)["query"]["pages"][0]["revisions"][0]["slots"]["main"]["content"]
-i = wt.find("{{Match")
-print("LP MATCH BLOCK:\n", wt[i:i+2500])
-print("veto words:", sorted(set(re.findall(r"\|\s*(\w*veto\w*|\w*ban\w*|\w*pick\w*)\s*=", wt)))[:30])
+h = get("https://www.dust2.us/matches/2399855/legacy-vs-the-mongolz")
+print("MATCH", len(h), h[:80])
+b = re.sub(r"\s+", " ", h); i = b.find("maps-container")
+print("MAPS", b[i:i+2500] if i >= 0 else "no maps-container")
+for k in ("veto", "banned", "BANNED", "picked", "removed"):
+    j = b.find(k); print(k, b[max(0, j-200):j+300] if j >= 0 else "-")
+time.sleep(3)
+r = get("https://www.dust2.us/results?team=9565")
+print("RESULTS", len(r), r[:80]); print(re.findall(r'href="([^"]*matches/\d+/[^"]+)"', r)[:8])
