@@ -336,6 +336,33 @@ html { overflow-anchor: none; }
 .ptab td.mn { max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ptab small { font-size: 10px; }
 .rt2 { font-weight: 700; }
+/* главная: три вкладки и подвкладки */
+.hometabs.three { grid-template-columns: repeat(3, 1fr); }
+.hsub { margin-top: 2px; }
+.rank { margin-top: 8px; display: flex; flex-direction: column; }
+.rk { display: grid; grid-template-columns: 34px 1fr auto auto 12px; gap: 8px; align-items: baseline; padding: 10px 12px; border-top: 1px solid var(--line); width: 100%; text-align: left; box-sizing: border-box; }
+.rk:first-child { border-top: 0; }
+.rk-n { color: var(--muted); font-weight: 700; }
+.rk-t { font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rk-m { font-size: 12px; color: var(--muted); white-space: nowrap; }
+.rk-p { font-weight: 700; font-size: 13px; }
+.tm-h { display: flex; flex-direction: column; gap: 4px; }
+.tm-h .acr { font-family: var(--display); font-weight: 800; font-size: 24px; line-height: 1.1; }
+.tm-h .tvrs { font-size: 13px; color: var(--muted); font-weight: 600; }
+.tm-h .tpr, .roster .hd .tpr { font-size: 12px; color: var(--muted); }
+.tm-pl { display: flex; flex-wrap: wrap; gap: 6px; }
+.tm-pl span { font-size: 13px; font-weight: 600; padding: 3px 8px; border-radius: 6px; background: var(--sunk); }
+.mini .ma, .mini .mb { display: flex; flex-direction: column; line-height: 1.15; }
+.mini .mb { align-items: flex-end; }
+.mini small { font-family: var(--mono); font-size: 10.5px; font-weight: 500; color: var(--muted); margin-top: 2px; white-space: nowrap; }
+.match.res { grid-template-columns: 38px 1fr auto; }
+.ptr { position: fixed; top: calc(env(safe-area-inset-top, 0px) + 8px); left: 50%; transform: translate3d(-50%,-60px,0); opacity: 0; z-index: 40; display: flex; align-items: center; gap: 6px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; font-size: 12px; color: var(--muted); font-weight: 600; pointer-events: none; }
+.ptr .arr { font-style: normal; transition: transform .15s; display: inline-block; }
+.ptr .spin { width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--line); border-top-color: var(--fg); animation: spin .7s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.hero-wrap, .mini-wrap { transition: opacity .12s linear; }
+
 .face .acr.sm { font-size: 18px; overflow-wrap: anywhere; }
 
 /* лента */
@@ -566,14 +593,6 @@ a.ni { text-decoration: none; color: inherit; }
     return cur ? html + '</section>' : html;
   }
 
-  function homeHeader(active) {
-    var L = state.list;
-    return '<div class="view"><header class="top"><div class="brand"><h1>RIM<b>·</b>CS</h1>' +
-      '<span class="upd">обновлено ' + esc(ago(L.updated)) + ' · время МСК</span></div>' +
-      '<div class="hometabs" role="tablist"><button class="tab" data-home="tours" aria-selected="' + (active === "tours") + '">Турниры</button>' +
-      '<button class="tab" data-home="feed" aria-selected="' + (active === "feed") + '">Лента</button></div></header>';
-  }
-
   function getFeed() {
     if (DEMO) return Promise.resolve(DEMO.feed || { items: [] });
     if (state.feed) return Promise.resolve(state.feed);
@@ -652,45 +671,148 @@ a.ni { text-decoration: none; color: inherit; }
   function ym(s) { var d = new Date(s); var p = new Intl.DateTimeFormat("en-CA", { timeZone: TZ, year: "numeric", month: "2-digit" }).format(d).split("-"); return { y: +p[0], m: +p[1] - 1 }; }
   function ymKey(o) { return o.y * 12 + o.m; }
 
-  function renderHome() {
+  function homeHeader(active) {
     var L = state.list;
-    var tours = L.tournaments || [];
-    var today = dayKey(new Date().toISOString());
-    var html = homeHeader("tours");
-    if (!tours.length) { $app.innerHTML = html + '<div class="empty"><strong>Турниров тир-1 нет</strong>Данные обновляются каждые 3 часа.</div></div>'; return; }
-    var nowK = ymKey(ym(new Date().toISOString()));
-    var months = {};
-    tours.forEach(function (t) {
+    function t(id, label) { return '<button class="tab" data-home="' + id + '" aria-selected="' + (active === id) + '">' + label + '</button>'; }
+    var sub = "";
+    if (active === "tours") {
+      var c = tourBuckets();
+      sub = '<div class="filt hsub" role="group">' + [["live", "Идущие"], ["up", "Грядущие"], ["done", "Завершённые"]].map(function (o) {
+        return '<button class="chip" data-tsub="' + o[0] + '" aria-pressed="' + (tourSub() === o[0]) + '">' + o[1] + '<span class="c">' + c[o[0]].length + '</span></button>';
+      }).join("") + '</div>';
+    } else if (active === "rating") {
+      sub = '<div class="filt hsub" role="group">' + RATE_SUBS.map(function (o) {
+        return '<button class="chip" data-rsub="' + o[0] + '" aria-pressed="' + (rateSub() === o[0]) + '">' + o[1] + '</button>';
+      }).join("") + '</div>';
+    }
+    return '<div class="view"><header class="top"><div class="brand"><h1>RIM<b>·</b>CS</h1>' +
+      '<span class="upd">обновлено ' + esc(ago(L.updated)) + ' · время МСК</span></div>' +
+      '<div class="hometabs three" role="tablist">' + t("tours", "Турниры") + t("feed", "Лента") + t("rating", "Рейтинг") + '</div>' + sub + '</header>';
+  }
+
+  // турниры: идущие, грядущие, завершённые
+  function tourBuckets() {
+    var now = Date.now(), out = { live: [], up: [], done: [] };
+    (state.list.tournaments || []).forEach(function (t) {
       var b = t.begin || t.next, e = t.end || b;
-      if (!b) return;
-      var bk = ymKey(ym(b)), ek = ymKey(ym(e));
-      for (var k = Math.max(bk, nowK); k <= ek; k++) (months[k] = months[k] || []).push({ t: t, bk: bk, ek: ek, k: k });
+      var bt = b ? new Date(b).getTime() : Infinity, et = e ? new Date(e).getTime() : bt;
+      if (t.finished || et < now - 12 * 3600e3) out.done.push(t);
+      else if (t.live || bt <= now) out.live.push(t);
+      else out.up.push(t);
     });
-    Object.keys(months).map(Number).sort(function (a, b) { return a - b; }).forEach(function (k) {
-      var y = Math.floor(k / 12), m = k % 12;
-      html += '<h2 class="sect-title month">' + MONTHS[m].charAt(0).toUpperCase() + MONTHS[m].slice(1) + ' ' + y + '</h2><div class="tours">';
-      months[k].forEach(function (x) {
-        var t = x.t;
-        var ms = (L.matches || []).filter(function (mm) { return tourOf(mm) === String(t.id); });
-        var todayN = ms.filter(function (mm) { return dayKey(mm.begin_at) === today; }).length;
-        var b = t.begin || t.next, e = t.end;
-        var dates = b ? dm(b) + (e && dayKey(e) !== dayKey(b) ? " – " + dm(e) : "") : "";
-        var live = t.live || (b && e && new Date(b) <= new Date() && new Date(e) >= new Date());
-        var span = "";
-        if (x.ek > x.k) { var n = (x.k + 1) % 12; span = '<span class="span">→ продолжится в ' + MONTHS_IN[n] + '</span>'; }
-        if (x.bk < x.k) { var p0 = ((x.k - 1) % 12 + 12) % 12; span += '<span class="span">← начался в ' + MONTHS_IN[p0] + '</span>'; }
-        var next = t.live ? '<span class="live">● LIVE ' + t.live + '</span>'
-          : ms.length ? (t.next ? 'ближайший <b>' + esc(dayKey(t.next) === today ? "сегодня " + hm(t.next) : dm(t.next) + " " + hm(t.next)) + '</b>' : '')
-          : '<span class="muted">расписание пока не опубликовано</span>';
-        html += '<button class="tour-card' + (todayN ? " today" : "") + '" data-tour="' + esc(t.id) + '">' +
-          '<span class="tn">' + esc(t.name) + '</span><span class="pill go ' + esc(t.tier) + '">' + esc((t.tier || "?").toUpperCase()) + '</span>' +
-          '<span class="tm2">' + [dates && '<b>' + esc(dates) + '</b>', live && !t.live ? '<span class="live">идёт сейчас</span>' : '',
-            (t.prize_usd || t.prize) && esc(t.prize_usd ? usd(t.prize_usd) : prize(t.prize)),
-            todayN ? '<b>сегодня ' + todayN + '</b>' : (ms.length ? ms.length + ' матч.' : ''), next].filter(Boolean).join(' · ') + '</span>' +
-          (span ? '<span class="tm2 spanrow">' + span + '</span>' : '') + '</button>';
+    out.done.sort(function (a, b) { return String(b.end || "").localeCompare(String(a.end || "")); });
+    return out;
+  }
+  function tourSub() {
+    if (!state.tourSub) { var c = tourBuckets(); state.tourSub = c.live.length ? "live" : "up"; }
+    return state.tourSub;
+  }
+
+  function tourCard(t, today, span) {
+    var L = state.list;
+    var ms = (L.matches || []).filter(function (mm) { return tourOf(mm) === String(t.id); });
+    var todayN = ms.filter(function (mm) { return dayKey(mm.begin_at) === today; }).length;
+    var b = t.begin || t.next, e = t.end;
+    var dates = b ? dm(b) + (e && dayKey(e) !== dayKey(b) ? " – " + dm(e) : "") : "";
+    var live = !t.finished && (t.live || (b && e && new Date(b) <= new Date() && new Date(e) >= new Date()));
+    var next = t.finished ? (t.results ? t.results + ' ' + plural(t.results, "матч", "матча", "матчей") : '')
+      : t.live ? '<span class="live">● LIVE ' + t.live + '</span>'
+      : ms.length ? (t.next ? 'ближайший <b>' + esc(dayKey(t.next) === today ? "сегодня " + hm(t.next) : dm(t.next) + " " + hm(t.next)) + '</b>' : '')
+      : '<span class="muted">расписание пока не опубликовано</span>';
+    return '<button class="tour-card' + (todayN ? " today" : "") + '" data-tour="' + esc(t.id) + '">' +
+      '<span class="tn">' + esc(t.name) + '</span><span class="pill go ' + esc(t.tier) + '">' + esc((t.tier || "?").toUpperCase()) + '</span>' +
+      '<span class="tm2">' + [dates && '<b>' + esc(dates) + '</b>', live && !t.live ? '<span class="live">идёт сейчас</span>' : '',
+        (t.prize_usd || t.prize) && esc(t.prize_usd ? usd(t.prize_usd) : prize(t.prize)),
+        todayN ? '<b>сегодня ' + todayN + '</b>' : (!t.finished && ms.length ? ms.length + ' матч.' : ''), next].filter(Boolean).join(' · ') + '</span>' +
+      (span ? '<span class="tm2 spanrow">' + span + '</span>' : '') + '</button>';
+  }
+
+  function renderHome() {
+    var html = homeHeader("tours");
+    var today = dayKey(new Date().toISOString());
+    var c = tourBuckets(), sub = tourSub(), list = c[sub];
+    if (!list.length) {
+      $app.innerHTML = html + '<div class="empty"><strong>' + (sub === "live" ? "Сейчас турниров нет" : sub === "up" ? "Ближайших турниров нет" : "Завершённых турниров пока нет") + '</strong>Данные обновляются каждые 3 часа.</div></div>';
+      return;
+    }
+    if (sub === "up") {
+      // по месяцам: турнир — в месяце начала; «продолжится в…», если идёт и в следующем
+      var months = {};
+      list.forEach(function (t) {
+        var b = t.begin || t.next, e = t.end || b;
+        if (!b) return;
+        var bk = ymKey(ym(b)), ek = ymKey(ym(e));
+        (months[bk] = months[bk] || []).push({ t: t, bk: bk, ek: ek });
       });
-      html += '</div>';
-    });
+      Object.keys(months).map(Number).sort(function (a, b) { return a - b; }).forEach(function (k) {
+        var y = Math.floor(k / 12), m = k % 12;
+        html += '<h2 class="sect-title month">' + MONTHS[m].charAt(0).toUpperCase() + MONTHS[m].slice(1) + ' ' + y + '</h2><div class="tours">';
+        months[k].forEach(function (x) {
+          var span = x.ek > x.bk ? '<span class="span">→ продолжится в ' + MONTHS_IN[(x.bk + 1) % 12] + '</span>' : '';
+          html += tourCard(x.t, today, span);
+        });
+        html += '</div>';
+      });
+    } else {
+      html += '<div class="tours" style="margin-top:14px">' + list.map(function (t) { return tourCard(t, today, ""); }).join("") + '</div>';
+    }
+    $app.innerHTML = html + '</div>';
+  }
+
+  // ---------- рейтинг
+  var RATE_SUBS = [["all", "Все"], ["Европа", "Европа"], ["Азия", "Азия"], ["Америка", "Америка"], ["hltv", "HLTV"]];
+  var REG_ABBR = { "Европа": "EU", "Америка": "AM", "Азия": "AS" };
+  function rateSub() { return state.rateSub || "all"; }
+  function getRanking() {
+    if (state.ranking) return Promise.resolve(state.ranking);
+    return fetch("data/ranking.json" + bust()).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); }).then(function (j) { state.ranking = j; return j; });
+  }
+  function renderRating() {
+    var html = homeHeader("rating"), R = state.ranking, sub = rateSub();
+    if (!R) { $app.innerHTML = html + '<div class="empty">' + (state.rankingErr ? '<strong>Рейтинг ещё не собран</strong>Появится после ближайшего полного обновления.' : 'Загружаю рейтинг…') + '</div></div>'; return; }
+    var hl = sub === "hltv", rows = hl ? (R.hltv || {}).teams || [] : ((R.vrs || {}).teams || []).filter(function (t) { return sub === "all" || t.region === sub; });
+    html += '<div class="upd" style="margin-top:10px">' + (hl ? 'Рейтинг HLTV' : esc((R.vrs || {}).source || 'Рейтинг Valve (VRS)') + ((R.vrs || {}).date ? ' на ' + esc(R.vrs.date) : '')) + ' · нажми на команду</div>';
+    if (!rows.length) html += '<div class="empty"><strong>Нет данных</strong>Появятся после ближайшего полного обновления.</div>';
+    html += '<div class="box rank">' + rows.map(function (t) {
+      var pos = hl || sub === "all" ? t.rank : t.reg_rank;
+      return '<' + (t.page ? 'button class="rk" data-team="' + esc(t.slug) + '"' : 'div class="rk"') + '><span class="rk-n num">' + esc(pos) + '</span><span class="rk-t">' + esc(t.name) + '</span>' +
+        '<span class="rk-m">' + (!hl && t.region ? esc(REG_ABBR[t.region] || t.region) + (sub === "all" && t.reg_rank ? ' #' + t.reg_rank : ' · #' + t.rank) : '') + '</span>' +
+        '<span class="rk-p num">' + esc(t.points) + '</span>' + (t.page ? '<i class="chev2">›</i>' : '<i></i>') + '</' + (t.page ? 'button' : 'div') + '>';
+    }).join("") + '</div>';
+    $app.innerHTML = html + '</div>';
+  }
+  function getTeam(slug) {
+    state.teams = state.teams || {};
+    if (state.teams[slug]) return Promise.resolve(state.teams[slug]);
+    return fetch("data/team/" + encodeURIComponent(slug) + ".json" + bust()).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); }).then(function (j) { state.teams[slug] = j; return j; });
+  }
+  function prizesLine(pr) {
+    if (!(pr || []).length) return "";
+    return '<span class="tpr">🏆 <b>' + pr.length + '</b> · ' + pr.map(function (x) { return (MEDAL[x.place] || "") + ' ' + esc(x.event); }).join(' · ') + '</span>';
+  }
+  function renderTeam(slug) {
+    var T = (state.teams || {})[slug];
+    var html = '<div class="view"><header class="top">' + backBtn("Рейтинг") + '</header>';
+    if (!T) { $app.innerHTML = html + '<div class="empty">' + (state.teamErr ? '<strong>Данных о команде пока нет</strong>' : 'Загружаю…') + '</div></div>'; return; }
+    var v = T.vrs || {};
+    html += '<section class="hero"><div class="tm-h"><span class="acr">' + esc(T.name) + '</span>' +
+      '<span class="tvrs">' + (v.rank ? '#' + esc(v.rank) + ' VRS' + (v.region ? ' · ' + esc(REG_ABBR[v.region] || v.region) + ' #' + esc(v.reg_rank) : '') + ' · ' + esc(v.points) + ' очк.' : '') + '</span>' +
+      prizesLine(T.prizes) + '</div>' +
+      ((T.players || []).length ? '<div class="tm-pl">' + T.players.map(function (p) { return '<span>' + esc(p) + '</span>'; }).join("") + '</div>' : '') + '</section>';
+    var f = T.form || [], w = f.filter(function (x) { return x.won; }).length, S = T.series || {};
+    html += '<div class="sec"><h3>Форма <span>последние 10 серий · нажми на матч</span></h3><div class="box form"><div class="tmh a">' + esc(T.name) + '<span>' + w + '–' + (f.length - w) + '</span></div>' +
+      '<div class="squares">' + f.map(function (x) { return '<span class="sq ' + (x.won ? "w" : "l") + '">' + (x.won ? "W" : "L") + '</span>'; }).join("") + '</div>' +
+      groupByTour(f, function (x) {
+        var has = x.sid != null && S[String(x.sid)];
+        var inner = '<span>vs ' + esc(x.opponent_name || x.opponent) + ' <span class="d">' + esc(dm(x.date)) + '</span></span><span class="wl ' + (x.won ? "w" : "l") + ' num">' + esc(x.score) + ':' + esc(x.opp_score) + (has ? ' <i class="chev2">›</i>' : '') + '</span>';
+        return has ? '<button class="gr gbtn" data-tseries="' + esc(x.sid) + '">' + inner + '</button>' : '<div class="gr">' + inner + '</div>';
+      }) + '</div></div>';
+    var M = T.maps || {};
+    if ((M.table || []).length) {
+      html += '<div class="sec"><h3>Карты <span>за ' + Math.round((M.window_days || 120) / 30) + ' мес.</span></h3><div class="box"><table class="mtab"><thead><tr><th>Карта</th><th>Винрейт</th></tr></thead><tbody>' +
+        M.table.map(function (r) { var t = r.teams[0], p = pct(t.won, t.played); return '<tr><td class="mn">' + esc(r.map) + '</td><td class="a"><span class="wr"><span class="pct">' + p + '%</span><span class="track"><i style="width:' + p + '%"></i></span><span class="gp">' + t.won + '/' + t.played + '</span></span></td></tr>'; }).join("") +
+        '</tbody></table></div></div>';
+    }
     $app.innerHTML = html + '</div>';
   }
 
@@ -706,7 +828,7 @@ a.ni { text-decoration: none; color: inherit; }
     var A = x.teams[0] || {}, B = x.teams[1] || {};
     var sub = [x.stage, x.round].filter(Boolean).join(" · ");
     return '<button class="match res" data-rseries="' + esc(x.id) + '">' +
-      '<div class="time">' + esc(hm(x.date)) + '<small>BO' + esc(x.bo || "?") + '</small></div>' +
+      '<div class="time"><small>BO' + esc(x.bo || "?") + '</small></div>' +
       '<div class="vs"><div class="row"><span class="dot a"></span><span class="tname' + (x.winner === 0 ? ' won' : '') + '">' + esc(A.name || "?") + '</span></div>' +
       '<div class="row"><span class="dot b"></span><span class="tname' + (x.winner === 1 ? ' won' : '') + '">' + esc(B.name || "?") + '</span></div>' +
       (sub ? '<div class="tour">' + esc(sub) + '</div>' : '') +
@@ -720,7 +842,7 @@ a.ni { text-decoration: none; color: inherit; }
     var L = state.list, t = findTour(id);
     var ms = (L.matches || []).filter(function (m) { return tourOf(m) === String(id); });
     var hasRes = !!(t && t.results);
-    var tab = hasRes && state.tourTab === "done" ? "done" : "matches";
+    var tab = hasRes && (state.tourTab === "done" || !ms.length) ? "done" : "matches";
     var html = '<div class="view"><header class="top">' + backBtn("Турниры") +
       '<div class="subhead"><h1>' + esc(t ? t.name : "Турнир") + '</h1><span class="upd">' +
       (t ? '<span class="pill ' + esc(t.tier) + '">' + esc((t.tier || "").toUpperCase()) + '</span>' + (t.begin ? esc(dm(t.begin) + (t.end ? " – " + dm(t.end) : "")) : "") + (t.prize_usd ? " · " + esc(usd(t.prize_usd)) : t.prize ? " · " + esc(prize(t.prize)) : "") : "") +
@@ -891,12 +1013,13 @@ a.ni { text-decoration: none; color: inherit; }
 
   function h2hBlock(m) {
     var h = m.h2h || [];
-    if (!h.length) return '<div class="sec"><h3>Личные встречи</h3><div class="box note">За последний год команды не встречались.</div></div>';
+    var YR = new Date().getFullYear();
+    if (!h.length) return '<div class="sec"><h3>Личные встречи</h3><div class="box note">В ' + YR + ' году команды не встречались.</div></div>';
     var wa = h.filter(function (x) { return x.winner === 0; }).length, wb = h.filter(function (x) { return x.winner === 1; }).length;
     var mapsA = 0, mapsB = 0;
     h.forEach(function (x) { (x.maps || []).forEach(function (g) { if (g.winner === 0) mapsA++; if (g.winner === 1) mapsB++; }); });
     var tot = wa + wb || 1;
-    var html = '<div class="sec"><h3>Личные встречи <span>' + h.length + ' за год</span></h3><div class="box">' +
+    var html = '<div class="sec"><h3>Личные встречи <span>' + h.length + ' в ' + YR + '</span></h3><div class="box">' +
       '<div class="tally"><div class="n a num">' + wa + '</div><div class="lbl">победы в сериях' + (mapsA + mapsB ? '<br><span class="num">' + mapsA + ':' + mapsB + '</span> по картам' : '') + '</div><div class="n b num">' + wb + '</div>' +
       '<div class="bar2"><i class="a" style="width:' + (100 * wa / tot) + '%"></i><i class="b" style="width:' + (100 * wb / tot) + '%"></i></div></div>' +
       '<div class="h2h">';
@@ -952,8 +1075,11 @@ a.ni { text-decoration: none; color: inherit; }
       var w = list.filter(function (g) { return g.won; }).length;
       html += '<div class="box ' + (i ? "b" : "a") + '"><div class="hd">' + esc(t.name) + (list.length ? '<span>' + w + '–' + (list.length - w) + '</span>' : '') + '</div>';
       if (!list.length) html += '<div class="note">На ' + esc(mp) + ' не играли</div>';
+      var S = m.series || {};
       html += groupByTour(list, function (g) {
-        return '<div class="gr"><span>vs ' + esc(g.vs) + ' <span class="d">' + esc(dm(g.date)) + '</span></span><span class="wl ' + (g.won ? "w" : "l") + '">' + (g.score ? esc(g.score) : (g.won ? "W" : "L")) + '</span></div>';
+        var has = g.sid != null && S[String(g.sid)];
+        var inner = '<span>vs ' + esc(g.vs) + ' <span class="d">' + esc(dm(g.date)) + '</span></span><span class="wl ' + (g.won ? "w" : "l") + '">' + (g.score ? esc(g.score) : (g.won ? "W" : "L")) + (has ? ' <i class="chev2">›</i>' : '') + '</span>';
+        return has ? '<button class="gr gbtn" data-series="' + esc(g.sid) + '">' + inner + '</button>' : '<div class="gr">' + inner + '</div>';
       });
       html += '</div>';
     });
@@ -1056,7 +1182,7 @@ a.ni { text-decoration: none; color: inherit; }
   try { REGNAMES = new Intl.DisplayNames(["ru"], { type: "region" }); } catch (e) {}
   function country(cc) { if (!cc || cc.length !== 2) return ""; try { return REGNAMES ? REGNAMES.of(cc.toUpperCase()) : cc; } catch (e) { return cc; } }
   var PLACE_RU = { "1st": "1 место", "2nd": "2 место", "3rd": "3 место", "3-4th": "3–4 место", "4th": "4 место" };
-  var MEDAL = { "1st": "🥇", "2nd": "🥈", "3rd": "🥉", "3-4th": "🥉", "4th": "4" };
+  var MEDAL = { "1st": "🥇", "2nd": "🥈", "3rd": "🥉", "3-4th": "🥉" };
   var REG_FIX = { AM: "Америка", EU: "Европа", AS: "Азия", NA: "Америка", SA: "Америка" };
   function vrsLine(t) {
     var v = t.vrs;
@@ -1065,9 +1191,10 @@ a.ni { text-decoration: none; color: inherit; }
     return [v.region, "#" + v.rank + " VRS", v.points + " очк."].filter(Boolean).join(" · ");
   }
 
+  function miniVrs(t) { vrsLine(t); var v = t.vrs; return v ? '<small>#' + esc(v.rank) + (v.region ? ' · ' + esc(REG_ABBR[v.region] || v.region) + (v.reg_rank ? ' #' + esc(v.reg_rank) : '') : '') + ' · ' + esc(v.points) + '</small>' : ''; }
   function heroVrs(t) { vrsLine(t); var v = t.vrs; return v ? '<span class="tvrs">' + esc(v.region || "") + '<br>#' + esc(v.rank) + ' VRS · ' + esc(v.points) + '</span>' : ''; }
   function personRow(p, roles, real, extra, statsHtml, attrs) {
-    var info = [esc(country(p.nationality || p.flag)), real ? esc(real) + (p.name_ru ? ' <span class="pron">[' + esc(plain(p.name_ru)) + ']</span>' : '') : (p.name_ru ? esc(plain(p.name_ru)) : ""),
+    var info = [real ? esc(real) + (p.name_ru ? ' <span class="pron">[' + esc(plain(p.name_ru)) + ']</span>' : '') : (p.name_ru ? esc(plain(p.name_ru)) : ""),
       p.age ? esc(p.age) + " " + years(p.age) : ""].concat(extra || []).filter(Boolean);
     return '<' + (attrs ? 'button class="pl"' + attrs : 'div class="pl"') + '><span class="nickline"><span class="pflag">' + esc(flag(p.nationality || p.flag)) + '</span><span class="nick">' + esc(p.nick) + '</span></span>' +
       (roles.length ? '<span class="rcol">' + roles.map(function (r) { return '<span class="rt ' + r[1] + '">' + esc(r[0]) + '</span>'; }).join("") + '</span>' : '') +
@@ -1075,12 +1202,11 @@ a.ni { text-decoration: none; color: inherit; }
   }
 
   function playersTab(m) {
-    var html = factsBlock(m);
+    var html = "";
     m.teams.forEach(function (t, i) {
-      var pr = t.prizes || [];
+      var pr = (t.prizes || []).filter(function (x) { return MEDAL[x.place]; });
       html += '<div class="sec"><div class="box roster ' + (i ? "b" : "a") + '"><div class="hd"><span class="tn">' + esc(t.name) + '</span>' +
-        (vrsLine(t) ? '<span class="tinfo">' + esc(vrsLine(t)) + '</span>' : '') +
-        '<span class="tpr">' + (pr.length ? 'Призовые за 3 мес.: <b>' + pr.length + '</b> — ' + pr.map(function (x) { return (MEDAL[x.place] && MEDAL[x.place].length > 1 ? MEDAL[x.place] + ' ' : '') + esc(PLACE_RU[x.place] || x.place) + ', ' + esc(x.event); }).join('; ') : 'Призовых мест за 3 мес. нет') + '</span></div>';
+        prizesLine(pr) + '</div>';
       if (!(t.players || []).length) html += '<div class="note">Состав не указан.</div>';
       function prank(p) {
         var tg = p.tags || [];
@@ -1221,7 +1347,7 @@ a.ni { text-decoration: none; color: inherit; }
   function tabBodyHtml(m, key) {
     if (key === "players") return playersTab(m);
     if (key === "stats") return vrsBlock(m) + formBlock(m) + h2hBlock(m) + mapsTable(m) + mapZone(m);
-    return newsList(m, key.slice(5));
+    return (key === "news:all" ? factsBlock(m) : "") + newsList(m, key.slice(5));
   }
 
   function headHtml(m) {
@@ -1230,7 +1356,7 @@ a.ni { text-decoration: none; color: inherit; }
     function tabBtn(id, label, c) { return '<button class="tab" role="tab" data-tab="' + id + '" aria-selected="' + (state.tab === id) + '">' + label + (c ? '<span class="c">' + c + '</span>' : '') + '</button>'; }
     var opts = newsSteps().map(function (f) { return [f, f === "all" ? "Все" : f]; });
     return '<div class="hbar">' + backBtn(m.tournament || "Назад") + '</div>' +
-      '<div class="fold mini-wrap"><div class="fi"><div class="mini"><span class="ma">' + esc(abbr(A)) + '</span><span class="mm">BO' + esc(m.bo) + '</span><span class="mb">' + esc(abbr(B)) + '</span></div></div></div>' +
+      '<div class="fold mini-wrap"><div class="fi"><div class="mini"><span class="ma">' + esc(abbr(A)) + miniVrs(A) + '</span><span class="mm">BO' + esc(m.bo) + '</span><span class="mb">' + esc(abbr(B)) + miniVrs(B) + '</span></div></div></div>' +
       '<div class="fold hero-wrap"><div class="fi"><section class="hero"><div class="meta"><span class="pill ' + esc(m.tier) + '">' + esc((m.tier || "").toUpperCase()) + '</span><span>' + esc(m.tournament) + (m.stage ? " · " + esc(m.stage) : "") + '</span></div>' +
       '<div class="face"><div class="tm a"><span class="acr">' + esc(abbr(A)) + '</span><span class="full">' + esc(A.name) + '</span>' + heroVrs(A) + '</div>' +
       '<div class="mid"><b>' + esc(hm(m.begin_at)) + '</b>' + esc(dm(m.begin_at)) + ' · BO' + esc(m.bo) + '</div>' +
@@ -1262,14 +1388,15 @@ a.ni { text-decoration: none; color: inherit; }
     HD.h.classList.toggle("anim", !!anim);
     HD.hw.style.height = (HD.heroH * (1 - p)) + "px";
     HD.hw.firstElementChild.style.transform = "translate3d(0," + (-HD.heroH * p * 0.5) + "px,0)";
-    HD.hw.style.opacity = String(Math.max(0, 1 - p * 1.4));
+    HD.hw.style.opacity = String(1 - ease(Math.min(1, p / 0.75)));
     HD.mw.style.height = (HD.miniH * p) + "px";
-    HD.mw.style.opacity = String(Math.max(0, Math.min(1, (p - 0.4) / 0.6)));
+    HD.mw.style.opacity = String(ease(Math.max(0, Math.min(1, (p - 0.35) / 0.65))));
     HD.nw.style.height = (HD.nfH * nf) + "px";
     HD.nw.style.opacity = String(nf);
     HD.nw.style.visibility = nf > 0.01 ? "visible" : "hidden";
     HD.sh.style.setProperty("--hcur", (HD.base + HD.heroH * (1 - p) + HD.miniH * p + HD.nfH * nf) + "px");
   }
+  function ease(x) { return x * x * (3 - 2 * x); }
   function headNow(anim) { var p = activePane(); applyHead(p ? p.scrollTop : 0, isNews(curKey()) ? 1 : 0, anim); }
   // соседняя страница встаёт так же, как текущая: шапка не прыгает (свёрнута — остаётся свёрнутой)
   function syncPane(target, from) {
@@ -1290,10 +1417,10 @@ a.ni { text-decoration: none; color: inherit; }
   function paneOf(k) { return panes().find(function (p) { return p.getAttribute("data-key") === k; }) || null; }
   function activePane() { return paneOf(curKey()); }
   function paneW() { var sh = q(".mviewport"); return sh ? sh.clientWidth : window.innerWidth; }
-  function trackTo(i, anim) {
+  function trackTo(i, anim, ms) {
     var tr = q(".mtrack");
     if (!tr) return;
-    tr.style.transition = anim ? "transform .26s cubic-bezier(.2,.7,.3,1)" : "none";
+    tr.style.transition = anim ? "transform " + (ms || 260) + "ms cubic-bezier(.2,.7,.3,1)" : "none";
     tr.style.transform = "translate3d(" + (-i * paneW()) + "px,0,0)";
   }
   function renderMatch(m) {
@@ -1348,7 +1475,7 @@ a.ni { text-decoration: none; color: inherit; }
     if (!swipeOk(e)) return;
     var keys = paneKeys();
     sw = { x: e.touches[0].clientX, y: e.touches[0].clientY, t: Date.now(), dx: 0, lock: null, keys: keys,
-           i: Math.max(0, keys.indexOf(curKey())), zone: state.tab === "stats" && e.target.closest(".mzbody") ? "map" : null, dir: 0 };
+           i: Math.max(0, keys.indexOf(curKey())), zone: state.tab === "stats" && e.target.closest(".mapzone") ? "map" : null, dir: 0 };
   }, { passive: true });
   document.addEventListener("touchmove", function (e) {
     if (!sw || sw.lock === "v") return;
@@ -1398,7 +1525,7 @@ a.ni { text-decoration: none; color: inherit; }
     }
     var next = s0.i + (s0.dx < 0 ? 1 : -1);
     if (far && next >= 0 && next < s0.keys.length) {
-      trackTo(next, true);
+      trackTo(next, true, Math.round(Math.max(130, Math.min(260, (W - Math.abs(s0.dx)) / Math.max(v * 1.6, 1.4)))));  // быстрый свайп — быстрее доезжает
       setKey(s0.keys[next]); markTabs(s0.keys[next]); headNow(true);
       try { TG && TG.HapticFeedback && TG.HapticFeedback.selectionChanged(); } catch (err) {}
     } else { trackTo(s0.i, true); markTabs(s0.keys[s0.i]); headNow(true); }
@@ -1444,7 +1571,7 @@ a.ni { text-decoration: none; color: inherit; }
     if (!s0.el) return;
     var W = paneW(), v = Math.abs(s0.dx) / Math.max(1, Date.now() - s0.t), D = s0.el.offsetWidth + 24;
     var go = s0.g && (Math.abs(s0.dx) > W * 0.22 || (v > 0.45 && Math.abs(s0.dx) > 35));
-    var t = "transform .22s cubic-bezier(.2,.7,.3,1)";
+    var t = "transform " + Math.round(Math.max(120, Math.min(220, (D - Math.abs(s0.dx)) / Math.max(v * 1.6, 1.4)))) + "ms cubic-bezier(.2,.7,.3,1)";
     if (!go) {
       if (s0.marked) markMap(state.map);
       s0.el.style.transition = t; s0.el.style.transform = "";
@@ -1504,7 +1631,7 @@ a.ni { text-decoration: none; color: inherit; }
   }
   function updateBackBtn() {
     var h = location.hash.replace("#", "");
-    try { TG && (state.ovl || (h && h !== "feed") ? TG.BackButton.show() : TG.BackButton.hide()); } catch (e) {}
+    try { TG && (state.ovl || (h && h !== "feed" && h !== "rating") ? TG.BackButton.show() : TG.BackButton.hide()); } catch (e) {}
   }
   function openSeries(S, label) { state.seriesMap = -1; openOverlay("series", S, seriesView(S, label)); }
 
@@ -1545,7 +1672,12 @@ a.ni { text-decoration: none; color: inherit; }
   // ---------- свайпы на главной и в турнире: вкладки и назад
   var ps = null;
   function pageSteps() {
-    if (state.view === "home" || state.view === "feed") return { list: ["home", "feed"], i: state.view === "feed" ? 1 : 0, back: false };
+    if (state.view === "home" || state.view === "feed" || state.view === "rating") {
+      var L = ["t:live", "t:up", "t:done", "feed"].concat(RATE_SUBS.map(function (o) { return "r:" + o[0]; }));
+      var cur = state.view === "feed" ? "feed" : state.view === "rating" ? "r:" + rateSub() : "t:" + tourSub();
+      return { list: L, i: Math.max(0, L.indexOf(cur)), back: false, home: true };
+    }
+    if (state.view && state.view.indexOf("team:") === 0) return { list: ["team"], i: 0, back: true };
     if (state.view && state.view.indexOf("tour:") === 0) {
       var t = findTour(state.view.slice(5)), L = t && t.results ? ["matches", "done"] : ["matches"];
       return { list: L, i: state.tourTab === "done" && L.length > 1 ? 1 : 0, back: true };
@@ -1592,7 +1724,13 @@ a.ni { text-decoration: none; color: inherit; }
     setTimeout(function () {
       var from = p0.dx < 0 ? 1 : -1;
       if (next < 0) { goBack(); }
-      else if (p0.st.list[0] === "home") { location.hash = p0.st.list[next] === "feed" ? "feed" : ""; }
+      else if (p0.st.home) {
+        var k = p0.st.list[next];
+        if (k === "feed") { if (location.hash !== "#feed") location.hash = "feed"; else renderFeed(); }
+        else if (k.indexOf("r:") === 0) { state.rateSub = k.slice(2); if (location.hash !== "#rating") location.hash = "rating"; else renderRating(); }
+        else { state.tourSub = k.slice(2); if (location.hash) location.hash = ""; else renderHome(); }
+        var hs = q("#app .hsub"); if (hs) revealSel(hs);
+      }
       else { state.tourTab = p0.st.list[next]; showTourTab(); }
       var nv = q("#app > .view");
       if (nv) {
@@ -1632,6 +1770,8 @@ a.ni { text-decoration: none; color: inherit; }
       if (state.view !== "tour:" + tt[1]) state.tourTab = "matches";
       state.view = "tour:" + tt[1]; showTourTab();
     }
+    else if (h === "rating") { state.view = "rating"; renderRating(); getRanking().then(function () { if (state.view === "rating") renderRating(); }).catch(function () { state.rankingErr = true; if (state.view === "rating") renderRating(); }); }
+    else if (/^r-/.test(h)) { var sl = h.slice(2); state.view = "team:" + sl; state.teamErr = false; renderTeam(sl); getTeam(sl).then(function () { if (state.view === "team:" + sl) renderTeam(sl); }).catch(function () { state.teamErr = true; if (state.view === "team:" + sl) renderTeam(sl); }); }
     else if (h === "feed") { state.view = "feed"; renderFeed(); getFeed().then(function () { if (state.view === "feed") renderFeed(); }).catch(function () { if (state.view === "feed") $app.innerHTML = homeHeader("feed") + '<div class="empty"><strong>Лента пока не собрана</strong>Появится после ближайшего обновления данных.</div></div>'; }); }
     else { state.view = "home"; renderHome(); }
   }
@@ -1643,17 +1783,75 @@ a.ni { text-decoration: none; color: inherit; }
     if (/^m-/.test(h)) {
       var m = (state.list.matches || []).find(function (x) { return "m-" + x.id === h; });
       location.hash = m ? "t-" + tourOf(m) : "";
-    } else location.hash = "";
+    } else if (/^r-/.test(h)) location.hash = "rating";
+    else location.hash = "";
   }
 
-  if (TG) { try { TG.BackButton.onClick(goBack); } catch (e) {} }
+  if (TG) { try { TG.BackButton.onClick(goBack); TG.disableVerticalSwipes && TG.disableVerticalSwipes(); } catch (e) {} }
+
+  // ---------- потянуть вниз в самом верху — обновить данные
+  var pr = null, prEl = null;
+  function atTop() {
+    if (state.ovl) return false;
+    if (state.openId) { var p = activePane(); return !!p && p.scrollTop <= 0; }
+    return window.scrollY <= 0;
+  }
+  function ptrShow(y, txt, spin) {
+    if (!prEl) { prEl = document.createElement("div"); prEl.className = "ptr"; document.body.appendChild(prEl); }
+    prEl.innerHTML = (spin ? '<i class="spin"></i>' : '<i class="arr" style="transform:rotate(' + (y > 60 ? 180 : 0) + 'deg)">↓</i>') + esc(txt);
+    prEl.style.transition = spin ? "transform .18s ease-out" : "none";
+    prEl.style.transform = "translate3d(-50%," + (y - 50) + "px,0)";
+    prEl.style.opacity = String(Math.min(1, y / 40));
+  }
+  function ptrHide() { if (prEl) { prEl.style.transition = "transform .2s ease-out, opacity .2s"; prEl.style.transform = "translate3d(-50%,-60px,0)"; prEl.style.opacity = "0"; } }
+  document.addEventListener("touchstart", function (e) {
+    pr = null;
+    if (e.touches.length !== 1 || state.refreshing || !state.list || !atTop()) return;
+    pr = { x: e.touches[0].clientX, y: e.touches[0].clientY, dy: 0, lock: null };
+  }, { passive: true });
+  document.addEventListener("touchmove", function (e) {
+    if (!pr || pr.lock === "x") return;
+    var dx = e.touches[0].clientX - pr.x, dy = e.touches[0].clientY - pr.y;
+    if (!pr.lock) {
+      if (dy > 10 && dy > Math.abs(dx) * 1.5) pr.lock = "v";
+      else if (Math.abs(dx) > 10 || dy < -10) { pr.lock = "x"; return; }
+      else return;
+    }
+    pr.dy = Math.min(110, dy * 0.5);
+    ptrShow(pr.dy, pr.dy > 60 ? "Отпусти — обновлю" : "Потяни, чтобы обновить");
+  }, { passive: true });
+  function ptrEnd() {
+    if (!pr) return;
+    var p0 = pr; pr = null;
+    if (p0.lock !== "v") return;
+    if (p0.dy <= 60) { ptrHide(); return; }
+    refreshAll();
+  }
+  document.addEventListener("touchend", ptrEnd, { passive: true });
+  document.addEventListener("touchcancel", ptrEnd, { passive: true });
+  function refreshAll() {
+    state.refreshing = true;
+    ptrShow(56, "Обновляю…", true);
+    try { TG && TG.HapticFeedback && TG.HapticFeedback.impactOccurred("light"); } catch (err) {}
+    state.details = {}; state.feed = null; state.results = {}; state.ranking = null; state.teams = {};
+    getList().then(function (L) { state.list = L; route(); }).catch(function () {})
+      .then(function () { setTimeout(function () { state.refreshing = false; ptrHide(); }, 400); });
+  }
   window.addEventListener("hashchange", route);
 
   // ---------- клики
   document.addEventListener("click", function (e) {
-    var t = e.target.closest("[data-fread],[data-close],#facts-more,[data-home],[data-feedch],[data-tg],[data-reader],[data-open],[data-tour],[data-tab],[data-map],[data-nf],[data-player],[data-link],[data-read],[data-series],[data-rseries],[data-smap],[data-ttab],#back");
+    var t = e.target.closest("[data-tsub],[data-rsub],[data-team],[data-tseries],[data-fread],[data-close],#facts-more,[data-home],[data-feedch],[data-tg],[data-reader],[data-open],[data-tour],[data-tab],[data-map],[data-nf],[data-player],[data-link],[data-read],[data-series],[data-rseries],[data-smap],[data-ttab],#back");
     if (!t) return;
-    if (t.hasAttribute("data-home")) { var hv = t.getAttribute("data-home"); if (hv === "feed") { location.hash = hv; } else if (location.hash) { location.hash = ""; } return; }
+    if (t.hasAttribute("data-home")) { var hv = t.getAttribute("data-home"); if (hv === "feed" || hv === "rating") { location.hash = hv; } else if (location.hash) { location.hash = ""; } return; }
+    if (t.hasAttribute("data-tsub")) { state.tourSub = t.getAttribute("data-tsub"); keepFilterScroll(renderHome); return; }
+    if (t.hasAttribute("data-rsub")) { state.rateSub = t.getAttribute("data-rsub"); keepFilterScroll(renderRating); return; }
+    if (t.hasAttribute("data-team")) { go("#r-" + t.getAttribute("data-team")); window.scrollTo(0, 0); return; }
+    if (t.hasAttribute("data-tseries")) {
+      var TT = (state.teams || {})[state.view.slice(5)], S3 = TT && (TT.series || {})[t.getAttribute("data-tseries")];
+      if (S3) openSeries(S3, TT.name);
+      return;
+    }
     if (t.hasAttribute("data-close")) { goBack(); return; }
     if (t.hasAttribute("data-fread")) {
       var it = ((state.feed || {}).items || []).find(function (x) { return x.key === t.getAttribute("data-fread"); });

@@ -1,0 +1,58 @@
+name: Обновить новости
+
+on:
+  schedule:
+    - cron: "*/20 * * * *"   # каждые 20 минут: только Telegram-каналы (лента и новости матчей)
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: collect
+  cancel-in-progress: false
+
+jobs:
+  news:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Восстановить кэш сборщика
+        uses: actions/cache/restore@v4
+        with:
+          path: cache
+          key: collector-cache-${{ github.run_id }}
+          restore-keys: collector-cache-
+
+      - name: Свежие новости
+        env:
+          NEWS_ONLY: "1"
+          GIGACHAT_KEY: ${{ secrets.GIGACHAT_KEY }}
+        run: python collector/collect.py
+
+      - name: Сохранить кэш сборщика
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: cache
+          key: collector-cache-${{ github.run_id }}
+
+      - name: Сохранить данные
+        run: |
+          git config user.name "cs-prep-bot"
+          git config user.email "cs-prep-bot@users.noreply.github.com"
+          git add docs/data
+          git diff --cached --quiet && exit 0
+          git commit -m "Новости: $(date -u +'%Y-%m-%d %H:%M') UTC"
+          for i in 1 2 3; do
+            git pull --rebase --autostash -X theirs -q origin main && git push && exit 0
+            git rebase --abort 2>/dev/null || true
+            sleep 5
+          done
+          exit 1

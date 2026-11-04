@@ -703,11 +703,18 @@ def map_title(raw: str | None) -> str | None:
     return r[:1].upper() + r[1:]
 
 
+GAMES_NEW_LIMIT = int(os.environ.get("GAMES_NEW_LIMIT", "700"))
+_games_new = [0]
+
+
 def bo3_games(m: dict) -> list[dict]:
     """Карты матча как есть: [{'map','n','wn','ln','ws','ls'}] (кто выиграл — по клан-тегу). Кэш навсегда."""
     key = str(m["id"])
     if key in games_cache:
         return games_cache[key]
+    if _games_new[0] >= GAMES_NEW_LIMIT:
+        return []  # лимит новых запросов за запуск — догрузим в следующий раз
+    _games_new[0] += 1
     try:
         games = bo3("/games", {"filter[games.match_id][eq]": m["id"]}).get("results") or []
     except Exception as e:
@@ -892,7 +899,7 @@ def bo3_h2h_matches(a: int, b: int) -> list[dict]:
 
 
 def build_h2h(a: int, b: int, hist_a: list[dict]) -> list[dict]:
-    since = NOW - timedelta(days=H2H_DAYS)
+    since = datetime(NOW.year, 1, 1, tzinfo=timezone.utc)  # «за год» — текущий календарный год
     exact = bo3_h2h_matches(a, b)
     if exact:
         hist_a = exact
@@ -939,7 +946,7 @@ def build_maps(bids: list[int | None], hists: list[list[dict]], max_matches: int
                 row["teams"][idx]["won"] += int(r["won"])
                 recent.setdefault(name, []).append({
                     "team": idx, "date": m.get("start_date"), "vs": opp.get("acronym") or opp.get("name"),
-                    "won": r["won"], "score": r["score"], "tournament": tour_name(m)})
+                    "won": r["won"], "score": r["score"], "tournament": tour_name(m), "sid": m.get("id")})
     for name in recent:
         recent[name].sort(key=lambda r: r["date"] or "", reverse=True)
     rows = sorted(table.values(), key=lambda r: -(r["teams"][0]["played"] + r["teams"][1]["played"]))
@@ -1247,30 +1254,70 @@ def build_results(tr: dict) -> dict | None:
 
 # ---------------------------------------------------------------- рейтинг Valve (VRS) и призовые места
 
-VRS_REGION = {"eu": "Европа", "am": "Америка", "na": "Америка", "sa": "Америка", "as": "Азия", "asia": "Азия"}
+VRS_REGION = {"europe": "Европа", "americas": "Америка", "eu": "Европа", "am": "Америка", "na": "Америка", "sa": "Америка", "as": "Азия", "asia": "Азия"}
+
+
+def parse_ranked(h: str) -> list[dict]:
+    """Страница рейтинга HLTV (Valve или собственный): место, название, очки, регион, id команды."""
+    b = hclean(h)
+    out = []
+    for blk in b.split('<div class="ranked-team standard-box">')[1:]:
+        pos = re.search(r'class="position[^"]*">#(\d+)<', blk)
+        nm = re.search(r'<span class="name">([^<]+)</span>', blk)
+        pts = re.search(r'<span class="points">\((\d+)', blk)
+        reg = re.search(r'<span class="region region-([a-z]+)">([^<]*)<', blk)
+        tid = re.search(r'href="/team/(\d+)/([^"#?]+)"', blk)
+        if not (pos and nm and pts):
+            continue
+        out.append({"rank": int(pos.group(1)), "name": strip_html(nm.group(1)), "points": int(pts.group(1)),
+                    "region": (VRS_REGION.get(reg.group(1)) or VRS_REGION.get(reg.group(2).strip().lower()) or reg.group(2)) if reg else None,
+                    "hltv": {"id": int(tid.group(1)), "slug": tid.group(2)} if tid else None})
+    seen: dict = {}
+    for r in out:  # место внутри своего региона
+        seen[r.get("region")] = seen.get(r.get("region"), 0) + 1
+        r["reg_rank"] = seen[r.get("region")]
+    return out
 
 
 def vrs_table() -> list[dict]:
     """Живой рейтинг Valve с HLTV: место, очки, регион (учитывает и незавершённые турниры)."""
     def fn():
         h = hltv_get("/valve-ranking/teams")
-        if not h:
-            return None
-        b = hclean(h)
+        return parse_ranked(h) if h else None
+    return hltv_cached("vrs2", fn) or []
+
+
+def hltv_world_ranking() -> list[dict]:
+    def fn():
+        h = hltv_get("/ranking/teams")
+        return parse_ranked(h) if h else None
+    return hltv_cached("hltvrank", fn) or []
+
+
+def valve_md_table() -> list[dict]:
+    """Официальный рейтинг Valve с GitHub (снимок раз в месяц) — если на HLTV меньше 100 команд."""
+    def fn():
+        base = "https://api.github.com/repos/ValveSoftware/counter-strike_regional_standings/contents/live/" + str(NOW.year)
+        files = sorted(x["name"] for x in json.loads(http_get(base, {"Accept": "application/vnd.github+json"})) if x.get("type") == "file")
+        raw = "https://raw.githubusercontent.com/ValveSoftware/counter-strike_regional_standings/main/live/%d/" % NOW.year
+        glob = [f for f in files if f.startswith("standings_global")][-1]
+        region = {}
+        for key, ru in (("europe", "Европа"), ("americas", "Америка"), ("asia", "Азия")):
+            fs = [f for f in files if f.startswith("standings_" + key)]
+            if fs:
+                for line in http_get(raw + fs[-1]).decode("utf-8", "replace").splitlines():
+                    c = [x.strip() for x in line.split("|")]
+                    if len(c) > 4 and c[1].isdigit():
+                        region[c[3]] = (ru, int(c[1]))
         out = []
-        for blk in b.split('<div class="ranked-team standard-box">')[1:]:
-            pos = re.search(r'class="position[^"]*">#(\d+)<', blk)
-            nm = re.search(r'<span class="name">([^<]+)</span>', blk)
-            pts = re.search(r'<span class="points">\((\d+)', blk)
-            reg = re.search(r'<span class="region region-([a-z]+)">([^<]*)<', blk)
-            tid = re.search(r'href="/team/(\d+)/([^"#?]+)"', blk)
-            if not (pos and nm and pts):
-                continue
-            out.append({"rank": int(pos.group(1)), "name": strip_html(nm.group(1)), "points": int(pts.group(1)),
-                        "region": (VRS_REGION.get(reg.group(1)) or VRS_REGION.get(reg.group(2).strip().lower()) or reg.group(2)) if reg else None,
-                        "hltv": {"id": int(tid.group(1)), "slug": tid.group(2)} if tid else None})
-        return out or None
-    return hltv_cached("vrs", fn) or []
+        for line in http_get(raw + glob).decode("utf-8", "replace").splitlines():
+            c = [x.strip() for x in line.split("|")]
+            if len(c) > 4 and c[1].isdigit():
+                rg = region.get(c[3]) or (None, None)
+                out.append({"rank": int(c[1]), "name": c[3], "points": int(c[2]), "region": rg[0], "reg_rank": rg[1], "hltv": None,
+                            "roster": [x.strip() for x in c[4].split(",") if x.strip()]})
+        return {"date": glob[17:27].replace("_", "-"), "teams": out} if out else None
+    return hltv_cached("valvemd", fn) or {}
 
 
 def vrs_find(t: dict, table: list[dict]) -> dict | None:
@@ -1307,7 +1354,7 @@ def vrs_outcomes(a: dict, b: dict, table: list[dict]) -> dict:
     return res
 
 
-PLACE_TOP = re.compile(r"^(1st|2nd|3rd|3-4th|4th)$")
+PLACE_TOP = re.compile(r"^(1st|2nd|3rd|3-4th)$")
 
 
 def team_achievements(hltv_team: dict) -> list[dict]:
@@ -1692,7 +1739,7 @@ def feed_dedupe(clusters: list[list[dict]]) -> list[list[dict]]:
         return i
     W, STEP = 40, 30
     stale: set = set()
-    for start in range(0, max(1, min(len(clusters), 110) - 10), STEP):  # свежие ~110 постов: дубли бывают рядом по времени
+    for start in range(0, 1 if FAST else max(1, min(len(clusters), 110) - 10), STEP):  # быстрый режим — только свежие 40  # свежие ~110 постов: дубли бывают рядом по времени
         idx = list(range(start, min(len(clusters), start + W)))
         if len(idx) < 2:
             break
@@ -2595,7 +2642,12 @@ def giga_kind(model: str | None) -> str:
     return "max" if "max" in m else "pro" if "pro" in m else "lite"
 
 
+FAST = os.environ.get("NEWS_ONLY") == "1"   # быстрое обновление: только новости из Telegram
+
+
 def giga_chat(system: str, user: str, max_tokens: int = 900, model: str | None = None) -> str | None:
+    if FAST and system is DEDUP_SYSTEM:
+        return None  # в быстром режиме повторы в новостях матча склеиваем без нейросети (экономим лимит)
     if not GIGA_KEY or _giga["off"]:
         return None
     if not giga_budget_ok(giga_kind(model)):
@@ -3218,6 +3270,21 @@ def build_detail(m: dict, prev: dict | None) -> dict:
                 sd = None
             if sd:
                 series[k] = sd
+    # и по матчам из «Последних игр на карте»
+    by_id = {str(m0.get("id")): m0 for hist in hists for m0 in hist}
+    for name, rows in ((detail.get("maps") or {}).get("recent") or {}).items():
+        for i in (0, 1):
+            for g in [r for r in rows if r.get("team") == i][:8]:
+                k = str(g.get("sid"))
+                if k in series or k not in by_id:
+                    continue
+                try:
+                    sd = series_detail(by_id[k])
+                except Exception as e:
+                    warn(f"Серия {k}: {e!r}")
+                    sd = None
+                if sd:
+                    series[k] = sd
     detail["series"] = series
     # место и очки VRS, оценка при разных исходах, призовые места за 3 месяца
     try:
@@ -3230,7 +3297,7 @@ def build_detail(m: dict, prev: dict | None) -> dict:
         r = vrs_find(t, table) if table else None
         rows.append(r)
         if r:
-            t["vrs"] = {"rank": r["rank"], "points": r["points"], "region": r.get("region")}
+            t["vrs"] = {"rank": r["rank"], "points": r["points"], "region": r.get("region"), "reg_rank": r.get("reg_rank")}
         try:
             t["prizes"] = prize_places((r or {}).get("hltv") or hltv_team_for(t), hist)
         except Exception as e:
@@ -3244,10 +3311,116 @@ def build_detail(m: dict, prev: dict | None) -> dict:
     else:
         detail["news"] = prev["news"]
     try:
-        detail["facts"] = build_facts(detail, prev)
+        if soon or not prev:
+            detail["facts"] = build_facts(detail, prev)
+        else:
+            detail["facts"] = prev.get("facts") or (code_facts(detail)[:20] or None)  # до матча ещё далеко — нейросеть не тратим
     except Exception as e:
         warn(f"Факты: {e!r}")
     return detail
+
+
+TEAM_GAMES_NEW = [0]
+
+
+def team_by_name(name: str) -> int | None:
+    key = "n:" + norm(name)
+    if teams_map.get(key):
+        return teams_map[key]
+    bid = bo3_team_id({"id": key, "name": name})
+    if bid:
+        teams_map[key] = bid
+    return bid
+
+
+def build_team_page(r: dict) -> dict | None:
+    """Страница команды из рейтинга: место, состав, форма, карты, призовые."""
+    bid = team_by_name(r["name"])
+    if not bid:
+        return None
+    add_alias(bid, r["name"])
+    hist = bo3_history(bid, pages=1)
+    form = build_form(bid, hist)
+    series = {}
+    for m0 in hist[:10]:
+        try:
+            sd = series_detail(m0)
+        except Exception as e:
+            warn(f"Серия {m0.get('id')}: {e!r}")
+            sd = None
+        if sd:
+            series[str(m0.get("id"))] = sd
+    maps = build_maps([bid], [hist], max_matches=30)
+    for row in maps.get("table") or []:
+        row["teams"] = row["teams"][:1]
+    players = list((bo3_team_players(bid, hist) or {}).values())
+    ach = []
+    if r.get("hltv") and (hltv_cache.get(f"ach:{r['hltv']['id']}") or TEAM_GAMES_NEW[0] < 6):
+        TEAM_GAMES_NEW[0] += 1
+        try:
+            ach = prize_places(r["hltv"], hist)
+        except Exception as e:
+            warn(f"Призовые {r['name']}: {e!r}")
+    return {"updated": iso(NOW), "name": r["name"], "vrs": {k: r.get(k) for k in ("rank", "points", "region", "reg_rank")},
+            "players": players or r.get("roster") or [], "form": form, "series": series,
+            "maps": {"window_days": maps.get("window_days"), "table": maps.get("table") or []}, "prizes": ach}
+
+
+def team_slug(name: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "-", norm(name) or name.lower()).strip("-") or "team"
+
+
+def build_ranking() -> dict:
+    """Вкладка «Рейтинг»: топ-100 VRS (живой с HLTV, иначе официальный снимок Valve) и рейтинг HLTV."""
+    vrs = vrs_table()
+    src, date = "HLTV · живой рейтинг Valve", None
+    if len(vrs) < 100:
+        md = valve_md_table()
+        if len(md.get("teams") or []) > len(vrs):
+            vrs, src, date = md["teams"], "Valve · официальный рейтинг", md.get("date")
+    vrs = vrs[:100]
+    hl = hltv_world_ranking()[:100]
+    (OUT / "team").mkdir(parents=True, exist_ok=True)
+    keep = set()
+    for r in vrs:
+        r["slug"] = team_slug(r["name"])
+        path = OUT / "team" / f"{r['slug']}.json"
+        try:
+            page = build_team_page(r)
+        except Exception as e:
+            warn(f"Команда {r['name']}: {e!r}")
+            page = None
+        if page:
+            save_json(path, page)
+        if path.exists():
+            keep.add(path.name)
+            r["page"] = True
+    for r in hl:
+        r["slug"] = team_slug(r["name"])
+        r["page"] = (r["slug"] + ".json") in keep
+    for f in (OUT / "team").glob("*.json"):
+        if f.name not in keep:
+            f.unlink()
+    return {"updated": iso(NOW), "vrs": {"source": src, "date": date, "teams": vrs}, "hltv": {"teams": hl}}
+
+
+def finished_tournaments() -> list[dict]:
+    """Сыгранные турниры тир-1 этого года — для вкладки «Завершённые»."""
+    try:
+        res = bo3("/tournaments", {"page[limit]": 30, "sort": "-start_date", "filter[tournaments.tier][in]": ",".join(sorted(TIERS)),
+                                   "filter[tournaments.status][in]": "finished"}).get("results") or []
+    except Exception as e:
+        warn(f"bo3 завершённые турниры: {e!r}")
+        return []
+    out = []
+    for t in res:
+        b, e = parse_iso(t.get("start_date")), parse_iso(t.get("end_date"))
+        if not b or b.year != NOW.year:
+            continue
+        out.append({"id": "bo3-" + str(t["id"]), "name": (t.get("name") or "").replace("Intel Extreme Masters", "IEM"),
+                    "tier": (t.get("tier") or "").lower(), "begin": iso(b), "end": iso(e) if e else None,
+                    "prize": None, "prize_usd": t.get("prize"), "matches": 0, "next": None, "live": 0, "finished": True})
+    return out
 
 
 def prune_caches() -> None:
@@ -3283,7 +3456,9 @@ def main() -> int:
     for m in matches:
         b = match_brief(m)
         begin = parse_iso(b["begin_at"])
-        detailed = len(b["teams"]) == 2 and begin is not None and begin - NOW <= timedelta(hours=DETAIL_HOURS)
+        sb = parse_iso((b.get("serie") or {}).get("begin"))
+        detailed = len(b["teams"]) == 2 and begin is not None and (begin - NOW <= timedelta(hours=DETAIL_HOURS)
+                                                                   or (sb is not None and sb - NOW <= timedelta(hours=DETAIL_HOURS)))  # за 3 дня до турнира
         if detailed:
             path = OUT / "match" / f"{m['id']}.json"
             prev = load_json(path, None)
@@ -3337,6 +3512,9 @@ def main() -> int:
         else:
             tours[tr["id"]] = tr
     tour_list = [t for t in tours.values() if not t.get("end") or (parse_iso(t["end"]) or NOW) >= NOW - timedelta(hours=12)]
+    for tr in finished_tournaments():
+        if not any(tour_same(tr["name"], tour_norm(t["name"])) for t in tour_list):
+            tour_list.append(tr)
     tour_list.sort(key=lambda x: (x.get("begin") or x.get("next") or "9999"))
     for tr in tour_list:
         b = parse_iso(tr.get("begin"))
@@ -3352,10 +3530,14 @@ def main() -> int:
     keep_res = set()
     for tr in tour_list:
         b, e = parse_iso(tr.get("begin")), parse_iso(tr.get("end"))
-        if not b or b > NOW or (e and e < NOW - timedelta(days=2)):
+        if not b or b > NOW:
             continue
         fid = re.sub(r"[^\w-]", "-", str(tr["id"]))
         path = OUT / "results" / f"{fid}.json"
+        if e and e < NOW - timedelta(days=2) and path.exists():
+            keep_res.add(path.name)  # итоги давно закончившегося турнира уже не меняются
+            tr["results"] = len((load_json(path, {}) or {}).get("matches") or [])
+            continue
         try:
             res = build_results(tr)
         except Exception as ex:
@@ -3380,6 +3562,10 @@ def main() -> int:
         attach_major(tour_list, rosters)
     except Exception as e:
         warn(f"Мейджор: {e!r}")
+    try:
+        save_json(OUT / "ranking.json", build_ranking())
+    except Exception as e:
+        warn(f"Рейтинг: {e!r}")
     for k in [k for k, v in tg_cache.items() if (v.get("t") or "") < iso(NOW - timedelta(days=NEWS_DAYS + 3))]:
         del tg_cache[k]
     save_json(TG_CACHE_F, tg_cache)
@@ -3416,5 +3602,30 @@ def main() -> int:
     return 0
 
 
+def news_main() -> int:
+    """Каждые ~20 минут: свежие посты каналов → лента и новости уже собранных матчей. Статистику не трогаем."""
+    L = load_json(OUT / "matches.json", {}) or {}
+    CURRENT_TOURS[:] = list(dict.fromkeys(m.get("tournament") for m in L.get("matches") or [] if m.get("tournament")))
+    try:
+        save_json(OUT / "feed.json", build_feed())
+    except Exception as e:
+        warn(f"Лента: {e!r}")
+    for f in (OUT / "match").glob("*.json"):
+        d = load_json(f, None)
+        if not d or not d.get("teams"):
+            continue
+        try:
+            d["news"] = build_news(d["teams"])
+            save_json(f, d)
+        except Exception as e:
+            warn(f"Новости {f.stem}: {e!r}")
+    save_json(TG_CACHE_F, tg_cache)
+    save_json(GIGA_USAGE_F, giga_usage)
+    save_json(DEDUP_CACHE_F, dedup_cache)
+    save_json(TR_CACHE_F, tr_cache)
+    print(f"Новости обновлены, предупреждений: {len(stats['warnings'])}")
+    return 0
+
+
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(news_main() if FAST else main())
