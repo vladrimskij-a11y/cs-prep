@@ -479,11 +479,14 @@ html { overflow-anchor: none; }
 .lv-p { display: grid; grid-template-columns: 1fr auto 30px; gap: 6px; font-size: 12.5px; padding: 2px 0; }
 .lv-p span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .lv-p i { font-style: normal; color: var(--muted); text-align: right; }
 .lv-h { margin-top: 8px; font-size: 11px; color: var(--muted); }
-.box.cheat { padding: 4px 12px; }
-.ch-r { display: grid; grid-template-columns: 92px 1fr; gap: 10px; padding: 8px 0; border-top: 1px solid var(--line); font-size: 13px; line-height: 1.4; }
-.ch-r:first-child { border-top: 0; }
-.ch-k { color: var(--muted); font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; padding-top: 2px; }
-.ch-v b.a { color: var(--ct); } .ch-v b.b { color: var(--t); }
+[data-tname] { cursor: pointer; } .tlink { text-decoration: none; }
+.toast { position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--fg); color: var(--bg); padding: 10px 16px; border-radius: 12px; font-size: 13px; z-index: 99; max-width: calc(100vw - 32px); transition: opacity .3s; }
+.toast.out { opacity: 0; }
+.stake { padding: 4px 14px; }
+.stk { display: grid; grid-template-columns: 22px 1fr; gap: 8px; padding: 10px 0; border-top: 1px solid var(--line); font-size: 14px; line-height: 1.4; }
+.stk:first-child { border-top: 0; }
+.stk i { font-style: normal; font-size: 16px; line-height: 1.25; text-align: center; }
+.stk .slot { display: inline-block; margin-top: 4px; font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: color-mix(in srgb, var(--accent, #4c8dff) 16%, transparent); color: var(--fg); }
 .pstat.tf { margin-top: 2px; color: var(--muted); } .pstat.tf small { color: var(--muted); }
 .pop { position: fixed; inset: 0; z-index: 50; }
 .pop-in { position: fixed; max-width: min(320px, calc(100vw - 24px)); max-height: 50vh; overflow: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
@@ -1136,6 +1139,23 @@ a.ni { text-decoration: none; color: inherit; }
     }
     return html;
   }
+  function toast(txt) {
+    var el = document.createElement("div"); el.className = "toast"; el.textContent = txt; document.body.appendChild(el);
+    setTimeout(function () { el.classList.add("out"); }, 1800); setTimeout(function () { el.remove(); }, 2200);
+  }
+  // страница команды по названию из любого места (шапка матча, состав, стадии мажора, участники)
+  function tnorm(x) { return String(x || "").toLowerCase().replace(/[^a-z0-9а-я]/g, ""); }
+  function teamSlugFor(name) {
+    var T = ((state.ranking || {}).vrs || {}).teams || [], n = tnorm(name), n2 = tnorm(String(name || "").replace(/^(the|team)\s+|\s+(team|esports|gaming|club)$/ig, ""));
+    if (!n) return null;
+    var hit = T.find(function (t) { return t.page && (tnorm(t.name) === n || tnorm(t.name) === n2 || tnorm(t.slug) === n); })
+      || T.find(function (t) { var k = tnorm(t.name); return t.page && k.length >= 3 && n.length >= 3 && (k.indexOf(n2 || n) >= 0 || (n2 || n).indexOf(k) >= 0); });
+    return hit ? hit.slug : null;
+  }
+  function openTeamByName(name) {
+    var go2 = function () { var sl = teamSlugFor(name); if (sl) { go("#r-" + sl); window.scrollTo(0, 0); } else toast("Страницы команды " + name + " пока нет"); };
+    if (state.ranking) go2(); else getRanking().then(go2).catch(function () { toast("Не удалось открыть страницу команды"); });
+  }
   function showTeam(slug) {
     var T = (state.teams || {})[slug];
     renderShell({ id: "team:" + slug, back: "Рейтинг", title: esc(T ? T.name : "Команда"), tabs: [{ key: "main", label: "" }], pane: function () { return teamPane(T); } });
@@ -1313,7 +1333,7 @@ a.ni { text-decoration: none; color: inherit; }
       html += '<div class="box mjs"><div class="mjs-h"><b>' + esc(st.stage) + '</b><span>' + esc(STAGE_RU[st.stage] || "") + ' · ' + st.teams.length + ' ' + plural(st.teams.length, "команда", "команды", "команд") + '</span></div><div class="mjs-list">';
       st.teams.forEach(function (x) {
         var rc = x.roster_change;
-        html += '<div class="mjs-t"><span class="mjs-n">' + logo(x.name) + esc(x.name) + '</span><span class="mjs-r">' + esc(x.region || "") + '</span>' +
+        html += '<div class="mjs-t" data-tname="' + esc(x.name) + '"><span class="mjs-n">' + logo(x.name) + esc(x.name) + '</span><span class="mjs-r">' + esc(x.region || "") + '</span>' +
           (x.chance ? '<span class="ch ' + (x.chance === "уверенно" ? "hi" : x.chance === "вероятно" ? "mid" : "lo") + '">' + esc(x.chance) + '</span>' : '') +
           (rc ? '<span class="ch lo">состав изменился</span>' : '') + '</div>';
       });
@@ -1321,7 +1341,7 @@ a.ni { text-decoration: none; color: inherit; }
     });
     if ((M.bubble || []).length) {
       html += '<div class="box mjs"><div class="mjs-h"><b>Ближайшие за чертой</b><span>могут занять место при отказе или смене состава</span></div><div class="mjs-list">' +
-        M.bubble.map(function (x) { return '<div class="mjs-t"><span class="mjs-n">' + esc(x.name) + '</span><span class="mjs-r">' + esc(x.region || "") + '</span><span class="ch lo">−' + esc(x.gap) + ' очк.</span></div>'; }).join("") + '</div></div>';
+        M.bubble.map(function (x) { return '<div class="mjs-t" data-tname="' + esc(x.name) + '"><span class="mjs-n">' + esc(x.name) + '</span><span class="mjs-r">' + esc(x.region || "") + '</span><span class="ch lo">−' + esc(x.gap) + ' очк.</span></div>'; }).join("") + '</div></div>';
     }
     return html + '</div>';
   }
@@ -1344,7 +1364,7 @@ a.ni { text-decoration: none; color: inherit; }
       var cur = null;
       html += '<div class="sec"><h3>Участники <span>как попали</span></h3><div class="box">' + list.map(function (t) {
         var g = howRu(t.how), head = g !== cur ? (cur = g, '<div class="prz-g">' + esc(g) + '</div>') : '';
-        return head + '<div class="prz-row"><span class="prz-pl">' + logo(t.name) + esc(t.name) + '</span></div>';
+        return head + '<div class="prz-row" data-tname="' + esc(t.name) + '"><span class="prz-pl">' + logo(t.name) + esc(t.name) + '</span></div>';
       }).join("") + '</div></div>';
     }
     return html;
@@ -1732,9 +1752,9 @@ a.ni { text-decoration: none; color: inherit; }
     return html;
   }
   function playersTab(m) {
-    var html = '<div id="livebox">' + (state.live && state.live.id === m.id ? state.live.html || "" : "") + '</div>' + cheatSheet(m);
+    var html = '<div id="livebox">' + (state.live && state.live.id === m.id ? state.live.html || "" : "") + '</div>';
     m.teams.forEach(function (t, i) {
-      html += '<div class="sec"><div class="box roster ' + (i ? "b" : "a") + '"><div class="hd"><span class="tn">' + esc(t.name) + '</span>' + trophyCount(t.prizes) + medalsHtml(t.prizes) + '</div>';
+      html += '<div class="sec"><div class="box roster ' + (i ? "b" : "a") + '"><div class="hd"><span class="tn tlink" data-tname="' + esc(t.name) + '">' + esc(t.name) + ' ›</span>' + trophyCount(t.prizes) + medalsHtml(t.prizes) + '</div>';
       if (!(t.players || []).length) html += '<div class="note">Состав не указан.</div>';
       html += rosterRows(t.players, t.coach, t, true) + '</div></div>';
     });
@@ -1870,7 +1890,7 @@ a.ni { text-decoration: none; color: inherit; }
 
   function tabBodyHtml(m, key) {
     if (key === "players") return playersTab(m);
-    if (key === "stats") return vrsBlock(m) + pickBlock(m) + mapsTable(m) + formBlock(m) + h2hBlock(m) + mapZone(m);
+    if (key === "stats") return stakeBlock(m) + vrsBlock(m) + pickBlock(m) + mapsTable(m) + formBlock(m) + h2hBlock(m) + mapZone(m);
     return (key === "news:all" ? factsBlock(m) : "") + newsList(m, key.slice(5));
   }
 
@@ -1880,11 +1900,11 @@ a.ni { text-decoration: none; color: inherit; }
     function tabBtn(id, label, c) { return '<button class="tab" role="tab" data-tab="' + id + '" aria-selected="' + (state.tab === id) + '">' + label + (c ? '<span class="c">' + c + '</span>' : '') + '</button>'; }
     var opts = newsSteps().map(function (f) { return [f, f === "all" ? "Все" : f]; });
     return '<div class="hbar">' + backBtn(m.tournament || "Назад") + '</div>' +
-      '<div class="fold mini-wrap"><div class="fi"><div class="mini"><span class="ma">' + esc(abbr(A)) + miniVrs(A) + '</span><span class="mm">BO' + esc(m.bo) + miniOutc(m) + '</span><span class="mb">' + esc(abbr(B)) + miniVrs(B) + '</span></div></div></div>' +
+      '<div class="fold mini-wrap"><div class="fi"><div class="mini"><span class="ma" data-tname="' + esc(A.name) + '">' + esc(abbr(A)) + miniVrs(A) + '</span><span class="mm">BO' + esc(m.bo) + miniOutc(m) + '</span><span class="mb" data-tname="' + esc(B.name) + '">' + esc(abbr(B)) + miniVrs(B) + '</span></div></div></div>' +
       '<div class="fold hero-wrap"><div class="fi"><section class="hero"><div class="meta"><span class="pill ' + esc(m.tier) + '">' + esc((m.tier || "").toUpperCase()) + '</span><span>' + esc(m.tournament) + (m.stage ? " · " + esc(m.stage) : "") + '</span></div>' +
-      '<div class="face"><div class="tm a"><span class="acr">' + esc(abbr(A)) + '</span><span class="full">' + esc(A.name) + '</span>' + heroVrs(A) + '</div>' +
+      '<div class="face"><div class="tm a" data-tname="' + esc(A.name) + '"><span class="acr">' + esc(abbr(A)) + '</span><span class="full">' + esc(A.name) + '</span>' + heroVrs(A) + '</div>' +
       '<div class="mid"><b>' + esc(hm(m.begin_at)) + '</b>' + esc(dm(m.begin_at)) + ' · BO' + esc(m.bo) + '</div>' +
-      '<div class="tm b"><span class="acr">' + esc(abbr(B)) + '</span><span class="full">' + esc(B.name) + '</span>' + heroVrs(B) + '</div></div>' +
+      '<div class="tm b" data-tname="' + esc(B.name) + '"><span class="acr">' + esc(abbr(B)) + '</span><span class="full">' + esc(B.name) + '</span>' + heroVrs(B) + '</div></div>' +
       heroOutcomes(m) + '</section></div></div>' +
       '<nav class="tabs" role="tablist">' + tabBtn("players", "Игроки") + tabBtn("stats", "Статистика") + tabBtn("news", "Новости", nCount) + '</nav>' +
       '<div class="fold nf-wrap"><div class="fi"><div class="filt nfilt" role="group" aria-label="О ком">' + opts.map(function (o) {
@@ -1948,7 +1968,7 @@ a.ni { text-decoration: none; color: inherit; }
     tr.style.transition = anim ? "transform " + (ms || 260) + "ms cubic-bezier(.2,.7,.3,1)" : "none";
     tr.style.transform = "translate3d(" + (-i * paneW()) + "px,0,0)";
   }
-  // ---- шпаргалка к эфиру: то, что можно сказать вслух, одним экраном
+  // ---- форма на текущем турнире
   function tourSeries(m, i) {  // серии команды на этом турнире (по дате начала турнира)
     var t = m.teams[i] || {}, since = (m.serie || {}).begin || "";
     return (t.form || []).filter(function (f) { return since && String(f.date) >= since.slice(0, 10); });
@@ -1966,73 +1986,22 @@ a.ni { text-decoration: none; color: inherit; }
     });
     return Object.keys(acc).map(function (k) { var a = acc[k]; return { nick: a.nick, n: a.n, kd: a.d ? a.k / a.d : a.k, adr: a.adr / a.n, r: a.r / a.n }; });
   }
-  function cheatSheet(m) {
-    var A = m.teams[0] || {}, B = m.teams[1] || {}, L = [];
-    if (!A.name || !B.name) return "";
-    function sp(t, i) { return '<b class="' + (i ? "b" : "a") + '">' + esc(abbr(t)) + '</b>'; }
-    // форма
-    var fl = [A, B].map(function (t, i) {
-      var f = (t.form || []).slice(0, 5); if (!f.length) return "";
-      var w = f.filter(function (x) { return x.won; }).length, st = 0;
-      for (var j = 0; j < f.length && f[j].won === f[0].won; j++) st++;
-      return sp(t, i) + ' ' + w + ' из ' + f.length + (st >= 2 ? (f[0].won ? ', ' + st + ' победы подряд' : ', ' + st + ' поражения подряд') : '');
-    }).filter(Boolean);
-    if (fl.length) L.push(["Форма", fl.join(' · ')]);
-    // личные встречи
-    var H = m.h2h || [];
-    if (H.length) {
-      var wa = H.filter(function (x) { return x.winner === 0; }).length, h0 = H[0];
-      L.push(["Личные встречи", sp(A, 0) + ' ' + wa + ':' + (H.length - wa) + ' ' + sp(B, 1) + ' за полгода; последняя — ' + esc(dm(h0.date)) + ', ' + esc(h0.tournament || "") + ', ' + esc((h0.score || []).join(":")) + ' в пользу ' + esc(abbr(h0.winner === 0 ? A : B))]);
-    } else L.push(["Личные встречи", "за полгода не встречались"]);
-    // карты
-    var T = ((m.maps || {}).table || []);
-    var ml = [0, 1].map(function (i) {
-      var rows = T.map(function (r) { var x = r.teams[i] || {}; return { map: r.map, p: x.played || 0, w: x.won || 0 }; }).filter(function (r) { return r.p >= 4; });
-      if (!rows.length) return "";
-      rows.sort(function (a, b) { return b.w / b.p - a.w / a.p; });
-      var best = rows[0], worst = rows[rows.length - 1];
-      return sp(i ? B : A, i) + ' лучше всего ' + esc(best.map) + ' (' + Math.round(100 * best.w / best.p) + '%)' + (worst !== best ? ', хуже всего ' + esc(worst.map) + ' (' + Math.round(100 * worst.w / worst.p) + '%)' : '');
-    }).filter(Boolean);
-    if (ml.length) L.push(["Карты", ml.join('<br>')]);
-    // пик и счёт
-    var P = m.prediction;
-    if (P && (P.maps || []).length) L.push(["Вероятный пик", P.maps.map(function (x) { return esc(x.map); }).join(" → ") + ((P.outcomes || [])[0] ? '; вероятнее всего ' + esc(P.outcomes[0].score) + ' (' + esc(P.outcomes[0].p) + '%)' : '')]);
-    // лучшие игроки: 3 месяца и этот турнир
-    var pl = [0, 1].map(function (i) {
-      var t = m.teams[i], st = (t.stats || []).slice().sort(function (a, b) { return (b.rating || 0) - (a.rating || 0); })[0];
-      var tf = tourForm(m, i).sort(function (a, b) { return b.r - a.r; })[0];
-      var out = [];
-      if (st) out.push(esc(st.nick) + ' (рейт. ' + Number(st.rating).toFixed(2) + ' за 3 мес.)');
-      if (tf && (!st || tf.nick.toLowerCase() !== String(st.nick).toLowerCase() || true)) out.push('на турнире — ' + esc(tf.nick) + ' (' + tf.r.toFixed(2) + ', ADR ' + Math.round(tf.adr) + ')');
-      return out.length ? sp(t, i) + ' ' + out.join(', ') : "";
-    }).filter(Boolean);
-    if (pl.length) L.push(["Лучшие", pl.join('<br>')]);
-    // путь на турнире
-    var tl = [0, 1].map(function (i) {
-      var f = tourSeries(m, i); if (!f.length) return "";
-      return sp(m.teams[i], i) + ' ' + f.slice().reverse().map(function (x) { return (x.won ? "✓ " : "✗ ") + esc(x.opponent_name || x.opponent) + ' ' + x.score + ':' + x.opp_score; }).join(", ");
-    }).filter(Boolean);
-    if (tl.length) L.push(["На турнире", tl.join('<br>')]);
-    // VRS
-    var O = m.vrs_outcomes;
-    if (O && O.win0) L.push(["VRS", 'победа ' + sp(A, 0) + ': ' + (O.win0[0].delta > 0 ? "+" : "") + O.win0[0].delta + ' (#' + O.win0[0].rank + ') · победа ' + sp(B, 1) + ': ' + (O.win1[1].delta > 0 ? "+" : "") + O.win1[1].delta + ' (#' + O.win1[1].rank + ')']);
-    L.push(["На кону", '<span id="stake">…</span>']);
-    setTimeout(function () { fillStake(m); }, 0);
-    return '<div class="sec"><h3>Шпаргалка <span>к эфиру</span></h3><div class="box cheat">' + L.map(function (x) {
-      return '<div class="ch-r"><div class="ch-k">' + esc(x[0]) + '</div><div class="ch-v">' + x[1] + '</div></div>';
-    }).join("") + '</div></div>';
-  }
   // что на кону: куда идут победитель и проигравший, сколько денег за место
-  function placeLabel(a, b) { function o(n) { return n + (n === 1 ? "st" : n === 2 ? "nd" : n === 3 ? "rd" : "th"); } return a === b ? o(a) : a + "-" + o(b); }
-  function fillStake(m) {
-    var sid = (m.serie || {}).id; if (!sid) return;
-    getResults(sid).then(function (R0) {
-      var el = document.getElementById("stake"); if (!el) return;
-      var txt = stakeText(m, R0);
-      if (txt) el.innerHTML = txt; else { var row = el.closest(".ch-r"); if (row) row.remove(); }
-    }).catch(function () { var el = document.getElementById("stake"), row = el && el.closest(".ch-r"); if (row) row.remove(); });
+    function stakeBlock(m) {
+    if (!(m.serie || {}).id || !(m.teams[0] || {}).name || !(m.teams[1] || {}).name) return "";
+    setTimeout(function () { fillStake(m); }, 0);
+    return '<div class="sec" id="stakesec"><h3>На кону</h3><div class="box stake" id="stake"><div class="stk"><i>…</i><span class="upd">Смотрю сетку турнира</span></div></div></div>';
   }
-  function stakeText(m, R0) {
+  function fillStake(m) {
+    function drop() { var sec = document.getElementById("stakesec"); if (sec) sec.remove(); }
+    getResults(m.serie.id).then(function (R0) {
+      var el = document.getElementById("stake"); if (!el) return;
+      var rows = stakeRows(m, R0);
+      if (!rows.length) return drop();
+      el.innerHTML = rows.map(function (r) { return '<div class="stk"><i>' + r[0] + '</i><span>' + r[1] + '</span></div>'; }).join("");
+    }).catch(drop);
+  }
+  function stakeRows(m, R0) {
     var A = m.teams[0] || {}, B = m.teams[1] || {}, an = String(A.name || "").toLowerCase(), bn = String(B.name || "").toLowerCase();
     function is(x, n) { x = String(x || "").toLowerCase(); return x && n && (x === n || x.indexOf(n) >= 0 || n.indexOf(x) >= 0); }
     var stages = (R0 && R0.stages) || [], hit = null;
@@ -2043,28 +2012,45 @@ a.ni { text-decoration: none; color: inherit; }
         });
       });
     });
-    if (!hit) return "";
+    if (!hit) return [];
     var tour = (state.list.tournaments || []).find(function (t) { return String(t.id) === String((m.serie || {}).id); }) || {};
     var places = ((tour.hltv || {}).places || []);
-    function money(pl) { var p = places.find(function (x) { return x.place === pl; }); if (!p) return ""; var v = (p.prize || 0) + (p.club || 0); return v ? ' ($' + v.toLocaleString("en-US") + ')' : ''; }
+    function placeOf(n) {  // строка призовых для места n (учитывая диапазоны «5-6th»)
+      return places.find(function (p) { var a = String(p.place || "").match(/(\d+)(?:\D+(\d+))?/); if (!a) return false; var lo = +a[1], hi = a[2] ? +a[2] : lo; return n >= lo && n <= hi; });
+    }
+    function reward(n) {  // деньги и путёвки за место
+      var p = placeOf(n); if (!p) return "";
+      var v = (p.prize || 0) + (p.club || 0), out = [];
+      if (v) out.push('$' + v.toLocaleString("en-US"));
+      var sl = (p.spots || []).concat(p.other || []).filter(Boolean);
+      return (out.length ? ' (' + out.join(", ") + ')' : '') + (sl.length ? '<br><span class="slot">Путёвка: ' + esc(sl.join(", ")) + '</span>' : '');
+    }
     var rounds = hit.st.rounds, rd = hit.rd, nextR = rounds[hit.ri + 1], name = String(rd.name || "");
     var third = stages.some(function (st) { return (st.rounds || []).some(function (r) { return /3rd|3-е|третье/i.test(r.name || ""); }); });
-    if (/гранд|grand/i.test(name + " " + (rd.bracket || ""))) return 'Победитель — чемпион' + money("1st") + ', проигравший — 2-е место' + money("2nd");
-    if (rd.bracket === "upper") return 'Победитель идёт дальше по верхней сетке, проигравший — в нижнюю';
-    var win = "";
+    if (/гранд|grand/i.test(name + " " + (rd.bracket || ""))) return [["🏆", 'Победитель — чемпион' + reward(1)], ["🥈", 'Проигравший — 2-е место' + reward(2)]];
+    if (/3rd|3-е|третье/i.test(name)) return [["🥉", 'Победитель — 3-е место' + reward(3)], ["✗", 'Проигравший — 4-е место' + reward(4)]];
+    var out = [];
+    if (rd.bracket === "upper") {
+      var nu = nextR && nextR.bracket === "upper" ? nextR : null;
+      out.push(["↗", 'Победитель идёт дальше по верхней сетке' + (nu ? ' — ' + esc(String(nu.name || "").toLowerCase()) : '')]);
+      out.push(["↘", 'Проигравший — в нижнюю сетку, ещё один шанс']);
+      return out;
+    }
     if (nextR) {
       var j = (nextR.matches || []).length === (rd.matches || []).length ? hit.mi : Math.floor(hit.mi / 2), nm = (nextR.matches || [])[j] || {};
       var opp = nm.a && !is(nm.a, an) && !is(nm.a, bn) ? nm.a : nm.b && !is(nm.b, an) && !is(nm.b, bn) ? nm.b : null;
-      win = 'Победитель — в ' + esc(String(nextR.name || "следующий раунд").toLowerCase()) + (opp ? ' против ' + esc(opp) : '');
+      out.push(["↗", 'Победитель — в ' + esc(String(nextR.name || "следующий раунд").toLowerCase()) + (opp ? ' против ' + esc(opp) : '')]);
+    } else if (hit.st.format !== "playoff") {
+      var nextSt = stages[hit.si + 1];
+      out.push(["↗", 'Победитель выходит ' + (nextSt ? 'в ' + esc(String(nextSt.title || "следующую стадию").toLowerCase()) : 'дальше')]);
     }
-    if (rd.bracket === "lower" && !nextR) win = 'Победитель выходит дальше';
-    var later = 0; rounds.slice(hit.ri + 1).forEach(function (r) { (r.matches || []).forEach(function () { later += 2; }); });
-    later = Math.max(later - (rounds.slice(hit.ri + 1).length ? rounds.slice(hit.ri + 2).reduce(function (s2, r) { return s2 + (r.matches || []).length; }, 0) : 0), 0);
     var nLose = (rd.matches || []).length, above = (nextR ? (nextR.matches || []).length * 2 : 1);
-    var lose;
-    if (third && /полуфинал|semi/i.test(name)) lose = 'проигравший сыграет за 3-е место';
-    else if (hit.st.format === "playoff" || rd.bracket === "lower" || rd.bracket === "default") { var pl = placeLabel(above + 1, above + nLose); lose = 'проигравший вылетает, ' + pl.replace(/(st|nd|rd|th)$/, "") + '-е место' + money(pl); }
-    return [win, lose].filter(Boolean).join('; ');
+    if (third && /полуфинал|semi/i.test(name)) out.push(["🥉", 'Проигравший сыграет за 3-е место']);
+    else if (hit.st.format === "playoff" || rd.bracket === "lower" || rd.bracket === "default") {
+      var lo = above + 1, hi = above + nLose;
+      out.push(["✗", 'Проигравший вылетает, ' + (lo === hi ? lo : lo + '–' + hi) + '-е место' + reward(lo)]);
+    }
+    return out;
   }
   // ---- живой режим: счёт карт, раунды и статистика игроков с bo3.gg через наш посредник (обновление раз в 15 с)
   var LIVE = "https://rimcs-live.vladrimskij.workers.dev";
@@ -2553,7 +2539,7 @@ a.ni { text-decoration: none; color: inherit; }
   // ---------- клики
   document.addEventListener("click", function (e) {
     if (state.pop && !e.target.closest(".pop-in")) { closePop(); if (!e.target.closest("[data-pop]")) { e.preventDefault(); e.stopPropagation(); return; } }
-    var t = e.target.closest("[data-pop],[data-vplay],[data-snav],[data-goto],[data-sk],[data-team],[data-tseries],[data-fread],[data-close],#facts-more,[data-home],[data-feedch],[data-tg],[data-reader],[data-open],[data-tour],[data-tab],[data-map],[data-nf],[data-player],[data-link],[data-read],[data-series],[data-rseries],[data-smap],[data-ttab],#back");
+    var t = e.target.closest("[data-pop],[data-vplay],[data-snav],[data-goto],[data-sk],[data-team],[data-tname],[data-tseries],[data-fread],[data-close],#facts-more,[data-home],[data-feedch],[data-tg],[data-reader],[data-open],[data-tour],[data-tab],[data-map],[data-nf],[data-player],[data-link],[data-read],[data-series],[data-rseries],[data-smap],[data-ttab],#back");
     if (!t) return;
     if (t.hasAttribute("data-pop")) { e.stopPropagation(); e.preventDefault(); openPop(t.getAttribute("data-pop"), t); return; }
     if (t.hasAttribute("data-vplay")) { var vv = t.parentNode.querySelector("video"); if (vv) { t.remove(); vv.play().catch(function () {}); } return; }
@@ -2561,6 +2547,7 @@ a.ni { text-decoration: none; color: inherit; }
     if (t.hasAttribute("data-goto")) { go("#" + t.getAttribute("data-goto")); return; }
     if (t.hasAttribute("data-sk")) { shellGo(t.getAttribute("data-sk")); return; }
     if (t.hasAttribute("data-team")) { go("#r-" + t.getAttribute("data-team")); window.scrollTo(0, 0); return; }
+    if (t.hasAttribute("data-tname")) { openTeamByName(t.getAttribute("data-tname")); return; }
     if (t.hasAttribute("data-tseries")) {
       var TT = (state.teams || {})[state.view.slice(5)], S3 = TT && (TT.series || {})[t.getAttribute("data-tseries")];
       if (S3) openSeries(S3, TT.name);
