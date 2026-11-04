@@ -2988,7 +2988,8 @@ FAST = os.environ.get("NEWS_ONLY") == "1"   # быстрое обновлени�
 GEMINI_KEY = os.environ.get("GEMINI_KEY", "").strip()
 GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-flash-latest")
 GEMINI_DAY_LIMIT = int(os.environ.get("GEMINI_DAY_LIMIT", "800"))   # запросов в день — запас до бесплатного лимита Google
-_gem = {"off": False, "last": 0.0, "fails": 0, "model": GEMINI_MODEL, "think": True}
+GEMINI_LITE = os.environ.get("GEMINI_LITE", "gemini-flash-lite-latest")  # запасная облегчённая модель: обычно свободна, тоже бесплатна
+_gem = {"off": False, "last": 0.0, "fails": 0, "model": GEMINI_MODEL, "think": True, "busy": 0}
 
 
 def gem_ok() -> bool:
@@ -3004,7 +3005,7 @@ def llm_ok() -> bool:
 def gemini_call(system: str | None, parts: list, max_tokens: int = 900, json_mode: bool = True) -> str | None:
     if not gem_ok():
         return None
-    for attempt in range(3):
+    for attempt in range(5):
         wait = 4.5 - (time.time() - _gem["last"])  # бесплатный уровень: ~15 запросов в минуту
         if wait > 0:
             time.sleep(wait)
@@ -3026,7 +3027,7 @@ def gemini_call(system: str | None, parts: list, max_tokens: int = 900, json_mod
             day = NOW.strftime("%Y-%m-%d")
             giga_usage.setdefault(day, {})["gemini"] = (giga_usage.get(day) or {}).get("gemini", 0) + 1
             stats["gemini_calls"] = stats.get("gemini_calls", 0) + 1
-            _gem["fails"] = 0
+            _gem["fails"] = _gem["busy"] = 0
             cand = (j.get("candidates") or [{}])[0]
             return "".join(p.get("text", "") for p in (cand.get("content") or {}).get("parts") or []) or None
         except urllib.error.HTTPError as e:
@@ -3034,11 +3035,31 @@ def gemini_call(system: str | None, parts: list, max_tokens: int = 900, json_mod
             if e.code == 400 and "thinking" in msg.lower() and _gem["think"]:
                 _gem["think"] = False
                 continue
-            if e.code == 404 and _gem["model"] != "gemini-2.5-flash":
+            if e.code == 404 and _gem["model"] == GEMINI_LITE and GEMINI_LITE != "gemini-2.5-flash-lite":
+                _gem["model"] = "gemini-2.5-flash-lite"
+                continue
+            if e.code == 404 and _gem["model"] not in ("gemini-2.5-flash", "gemini-2.5-flash-lite"):
                 _gem["model"] = "gemini-2.5-flash"
                 continue
+            if e.code in (500, 502, 503, 504):  # модель перегружена: подождать, потом перейти на облегчённую
+                if attempt == 0:
+                    time.sleep(8)
+                    continue
+                if _gem["model"] not in (GEMINI_LITE, "gemini-2.5-flash-lite"):
+                    warn(f"Gemini {_gem['model']} перегружена — переключаюсь на {GEMINI_LITE}")
+                    _gem["model"] = GEMINI_LITE
+                    continue
+                if attempt < 4:
+                    time.sleep(15)
+                    continue
+                _gem["busy"] += 1
+                if _gem["busy"] >= 4:
+                    _gem["off"] = True  # перегружены обе — до конца прогона работает GigaChat
             if e.code == 429 and attempt == 0:
                 time.sleep(25)
+                continue
+            if e.code == 429 and _gem["model"] not in (GEMINI_LITE, "gemini-2.5-flash-lite"):
+                _gem["model"] = GEMINI_LITE  # у облегчённой модели свой дневной лимит
                 continue
             if e.code in (401, 403, 429):
                 _gem["off"] = True  # ключ не подходит или кончился дневной лимит — до конца прогона работает GigaChat
