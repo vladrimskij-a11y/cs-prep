@@ -28,6 +28,7 @@ import gzip
 import hashlib
 import html as _html
 import json
+import math
 import os
 import re
 import sys
@@ -1203,14 +1204,19 @@ def round_ru(s: str | None) -> str | None:
     return t[:1].upper() + t[1:]
 
 
+_bo3_tours: dict = {}
+
+
 def bo3_tournament_for(name: str) -> dict | None:
     """Турнир bo3.gg (со стадиями, раундами и матчами) по нашему названию."""
-    try:
-        res = bo3("/tournaments", {"page[limit]": 30, "sort": "-start_date", "filter[tournaments.tier][in]": ",".join(sorted(TIERS)),
-                                   "filter[tournaments.status][in]": "current,finished"}).get("results") or []
-    except Exception as e:
-        warn(f"bo3 турниры (итоги): {e!r}")
-        return None
+    if _bo3_tours.get("list") is None:
+        try:
+            _bo3_tours["list"] = bo3("/tournaments", {"page[limit]": 40, "sort": "-start_date", "filter[tournaments.tier][in]": ",".join(sorted(TIERS)),
+                                                      "filter[tournaments.status][in]": "upcoming,current,finished"}).get("results") or []
+        except Exception as e:
+            warn(f"bo3 турниры (итоги): {e!r}")
+            _bo3_tours["list"] = []
+    res = _bo3_tours["list"]
     nn = tour_norm(name)
     pick = next((t for t in res if tour_same((t.get("name") or "").replace("Intel Extreme Masters", "IEM"), nn)
                  or tour_same(name, tour_norm((t.get("name") or "").replace("Intel Extreme Masters", "IEM")))), None)
@@ -1228,7 +1234,19 @@ def build_results(tr: dict) -> dict | None:
     T = bo3_tournament_for(tr["name"])
     if not T:
         return None
-    out = []
+    out, stages = [], []
+    for st in sorted(T.get("stages") or [], key=lambda x: x.get("sequence_number") or 0):
+        stage = re.sub(re.escape(T.get("name") or "") + r"\s*", "", st.get("title") or "").strip() or None
+        rounds = []
+        for rd in sorted(st.get("rounds") or [], key=lambda x: (x.get("bracket_type") or "", x.get("round_index") or 0)):
+            ms = []
+            for m in sorted(rd.get("matches") or [], key=lambda x: x.get("position") or 0):
+                t1, t2 = m.get("team1") or {}, m.get("team2") or {}
+                ms.append({"id": m.get("id"), "a": t1.get("name"), "b": t2.get("name"), "sa": m.get("team1_score"), "sb": m.get("team2_score"),
+                           "st": m.get("status"), "date": m.get("start_date"), "bo": m.get("bo_type"),
+                           "w": 0 if m.get("winner_team_id") and m.get("winner_team_id") == m.get("team1_id") else 1 if m.get("winner_team_id") and m.get("winner_team_id") == m.get("team2_id") else None})
+            rounds.append({"name": round_ru(rd.get("name")), "bracket": rd.get("bracket_type"), "matches": ms})
+        stages.append({"title": round_ru(stage) or "Стадия", "format": st.get("format_type"), "status": st.get("status"), "rounds": rounds})
     for st in T.get("stages") or []:
         stage = re.sub(re.escape(T.get("name") or "") + r"\s*", "", st.get("title") or "").strip() or None
         for rd in st.get("rounds") or []:
@@ -1254,7 +1272,7 @@ def build_results(tr: dict) -> dict | None:
                     d["tournament"] = tr["name"]
                     out.append(d)
     out.sort(key=lambda x: x.get("date") or "", reverse=True)
-    return {"updated": iso(NOW), "tournament": tr["name"], "matches": out}
+    return {"updated": iso(NOW), "tournament": tr["name"], "matches": out, "stages": stages}
 
 
 # ---------------------------------------------------------------- рейтинг Valve (VRS) и призовые места
@@ -1342,6 +1360,88 @@ def vrs_find(t: dict, table: list[dict]) -> dict | None:
 
 
 VRS_K = 32  # как в личных встречах модели Valve (сверено с таблицами пересчёта в репозитории Valve)
+VALVE_RAW = "https://raw.githubusercontent.com/ValveSoftware/counter-strike_regional_standings/main/live/"
+
+
+def valve_curve(x: float) -> float:
+    """Кривая Valve для «баунти»: 1 / (1 + |log10 x|), сверено с файлами рейтинга."""
+    return 1.0 if x >= 1 else 0.0 if x <= 0 else 1 / (1 + abs(math.log10(x)))
+
+
+def valve_links() -> dict:
+    """norm(команда) → путь к файлу с разбором её очков в официальном рейтинге Valve."""
+    def fn():
+        base = "https://api.github.com/repos/ValveSoftware/counter-strike_regional_standings/contents/live/" + str(NOW.year)
+        files = sorted(x["name"] for x in json.loads(http_get(base, {"Accept": "application/vnd.github+json"})) if x.get("type") == "file")
+        glob = [f for f in files if f.startswith("standings_global")][-1]
+        out = {}
+        for line in http_get(VALVE_RAW + f"{NOW.year}/" + glob).decode("utf-8", "replace").splitlines():
+            c = [x.strip() for x in line.split("|")]
+            m = re.search(r"\((details/[^)]+)\)", line)
+            if len(c) > 4 and c[1].isdigit() and m:
+                out.setdefault(norm(c[3]), f"{NOW.year}/" + m.group(1))
+        return out or None
+    return hltv_cached("valvelinks", fn) or {}
+
+
+def valve_detail(name: str) -> dict | None:
+    links = valve_links()
+    path = links.get(norm(name)) or next((v for k, v in links.items() if len(k) >= 3 and (k in norm(name) or norm(name) in k)), None)
+    if not path:
+        return None
+    def fn():
+        t = http_get(VALVE_RAW + path).decode("utf-8", "replace")
+        num = lambda rx: float(re.search(rx, t).group(1))
+        d = {"offered": num(r"Bounty Offered:\s*([\d.]+)"), "collected": num(r"Bounty Collected:\s*([\d.]+)"),
+             "network": num(r"Opponent Network:\s*([\d.]+)"), "lan": num(r"LAN Wins:\s*([\d.]+)"),
+             "seed": num(r"Starting Rank Value \(([\d.]+)\)")}
+        mm = re.search(r"400 \+ \( \( [\d.]+ - ([\d.]+) \) / \( ([\d.]+) - [\d.]+ \) \)", t)
+        d["min"], d["max"] = (float(mm.group(1)), float(mm.group(2))) if mm else (0.0, 1.0)
+        bc, net, lan = [], [], []
+        for line in t.split('id="table1"', 1)[-1].split('id="table2"', 1)[0].splitlines():
+            c = [x.strip() for x in line.split("|")]
+            if len(c) < 12 or not c[1].isdigit():
+                continue
+            adj = lambda x: float(re.search(r"\(([\d.]+)\)", x).group(1)) if "(" in x else None
+            for col, lst in ((8, bc), (9, net), (10, lan)):
+                v = adj(c[col])
+                if v is not None:
+                    lst.append(v)
+        d.update({"bc": bc, "net": net, "lanl": lan})
+        return d
+    return hltv_cached("valvedet:" + path, fn)
+
+
+def vrs_outcomes_valve(a: dict, b: dict, table: list[dict], lan: bool = True) -> dict | None:
+    """Как HLTV: победитель получает очки за личную встречу и за улучшение своих факторов (баунти, сеть соперников, LAN),
+    проигравший — только поправку за личную встречу. Факторы — из официального разбора Valve на начало месяца."""
+    da, db = valve_detail(a["name"]), valve_detail(b["name"])
+    if not da or not db:
+        return None
+    def top(vals, v):
+        return sum(sorted(vals + [v], reverse=True)[:10]) / 10
+    def gain(W, L):
+        bc = valve_curve(top(W["bc"], L["offered"]))
+        net = top(W["net"], L["network"])
+        ln = top(W["lanl"], 1.0) if lan else W["lan"]
+        avg = (W["offered"] + max(bc, W["collected"]) + max(net, W["network"]) + max(ln, W["lan"])) / 4
+        seed = 400 + (avg - W["min"]) / max(1e-6, W["max"] - W["min"]) * 1600
+        return max(0.0, min(2000.0, seed) - W["seed"])
+    ea = 1 / (1 + 10 ** ((db["seed"] - da["seed"]) / 400))
+    res = {}
+    for win in (0, 1):
+        if win == 0:
+            dA, dB = gain(da, db) + VRS_K * (1 - ea), -VRS_K * (1 - ea)
+        else:
+            dA, dB = -VRS_K * ea, gain(db, da) + VRS_K * ea
+        dA, dB = round(dA), round(dB)
+        pa, pb = a["points"] + dA, b["points"] + dB
+        others = [r["points"] for r in table if r["name"] not in (a["name"], b["name"])]
+        ra = 1 + sum(1 for p in others + [pb] if p > pa)
+        rb = 1 + sum(1 for p in others + [pa] if p > pb)
+        res["win" + str(win)] = [{"delta": dA, "points": pa, "rank": ra}, {"delta": dB, "points": pb, "rank": rb}]
+    res["model"] = "valve"
+    return res
 
 
 def vrs_outcomes(a: dict, b: dict, table: list[dict]) -> dict:
@@ -3376,6 +3476,112 @@ def attach_veto(sd: dict) -> None:
                 return
 
 
+def bo3_odds(bids: list) -> dict | None:
+    """Коэффициенты букмекеров на ближайший матч двух команд (bo3.gg) → вероятности победы и точного счёта."""
+    if len(bids) != 2 or not all(bids):
+        return None
+    try:
+        res = bo3("/matches", {"page[limit]": 20, "sort": "start_date", "filter[matches.status][in]": "upcoming,current",
+                               "filter[matches.team_ids][overlap]": bids[0]}).get("results") or []
+    except Exception as e:
+        warn(f"bo3 коэффициенты: {e!r}")
+        return None
+    m = next((x for x in res if {x.get("team1_id"), x.get("team2_id")} == set(bids)), None)
+    bu = (m or {}).get("bet_updates") or {}
+    c1, c2 = (bu.get("team_1") or {}).get("coeff"), (bu.get("team_2") or {}).get("coeff")
+    if not c1 or not c2 or min(c1, c2) < 1.02:
+        return None  # нет линии или матч уже фактически решён
+    flip = m.get("team1_id") == bids[1]
+    p1 = (1 / c1) / (1 / c1 + 1 / c2)
+    out = {"win": [round(100 * (1 - p1 if flip else p1)), round(100 * (p1 if flip else 1 - p1))]}
+    sc = {}
+    for mk in bu.get("additional_markets") or []:
+        mt = re.match(r"score_(\d)_(\d)$", mk.get("bet_type") or "")
+        if mt and mk.get("coeff") and mk["coeff"] > 1.0:
+            a, b = int(mt.group(1)), int(mt.group(2))
+            sc[(b, a) if flip else (a, b)] = 1 / mk["coeff"]
+    if len(sc) >= 3:
+        tot = sum(sc.values())
+        out["scores"] = [{"score": f"{a}:{b}", "p": round(100 * v / tot)} for (a, b), v in sorted(sc.items(), key=lambda kv: -kv[1])]
+    return out
+
+
+def build_prediction(d: dict, bids: list) -> dict | None:
+    """Вероятное вето (по вето команд за 3 месяца), счёт на картах (по винрейту карт) и исходы серии."""
+    V = d.get("veto") or {}
+    vt = V.get("teams") or []
+    table = {r["map"]: r for r in (d.get("maps") or {}).get("table") or []}
+    if len(vt) < 2 or not all(vt) or not table:
+        return None
+    seen: dict = {}
+    for t in vt:
+        for key in ("picks", "bans", "deciders"):
+            for mp, c in t.get(key) or []:
+                seen[mp] = seen.get(mp, 0) + c
+    pool = [mp for mp, _ in sorted(seen.items(), key=lambda kv: -kv[1])][:7]
+    if len(pool) < 7:
+        pool += [mp for mp in table if mp not in pool][:7 - len(pool)]
+    def wr(i, mp):
+        r = table.get(mp)
+        t = r["teams"][i] if r else {"won": 0, "played": 0}
+        return (t["won"] + 1) / (t["played"] + 2)
+    def pmap(mp):  # вероятность, что карту выиграет первая команда (log5)
+        a, b = wr(0, mp), wr(1, mp)
+        return a * (1 - b) / (a * (1 - b) + b * (1 - a))
+    def choose(i, act, left):
+        t = vt[i]
+        cnt = dict(t.get("bans" if act == "ban" else "picks") or [])
+        if act == "ban":
+            for mp, c in t.get("first_bans") or []:
+                cnt[mp] = cnt.get(mp, 0) + c
+        own = (lambda mp: wr(i, mp)) if act == "pick" else (lambda mp: -wr(i, mp))
+        return max(left, key=lambda mp: (cnt.get(mp, 0), own(mp)))
+    bo = int(d.get("bo") or 3)
+    order = {1: [(0, "ban"), (1, "ban"), (0, "ban"), (1, "ban"), (0, "ban"), (1, "ban")],
+             3: [(0, "ban"), (1, "ban"), (0, "pick"), (1, "pick"), (0, "ban"), (1, "ban")],
+             5: [(0, "ban"), (1, "ban"), (0, "pick"), (1, "pick"), (0, "pick"), (1, "pick")]}.get(bo)
+    if not order:
+        return None
+    left, steps, maps = list(pool), [], []
+    for i, act in order:
+        if not left:
+            break
+        mp = choose(i, act, left)
+        left.remove(mp)
+        steps.append({"team": i, "act": act, "map": mp})
+        if act == "pick":
+            maps.append({"map": mp, "by": i})
+    if left:
+        steps.append({"team": None, "act": "decider", "map": left[0]})
+        maps.append({"map": left[0], "by": None})
+    probs = [pmap(x["map"]) for x in maps]
+    for x, p in zip(maps, probs):
+        r = 0.5 + (p - 0.5) * 0.25  # вероятность раунда из вероятности карты — грубая оценка
+        lose = max(3, min(11, round(13 * (1 - max(r, 1 - r)) / max(r, 1 - r))))
+        x["p"] = round(100 * p)
+        x["score"] = [13, lose] if p >= 0.5 else [lose, 13]
+    need = bo // 2 + 1
+    dist: dict = {}
+    def walk(k, a, b, pr):
+        if a == need or b == need or k >= len(probs):
+            dist[(a, b)] = dist.get((a, b), 0) + pr
+            return
+        walk(k + 1, a + 1, b, pr * probs[k])
+        walk(k + 1, a, b + 1, pr * (1 - probs[k]))
+    walk(0, 0, 0, 1.0)
+    outcomes = [{"score": f"{a}:{b}", "p": round(100 * v)} for (a, b), v in sorted(dist.items(), key=lambda kv: -kv[1])]
+    res = {"steps": steps, "maps": maps, "outcomes": outcomes, "source": "статистика"}
+    odds = bo3_odds(bids) if not STATS or True else None
+    if odds:
+        res["odds"] = odds
+        if odds.get("scores"):
+            res["outcomes"], res["source"] = odds["scores"], "букмекеры"
+    top = res["outcomes"][0]["score"] if res["outcomes"] else ""
+    if bo == 3 and top in ("2:0", "0:2") and len(maps) == 3:
+        maps[2]["score"] = [0, 0]  # самый вероятный исход — 2:0, до десайдера дело не дойдёт
+    return res
+
+
 def build_detail(m: dict, prev: dict | None) -> dict:
     brief = match_brief(m)
     teams, bids, hists = [], [], []
@@ -3404,6 +3610,10 @@ def build_detail(m: dict, prev: dict | None) -> dict:
         detail["veto"] = build_veto(teams)
     except Exception as e:
         warn(f"Вето: {e!r}")
+    try:
+        detail["prediction"] = build_prediction(detail, bids)
+    except Exception as e:
+        warn(f"Прогноз: {e!r}")
     for t, bid, hist in zip(teams, bids, hists):
         t["stats"] = build_player_stats(t, bid, hist)
         for p in t.get("players") or []:
@@ -3466,7 +3676,11 @@ def build_detail(m: dict, prev: dict | None) -> dict:
         except Exception as e:
             warn(f"Призовые места {t.get('name')}: {e!r}")
     if len(rows) == 2 and all(rows):
-        detail["vrs_outcomes"] = vrs_outcomes(rows[0], rows[1], table)
+        try:
+            detail["vrs_outcomes"] = vrs_outcomes_valve(rows[0], rows[1], table) or vrs_outcomes(rows[0], rows[1], table)
+        except Exception as e:
+            warn(f"VRS прогноз: {e!r}")
+            detail["vrs_outcomes"] = vrs_outcomes(rows[0], rows[1], table)
     begin = parse_iso(brief["begin_at"])
     soon = begin is not None and begin - NOW <= timedelta(hours=DETAIL_HOURS)
     if STATS and prev and prev.get("news"):
@@ -3550,7 +3764,7 @@ def build_ranking() -> dict:
         if len(md.get("teams") or []) > len(vrs):
             vrs, src, date = md["teams"], "Valve · официальный рейтинг", md.get("date")
     vrs = vrs[:100]
-    hl = hltv_world_ranking()[:100]
+    hl = []  # рейтинг HLTV не показываем — только VRS
     hm0 = {norm(r["name"]): r["rank"] for r in hl}
     for r in vrs:
         r["hltv_rank"] = hm0.get(norm(r["name"]))
@@ -3708,7 +3922,7 @@ def main() -> int:
     keep_res = set()
     for tr in tour_list:
         b, e = parse_iso(tr.get("begin")), parse_iso(tr.get("end"))
-        if not b or b > NOW:
+        if not b or b > NOW + timedelta(days=3):
             continue
         fid = re.sub(r"[^\w-]", "-", str(tr["id"]))
         path = OUT / "results" / f"{fid}.json"
@@ -3721,11 +3935,13 @@ def main() -> int:
         except Exception as ex:
             warn(f"Итоги {tr['name']}: {ex!r}")
             res = None
-        if res and res["matches"]:
+        if res and (res["matches"] or res.get("stages")):
             save_json(path, res)
         if path.exists():
             keep_res.add(path.name)
-            tr["results"] = len((load_json(path, {}) or {}).get("matches") or [])
+            rj = load_json(path, {}) or {}
+            tr["results"] = len(rj.get("matches") or [])
+            tr["bracket"] = bool(rj.get("stages"))
     for f in (OUT / "results").glob("*.json"):
         if f.name not in keep_res:
             f.unlink()
@@ -3740,6 +3956,12 @@ def main() -> int:
         attach_major(tour_list, rosters)
     except Exception as e:
         warn(f"Мейджор: {e!r}")
+    major_next = None
+    if not any(t.get("major", {}).get("final") and (parse_iso(t.get("end")) or NOW) >= NOW for t in tour_list if re.search(r"major", t.get("name") or "", re.I)):
+        try:
+            major_next = major_view(build_major(rosters))  # инвайты на следующий мейджор ещё не разосланы — прогноз по VRS
+        except Exception as e:
+            warn(f"Прогноз мейджора: {e!r}")
     try:
         rk = load_json(OUT / "ranking.json", None)
         active = any((x.get("tier") == "s") and x.get("has_detail") for x in listing)
@@ -3777,6 +3999,7 @@ def main() -> int:
         "tiers": sorted(TIERS),
         "tournaments": tour_list,
         "matches": listing,
+        "major_next": major_next,
         "meta": stats,
     }, pretty=True)
     print(f"Готово: {len(listing)} матчей, PandaScore: {stats['panda_requests']}, bo3: {stats['bo3_requests']}, "
