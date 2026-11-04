@@ -380,10 +380,11 @@ html { overflow-anchor: none; }
 .pp-steps .vt-a { text-transform: none; font-size: 12px; }
 .pp-steps .vt-a b { color: var(--fg); }
 /* стрелки по разделам */
-.snav { position: fixed; right: max(14px, env(safe-area-inset-right, 0px)); bottom: calc(18px + env(safe-area-inset-bottom, 0px)); display: flex; flex-direction: column; gap: 8px; z-index: 6; }
+.snav { display: none; position: absolute; right: max(14px, env(safe-area-inset-right, 0px)); bottom: calc(18px + env(safe-area-inset-bottom, 0px)); display: flex; flex-direction: column; gap: 8px; z-index: 6; }
 .snav button { width: 40px; height: 40px; border-radius: 50%; background: color-mix(in srgb, var(--surface) 70%, transparent); border: 1px solid var(--line);
   color: var(--fg); font-size: 18px; font-weight: 700; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); opacity: .75; }
 .snav button:active { opacity: 1; }
+.mshell.on-stats .snav { display: flex; }
 /* сетка турнира */
 .brk { padding: 8px 0; }
 .brk-h { padding: 2px 12px 6px; font-size: 12px; font-weight: 700; color: var(--muted); }
@@ -1010,6 +1011,7 @@ a.ni { text-decoration: none; color: inherit; }
       '<div class="rscore num"><span class="a">' + esc(A.score) + '</span><span class="x">:</span><span class="b">' + esc(B.score) + '</span></div></button>';
   }
 
+  function cap(x) { return x ? x.charAt(0).toUpperCase() + x.slice(1) : x; }
   var BR_RU = { upper: "Верхняя сетка", lower: "Нижняя сетка" };
   function bracketHtml(R) {
     var have = {};
@@ -1032,7 +1034,7 @@ a.ni { text-decoration: none; color: inherit; }
       html += '<div class="sec"><h3>' + esc(st.title) + (st.status === "current" ? ' <span>идёт</span>' : '') + '</h3>';
       groups.forEach(function (g) {
         html += '<div class="box brk">' + (BR_RU[g.b] ? '<div class="brk-h">' + BR_RU[g.b] + '</div>' : '') + '<div class="bracket"><div class="brk-row">' +
-          g.rounds.map(function (rd) { return '<div class="brk-col"><div class="brk-rn">' + esc(rd.name || "") + '</div>' + rd.matches.map(box).join("") + '</div>'; }).join("") + '</div></div></div>';
+          g.rounds.map(function (rd) { return '<div class="brk-col"><div class="brk-rn">' + esc(cap(String(rd.name || "").replace(/^(Верхняя|Нижняя) сетка\s*/i, ""))) + '</div>' + rd.matches.map(box).join("") + '</div>'; }).join("") + '</div></div></div>';
       });
       html += '</div>';
     });
@@ -1378,7 +1380,7 @@ a.ni { text-decoration: none; color: inherit; }
         '<span class="vr-c"><b class="num">#' + t.vrs.rank + '</b><small class="num">' + t.vrs.points + '</small></span>' +
         cell(O.win0[i]) + cell(O.win1[i]) + '</div>';
     });
-    return html + '<div class="note">Оценка по формуле личных встреч Valve: изменение очков за саму победу или поражение. Бонусы за итог турнира сюда не входят.</div></div></div>';
+    return html + '<div class="note">' + (O.model === "valve" ? 'Оценка по модели Valve: победа даёт очки за личную встречу и за силу побеждённого (баунти, сеть соперников, LAN). От HLTV может отличаться на 10–20 очков.' : 'Оценка только по личной встрече.') + '</div></div></div>';
   }
 
   function newsFor(m, who) {
@@ -1583,7 +1585,7 @@ a.ni { text-decoration: none; color: inherit; }
 
   function tabBodyHtml(m, key) {
     if (key === "players") return playersTab(m);
-    if (key === "stats") return vrsBlock(m) + pickBlock(m) + formBlock(m) + h2hBlock(m) + mapsTable(m) + mapZone(m) + '<div class="snav"><button data-snav="-1" aria-label="Предыдущий раздел">↑</button><button data-snav="1" aria-label="Следующий раздел">↓</button></div>';
+    if (key === "stats") return vrsBlock(m) + pickBlock(m) + formBlock(m) + h2hBlock(m) + mapsTable(m) + mapZone(m);
     return (key === "news:all" ? factsBlock(m) : "") + newsList(m, key.slice(5));
   }
 
@@ -1644,6 +1646,7 @@ a.ni { text-decoration: none; color: inherit; }
   }
   function markTabs(key) {
     var tab = isNews(key) ? "news" : key, nf = isNews(key) ? key.slice(5) : null;
+    var shl = q(".mshell"); if (shl) shl.classList.toggle("on-stats", key === "stats");
     document.querySelectorAll(".mhead [data-tab]").forEach(function (b) { b.setAttribute("aria-selected", String(b.getAttribute("data-tab") === tab)); });
     if (nf != null) {
       document.querySelectorAll(".mhead [data-nf]").forEach(function (b) { b.setAttribute("aria-pressed", String(b.getAttribute("data-nf") === nf)); });
@@ -1669,7 +1672,9 @@ a.ni { text-decoration: none; color: inherit; }
     keys.forEach(function (k) {
       html += '<div class="pane' + (isNews(k) ? ' np' : '') + '" data-key="' + esc(k) + '"><div class="pin"><div class="tabbody">' + tabBodyHtml(m, k) + '</div></div></div>';
     });
-    $app.innerHTML = html + '</div></div><div class="mhead"><div class="pin">' + headHtml(m) + '</div></div></div>';
+    $app.innerHTML = html + '</div></div><div class="mhead"><div class="pin">' + headHtml(m) + '</div></div>' +
+      '<div class="snav"><button data-snav="-1" aria-label="Предыдущий раздел">↑</button><button data-snav="1" aria-label="Следующий раздел">↓</button></div></div>';
+    q(".mshell").classList.toggle("on-stats", curKey() === "stats");
     measureHead();
     trackTo(Math.max(0, keys.indexOf(curKey())), false);
     panes().forEach(function (p) {
