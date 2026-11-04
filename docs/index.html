@@ -362,6 +362,50 @@ html { overflow-anchor: none; }
 .ptr .spin { width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--line); border-top-color: var(--fg); animation: spin .7s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .hero-wrap, .mini-wrap { transition: opacity .12s linear; }
+/* исходы на карточке матча */
+.outc { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; align-items: center; }
+.oc { display: flex; flex-direction: column; align-items: center; padding: 4px 10px; border-radius: 8px; background: var(--sunk); min-width: 44px; }
+.oc b { font-size: 14px; } .oc small { font-size: 11px; color: var(--muted); }
+.oc.a b { color: var(--ct); } .oc.b b { color: var(--t); }
+.oc.top { outline: 1px solid var(--fg); }
+.oc-src { width: 100%; text-align: center; font-size: 10.5px; color: var(--muted); }
+/* вероятный пик */
+.pp-maps { display: grid; grid-template-columns: repeat(auto-fit, minmax(92px, 1fr)); gap: 8px; padding: 12px; }
+.pp-m { display: flex; flex-direction: column; gap: 2px; padding: 10px; border-radius: 8px; background: var(--sunk); border-top: 3px solid var(--line); }
+.pp-m.a { border-top-color: var(--ct); } .pp-m.b { border-top-color: var(--t); }
+.pp-m b { font-size: 15px; } .pp-n { font-size: 11px; color: var(--muted); font-weight: 600; }
+.pp-s { font-weight: 700; font-size: 16px; } .pp-s .a { color: var(--ct); } .pp-s .b { color: var(--t); }
+.pp-m small { font-size: 11px; color: var(--muted); }
+.pp-steps { display: flex; flex-wrap: wrap; gap: 6px 12px; padding: 0 12px 12px; }
+.pp-steps .vt-a { text-transform: none; font-size: 12px; }
+.pp-steps .vt-a b { color: var(--fg); }
+/* стрелки по разделам */
+.snav { display: none; position: absolute; right: max(14px, env(safe-area-inset-right, 0px)); bottom: calc(18px + env(safe-area-inset-bottom, 0px)); display: flex; flex-direction: column; gap: 8px; z-index: 6; }
+.snav button { width: 40px; height: 40px; border-radius: 50%; background: color-mix(in srgb, var(--surface) 70%, transparent); border: 1px solid var(--line);
+  color: var(--fg); font-size: 18px; font-weight: 700; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); opacity: .75; }
+.snav button:active { opacity: 1; }
+.mshell.on-stats .snav { display: flex; }
+/* сетка турнира */
+.brk { padding: 8px 0; }
+.brk-h { padding: 2px 12px 6px; font-size: 12px; font-weight: 700; color: var(--muted); }
+.bracket { overflow-x: auto; scrollbar-width: none; }
+.brk-row { display: flex; gap: 10px; padding: 0 12px; width: max-content; }
+.brk-col { display: flex; flex-direction: column; justify-content: space-around; gap: 8px; width: 150px; }
+.brk-rn { font-size: 11px; color: var(--muted); font-weight: 600; min-height: 28px; }
+.bm { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--bg); text-align: left; width: 100%; }
+.bm .bt { display: flex; justify-content: space-between; gap: 6px; padding: 5px 8px; font-size: 12.5px; }
+.bm .bt + .bt { border-top: 1px solid var(--line); }
+.bm .bt span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bm .bt.w { font-weight: 700; } .bm .bt.l { color: var(--muted); }
+.bm small { font-size: 10.5px; color: var(--muted); padding: 2px 8px 4px; }
+/* видео */
+.vid { position: relative; }
+.vbtn { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 64px; height: 64px; border-radius: 50%; background: rgba(0,0,0,.55); color: #fff; display: grid; place-items: center; }
+.vbtn svg { width: 28px; height: 28px; margin-left: 4px; }
+/* главная по центру */
+.menu { min-height: calc(var(--tg-viewport-stable-height, 100dvh) - 150px); justify-content: center; margin-top: 0; }
+.mcard.off { opacity: .55; }
+
 /* разделы: неподвижная шапка, вкладки-страницы */
 .sshell { position: fixed; left: 0; right: 0; top: 0; height: var(--tg-viewport-stable-height, 100dvh); overflow: hidden; background: var(--bg); z-index: 1; }
 .sshell .pane > .pin { padding-top: calc(var(--shh, 120px) + 6px); }
@@ -636,7 +680,7 @@ a.ni { text-decoration: none; color: inherit; }
   // картинка или видео поста: видео играет прямо здесь; если ссылка устарела — кнопка «Смотреть в Telegram»
   function media(img, video, url) {
     if (video && /^https?:/.test(video)) {
-      return '<div class="vid"><video controls playsinline preload="metadata"' + (img ? ' poster="' + esc(img) + '"' : '') + ' src="' + esc(video) + '" data-fallback="' + esc(url || "") + '"></video></div>';
+      return '<div class="vid"><video playsinline preload="metadata"' + (img ? ' poster="' + esc(img) + '"' : '') + ' src="' + esc(video) + '" data-fallback="' + esc(url || "") + '"></video><button class="vbtn" data-vplay aria-label="Смотреть">' + PLAY + '</button></div>';
     }
     if (video) {
       return '<a class="vid vtg" href="' + esc(url) + '" data-tg="' + esc(url) + '" target="_blank" rel="noopener">' +
@@ -644,6 +688,11 @@ a.ni { text-decoration: none; color: inherit; }
     }
     return img ? '<img src="' + esc(img) + '" alt="" loading="lazy" onerror="this.remove()">' : '';
   }
+  // видео: управление появляется только после нажатия на сам ролик
+  document.addEventListener("click", function (e) {
+    var v = e.target.tagName === "VIDEO" ? e.target : null;
+    if (v && !v.controls && !v.paused) { v.controls = true; }
+  }, true);
   document.addEventListener("error", function (e) {
     var v = e.target && e.target.tagName === "VIDEO" ? e.target : null;
     if (!v || !v.parentNode) return;
@@ -724,7 +773,13 @@ a.ni { text-decoration: none; color: inherit; }
     $app.innerHTML = '<div class="view"><header class="top"><div class="brand"><h1>RIM<b>·</b>CS</h1><span class="upd">обновлено ' + esc(ago(L.updated)) + ' · время МСК</span></div></header>' +
       '<div class="menu">' + card("feed", "Лента", "Новости Telegram-каналов без повторов и мусора") +
       card("tours", "Турниры", c.live[0] ? "Идёт: " + c.live.map(function (t) { return t.name; }).slice(0, 2).join(", ") : c.up[0] ? "Скоро: " + c.up[0].name : "Тир-1 и тир-2") +
-      card("rating", "Рейтинг", "Топ-100 VRS и место в HLTV") + '</div></div>';
+      card("rating", "Рейтинг", "Топ-100 команд по VRS") + majorCard() + '</div></div>';
+    function majorCard() {
+      var maj = (L.tournaments || []).find(function (t) { return /major/i.test(t.name) && t.major && t.major.final && !t.finished && new Date(t.end || t.begin) >= new Date(); });
+      if (maj) return card("t-" + maj.id, "Мейджор", maj.name + " · инвайты разосланы — кто с какой стадии");
+      if (L.major_next) return card("major", "Мейджор", "Кто попадёт на следующий мейджор и с какой стадии — прогноз по VRS");
+      return '<div class="mcard off"><span class="mc-t">Мейджор</span><span class="mc-s">Прогноз появится, когда HLTV опубликует расчёт инвайтов</span></div>';
+    }
   }
 
   // ---------- разделы с вкладками: шапка стоит на месте, вкладки — страницы в ряд со своей прокруткой
@@ -770,7 +825,7 @@ a.ni { text-decoration: none; color: inherit; }
     if (!SH || !q(".sshell") || state.ovl || e.touches.length !== 1) return;
     var x = e.touches[0].clientX;
     if (x < 20 || x > window.innerWidth - 20 || e.target.closest("video, input")) return;
-    var sc = e.target.closest(".filt");
+    var sc = e.target.closest(".filt, .bracket");
     if (sc && sc.scrollWidth > sc.clientWidth + 2) return;
     ss = { x: x, y: e.touches[0].clientY, t: Date.now(), dx: 0, lock: null, i: SH.keys.indexOf(SH.key) };
   }, { passive: true });
@@ -885,7 +940,7 @@ a.ni { text-decoration: none; color: inherit; }
       var pos = sub === "all" ? t.rank : t.reg_rank;
       return '<' + (t.page ? 'button class="rk" data-team="' + esc(t.slug) + '"' : 'div class="rk"') + '><span class="rk-n num">' + esc(pos) + '</span>' +
         '<span class="rk-t">' + esc(t.name) + '<small>' + (sub === "all" ? (t.region ? esc(REG_ABBR[t.region] || t.region) + ' #' + esc(t.reg_rank) : '') : 'VRS #' + esc(t.rank)) + '</small></span>' +
-        '<span class="rk-m">' + (t.hltv_rank ? 'HLTV #' + esc(t.hltv_rank) : '') + '</span>' +
+        '<span class="rk-m"></span>' +
         '<span class="rk-p num">' + esc(t.points) + '</span>' + (t.page ? '<i class="chev2">›</i>' : '<i></i>') + '</' + (t.page ? 'button' : 'div') + '>';
     }).join("") + '</div>';
   }
@@ -911,7 +966,7 @@ a.ni { text-decoration: none; color: inherit; }
     if (!T) return '<div class="empty">' + (state.teamErr ? '<strong>Данных о команде пока нет</strong>' : 'Загружаю…') + '</div>';
     var v = T.vrs || {};
     var html = '<section class="hero"><div class="tm-h"><span class="tvrs">' + (v.rank ? '#' + esc(v.rank) + ' VRS' + (v.region ? ' · ' + esc(REG_ABBR[v.region] || v.region) + ' #' + esc(v.reg_rank) : '') + ' · ' + esc(v.points) + ' очк.' : '') +
-      (v.hltv_rank ? ' · HLTV #' + esc(v.hltv_rank) : '') + '</span>' + prizesLine(T.prizes) + '</div>' +
+      '</span>' + prizesLine(T.prizes) + '</div>' +
       ((T.players || []).length ? '<div class="tm-pl">' + T.players.map(function (p) { return '<span>' + esc(p) + '</span>'; }).join("") + '</div>' : '') + '</section>';
     var f = T.form || [], w = f.filter(function (x) { return x.won; }).length, S = T.series || {};
     html += '<div class="sec"><h3>Форма <span>последние 10 серий · нажми на матч</span></h3><div class="box form"><div class="tmh a">' + esc(T.name) + '<span>' + w + '–' + (f.length - w) + '</span></div>' +
@@ -956,15 +1011,50 @@ a.ni { text-decoration: none; color: inherit; }
       '<div class="rscore num"><span class="a">' + esc(A.score) + '</span><span class="x">:</span><span class="b">' + esc(B.score) + '</span></div></button>';
   }
 
+  function cap(x) { return x ? x.charAt(0).toUpperCase() + x.slice(1) : x; }
+  var BR_RU = { upper: "Верхняя сетка", lower: "Нижняя сетка" };
+  function bracketHtml(R) {
+    var have = {};
+    (R.matches || []).forEach(function (x) { have[String(x.id)] = 1; });
+    function box(x) {
+      var fin = x.st === "finished", btn = fin && have[String(x.id)];
+      var inner = '<span class="bt' + (x.w === 0 ? ' w' : x.w === 1 ? ' l' : '') + '"><span>' + esc(x.a || "TBD") + '</span><b class="num">' + esc(x.sa == null || !fin && !x.sa ? "" : x.sa) + '</b></span>' +
+        '<span class="bt' + (x.w === 1 ? ' w' : x.w === 0 ? ' l' : '') + '"><span>' + esc(x.b || "TBD") + '</span><b class="num">' + esc(x.sb == null || !fin && !x.sb ? "" : x.sb) + '</b></span>' +
+        (!fin && x.date ? '<small>' + esc(dm(x.date) + " " + hm(x.date)) + (x.st === "current" ? ' · LIVE' : '') + '</small>' : '');
+      return btn ? '<button class="bm fin" data-rseries="' + esc(x.id) + '">' + inner + '</button>' : '<div class="bm' + (fin ? ' fin' : '') + '">' + inner + '</div>';
+    }
+    var html = "";
+    (R.stages || []).forEach(function (st) {
+      var groups = [];
+      st.rounds.forEach(function (rd) {
+        var g = groups.find(function (x) { return x.b === (rd.bracket || ""); });
+        if (!g) groups.push(g = { b: rd.bracket || "", rounds: [] });
+        g.rounds.push(rd);
+      });
+      html += '<div class="sec"><h3>' + esc(st.title) + (st.status === "current" ? ' <span>идёт</span>' : '') + '</h3>';
+      groups.forEach(function (g) {
+        html += '<div class="box brk">' + (BR_RU[g.b] ? '<div class="brk-h">' + BR_RU[g.b] + '</div>' : '') + '<div class="bracket"><div class="brk-row">' +
+          g.rounds.map(function (rd) { return '<div class="brk-col"><div class="brk-rn">' + esc(cap(String(rd.name || "").replace(/^(Верхняя|Нижняя) сетка\s*/i, ""))) + '</div>' + rd.matches.map(box).join("") + '</div>'; }).join("") + '</div></div></div>';
+      });
+      html += '</div>';
+    });
+    return html || '<div class="empty"><strong>Сетки пока нет</strong></div>';
+  }
   function showTour(id) {
     var L = state.list, t = findTour(id);
     var ms = (L.matches || []).filter(function (m) { return tourOf(m) === String(id); });
     var tabs = [];
+    if (t && t.bracket) tabs.push({ key: "overview", label: "Обзор" });
     if (ms.length || !(t && t.results)) tabs.push({ key: "matches", label: "Матчи" });
     if (t && t.results) tabs.push({ key: "done", label: "Завершённые" });
     var sub = t ? '<span class="pill ' + esc(t.tier) + '">' + (t.tier === "s" ? "ТИР-1" : "ТИР-2") + '</span>' + (t.begin ? esc(dm(t.begin) + (t.end ? " – " + dm(t.end) : "")) : "") + (t.prize_usd ? " · " + esc(usd(t.prize_usd)) : t.prize ? " · " + esc(prize(t.prize)) : "") : "";
     renderShell({ id: "tour:" + id, back: "Турниры", title: esc(t ? t.name : "Турнир") + '<span class="upd shsub">' + sub + '</span>', tabs: tabs,
       pane: function (k) {
+        if (k === "overview") {
+          var R0 = (state.results || {})[id];
+          if (!R0) { getResults(id).then(function () { if (state.view === "tour:" + id) showTour(id); }).catch(function () {}); return '<div class="empty">Загружаю сетку…</div>'; }
+          return bracketHtml(R0);
+        }
         if (k === "done") {
           var R = (state.results || {})[id];
           if (!R) {
@@ -1252,6 +1342,31 @@ a.ni { text-decoration: none; color: inherit; }
   }
 
   // место и очки VRS: сейчас и после матча (оценка)
+  function heroOutcomes(m) {
+    var P = m.prediction;
+    if (!P || !(P.outcomes || []).length) return "";
+    var sorted = P.outcomes.slice().sort(function (a, b) { var x = a.score.split(":"), y = b.score.split(":"); return (y[0] - y[1]) - (x[0] - x[1]); });
+    return '<div class="outc">' + sorted.map(function (o) {
+      var x = o.score.split(":"), side = +x[0] > +x[1] ? "a" : "b";
+      return '<span class="oc ' + side + (o === P.outcomes[0] ? ' top' : '') + '"><b class="num">' + esc(o.score) + '</b><small class="num">' + esc(o.p) + '%</small></span>';
+    }).join("") + '<span class="oc-src">' + (P.source === "букмекеры" ? "по коэффициентам букмекеров" : "оценка по статистике карт") + '</span></div>';
+  }
+  // вероятный пик: вето по привычкам команд за 3 месяца, счёт — по винрейту карт
+  function pickBlock(m) {
+    var P = m.prediction, A = m.teams[0] || {}, B = m.teams[1] || {};
+    if (!P || !(P.maps || []).length) return "";
+    var html = '<div class="sec" data-nav><h3>Вероятный пик <span>по вето за 3 мес.</span></h3><div class="box ppick"><div class="pp-maps">' + P.maps.map(function (x, i) {
+      var who = x.by === 0 ? abbr(A) : x.by === 1 ? abbr(B) : "десайдер";
+      var z = x.score && x.score[0] === 0 && x.score[1] === 0;
+      return '<div class="pp-m ' + (x.by === 0 ? "a" : x.by === 1 ? "b" : "n") + '"><span class="pp-n">Карта ' + (i + 1) + ' · ' + esc(who) + '</span><b>' + esc(x.map) + '</b>' +
+        '<span class="num pp-s"><span class="a">' + esc(x.score ? x.score[0] : "–") + '</span>:<span class="b">' + esc(x.score ? x.score[1] : "–") + '</span></span>' +
+        (z ? '<small>скорее всего не понадобится</small>' : '<small class="num">' + esc(abbr(A)) + ' ' + esc(x.p) + '%</small>') + '</div>';
+    }).join("") + '</div><div class="pp-steps">' + (P.steps || []).map(function (st) {
+      var t = st.team === 0 ? abbr(A) : st.team === 1 ? abbr(B) : "";
+      return '<span class="vt-a ' + esc(st.act) + '">' + (st.act === "ban" ? esc(t) + " бан" : st.act === "pick" ? esc(t) + " пик" : "остаётся") + ' <b>' + esc(st.map) + '</b></span>';
+    }).join("") + '</div>' + (P.odds && P.odds.win ? '<div class="note">Букмекеры: ' + esc(abbr(A)) + ' ' + P.odds.win[0] + '% · ' + esc(abbr(B)) + ' ' + P.odds.win[1] + '%</div>' : '') + '</div></div>';
+    return html;
+  }
   function vrsBlock(m) {
     var O = m.vrs_outcomes, A = m.teams[0] || {}, B = m.teams[1] || {};
     if (!O || !A.vrs || !B.vrs) return "";
@@ -1265,7 +1380,7 @@ a.ni { text-decoration: none; color: inherit; }
         '<span class="vr-c"><b class="num">#' + t.vrs.rank + '</b><small class="num">' + t.vrs.points + '</small></span>' +
         cell(O.win0[i]) + cell(O.win1[i]) + '</div>';
     });
-    return html + '<div class="note">Оценка по формуле личных встреч Valve: изменение очков за саму победу или поражение. Бонусы за итог турнира сюда не входят.</div></div></div>';
+    return html + '<div class="note">' + (O.model === "valve" ? 'Оценка по модели Valve: победа даёт очки за личную встречу и за силу побеждённого (баунти, сеть соперников, LAN). От HLTV может отличаться на 10–20 очков.' : 'Оценка только по личной встрече.') + '</div></div></div>';
   }
 
   function newsFor(m, who) {
@@ -1306,8 +1421,9 @@ a.ni { text-decoration: none; color: inherit; }
     return [v.region, "#" + v.rank + " VRS", v.points + " очк."].filter(Boolean).join(" · ");
   }
 
-  function miniVrs(t) { vrsLine(t); var v = t.vrs; return v ? '<small>#' + esc(v.rank) + (v.region ? ' · ' + esc(REG_ABBR[v.region] || v.region) + (v.reg_rank ? ' #' + esc(v.reg_rank) : '') : '') + ' · ' + esc(v.points) + '</small>' : ''; }
-  function heroVrs(t) { vrsLine(t); var v = t.vrs; return v ? '<span class="tvrs">' + esc(v.region || "") + '<br>#' + esc(v.rank) + ' VRS · ' + esc(v.points) + '</span>' : ''; }
+  function vrsShort(t) { vrsLine(t); var v = t.vrs; return v ? '🌐 #' + esc(v.rank) + (v.region ? ' · ' + esc(REG_ABBR[v.region] || v.region) + (v.reg_rank ? ' #' + esc(v.reg_rank) : '') : '') : ''; }
+  function miniVrs(t) { var x = vrsShort(t); return x ? '<small>' + x + '</small>' : ''; }
+  function heroVrs(t) { var x = vrsShort(t); return x ? '<span class="tvrs">' + x + '</span>' : ''; }
   function personRow(p, roles, real, extra, statsHtml, attrs) {
     var info = [real ? esc(real) + (p.name_ru ? ' <span class="pron">[' + esc(plain(p.name_ru)) + ']</span>' : '') : (p.name_ru ? esc(plain(p.name_ru)) : ""),
       p.age ? esc(p.age) + " " + years(p.age) : ""].concat(extra || []).filter(Boolean);
@@ -1469,7 +1585,7 @@ a.ni { text-decoration: none; color: inherit; }
 
   function tabBodyHtml(m, key) {
     if (key === "players") return playersTab(m);
-    if (key === "stats") return vrsBlock(m) + formBlock(m) + h2hBlock(m) + mapsTable(m) + mapZone(m);
+    if (key === "stats") return vrsBlock(m) + pickBlock(m) + formBlock(m) + h2hBlock(m) + mapsTable(m) + mapZone(m);
     return (key === "news:all" ? factsBlock(m) : "") + newsList(m, key.slice(5));
   }
 
@@ -1484,7 +1600,7 @@ a.ni { text-decoration: none; color: inherit; }
       '<div class="face"><div class="tm a"><span class="acr">' + esc(abbr(A)) + '</span><span class="full">' + esc(A.name) + '</span>' + heroVrs(A) + '</div>' +
       '<div class="mid"><b>' + esc(hm(m.begin_at)) + '</b>' + esc(dm(m.begin_at)) + ' · BO' + esc(m.bo) + '</div>' +
       '<div class="tm b"><span class="acr">' + esc(abbr(B)) + '</span><span class="full">' + esc(B.name) + '</span>' + heroVrs(B) + '</div></div>' +
-      '</section></div></div>' +
+      heroOutcomes(m) + '</section></div></div>' +
       '<nav class="tabs" role="tablist">' + tabBtn("players", "Игроки") + tabBtn("stats", "Статистика") + tabBtn("news", "Новости", nCount) + '</nav>' +
       '<div class="fold nf-wrap"><div class="fi"><div class="filt nfilt" role="group" aria-label="О ком">' + opts.map(function (o) {
         return '<button class="chip" data-nf="' + esc(o[0]) + '" aria-pressed="' + (state.newsFilter === o[0]) + '">' + esc(o[1]) + '<span class="c">' + newsFor(m, o[0]).length + '</span></button>';
@@ -1530,6 +1646,7 @@ a.ni { text-decoration: none; color: inherit; }
   }
   function markTabs(key) {
     var tab = isNews(key) ? "news" : key, nf = isNews(key) ? key.slice(5) : null;
+    var shl = q(".mshell"); if (shl) shl.classList.toggle("on-stats", key === "stats");
     document.querySelectorAll(".mhead [data-tab]").forEach(function (b) { b.setAttribute("aria-selected", String(b.getAttribute("data-tab") === tab)); });
     if (nf != null) {
       document.querySelectorAll(".mhead [data-nf]").forEach(function (b) { b.setAttribute("aria-pressed", String(b.getAttribute("data-nf") === nf)); });
@@ -1555,7 +1672,9 @@ a.ni { text-decoration: none; color: inherit; }
     keys.forEach(function (k) {
       html += '<div class="pane' + (isNews(k) ? ' np' : '') + '" data-key="' + esc(k) + '"><div class="pin"><div class="tabbody">' + tabBodyHtml(m, k) + '</div></div></div>';
     });
-    $app.innerHTML = html + '</div></div><div class="mhead"><div class="pin">' + headHtml(m) + '</div></div></div>';
+    $app.innerHTML = html + '</div></div><div class="mhead"><div class="pin">' + headHtml(m) + '</div></div>' +
+      '<div class="snav"><button data-snav="-1" aria-label="Предыдущий раздел">↑</button><button data-snav="1" aria-label="Следующий раздел">↓</button></div></div>';
+    q(".mshell").classList.toggle("on-stats", curKey() === "stats");
     measureHead();
     trackTo(Math.max(0, keys.indexOf(curKey())), false);
     panes().forEach(function (p) {
@@ -1721,6 +1840,26 @@ a.ni { text-decoration: none; color: inherit; }
     s0.g.addEventListener("transitionend", function (ev) { if (ev.target === s0.g) fin(); });
     setTimeout(fin, 320);
   }
+  // стрелки внизу «Статистики»: следующий/предыдущий раздел встаёт под шапку
+  function statsNav(dir) {
+    var pane = activePane();
+    if (!pane || !HD) return;
+    var secs = [].slice.call(pane.querySelectorAll(".tabbody > .sec > h3, .mapzone, .mzsec > .mzh")).map(function (h) { return h.classList.contains("mapzone") ? h : h; });
+    var top = HD.base + HD.miniH + (isNews(curKey()) ? HD.nfH : 0);
+    var chips = pane.querySelector(".mapzone .mapsel"), chipH = chips ? chips.offsetHeight : 0;
+    var pr = pane.getBoundingClientRect().top;
+    var targets = secs.map(function (el) {
+      var inZone = !!el.closest(".mzsec");
+      var y = el.getBoundingClientRect().top - pr + pane.scrollTop - top - 8 - (inZone ? chipH : 0);
+      return Math.max(0, Math.round(y));
+    }).filter(function (y, i, a) { return a.indexOf(y) === i; }).sort(function (a, b) { return a - b; });
+    var cur = pane.scrollTop, t = null;
+    if (dir > 0) t = targets.find(function (y) { return y > cur + 4; });
+    else for (var i = targets.length - 1; i >= 0; i--) if (targets[i] < cur - 4) { t = targets[i]; break; }
+    if (t == null) t = dir > 0 ? pane.scrollHeight : 0;
+    pane.scrollTo({ top: t, behavior: "smooth" });
+    try { TG && TG.HapticFeedback && TG.HapticFeedback.selectionChanged(); } catch (err) {}
+  }
   function setMap(mp) {
     state.map = mp;
     var pane = activePane(), b = pane && pane.querySelector(".mzbody");
@@ -1811,9 +1950,11 @@ a.ni { text-decoration: none; color: inherit; }
       return;
     }
     state.openId = null;
-    if (!(tt || /^(tours|rating|feed|r-)/.test(h))) SH = null;
+    if (!(tt || /^(tours|rating|feed|major|r-)/.test(h))) SH = null;
     if (tt) { state.view = "tour:" + tt[1]; showTour(tt[1]); }
     else if (h === "tours") { state.view = "tours"; showTours(); }
+    else if (h === "major") { state.view = "major"; renderShell({ id: "major", back: "Главная", title: "Мейджор", tabs: [{ key: "main", label: "" }],
+      pane: function () { return state.list.major_next ? majorBlock(state.list.major_next) : '<div class="empty"><strong>Прогноза пока нет</strong></div>'; } }); }
     else if (h === "rating") { state.view = "rating"; showRating(); if (!state.ranking) getRanking().then(function () { if (state.view === "rating") showRating(); }).catch(function () { state.rankingErr = true; if (state.view === "rating") showRating(); }); }
     else if (/^r-/.test(h)) { var sl = h.slice(2); state.view = "team:" + sl; state.teamErr = false; showTeam(sl); getTeam(sl).then(function () { if (state.view === "team:" + sl) showTeam(sl); }).catch(function () { state.teamErr = true; if (state.view === "team:" + sl) showTeam(sl); }); }
     else if (h === "feed") { state.view = "feed"; showFeed(); if (!state.feed) getFeed().then(function () { if (state.view === "feed") showFeed(); }).catch(function () { state.feedErr = true; if (state.view === "feed") showFeed(); }); }
@@ -1887,8 +2028,10 @@ a.ni { text-decoration: none; color: inherit; }
 
   // ---------- клики
   document.addEventListener("click", function (e) {
-    var t = e.target.closest("[data-goto],[data-sk],[data-team],[data-tseries],[data-fread],[data-close],#facts-more,[data-home],[data-feedch],[data-tg],[data-reader],[data-open],[data-tour],[data-tab],[data-map],[data-nf],[data-player],[data-link],[data-read],[data-series],[data-rseries],[data-smap],[data-ttab],#back");
+    var t = e.target.closest("[data-vplay],[data-snav],[data-goto],[data-sk],[data-team],[data-tseries],[data-fread],[data-close],#facts-more,[data-home],[data-feedch],[data-tg],[data-reader],[data-open],[data-tour],[data-tab],[data-map],[data-nf],[data-player],[data-link],[data-read],[data-series],[data-rseries],[data-smap],[data-ttab],#back");
     if (!t) return;
+    if (t.hasAttribute("data-vplay")) { var vv = t.parentNode.querySelector("video"); if (vv) { t.remove(); vv.play().catch(function () {}); } return; }
+    if (t.hasAttribute("data-snav")) { statsNav(Number(t.getAttribute("data-snav"))); return; }
     if (t.hasAttribute("data-goto")) { go("#" + t.getAttribute("data-goto")); return; }
     if (t.hasAttribute("data-sk")) { shellGo(t.getAttribute("data-sk")); return; }
     if (t.hasAttribute("data-team")) { go("#r-" + t.getAttribute("data-team")); window.scrollTo(0, 0); return; }
