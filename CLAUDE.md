@@ -65,5 +65,5 @@
 - Вето: 04.11 вечером 391/397 серий, IEM Beijing 24/24.
 - 6 ноября 2026, 09:30 МСК (PRV–NAVI, IEM Beijing): проверить live-блок на вкладке «Игроки» — счёт, раунды, K–D/ADR совпадают с bo3.gg.
 - MVP у FURIA и BetBoom: HLTV отдавал 403 на страницы игроков; проверить после полных сборов.
-- Новости: владелец должен вставить новый код воркера, добавить секрет GH_TOKEN и крон */5 в Cloudflare. Проверить, что news.yml запускается раз в 5 мин.
+- Новости: news.yml живёт ~55 мин и делает проход каждые 5 мин (GitHub сам запускает раз в ~час, следующий ждёт в очереди). Кэш новостей отдельный (`news-cache-`), сливается с общим через `tools/merge_cache.py` в каждом сборе. Будильник Cloudflare владелец настроил 05.11, но запусков от него не было — не доведён (проверить код с scheduled, секрет GH_TOKEN, логи крона).
 - Страница игрока HLTV разбирается по правилам gigobyte/HLTV и hltv-scraper-api: `.achievement-table .team` (место `.achievement`, турнир `.tournament-name-cell a`), трофеи `.trophy-row-trophy img[title]`, `span.trophyDescription[title]` → `major_events` (с местом), `trophies`, `event_wins`; кэш `pinfo4`. Проверить после полных сборов, что поля заполняются.

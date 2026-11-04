@@ -36,6 +36,16 @@ jobs:
           key: collector-cache-${{ github.run_id }}
           restore-keys: collector-cache-
 
+      - name: Восстановить кэш новостей
+        uses: actions/cache/restore@v4
+        with:
+          path: cache_news
+          key: news-cache-${{ github.run_id }}
+          restore-keys: news-cache-
+
+      - name: Слить кэши
+        run: python tools/merge_cache.py cache cache_news
+
       - name: Сбор
         env:
           PANDASCORE_TOKEN: ${{ secrets.PANDASCORE_TOKEN }}

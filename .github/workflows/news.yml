@@ -1,5 +1,10 @@
 name: Обновить новости
 
+# GitHub запускает расписание с опозданием (на деле примерно раз в час), поэтому один запуск
+# не заканчивается сразу, а около часа обновляет новости каждые 5 минут. Следующий запуск
+# встаёт в очередь (concurrency) и подхватывает сразу после — получается почти без перерывов.
+# Будильник в воркере Cloudflare (если настроен) тоже просто ставит запуск в эту очередь.
+
 on:
   schedule:
     - cron: "*/5 * * * *"
@@ -15,7 +20,7 @@ concurrency:
 jobs:
   run:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 75
     steps:
       - uses: actions/checkout@v4
 
@@ -23,31 +28,52 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Взять текущие данные (ветка data)
-        run: |
-          mkdir -p docs/data
-          if git fetch -q --depth 1 origin data; then git archive FETCH_HEAD | tar -x -C docs/data; fi
-
-      - name: Восстановить кэш сборщика
+      - name: Восстановить кэш сборщика (общий)
         uses: actions/cache/restore@v4
         with:
           path: cache
           key: collector-cache-${{ github.run_id }}
           restore-keys: collector-cache-
 
-      - name: Сбор
+      - name: Восстановить кэш новостей
+        uses: actions/cache/restore@v4
+        with:
+          path: cache_news
+          key: news-cache-${{ github.run_id }}
+          restore-keys: news-cache-
+
+      - name: Слить кэши
+        run: python tools/merge_cache.py cache cache_news
+
+      - name: Новости каждые 5 минут, около часа
         env:
           NEWS_ONLY: "1"
           GIGACHAT_KEY: ${{ secrets.GIGACHAT_KEY }}
           GEMINI_KEY: ${{ secrets.GEMINI_KEY }}
-        run: python collector/collect.py
+          REMOTE: "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
+        run: |
+          end=$((SECONDS + 55 * 60))
+          i=0
+          while :; do
+            i=$((i + 1))
+            t0=$SECONDS
+            echo "::group::Проход $i"
+            # свежие данные из ветки data: полный сбор мог добавить новые карточки матчей
+            rm -rf docs/data && mkdir -p docs/data
+            if git fetch -q --depth 1 origin data; then git archive FETCH_HEAD | tar -x -C docs/data; fi
+            python collector/collect.py || echo "Проход $i: сбор завершился с ошибкой"
+            python collector/save_data.py news "$REMOTE" || echo "Проход $i: запись завершилась с ошибкой"
+            echo "::endgroup::"
+            left=$((300 - (SECONDS - t0)))
+            [ $left -lt 30 ] && left=30
+            [ $((SECONDS + left + 60)) -ge $end ] && break
+            sleep $left
+          done
+          echo "Проходов: $i"
 
-      - name: Сохранить кэш сборщика
+      - name: Сохранить кэш новостей
         if: always()
         uses: actions/cache/save@v4
         with:
           path: cache
-          key: collector-cache-${{ github.run_id }}
-
-      - name: Сохранить данные (ветка data, слияние с параллельными сборами)
-        run: python collector/save_data.py news "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
+          key: news-cache-${{ github.run_id }}
