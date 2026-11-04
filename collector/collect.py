@@ -1247,6 +1247,19 @@ def series_players(rows: list[dict], tid, names: dict) -> list[list]:
     return out
 
 
+def map_sides(det: dict | None, win: int | None) -> list | None:
+    """Раунды по сторонам на карте: [[CT, T] команды 1, [CT, T] команды 2]. win — индекс победителя карты (0/1)."""
+    if not det or win not in (0, 1) or not det.get("rounds"):
+        return None
+    out = [[0, 0], [0, 0]]
+    for _, tid, side in det["rounds"]:
+        if tid is None or not side:
+            continue
+        i = win if tid == det.get("wt") else 1 - win
+        out[i][0 if side.upper().startswith("CT") else 1] += 1
+    return out if sum(map(sum, out)) else None
+
+
 def series_detail(m: dict) -> dict | None:
     """Завершённая серия bo3: карты со счётом и статистика игроков (по серии и по каждой карте)."""
     t1, t2 = m.get("team1_id"), m.get("team2_id")
@@ -1264,7 +1277,7 @@ def series_detail(m: dict) -> dict | None:
         score = ([ws, ls] if win == 0 else [ls, ws]) if win is not None and ws is not None and ls is not None else None
         rows = det.get("players") or []
         every += rows
-        maps.append({"map": g.get("map"), "score": score, "winner": win,
+        maps.append({"map": g.get("map"), "score": score, "winner": win, "sides": map_sides(det, win),
                      "players": [series_players(rows, t1, names), series_players(rows, t2, names)] if rows else None})
     tm1, tm2 = m.get("team1") or {}, m.get("team2") or {}
     return {
@@ -4406,6 +4419,17 @@ def main() -> int:
         if e and e < NOW - timedelta(days=2) and path.exists():
             keep_res.add(path.name)  # итоги давно закончившегося турнира уже не меняются, кроме недостающего вето
             rj = load_json(path, {}) or {}
+            sides_added = 0
+            for sd in rj.get("matches") or []:  # раунды по сторонам — из кэша карт, без новых запросов
+                gs = games_cache.get(str(sd.get("id"))) or []
+                for i, mp in enumerate(sd.get("maps") or []):
+                    if mp.get("sides") is None and i < len(gs):
+                        sdv = map_sides(details_cache.get(str(gs[i].get("id"))), mp.get("winner"))
+                        if sdv:
+                            mp["sides"] = sdv
+                            sides_added += 1
+            if sides_added:
+                save_json(path, rj)
             if not STATS:
                 added = 0
                 for sd in rj.get("matches") or []:

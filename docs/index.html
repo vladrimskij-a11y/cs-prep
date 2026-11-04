@@ -504,6 +504,7 @@ html { overflow-anchor: none; }
 .stake { padding: 4px 14px; }
 .stk { display: grid; grid-template-columns: 22px 1fr; gap: 8px; padding: 10px 0; border-top: 1px solid var(--line); font-size: 14px; line-height: 1.4; }
 .stk:first-child { border-top: 0; }
+.stk-m { font-size: 12.5px; color: var(--muted); } .stk-m b { color: var(--fg); font-weight: 600; }
 .stk i { font-style: normal; font-size: 16px; line-height: 1.25; text-align: center; }
 .stk .slot { display: inline-block; margin-top: 4px; font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: color-mix(in srgb, var(--accent, #4c8dff) 16%, transparent); color: var(--fg); }
 .pstat.tf { margin-top: 2px; color: var(--muted); } .pstat.tf small { color: var(--muted); }
@@ -537,6 +538,16 @@ html { overflow-anchor: none; }
 .pp-m.mimg .pp-n, .pp-m.mimg small, .lv-m.mimg small { color: rgba(255,255,255,.82); }
 .pp-m.mimg .pp-s .a { color: #8db8ff; } .pp-m.mimg .pp-s .b { color: #ffc27a; }
 .pp-m.left.mimg { border: 1px dashed rgba(255,255,255,.35); }
+/* раунды по сторонам: CT голубой, T золотой — отдельно от цветов команд */
+.sides { display: flex; flex-direction: column; gap: 1px; margin-top: 3px; font-size: 10.5px; }
+.sd-r { display: flex; gap: 5px; align-items: baseline; }
+.sd-r em { font-style: normal; opacity: .75; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+.sd-r i { font-style: normal; font-weight: 700; font-variant-numeric: tabular-nums; }
+.sd-r .sct { color: #6fd0ff; } .sd-r .st { color: #ffc95c; }
+.sd-leg { font-size: 11.5px; color: var(--muted); padding: 2px 12px 10px; } .sd-leg i { font-style: normal; font-weight: 700; } .sd-leg .sct { color: #2f9fd6; } .sd-leg .st { color: #c98a12; }
+.pp-maps.sm { grid-column: 1 / -1; padding: 6px 0 0; gap: 6px; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); }
+.pp-m.sm { padding: 7px 8px; border-top-width: 2px; }
+.pp-m.sm b { font-size: 13px; } .pp-m.sm .pp-s { font-size: 14px; }
 .pp-m.left.mimg::before { filter: grayscale(.7); }
 .st-h .lg { margin-right: 6px; }
 
@@ -689,6 +700,26 @@ a.ni { text-decoration: none; color: inherit; }
 .ni .src a { font-weight: 600; color: var(--ct); text-decoration: none; }
 .banner { font-size: 12px; color: var(--muted); padding: 10px 12px; border: 1px dashed var(--line); border-radius: 8px; }
 @media (prefers-reduced-motion: no-preference) { .view { animation: in .18s ease-out; } @keyframes in { from { opacity: .4; transform: translateY(4px); } to { opacity: 1; transform: none; } } }
+
+/* ---------- визуальная полировка (минимализм тот же, но мягче и аккуратнее) ---------- */
+:root { --r: 14px; --r-s: 10px; --shadow: 0 1px 2px rgba(16,24,40,.05), 0 2px 8px rgba(16,24,40,.04); --line: #dde1e8; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --bg: #0f1218; --surface: #171b23; --sunk: #1d222c; --line: #252b36; --shadow: none; }
+}
+:root[data-theme="dark"] { --bg: #0f1218; --surface: #171b23; --sunk: #1d222c; --line: #252b36; --shadow: none; }
+.box, .hero, .match, .tour-card { box-shadow: var(--shadow); }
+.box, .hero, .match, .tour-card, .rk { border-color: var(--line); }
+.sec { margin-top: 18px; gap: 8px; }
+.sec > h3 { margin: 0 2px; }
+.tab { border-radius: var(--r-s); transition: background .15s, color .15s; }
+.chip { transition: background .15s, color .15s, border-color .15s; }
+.match, .tour-card, .bm, .fact.link, .ni, .rk, .gbtn, .pp-m, [data-tname] { transition: transform .12s ease, opacity .12s ease; }
+.match:active, .tour-card:active, .bm:active, .fact.link:active, .ni:active, button.rk:active, .gbtn:active { transform: scale(.985); opacity: .9; }
+.pp-m, .th-t, .lv-m { border-radius: var(--r-s); }
+.pill { border-radius: 6px; }
+.th-logo { background: var(--sunk); }
+.fact.link .fsrc { opacity: .8; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
 
 <div class="wrap" id="app"></div>
@@ -940,7 +971,7 @@ a.ni { text-decoration: none; color: inherit; }
       : ms.length ? (t.next ? 'ближайший <b>' + esc(dayKey(t.next) === today ? "сегодня " + hm(t.next) : dm(t.next) + " " + hm(t.next)) + '</b>' : '')
       : '<span class="muted">расписание пока не опубликовано</span>';
     return '<button class="tour-card' + (todayN ? " today" : "") + (t.tier !== "s" ? " t2" : "") + (t.bg ? ' tbg" style="--tb:url(' + esc(t.bg) + ')' : '') + '" data-tour="' + esc(t.id) + '">' +
-      '<span class="tn">' + esc(t.name) + '</span><span class="pill go ' + esc(t.tier) + '">' + esc((t.tier || "?").toUpperCase()) + '</span>' +
+      '<span class="tn">' + esc(withYear(t.name, t.begin || t.next)) + '</span><span class="pill go ' + esc(t.tier) + '">' + esc((t.tier || "?").toUpperCase()) + '</span>' +
       '<span class="tm2">' + [dates && '<b>' + esc(dates) + '</b>', live && !t.live ? '<span class="live">идёт сейчас</span>' : '',
         (t.prize_usd || t.prize) && esc(t.prize_usd ? usd(t.prize_usd) : prize(t.prize)),
         todayN ? '<b>сегодня ' + todayN + '</b>' : (!t.finished && ms.length ? ms.length + ' матч.' : ''), next].filter(Boolean).join(' · ') + '</span>' +
@@ -1150,7 +1181,7 @@ a.ni { text-decoration: none; color: inherit; }
   function prizesLine(pr) {
     pr = (pr || []).filter(function (x) { return MEDAL[x.place]; });
     if (!pr.length) return "";
-    return '<span class="tpr">🏆 <b>' + pr.length + '</b> · ' + pr.map(function (x) { return MEDAL[x.place] + ' ' + esc(x.event); }).join(' · ') + '</span>';
+    return '<span class="tpr">🏆 <b>' + pr.length + '</b> · ' + pr.map(function (x) { return MEDAL[x.place] + ' ' + esc(withYear(x.event, x.date)); }).join(' · ') + '</span>';
   }
   var REG_RU = { "Европа": "Европа", "Америка": "Америка", "Азия": "Азия", Europe: "Европа", Americas: "Америка", Asia: "Азия" };
   function teamPane(T) {
@@ -1159,7 +1190,7 @@ a.ni { text-decoration: none; color: inherit; }
     // шапка команды: логотип и плитки — место в мире, в регионе, очки VRS, трофеи (нажать — список)
     var cups = (T.prizes || []).filter(function (x) { return MEDAL[x.place]; });
     var cols = [["🥇", ["1st"]], ["🥈", ["2nd"]], ["🥉", ["3rd", "3-4th"]]].map(function (c) {
-      return { i: c[0], l: cups.filter(function (x) { return c[1].indexOf(x.place) >= 0; }).map(function (x) { return x.event; }) };
+      return { i: c[0], l: cups.filter(function (x) { return c[1].indexOf(x.place) >= 0; }).map(function (x) { return withYear(x.event, x.date); }) };
     });
     var tiles = [];
     if (v.rank) tiles.push('<div class="th-t"><b class="num">#' + esc(v.rank) + '</b><span>в мире</span></div>');
@@ -1187,7 +1218,20 @@ a.ni { text-decoration: none; color: inherit; }
     }
     return html;
   }
-  var MAP_IMG = { ancient: 1, anubis: 1, dust2: 1, inferno: 1, mirage: 1, nuke: 1, overpass: 1, train: 1, vertigo: 1 };
+  var SIDES_LEGEND = '<div class="sd-leg">Раунды на карте: за <i class="sct">CT</i> и за <i class="st">T</i></div>';
+  // квадрат сыгранной карты: картинка карты, счёт цветом команд и раунды по сторонам (CT — голубой, T — золотой)
+  function mapSquare(g, i, A, B, small) {
+    var sd = g.sides, side = "";
+    if (sd && sd.length === 2) {
+      side = '<span class="sides">' + [A, B].map(function (t, k) {
+        return '<span class="sd-r"><em>' + esc(abbr(t)) + '</em><i class="sct">' + sd[k][0] + '</i><i class="st">' + sd[k][1] + '</i></span>';
+      }).join("") + '</span>';
+    }
+    return '<div class="pp-m ' + (g.winner === 0 ? "a" : g.winner === 1 ? "b" : "n") + (small ? " sm" : "") + mapBg(g.map) + '">' +
+      (small ? '' : '<span class="pp-n">Карта ' + (i + 1) + '</span>') + '<b>' + esc(g.map || "?") + '</b>' +
+      '<span class="num pp-s"><span class="a">' + esc(g.score ? g.score[0] : "–") + '</span>:<span class="b">' + esc(g.score ? g.score[1] : "–") + '</span></span>' + side + '</div>';
+  }
+  var MAP_IMG = { ancient: 1, anubis: 1, cache: 1, dust2: 1, inferno: 1, mirage: 1, nuke: 1, overpass: 1, train: 1, vertigo: 1 };
   function mapBg(name) {  // картинка карты фоном квадрата; текст остаётся читаемым за счёт затемнения
     var k = String(name || "").toLowerCase().replace(/^de_/, "").replace(/dust\s*ii/, "dust2").replace(/[^a-z0-9]/g, "");
     if (!k || k === "tba" || k === "tbd") return '';
@@ -1231,9 +1275,7 @@ a.ni { text-decoration: none; color: inherit; }
       '<div class="vs"><div class="row"><span class="dot a"></span>' + logo(A.name, A.logo) + '<span class="tname' + (x.winner === 0 ? ' won' : '') + '">' + esc(A.name || "?") + '</span><b class="rs num a' + (x.winner === 0 ? ' won' : '') + '">' + esc(A.score) + '</b></div>' +
       '<div class="row"><span class="dot b"></span>' + logo(B.name, B.logo) + '<span class="tname' + (x.winner === 1 ? ' won' : '') + '">' + esc(B.name || "?") + '</span><b class="rs num b' + (x.winner === 1 ? ' won' : '') + '">' + esc(B.score) + '</b></div>' +
       (sub ? '<div class="tour">' + esc(sub) + '</div>' : '') +
-      ((x.maps || []).length ? '<div class="maps">' + x.maps.map(function (g) {
-        return '<span class="mp ' + (g.winner === 0 ? "a" : g.winner === 1 ? "b" : "n") + '">' + esc(g.map || "?") + (g.score ? ' <span class="num">' + esc(g.score[0] + ":" + g.score[1]) + '</span>' : '') + '</span>';
-      }).join("") + '</div>' : '') + '</div>' +
+      ((x.maps || []).length ? '<div class="pp-maps sm">' + x.maps.map(function (g, i) { return mapSquare(g, i, A, B, true); }).join("") + '</div>' : '') + '</div>' +
       '</button>';
   }
 
@@ -1366,7 +1408,7 @@ a.ni { text-decoration: none; color: inherit; }
     var sub = t ? '<span class="pill ' + esc(t.tier) + '">' + esc((t.tier || "?").toUpperCase()) + '</span>' + (t.begin ? esc(dm(t.begin) + (t.end ? " – " + dm(t.end) : "")) : "") + (t.prize_usd ? " · " + esc(usd(t.prize_usd)) : t.prize ? " · " + esc(prize(t.prize)) : "") : "";
     setTimeout(drawBrackets, 0);
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { if (q(".brk-row")) drawBrackets(); });
-    renderShell({ id: "tour:" + id, back: "Турниры", def: tabs.some(function (x) { return x.key === "matches"; }) ? "matches" : undefined, title: esc(t ? t.name : "Турнир") + '<span class="upd shsub">' + sub + '</span>', tabs: tabs,
+    renderShell({ id: "tour:" + id, back: "Турниры", def: tabs.some(function (x) { return x.key === "matches"; }) ? "matches" : undefined, title: esc(t ? withYear(t.name, t.begin || t.next) : "Турнир") + '<span class="upd shsub">' + sub + '</span>', tabs: tabs,
       pane: function (k) {
         if (k === "overview") {
           var R0 = (state.results || {})[id];
@@ -1379,7 +1421,7 @@ a.ni { text-decoration: none; color: inherit; }
             getResults(id).then(function () { if (state.view === "tour:" + id) showTour(id); }).catch(function () {});
             return '<div class="empty">Загружаю результаты…</div>';
           }
-          var html = "", cur = null;
+          var html = (R.matches || []).some(function (x) { return (x.maps || []).some(function (g) { return g.sides; }); }) ? SIDES_LEGEND : "", cur = null;
           (R.matches || []).forEach(function (x) {
             var dk = dayKey(x.date);
             if (dk !== cur) { if (cur) html += '</section>'; cur = dk; html += '<section class="day"><h2>' + esc(dayTitle(x.date)) + '</h2>'; }
@@ -1523,16 +1565,17 @@ a.ni { text-decoration: none; color: inherit; }
   }
 
   function factsBlock(m) {
-    var F = m.facts || [];
+    // сначала факты из новостей (самые интересные для эфира), потом посчитанные по статистике; нажимается каждый
+    var F = (m.facts || []).map(function (f, i) { return { f: f, i: i, s: factSrc(m, f) }; });
     if (!F.length) return "";
+    F.sort(function (a, b) { return (b.s ? 1 : 0) - (a.s ? 1 : 0) || a.i - b.i; });
     var shown = state.factsAll ? F : F.slice(0, 10);
     var html = '<div class="sec"><h3>Факты для эфира <span>по данным матча</span></h3><div class="box facts">';
-    shown.forEach(function (f) {
-      var src = factSrc(m, f), hasSrc = !!src;
-      f = { tag: f.tag, text: f.text, src: src };
-      html += hasSrc
-        ? '<button class="fact link" data-reader="' + esc(f.src) + '"><span class="ftag">' + esc(f.tag || "") + ' <span class="fsrc" aria-label="открыть новость">' + SRC_ICON + 'новость</span></span><span>' + esc(f.text) + '</span></button>'
-        : '<div class="fact"><span class="ftag">' + esc(f.tag || "") + '</span><span>' + esc(f.text) + '</span></div>';
+    shown.forEach(function (x) {
+      var f = x.f;
+      html += x.s
+        ? '<button class="fact link" data-reader="' + esc(x.s) + '"><span class="ftag">' + esc(f.tag || "") + ' <span class="fsrc" aria-label="открыть новость">' + SRC_ICON + 'новость</span></span><span>' + esc(f.text) + '</span></button>'
+        : '<button class="fact link" data-fact="' + x.i + '"><span class="ftag">' + esc(f.tag || "") + ' <span class="fsrc">' + SRC_ICON + 'статистика</span></span><span>' + esc(f.text) + '</span></button>';
     });
     if (F.length > 10) html += '<button class="fmore" id="facts-more">' + (state.factsAll ? "Свернуть" : "Показать ещё " + (F.length - 10)) + '</button>';
     return html + '</div></div>';
@@ -1553,7 +1596,7 @@ a.ni { text-decoration: none; color: inherit; }
     h.slice(0, 10).forEach(function (x) {
       html += '<div class="it"><div class="d">' + esc(dmy(x.date)) + ' · BO' + esc(x.bo) + '</div>' +
         '<div class="sc"><span class="a">' + esc(x.score[0]) + '</span><span class="x">:</span><span class="b">' + esc(x.score[1]) + '</span></div>' +
-        '<div class="tr">' + esc(x.tournament) + '</div>';
+        '<div class="tr">' + esc(withYear(x.tournament, x.date)) + '</div>';
       if (x.maps && x.maps.length) {
         html += '<div class="maps">' + x.maps.map(function (g) {
           return '<span class="mp ' + (g.winner === 0 ? "a" : g.winner === 1 ? "b" : "n") + '">' + esc(g.map || "?") + (g.score ? ' <span class="num">' + esc(g.score) + '</span>' : '') + '</span>';
@@ -1629,6 +1672,13 @@ a.ni { text-decoration: none; color: inherit; }
     function cell(v) { return '<span class="num' + (v != null && v >= 55 ? ' good' : v != null && v <= 45 ? ' bad' : '') + '">' + (v != null ? v + '%' : '—') + '</span>'; }
   }
 
+  // у каждого турнира — год: если в названии его нет, берём из даты
+  function withYear(name, date) {
+    name = String(name || "");
+    if (!name || /\b(19|20)\d\d\b/.test(name)) return name;
+    var y = date ? String(date).slice(0, 4) : "";
+    return /^\d{4}$/.test(y) ? name + " " + y : name;
+  }
   // подряд идущие записи одного турнира — под одним заголовком
   function groupByTour(list, row) {
     var html = "", cur = null;
@@ -1637,7 +1687,7 @@ a.ni { text-decoration: none; color: inherit; }
       if (t !== cur) {
         if (cur !== null) html += '</div>';
         cur = t;
-        html += '<div class="grp"><div class="gh"><span>' + esc(t) + '</span>' + (x.tier ? '<span>' + esc(String(x.tier).toUpperCase()) + '</span>' : '') + '</div>';
+        html += '<div class="grp"><div class="gh"><span>' + esc(withYear(t, x.date)) + '</span>' + (x.tier ? '<span>' + esc(String(x.tier).toUpperCase()) + '</span>' : '') + '</div>';
       }
       html += row(x);
     });
@@ -1723,7 +1773,7 @@ a.ni { text-decoration: none; color: inherit; }
     var m = state.details[state.openId]; if (!m || !t || !t.name) return "";
     var i = m.teams.indexOf(t); if (i < 0) return "";
     var f = tourForm(m, i).find(function (x) { return x.nick.toLowerCase() === String(nick || "").toLowerCase(); });
-    return f ? '<span class="pstat tf"><span>На турнире:</span><span>K/D <b>' + f.kd.toFixed(2) + '</b></span><span>ADR <b>' + Math.round(f.adr) + '</b></span><small>' + f.n + ' сер.</small></span>' : "";
+    return f ? '<span class="pstat tf"><span>На турнире:</span><span>K/D <b>' + f.kd.toFixed(2) + '</b></span><span>ADR <b>' + Math.round(f.adr) + '</b></span><span>KAST <b>' + Math.round(f.kast) + '%</b></span><small>' + f.n + ' сер.</small></span>' : "";
   }
   function pstat(t, nick) {
     var key = String(nick || "").toLowerCase().replace(/[^a-z0-9а-я]/g, "");
@@ -1776,7 +1826,7 @@ a.ni { text-decoration: none; color: inherit; }
     pr = (pr || []).filter(function (x) { return MEDAL[x.place]; });
     if (!pr.length) return "";
     var cols = [["🥇", ["1st"]], ["🥈", ["2nd"]], ["🥉", ["3rd", "3-4th"]]].map(function (c) {
-      return { i: c[0], l: pr.filter(function (x) { return c[1].indexOf(x.place) >= 0; }).map(function (x) { return x.event; }) };
+      return { i: c[0], l: pr.filter(function (x) { return c[1].indexOf(x.place) >= 0; }).map(function (x) { return withYear(x.event, x.date); }) };
     });
     return '<span role="button" class="medal cup" data-pop="' + esc(JSON.stringify({ t: "🏆 Трофеи с 1 января: " + pr.length, c: cols })) + '">🏆<b>' + pr.length + '</b></span>';
   }
@@ -1899,16 +1949,20 @@ a.ni { text-decoration: none; color: inherit; }
   function seriesView(S, backLabel) {
     var A = S.teams[0] || {}, B = S.teams[1] || {};
     var maps = S.maps || [];
-    var dec = (S.veto || []).find(function (v) { return v.act === "decider"; });
+    // несыгранные карты — все пики и десайдер из вето, которых нет среди сыгранных (BO5 3:0 → две карты)
+    var playedM = maps.map(function (g) { return String(g.map || "").toLowerCase(); });
+    var unplayed = maps.length < (S.bo || 3) ? (S.veto || []).filter(function (v) { return (v.act === "pick" || v.act === "decider") && playedM.indexOf(String(v.map || "").toLowerCase()) < 0; }).slice(0, (S.bo || 3) - maps.length) : [];
     var keys = S.players ? [-1].concat(maps.map(function (g, i) { return g.players ? i : null; }).filter(function (x) { return x != null; })) : [];
     var head = '<div class="ovtop">' + (TG ? '' : '<button class="back" data-close>' + ARROW + esc(backLabel) + '</button>') + '</div>' +
-      '<div class="rd-meta">' + esc([S.tournament, S.stage, S.round].filter(Boolean).join(" · ")) + (S.date ? ' · ' + esc(dmy(S.date)) : '') + '</div>' +
+      '<div class="rd-meta">' + esc([withYear(S.tournament, S.date), S.stage, S.round].filter(Boolean).join(" · ")) + (S.date ? ' · ' + esc(dmy(S.date)) : '') + '</div>' +
       '<section class="hero sres"><div class="face"><div class="tm a">' + logo(A.name, A.logo).replace('class="lg"', 'class="lg big"') + '<span class="acr' + ((A.acronym || A.name || "").length > 6 ? ' sm' : '') + '">' + esc(A.acronym || A.name) + '</span></div>' +
       '<div class="mid"><b class="num">' + esc(A.score) + ' : ' + esc(B.score) + '</b>BO' + esc(S.bo || "?") + '</div>' +
       '<div class="tm b">' + logo(B.name, B.logo).replace('class="lg"', 'class="lg big"') + '<span class="acr' + ((B.acronym || B.name || "").length > 6 ? ' sm' : '') + '">' + esc(B.acronym || B.name) + '</span></div></div>' +
       (maps.length ? '<div class="pp-maps">' + maps.map(function (g, i) {
-        return '<div class="pp-m ' + (g.winner === 0 ? "a" : g.winner === 1 ? "b" : "n") + mapBg(g.map) + '"><span class="pp-n">Карта ' + (i + 1) + '</span><b>' + esc(g.map || "?") + '</b><span class="num pp-s"><span class="a">' + esc(g.score ? g.score[0] : "–") + '</span>:<span class="b">' + esc(g.score ? g.score[1] : "–") + '</span></span></div>';
-      }).join("") + (dec && maps.length < (S.bo || 3) ? '<div class="pp-m n left' + mapBg(dec.map) + '"><span class="pp-n">Карта ' + (maps.length + 1) + '</span><b>' + esc(dec.map) + '</b><small>не сыграна</small></div>' : '') + '</div>' : '') + '</section>' +
+        return mapSquare(g, i, A, B);
+      }).join("") + unplayed.map(function (v, j) {
+        return '<div class="pp-m n left' + mapBg(v.map) + '"><span class="pp-n">Карта ' + (maps.length + j + 1) + '</span><b>' + esc(v.map) + '</b><small>не сыграна</small></div>';
+      }).join("") + '</div>' : '') + (maps.some(function (g) { return g.sides; }) ? SIDES_LEGEND : '') + '</section>' +
       (keys.length > 1 ? '<div class="filt sfilt" role="tablist">' + keys.map(function (k, j) { return '<button class="chip" data-smap="' + j + '" aria-pressed="' + (j === 0) + '">' + (k < 0 ? "Вся серия" : esc(maps[k].map || ("Карта " + (k + 1)))) + '</button>'; }).join("") + '</div>' : '');
     var vetoHtml = (S.veto || []).length ? '<div class="sec"><h3>Вето</h3><div class="box veto">' + S.veto.map(function (v, i) {
       var who = v.team ? ([A, B].findIndex(function (t) { return t && t.name && (t.name.toLowerCase().indexOf(v.team.toLowerCase()) >= 0 || v.team.toLowerCase().indexOf(String(t.name).toLowerCase()) >= 0); })) : -1;
@@ -1985,7 +2039,7 @@ a.ni { text-decoration: none; color: inherit; }
     var opts = newsSteps().map(function (f) { return [f, f === "all" ? "Все" : f]; });
     return '<div class="hbar">' + backBtn(m.tournament || "Назад") + '</div>' +
       '<div class="fold mini-wrap"><div class="fi"><div class="mini"><span class="ma" data-tname="' + esc(A.name) + '">' + esc(abbr(A)) + miniVrs(A) + '</span><span class="mm">BO' + esc(m.bo) + miniOutc(m) + '</span><span class="mb" data-tname="' + esc(B.name) + '">' + esc(abbr(B)) + miniVrs(B) + '</span></div></div></div>' +
-      '<div class="fold hero-wrap"><div class="fi"><section class="hero"><div class="meta"><span class="pill ' + esc(m.tier) + '">' + esc((m.tier || "").toUpperCase()) + '</span><span>' + esc(m.tournament) + (m.stage ? " · " + esc(m.stage) : "") + '</span></div>' +
+      '<div class="fold hero-wrap"><div class="fi"><section class="hero"><div class="meta"><span class="pill ' + esc(m.tier) + '">' + esc((m.tier || "").toUpperCase()) + '</span><span>' + esc(withYear(m.tournament, (m.serie || {}).begin || m.begin_at)) + (m.stage ? " · " + esc(m.stage) : "") + '</span></div>' +
       '<div class="face"><div class="tm a" data-tname="' + esc(A.name) + '"><span class="acr">' + esc(abbr(A)) + '</span><span class="full">' + esc(A.name) + '</span>' + heroVrs(A) + '</div>' +
       '<div class="mid"><b>' + esc(hm(m.begin_at)) + '</b>' + esc(dm(m.begin_at)) + ' · BO' + esc(m.bo) + '</div>' +
       '<div class="tm b" data-tname="' + esc(B.name) + '"><span class="acr">' + esc(abbr(B)) + '</span><span class="full">' + esc(B.name) + '</span>' + heroVrs(B) + '</div></div>' +
@@ -2064,11 +2118,11 @@ a.ni { text-decoration: none; color: inherit; }
       var side = (S.teams || []).findIndex(function (x) { return x && x.name && t.name && (x.name.toLowerCase() === t.name.toLowerCase() || (t.acronym && x.acronym === t.acronym)); });
       if (side < 0) side = (S.teams[0] || {}).name === f.opponent_name ? 1 : 0;
       (S.players[side] || []).forEach(function (r) {
-        var k = String(r[0]).toLowerCase(), a = acc[k] || (acc[k] = { nick: r[0], n: 0, k: 0, d: 0, adr: 0, r: 0 });
-        a.n++; a.k += r[1]; a.d += r[2]; a.adr += r[3]; a.r += r[5];
+        var k = String(r[0]).toLowerCase(), a = acc[k] || (acc[k] = { nick: r[0], n: 0, k: 0, d: 0, adr: 0, r: 0, kast: 0 });
+        a.n++; a.k += r[1]; a.d += r[2]; a.adr += r[3]; a.r += r[5]; a.kast += Number(r[4]) || 0;
       });
     });
-    return Object.keys(acc).map(function (k) { var a = acc[k]; return { nick: a.nick, n: a.n, kd: a.d ? a.k / a.d : a.k, adr: a.adr / a.n, r: a.r / a.n }; });
+    return Object.keys(acc).map(function (k) { var a = acc[k]; return { nick: a.nick, n: a.n, kd: a.d ? a.k / a.d : a.k, adr: a.adr / a.n, r: a.r / a.n, kast: a.kast / a.n }; });
   }
   // что на кону: куда идут победитель и проигравший, сколько денег за место
     function stakeBlock(m) {
@@ -2104,10 +2158,12 @@ a.ni { text-decoration: none; color: inherit; }
     }
     function reward(n) {  // деньги и путёвки за место
       var p = placeOf(n); if (!p) return "";
-      var v = (p.prize || 0) + (p.club || 0), out = [];
-      if (v) out.push('$' + v.toLocaleString("en-US"));
+      var f = function (x) { return '$' + Number(x).toLocaleString("en-US"); }, parts = [];
+      if (p.prize) parts.push('команде <b>' + f(p.prize) + '</b>');
+      if (p.club) parts.push('клубу <b>' + f(p.club) + '</b>');
+      if (p.prize && p.club) parts.push('всего <b>' + f(p.prize + p.club) + '</b>');
       var sl = (p.spots || []).concat(p.other || []).filter(Boolean);
-      return (out.length ? ' (' + out.join(", ") + ')' : '') + (sl.length ? '<br><span class="slot">Путёвка: ' + esc(sl.join(", ")) + '</span>' : '');
+      return (parts.length ? '<br><span class="stk-m">' + parts.join(' · ') + '</span>' : '') + (sl.length ? '<br><span class="slot">Путёвка: ' + esc(sl.join(", ")) + '</span>' : '');
     }
     var rounds = hit.st.rounds, rd = hit.rd, nextR = rounds[hit.ri + 1], name = String(rd.name || "");
     var third = stages.some(function (st) { return (st.rounds || []).some(function (r) { return /3rd|3-е|третье/i.test(r.name || ""); }); });
@@ -2623,7 +2679,7 @@ a.ni { text-decoration: none; color: inherit; }
   // ---------- клики
   document.addEventListener("click", function (e) {
     if (state.pop && !e.target.closest(".pop-in")) { closePop(); if (!e.target.closest("[data-pop]")) { e.preventDefault(); e.stopPropagation(); return; } }
-    var t = e.target.closest("[data-pop],[data-vplay],[data-snav],[data-goto],[data-sk],[data-team],[data-tname],[data-tseries],[data-fread],[data-close],#facts-more,[data-home],[data-feedch],[data-tg],[data-reader],[data-open],[data-tour],[data-tab],[data-map],[data-nf],[data-player],[data-link],[data-read],[data-series],[data-rseries],[data-smap],[data-ttab],#back");
+    var t = e.target.closest("[data-pop],[data-vplay],[data-snav],[data-goto],[data-sk],[data-team],[data-tname],[data-tseries],[data-fread],[data-close],#facts-more,[data-home],[data-feedch],[data-tg],[data-reader],[data-fact],[data-open],[data-tour],[data-tab],[data-map],[data-nf],[data-player],[data-link],[data-read],[data-series],[data-rseries],[data-smap],[data-ttab],#back");
     if (!t) return;
     if (t.hasAttribute("data-pop")) { e.stopPropagation(); e.preventDefault(); openPop(t.getAttribute("data-pop"), t); return; }
     if (t.hasAttribute("data-vplay")) { var vv = t.parentNode.querySelector("video"); if (vv) { t.remove(); vv.play().catch(function () {}); } return; }
@@ -2645,6 +2701,12 @@ a.ni { text-decoration: none; color: inherit; }
     }
     if (t.id === "facts-more") { state.factsAll = !state.factsAll; renderMatch(state.details[state.openId]); return; }
     if (t.hasAttribute("data-tg")) { if (TG) { e.preventDefault(); try { TG.openTelegramLink(t.getAttribute("data-tg")); } catch (x) { openLink(t.getAttribute("data-tg")); } } return; }
+    if (t.hasAttribute("data-fact")) {  // факт из статистики — открываем как короткую новость
+      var mf = state.details[state.openId], ff = mf && (mf.facts || [])[Number(t.getAttribute("data-fact"))];
+      if (ff) openOverlay("news", "fact:" + t.getAttribute("data-fact"), readerView({ key: "fact", title: ff.text, source: "Статистика матча · bo3.gg", date: mf.updated || new Date().toISOString(),
+        summary_ru: (ff.tag ? ff.tag + ". " : "") + ff.text + "\n\nПосчитано по сыгранным картам и сериям команд за последние 3 месяца (bo3.gg)." }));
+      return;
+    }
     if (t.hasAttribute("data-reader")) {
       var m0 = state.details[state.openId], n = m0 && ((m0.news && m0.news.items) || []).find(function (x) { return x.key === t.getAttribute("data-reader"); });
       if (n) openOverlay("news", n.key, readerView(n));
