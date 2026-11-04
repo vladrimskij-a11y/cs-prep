@@ -1190,7 +1190,8 @@ a.ni { text-decoration: none; color: inherit; }
   var MAP_IMG = { ancient: 1, anubis: 1, dust2: 1, inferno: 1, mirage: 1, nuke: 1, overpass: 1, train: 1, vertigo: 1 };
   function mapBg(name) {  // картинка карты фоном квадрата; текст остаётся читаемым за счёт затемнения
     var k = String(name || "").toLowerCase().replace(/^de_/, "").replace(/dust\s*ii/, "dust2").replace(/[^a-z0-9]/g, "");
-    return MAP_IMG[k] ? ' mimg" style="--mi:url(img/maps/' + k + '.webp)' : '';
+    if (!k || k === "tba" || k === "tbd") return '';
+    return MAP_IMG[k] ? ' mimg" style="--mi:url(img/maps/' + k + '.webp)' : ' mimg" style="--mi:linear-gradient(135deg,#4a5a78,#252d3d)';  // карты вне набора — мягкий градиент, не чёрный
   }
   function toast(txt) {
     var el = document.createElement("div"); el.className = "toast"; el.textContent = txt; document.body.appendChild(el);
