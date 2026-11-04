@@ -1,0 +1,14 @@
+name: probe
+on: { workflow_dispatch: {} }
+jobs:
+  p:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          for r in DigitalFriends/cs2-map-images bnt0p/MapPictures MurkyYT/cs2-map-icons; do
+            b=$(curl -s https://api.github.com/repos/$r | python3 -c "import json,sys;print(json.load(sys.stdin).get('default_branch','main'))")
+            curl -s "https://api.github.com/repos/$r/git/trees/$b?recursive=1" | python3 -c "
+          import json,sys;d=json.load(sys.stdin)
+          for t in d.get('tree',[]):
+              if 'cache' in t['path'].lower() and t['type']=='blob': print('CACHE|', '$r', '$b', t['path'], t.get('size'))"
+          done
