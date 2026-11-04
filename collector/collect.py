@@ -163,9 +163,9 @@ def save_json(path: Path, data, pretty: bool = False) -> None:
     if path.parent.name in ("match", "team") or path.name == "matches.json":
         apply_name_ru(data)
     if pretty:
-        txt = json.dumps(data, ensure_ascii=False, indent=1)
+        txt = json.dumps(data, ensure_ascii=False, indent=1, default=str)
     else:
-        txt = json.dumps(data, ensure_ascii=False, separators=(",", ":"))
+        txt = json.dumps(data, ensure_ascii=False, separators=(",", ":"), default=str)  # что-то непривычное — текстом, а не падение сбора
     path.write_text(txt, "utf-8")
 
 
@@ -1003,8 +1003,15 @@ def build_h2h(a: int, b: int, hist_a: list[dict]) -> list[dict]:
         if d and d < since:
             break
         sa = side_of(m, a)
-        maps = [{"map": r["map"], "winner": None if r["won"] is None else (0 if r["won"] else 1), "score": r["score"]}
-                for r in map_results(m, a)]
+        games = bo3_games(m)
+        maps = []
+        for i, r in enumerate(map_results(m, a)):
+            win = None if r["won"] is None else (0 if r["won"] else 1)
+            sides = None
+            if i < len(games) and games[i].get("id") and win is not None:  # раунды за CT/T — для квадратов карт, как в сыгранных сериях
+                det = details_cache.get(str(games[i]["id"])) or game_detail(games[i]["id"])
+                sides = map_sides(det, win)
+            maps.append({"map": r["map"], "winner": win, "score": r["score"], "sides": sides})
         res.append({
             "date": m.get("start_date"),
             "tournament": tour_name(m),
@@ -3786,11 +3793,11 @@ def hltv_player_info(nick: str) -> dict | None:
     if k >= 0:
         seg = b[k:k + 120000].split("</table>", 1)[0]
         for row in re.split(r'<tr[^>]*class="[^"]*\bteam\b', seg)[1:]:
-            pl = re.search(r'class="achievement[^"]*"[^>]*>\s*([^<]+?)\s*<', row)
-            ev = re.search(r'class="tournament-name-cell"[^>]*>.*?<a [^>]*href="/events/\d+/[^"]*"[^>]*>(?:<[^>]+>)*\s*([^<]+?)\s*<', row)
-            if not ev:
+            m_pl = re.search(r'class="achievement[^"]*"[^>]*>\s*([^<]+?)\s*<', row)
+            m_ev = re.search(r'class="tournament-name-cell"[^>]*>.*?<a [^>]*href="/events/\d+/[^"]*"[^>]*>(?:<[^>]+>)*\s*([^<]+?)\s*<', row)
+            if not m_ev:
                 continue
-            name, place = _html.unescape(ev.group(1)).strip(), (pl.group(1).strip() if pl else "")
+            name, place = _html.unescape(m_ev.group(1)).strip(), (m_pl.group(1).strip() if m_pl else "")
             if "major" in name.lower():
                 lab = name + (f" — {place}" if place else "")
                 if lab not in mj:
@@ -3812,6 +3819,7 @@ def hltv_player_info(nick: str) -> dict | None:
     mj.sort(key=yr, reverse=True)
     d = {"mvp": mvp, "mvp_events": ev, "majors": int(pm.group(1)) if pm else 0, "major_wins": int(wm.group(1)) if wm else 0,
          "major_events": mj, "trophies": tro[:40], "event_wins": wins[:40]}
+    d["mvp_events"] = [str(x) for x in d["mvp_events"]] if isinstance(d["mvp_events"], list) else []
     hltv_cache[key] = {"t": iso(NOW), "data": d}
     return d
 

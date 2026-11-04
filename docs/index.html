@@ -1245,9 +1245,9 @@ a.ni { text-decoration: none; color: inherit; }
   }
   var SIDES_LEGEND = '<div class="sd-leg">Раунды на карте: за <i class="sct">CT</i> и за <i class="st">T</i></div>';
   // квадрат сыгранной карты: картинка карты, счёт цветом команд и раунды по сторонам (CT — голубой, T — золотой)
-  function mapSquare(g, i, A, B, small) {
+  function mapSquare(g, i, A, B, small, withSides) {
     var sd = g.sides, side = "";
-    if (sd && sd.length === 2 && !small) {  // в списке «Завершённых» стороны не показываем — только внутри матча
+    if (sd && sd.length === 2 && (!small || withSides)) {  // в списке «Завершённых» стороны не показываем — только внутри матча и в личных встречах
       side = '<span class="sides">' + [A, B].map(function (t, k) {
         return '<span class="sd-r"><em>' + esc(abbr(t)) + '</em><i class="sct">' + sd[k][0] + '</i><i class="st">' + sd[k][1] + '</i></span>';
       }).join("") + '</span>';
@@ -1624,8 +1624,9 @@ a.ni { text-decoration: none; color: inherit; }
         '<div class="sc"><span class="a">' + esc(x.score[0]) + '</span><span class="x">:</span><span class="b">' + esc(x.score[1]) + '</span></div>' +
         '<div class="tr">' + esc(withYear(x.tournament, x.date)) + '</div>';
       if (x.maps && x.maps.length) {
-        html += '<div class="maps">' + x.maps.map(function (g) {
-          return '<span class="mp ' + (g.winner === 0 ? "a" : g.winner === 1 ? "b" : "n") + '">' + esc(g.map || "?") + (g.score ? ' <span class="num">' + esc(g.score) + '</span>' : '') + '</span>';
+        html += '<div class="pp-maps sm">' + x.maps.map(function (g, k) {
+          var sc = typeof g.score === "string" ? g.score.split(":").map(Number) : g.score;
+          return mapSquare({ map: g.map, winner: g.winner, score: sc, sides: g.sides }, k, m.teams[0] || {}, m.teams[1] || {}, true, true);
         }).join("") + '</div>';
       }
       html += '</div>';
@@ -1878,15 +1879,22 @@ a.ni { text-decoration: none; color: inherit; }
     var top = r.bottom + 6, left = d.c ? Math.max(12, (W - box.offsetWidth) / 2) : Math.min(Math.max(12, r.left), W - box.offsetWidth - 12);
     if (top + box.offsetHeight > window.innerHeight - 12) top = Math.max(12, r.top - box.offsetHeight - 6);
     box.style.top = top + "px"; box.style.left = left + "px";
-    state.pop = el;
+    state.pop = el; state.popAt = Date.now(); state.popTop = null; state.popEl = null;
   }
   function closePop() { if (state.pop) { state.pop.remove(); state.pop = null; } }
   // начали листать страницу — окно с наградами/MVP сворачивается, страница едет дальше
   (function () {
+    // касание в Telegram часто даёт микро-прокрутку — её не считаем: закрываем только на заметное движение и не сразу после открытия
     var y0 = null;
+    function fresh() { return state.pop && Date.now() - (state.popAt || 0) < 600; }
     document.addEventListener("touchstart", function (e) { y0 = state.pop && e.touches.length === 1 && !e.target.closest(".pop-in") ? e.touches[0].clientY : null; }, { passive: true, capture: true });
-    document.addEventListener("touchmove", function (e) { if (y0 != null && Math.abs(e.touches[0].clientY - y0) > 6) { y0 = null; closePop(); } }, { passive: true, capture: true });
-    document.addEventListener("scroll", function (e) { if (state.pop && !(e.target.closest && e.target.closest(".pop-in"))) closePop(); }, { passive: true, capture: true });
+    document.addEventListener("touchmove", function (e) { if (y0 != null && !fresh() && Math.abs(e.touches[0].clientY - y0) > 14) { y0 = null; closePop(); } }, { passive: true, capture: true });
+    document.addEventListener("scroll", function (e) {
+      if (!state.pop || fresh() || (e.target.closest && e.target.closest(".pop-in"))) return;
+      var el = e.target === document ? document.scrollingElement : e.target, top = el ? el.scrollTop : 0;
+      if (state.popTop == null || state.popEl !== el) { state.popEl = el; state.popTop = top; return; }
+      if (Math.abs(top - state.popTop) > 24) closePop();
+    }, { passive: true, capture: true });
     document.addEventListener("wheel", function (e) { if (state.pop && !e.target.closest(".pop-in")) closePop(); }, { passive: true, capture: true });
   })();
   function rosterRows(players, coach, statsTeam, clickable) {
