@@ -1836,11 +1836,26 @@ def tg_process(post: dict) -> dict:
             _tg_giga[0] += 1
             info["ocr"] = giga_read_image(post["photo"])
         tg_cache[key] = info
-    if not info.get("title"):
-        full = ((post["text"] or "") + "\n" + (info.get("ocr") or "")).strip()
-        first = re.split(r"(?<=[.!?…])\s+|\n", full, 1)[0] if full else ""
-        info["title"] = first[:120]
+    info["title"] = orig_title(post["text"] or "", info.get("ocr") or "")  # заголовок — как в оригинале, без пересказа
     return info
+
+
+def orig_title(text: str, ocr: str = "") -> str:
+    """Первая строка поста (обычно это и есть заголовок канала); длинную режем по концу фразы."""
+    for src in (text, ocr):
+        line = next((x.strip() for x in (src or "").split("\n") if x.strip()), "")
+        if not line:
+            continue
+        if len(line) <= 160:
+            return line
+        cut = re.split(r"(?<=[.!?…])\s+", line)
+        out = ""
+        for c in cut:
+            if len(out) + len(c) > 160:
+                break
+            out = (out + " " + c).strip()
+        return out or line[:157].rsplit(" ", 1)[0] + "…"
+    return ""
 
 
 def tg_classify(posts: list[dict]) -> None:
@@ -1870,7 +1885,7 @@ def tg_classify(posts: list[dict]) -> None:
             info = tg_cache.setdefault(f"{p['channel']}/{p['id']}", {"t": iso(NOW)})
             info["cat"] = str(it.get("cat") or "").strip().lower()
             if it.get("title"):
-                info["title"] = str(it["title"]).strip()[:140]
+                info["ai_title"] = str(it["title"]).strip()[:140]  # только для склейки дублей, на сайте не показываем
             info["tour"] = str(it.get("tour") or "").strip() or None
             info["v"] = 3
 
@@ -1943,7 +1958,7 @@ def tg_posts() -> list[dict]:
             continue
         body = p["text"] or info.get("ocr") or ""
         res.append({
-            "title": info.get("title") or body[:120], "url": p["url"], "source": f"TG · {_tg_titles.get(p['channel'], p['channel'])}",
+            "title": orig_title(p["text"] or "", info.get("ocr") or "") or body[:120], "url": p["url"], "source": f"TG · {_tg_titles.get(p['channel'], p['channel'])}",
             "channel": p["channel"], "date": p["date"], "snippet": body[:400], "text": body, "photo": p.get("photo"),
             "photos": p.get("photos") or [], "video": p.get("video"), "tg": True, "cat": info.get("cat"), "tour": info.get("tour"),
         })
