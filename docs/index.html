@@ -479,6 +479,12 @@ html { overflow-anchor: none; }
 .lv-p { display: grid; grid-template-columns: 1fr auto 30px; gap: 6px; font-size: 12.5px; padding: 2px 0; }
 .lv-p span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .lv-p i { font-style: normal; color: var(--muted); text-align: right; }
 .lv-h { margin-top: 8px; font-size: 11px; color: var(--muted); }
+.box.cheat { padding: 4px 12px; }
+.ch-r { display: grid; grid-template-columns: 92px 1fr; gap: 10px; padding: 8px 0; border-top: 1px solid var(--line); font-size: 13px; line-height: 1.4; }
+.ch-r:first-child { border-top: 0; }
+.ch-k { color: var(--muted); font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; padding-top: 2px; }
+.ch-v b.a { color: var(--ct); } .ch-v b.b { color: var(--t); }
+.pstat.tf { margin-top: 2px; color: var(--muted); } .pstat.tf small { color: var(--muted); }
 .pop { position: fixed; inset: 0; z-index: 50; }
 .pop-in { position: fixed; max-width: min(320px, calc(100vw - 24px)); max-height: 50vh; overflow: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
   box-shadow: 0 10px 30px rgba(0,0,0,.35); padding: 10px 12px; font-size: 13px; }
@@ -1620,6 +1626,12 @@ a.ni { text-decoration: none; color: inherit; }
     return items.filter(function (n) { return (n.about || []).some(function (a) { return names.indexOf(a) >= 0; }); });
   }
 
+  function tourStat(t, nick) {  // форма игрока на текущем турнире (если играл)
+    var m = state.details[state.openId]; if (!m || !t || !t.name) return "";
+    var i = m.teams.indexOf(t); if (i < 0) return "";
+    var f = tourForm(m, i).find(function (x) { return x.nick.toLowerCase() === String(nick || "").toLowerCase(); });
+    return f ? '<span class="pstat tf"><span>На турнире:</span><span>рейт. <b>' + f.r.toFixed(2) + '</b></span><span>K/D <b>' + f.kd.toFixed(2) + '</b></span><span>ADR <b>' + Math.round(f.adr) + '</b></span><small>' + f.n + ' сер.</small></span>' : "";
+  }
   function pstat(t, nick) {
     var key = String(nick || "").toLowerCase().replace(/[^a-z0-9а-я]/g, "");
     var st = (t.stats || []).find(function (x) { return String(x.nick).toLowerCase().replace(/[^a-z0-9а-я]/g, "") === key; });
@@ -1712,7 +1724,7 @@ a.ni { text-decoration: none; color: inherit; }
         if (tg.some(function (x) { return x === "AWP" || /^Снайпер/.test(x); })) roles.push(["AWP", "awp"]);
         tg.forEach(function (x) { if (/^В аренде/.test(x)) extra.push(esc(x.toLowerCase())); else if (x === "Замена") extra.push("замена"); });
         var real = [p.first_name, p.last_name].filter(Boolean).join(" ");
-        html += personRow(p, roles, real, extra, statsTeam ? pstat(statsTeam, p.nick) : "", "");
+        html += personRow(p, roles, real, extra, (statsTeam ? pstat(statsTeam, p.nick) : "") + tourStat(statsTeam, p.nick), "");
       });
     (coach || []).forEach(function (c) {
       html += personRow({ nick: c.nick, flag: c.flag, name_ru: c.name_ru, age: c.age }, [["Тренер", ""]], c.name || "", [], "", "");
@@ -1720,7 +1732,7 @@ a.ni { text-decoration: none; color: inherit; }
     return html;
   }
   function playersTab(m) {
-    var html = '<div id="livebox">' + (state.live && state.live.id === m.id ? state.live.html || "" : "") + '</div>';
+    var html = '<div id="livebox">' + (state.live && state.live.id === m.id ? state.live.html || "" : "") + '</div>' + cheatSheet(m);
     m.teams.forEach(function (t, i) {
       html += '<div class="sec"><div class="box roster ' + (i ? "b" : "a") + '"><div class="hd"><span class="tn">' + esc(t.name) + '</span>' + trophyCount(t.prizes) + medalsHtml(t.prizes) + '</div>';
       if (!(t.players || []).length) html += '<div class="note">Состав не указан.</div>';
@@ -1934,6 +1946,124 @@ a.ni { text-decoration: none; color: inherit; }
     if (!tr) return;
     tr.style.transition = anim ? "transform " + (ms || 260) + "ms cubic-bezier(.2,.7,.3,1)" : "none";
     tr.style.transform = "translate3d(" + (-i * paneW()) + "px,0,0)";
+  }
+  // ---- шпаргалка к эфиру: то, что можно сказать вслух, одним экраном
+  function tourSeries(m, i) {  // серии команды на этом турнире (по дате начала турнира)
+    var t = m.teams[i] || {}, since = (m.serie || {}).begin || "";
+    return (t.form || []).filter(function (f) { return since && String(f.date) >= since.slice(0, 10); });
+  }
+  function tourForm(m, i) {  // игроки на этом турнире: средний рейтинг и ADR по сериям
+    var t = m.teams[i] || {}, acc = {};
+    tourSeries(m, i).forEach(function (f) {
+      var S = (m.series || {})[f.sid]; if (!S || !S.players) return;
+      var side = (S.teams || []).findIndex(function (x) { return x && x.name && t.name && (x.name.toLowerCase() === t.name.toLowerCase() || (t.acronym && x.acronym === t.acronym)); });
+      if (side < 0) side = (S.teams[0] || {}).name === f.opponent_name ? 1 : 0;
+      (S.players[side] || []).forEach(function (r) {
+        var k = String(r[0]).toLowerCase(), a = acc[k] || (acc[k] = { nick: r[0], n: 0, k: 0, d: 0, adr: 0, r: 0 });
+        a.n++; a.k += r[1]; a.d += r[2]; a.adr += r[3]; a.r += r[5];
+      });
+    });
+    return Object.keys(acc).map(function (k) { var a = acc[k]; return { nick: a.nick, n: a.n, kd: a.d ? a.k / a.d : a.k, adr: a.adr / a.n, r: a.r / a.n }; });
+  }
+  function cheatSheet(m) {
+    var A = m.teams[0] || {}, B = m.teams[1] || {}, L = [];
+    if (!A.name || !B.name) return "";
+    function sp(t, i) { return '<b class="' + (i ? "b" : "a") + '">' + esc(abbr(t)) + '</b>'; }
+    // форма
+    var fl = [A, B].map(function (t, i) {
+      var f = (t.form || []).slice(0, 5); if (!f.length) return "";
+      var w = f.filter(function (x) { return x.won; }).length, st = 0;
+      for (var j = 0; j < f.length && f[j].won === f[0].won; j++) st++;
+      return sp(t, i) + ' ' + w + ' из ' + f.length + (st >= 2 ? (f[0].won ? ', ' + st + ' победы подряд' : ', ' + st + ' поражения подряд') : '');
+    }).filter(Boolean);
+    if (fl.length) L.push(["Форма", fl.join(' · ')]);
+    // личные встречи
+    var H = m.h2h || [];
+    if (H.length) {
+      var wa = H.filter(function (x) { return x.winner === 0; }).length, h0 = H[0];
+      L.push(["Личные встречи", sp(A, 0) + ' ' + wa + ':' + (H.length - wa) + ' ' + sp(B, 1) + ' за полгода; последняя — ' + esc(dm(h0.date)) + ', ' + esc(h0.tournament || "") + ', ' + esc((h0.score || []).join(":")) + ' в пользу ' + esc(abbr(h0.winner === 0 ? A : B))]);
+    } else L.push(["Личные встречи", "за полгода не встречались"]);
+    // карты
+    var T = ((m.maps || {}).table || []);
+    var ml = [0, 1].map(function (i) {
+      var rows = T.map(function (r) { var x = r.teams[i] || {}; return { map: r.map, p: x.played || 0, w: x.won || 0 }; }).filter(function (r) { return r.p >= 4; });
+      if (!rows.length) return "";
+      rows.sort(function (a, b) { return b.w / b.p - a.w / a.p; });
+      var best = rows[0], worst = rows[rows.length - 1];
+      return sp(i ? B : A, i) + ' лучше всего ' + esc(best.map) + ' (' + Math.round(100 * best.w / best.p) + '%)' + (worst !== best ? ', хуже всего ' + esc(worst.map) + ' (' + Math.round(100 * worst.w / worst.p) + '%)' : '');
+    }).filter(Boolean);
+    if (ml.length) L.push(["Карты", ml.join('<br>')]);
+    // пик и счёт
+    var P = m.prediction;
+    if (P && (P.maps || []).length) L.push(["Вероятный пик", P.maps.map(function (x) { return esc(x.map); }).join(" → ") + ((P.outcomes || [])[0] ? '; вероятнее всего ' + esc(P.outcomes[0].score) + ' (' + esc(P.outcomes[0].p) + '%)' : '')]);
+    // лучшие игроки: 3 месяца и этот турнир
+    var pl = [0, 1].map(function (i) {
+      var t = m.teams[i], st = (t.stats || []).slice().sort(function (a, b) { return (b.rating || 0) - (a.rating || 0); })[0];
+      var tf = tourForm(m, i).sort(function (a, b) { return b.r - a.r; })[0];
+      var out = [];
+      if (st) out.push(esc(st.nick) + ' (рейт. ' + Number(st.rating).toFixed(2) + ' за 3 мес.)');
+      if (tf && (!st || tf.nick.toLowerCase() !== String(st.nick).toLowerCase() || true)) out.push('на турнире — ' + esc(tf.nick) + ' (' + tf.r.toFixed(2) + ', ADR ' + Math.round(tf.adr) + ')');
+      return out.length ? sp(t, i) + ' ' + out.join(', ') : "";
+    }).filter(Boolean);
+    if (pl.length) L.push(["Лучшие", pl.join('<br>')]);
+    // путь на турнире
+    var tl = [0, 1].map(function (i) {
+      var f = tourSeries(m, i); if (!f.length) return "";
+      return sp(m.teams[i], i) + ' ' + f.slice().reverse().map(function (x) { return (x.won ? "✓ " : "✗ ") + esc(x.opponent_name || x.opponent) + ' ' + x.score + ':' + x.opp_score; }).join(", ");
+    }).filter(Boolean);
+    if (tl.length) L.push(["На турнире", tl.join('<br>')]);
+    // VRS
+    var O = m.vrs_outcomes;
+    if (O && O.win0) L.push(["VRS", 'победа ' + sp(A, 0) + ': ' + (O.win0[0].delta > 0 ? "+" : "") + O.win0[0].delta + ' (#' + O.win0[0].rank + ') · победа ' + sp(B, 1) + ': ' + (O.win1[1].delta > 0 ? "+" : "") + O.win1[1].delta + ' (#' + O.win1[1].rank + ')']);
+    L.push(["На кону", '<span id="stake">…</span>']);
+    setTimeout(function () { fillStake(m); }, 0);
+    return '<div class="sec"><h3>Шпаргалка <span>к эфиру</span></h3><div class="box cheat">' + L.map(function (x) {
+      return '<div class="ch-r"><div class="ch-k">' + esc(x[0]) + '</div><div class="ch-v">' + x[1] + '</div></div>';
+    }).join("") + '</div></div>';
+  }
+  // что на кону: куда идут победитель и проигравший, сколько денег за место
+  function placeLabel(a, b) { function o(n) { return n + (n === 1 ? "st" : n === 2 ? "nd" : n === 3 ? "rd" : "th"); } return a === b ? o(a) : a + "-" + o(b); }
+  function fillStake(m) {
+    var sid = (m.serie || {}).id; if (!sid) return;
+    getResults(sid).then(function (R0) {
+      var el = document.getElementById("stake"); if (!el) return;
+      var txt = stakeText(m, R0);
+      if (txt) el.innerHTML = txt; else { var row = el.closest(".ch-r"); if (row) row.remove(); }
+    }).catch(function () { var el = document.getElementById("stake"), row = el && el.closest(".ch-r"); if (row) row.remove(); });
+  }
+  function stakeText(m, R0) {
+    var A = m.teams[0] || {}, B = m.teams[1] || {}, an = String(A.name || "").toLowerCase(), bn = String(B.name || "").toLowerCase();
+    function is(x, n) { x = String(x || "").toLowerCase(); return x && n && (x === n || x.indexOf(n) >= 0 || n.indexOf(x) >= 0); }
+    var stages = (R0 && R0.stages) || [], hit = null;
+    stages.forEach(function (st, si) {
+      (st.rounds || []).forEach(function (rd, ri) {
+        (rd.matches || []).forEach(function (x, mi) {
+          if (x.st !== "finished" && ((is(x.a, an) && is(x.b, bn)) || (is(x.a, bn) && is(x.b, an)))) hit = { st: st, si: si, rd: rd, ri: ri, mi: mi };
+        });
+      });
+    });
+    if (!hit) return "";
+    var tour = (state.list.tournaments || []).find(function (t) { return String(t.id) === String((m.serie || {}).id); }) || {};
+    var places = ((tour.hltv || {}).places || []);
+    function money(pl) { var p = places.find(function (x) { return x.place === pl; }); if (!p) return ""; var v = (p.prize || 0) + (p.club || 0); return v ? ' ($' + v.toLocaleString("en-US") + ')' : ''; }
+    var rounds = hit.st.rounds, rd = hit.rd, nextR = rounds[hit.ri + 1], name = String(rd.name || "");
+    var third = stages.some(function (st) { return (st.rounds || []).some(function (r) { return /3rd|3-е|третье/i.test(r.name || ""); }); });
+    if (/гранд|grand/i.test(name + " " + (rd.bracket || ""))) return 'Победитель — чемпион' + money("1st") + ', проигравший — 2-е место' + money("2nd");
+    if (rd.bracket === "upper") return 'Победитель идёт дальше по верхней сетке, проигравший — в нижнюю';
+    var win = "";
+    if (nextR) {
+      var j = (nextR.matches || []).length === (rd.matches || []).length ? hit.mi : Math.floor(hit.mi / 2), nm = (nextR.matches || [])[j] || {};
+      var opp = nm.a && !is(nm.a, an) && !is(nm.a, bn) ? nm.a : nm.b && !is(nm.b, an) && !is(nm.b, bn) ? nm.b : null;
+      win = 'Победитель — в ' + esc(String(nextR.name || "следующий раунд").toLowerCase()) + (opp ? ' против ' + esc(opp) : '');
+    }
+    if (rd.bracket === "lower" && !nextR) win = 'Победитель выходит дальше';
+    var later = 0; rounds.slice(hit.ri + 1).forEach(function (r) { (r.matches || []).forEach(function () { later += 2; }); });
+    later = Math.max(later - (rounds.slice(hit.ri + 1).length ? rounds.slice(hit.ri + 2).reduce(function (s2, r) { return s2 + (r.matches || []).length; }, 0) : 0), 0);
+    var nLose = (rd.matches || []).length, above = (nextR ? (nextR.matches || []).length * 2 : 1);
+    var lose;
+    if (third && /полуфинал|semi/i.test(name)) lose = 'проигравший сыграет за 3-е место';
+    else if (hit.st.format === "playoff" || rd.bracket === "lower" || rd.bracket === "default") { var pl = placeLabel(above + 1, above + nLose); lose = 'проигравший вылетает, ' + pl.replace(/(st|nd|rd|th)$/, "") + '-е место' + money(pl); }
+    return [win, lose].filter(Boolean).join('; ');
   }
   // ---- живой режим: счёт карт, раунды и статистика игроков с bo3.gg через наш посредник (обновление раз в 15 с)
   var LIVE = "https://rimcs-live.vladrimskij.workers.dev";
