@@ -15,17 +15,21 @@ jobs:
                   return r.status, r.read().decode("utf-8", "replace")
               except Exception as e:
                   return str(e), ""
-          st, h = get("/results")
-          b = re.sub(r"\s+", " ", h)
-          ids = [int(x) for x in re.findall(r'href="/matches/(\d+)/', b)]
-          print("PR| ids", len(ids), "min", min(ids), "max", max(ids), "uniq", len(set(ids)))
-          cls = re.findall(r'class="([^"]*(?:date|time|day|group)[^"]*)"', b)
-          from collections import Counter
-          print("PR| classes", Counter(cls).most_common(15))
-          print("PR| unix", len(re.findall(r'data-unix', b)), "zoned", len(re.findall(r'data-zonedgrouping', b)))
-          for k in (100, 1700):
-              m = list(re.finditer(r'href="/matches/(\d+)/', b))[k]
-              print("PR| row", k, b[m.start() - 1200:m.start() + 300].replace('"PR', ''))
-          for pat in (r'Results for [^<]{3,40}', r'\b(?:January|February|March|April|May|June|July|August|September|October|November|December) \d{1,2}\w* \d{4}'):
-              f = re.findall(pat, b); print("PR| pat", pat[:20], len(f), f[:1], f[-1:])
+          def ids_of(p):
+              st, h = get(p)
+              ids = sorted({int(x) for x in re.findall(r'href="/matches/(\d+)/', h)})
+              ev = re.findall(r'href="(/events/\d+/[^"]+)"', h)
+              print("PR|", p, st, "n", len(ids), "min", ids[:1], "max", ids[-1:], "events", ev[:2])
+              return h
+          h = ids_of("/results")
+          ids_of("/results?startDate=2026-05-01&endDate=2026-05-31")
+          ids_of("/results?team=4608")
+          ids_of("/results?offset=400")
+          ev = re.findall(r'href="/events/(\d+)/([^"]+)"', h)
+          if ev:
+              eid, sl = ev[-1]
+              ids_of(f"/results?event={eid}")
+              ids_of(f"/events/{eid}/{sl}")
+          for q in ("/events/archive", "/events", "/results/archive"):
+              ids_of(q)
           X
