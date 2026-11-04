@@ -2188,6 +2188,9 @@ _hltv_last = [0.0]
 _hltv_blocked = [False]
 
 
+_hltv_403 = [0]  # отказов подряд
+
+
 def hltv_get(path: str) -> str | None:
     if path in _hltv_pages:
         return _hltv_pages[path]
@@ -2201,9 +2204,14 @@ def hltv_get(path: str) -> str | None:
     try:
         html = http_get(HLTV + path, {"User-Agent": HLTV_UA, "Accept": "text/html", "Accept-Language": "en-US,en;q=0.9"},
                         timeout=30).decode("utf-8", "replace")
+        _hltv_403[0] = 0
     except urllib.error.HTTPError as e:
-        if e.code in (403, 429, 503):
-            _hltv_blocked[0] = True  # HLTV просит остановиться — до следующего запуска не обращаемся
+        # отказ на странице одного игрока (у некоторых он постоянный) — пропускаем только её;
+        # два отказа подряд, 429/503 или отказ на любой другой странице — HLTV просит остановиться, до следующего запуска не обращаемся
+        single = e.code == 403 and path.startswith("/player/") and _hltv_403[0] == 0
+        _hltv_403[0] = _hltv_403[0] + 1 if e.code == 403 else 0
+        if e.code in (403, 429, 503) and not single:
+            _hltv_blocked[0] = True
         warn(f"HLTV {path}: {e!r}")
         html = None
     except Exception as e:
@@ -3738,9 +3746,13 @@ def hltv_player_info(nick: str) -> dict | None:
     c = c or hltv_cache.get(f"pinfo3:{pl['id']}") or hltv_cache.get(f"pinfo2:{pl['id']}") or hltv_cache.get(f"pinfo:{pl['id']}")  # старая запись (без названий мейджоров) — пока не перечитали
     if _mvp_new[0] >= 60 or _hltv_blocked[0] or STATS:
         return c["data"] if c else None
+    fk = f"pfail:{pl['id']}"
+    if (parse_iso((hltv_cache.get(fk) or {}).get("t")) or NOW - timedelta(days=30)) > NOW - timedelta(days=7):
+        return c["data"] if c else None  # эта страница недавно отвечала отказом — не просим её снова неделю
     _mvp_new[0] += 1
     h = hltv_get(f"/player/{pl['id']}/{pl['slug']}")
     if not h:
+        hltv_cache[fk] = {"t": iso(NOW)}
         return c["data"] if c else None
     b = re.sub(r"\s+", " ", h)
     mvp = 0
