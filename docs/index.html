@@ -383,7 +383,7 @@ html { overflow-anchor: none; }
 .pp-steps .vt-a { text-transform: none; font-size: 12px; }
 .pp-steps .vt-a b { color: var(--fg); }
 /* стрелки по разделам */
-.snav { display: none; position: absolute; right: max(14px, env(safe-area-inset-right, 0px)); bottom: calc(18px + env(safe-area-inset-bottom, 0px)); display: flex; flex-direction: column; gap: 8px; z-index: 6; }
+.snav { display: none; position: absolute; right: max(14px, env(safe-area-inset-right, 0px)); bottom: calc(18px + env(safe-area-inset-bottom, 0px)); flex-direction: column; gap: 8px; z-index: 6; }
 .snav button { width: 40px; height: 40px; border-radius: 50%; background: color-mix(in srgb, var(--surface) 70%, transparent); border: 1px solid var(--line);
   color: var(--fg); font-size: 18px; font-weight: 700; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); opacity: .75; }
 .snav button:active { opacity: 1; }
@@ -437,7 +437,8 @@ html { overflow-anchor: none; }
 .bm .bt > span { flex: 1; min-width: 0; }
 .bm .bt > b { margin-left: auto; }
 .bm .bl { display: block; font-style: normal; font-size: 10.5px; color: var(--muted); padding: 4px 8px 0; }
-.snav { left: 75%; right: auto; transform: translateX(-50%); bottom: calc(34px + env(safe-area-inset-bottom, 0px)); flex-direction: column; gap: 12px; }
+.snav { left: 50%; right: auto; transform: translateX(-50%); bottom: calc(22% + env(safe-area-inset-bottom, 0px)); flex-direction: column; align-items: center; gap: 12px; }
+.mshell:not(.on-stats) .snav { display: none !important; }
 .snav button { width: 54px; height: 54px; font-size: 24px; }
 .match .vs .row .lg { margin-right: 0; }
 .lg.big { width: 34px; height: 34px; margin: 0 0 4px; }
@@ -453,6 +454,13 @@ html { overflow-anchor: none; }
 .medal b { font-size: 12px; font-weight: 700; }
 .medal.mvp { background: var(--t-soft); color: var(--t); }
 .roster .hd .medals { justify-self: end; }
+.medal { cursor: pointer; }
+.pop .pop-in.wide { box-sizing: border-box; width: min(calc(100vw - 24px), 440px); max-width: none; max-height: 70vh; }
+.pcols { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 8px; }
+.pcol { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.pop-in .pci { font-size: 16px; padding-bottom: 4px; border-bottom: 1px solid var(--line); margin-bottom: 2px; } .pop-in .pci b { display: inline; font-size: 14px; margin: 0; }
+.pce { font-size: 12px; line-height: 1.3; color: var(--fg); overflow-wrap: anywhere; }
+.pce.none { color: var(--muted); }
 .pop { position: fixed; inset: 0; z-index: 50; }
 .pop-in { position: fixed; max-width: min(320px, calc(100vw - 24px)); max-height: 50vh; overflow: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
   box-shadow: 0 10px 30px rgba(0,0,0,.35); padding: 10px 12px; font-size: 13px; }
@@ -1620,26 +1628,24 @@ a.ni { text-decoration: none; color: inherit; }
   function medalsHtml(pr) {
     pr = (pr || []).filter(function (x) { return MEDAL[x.place]; });
     if (!pr.length) return "";
-    var cols = [["🥇", ["1st"], "Победы"], ["🥈", ["2nd"], "Вторые места"], ["🥉", ["3rd", "3-4th"], "Третьи–четвёртые места"]];
-    return '<span class="medals">' + cols.map(function (c) {
-      var ev = pr.filter(function (x) { return c[1].indexOf(x.place) >= 0; });
-      if (!ev.length) return "";
-      return '<button class="medal" data-pop="' + esc(JSON.stringify({ t: c[0] + " " + c[2] + " с 1 января", l: ev.map(function (x) { return x.event; }) })) + '">' + c[0] + '<b>' + ev.length + '</b></button>';
-    }).join("") + '</span>';
+    var cols = [["🥇", ["1st"]], ["🥈", ["2nd"]], ["🥉", ["3rd", "3-4th"]]].map(function (c) {
+      return { i: c[0], l: pr.filter(function (x) { return c[1].indexOf(x.place) >= 0; }).map(function (x) { return x.event; }) };
+    });
+    return '<span role="button" class="medal cup" data-pop="' + esc(JSON.stringify({ t: "🏆 Трофеи с 1 января: " + pr.length, c: cols })) + '">🏆<b>' + pr.length + '</b></span>';
   }
   function trophyCount(pr) { return ""; }
   function mvpBadge(p) {
     if (!p.mvp) return "";
-    return '<button class="medal mvp" data-pop="' + esc(JSON.stringify({ t: "🏅 MVP на HLTV: " + p.mvp, l: p.mvp_events || [] })) + '">🏅<b>' + esc(p.mvp) + '</b></button>';
+    return '<span role="button" class="medal mvp" data-pop="' + esc(JSON.stringify({ t: "🏅 MVP на HLTV: " + p.mvp, l: p.mvp_events || [] })) + '">🏅<b>' + esc(p.mvp) + '</b></span>';
   }
   function openPop(data, anchor) {
     closePop();
     var d = JSON.parse(data), el = document.createElement("div");
     el.className = "pop";
-    el.innerHTML = '<div class="pop-in"><b>' + esc(d.t) + '</b>' + ((d.l || []).length ? '<ul>' + d.l.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join("") + '</ul>' : '<p>Список турниров появится после обновления данных.</p>') + '</div>';
+    el.innerHTML = '<div class="pop-in' + (d.c ? ' wide' : '') + '"><b>' + esc(d.t) + '</b>' + (d.c ? '<div class="pcols">' + d.c.map(function (c) { return '<div class="pcol"><div class="pci">' + c.i + ' <b>' + c.l.length + '</b></div>' + (c.l.length ? c.l.map(function (x) { return '<div class="pce">' + esc(x) + '</div>'; }).join("") : '<div class="pce none">—</div>') + '</div>'; }).join("") + '</div>' : (d.l || []).length ? '<ul>' + d.l.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join("") + '</ul>' : '<p>Список турниров появится после обновления данных.</p>') + '</div>';
     document.body.appendChild(el);
     var r = anchor.getBoundingClientRect(), box = el.firstChild, W = window.innerWidth;
-    var top = r.bottom + 6, left = Math.min(Math.max(12, r.left), W - box.offsetWidth - 12);
+    var top = r.bottom + 6, left = d.c ? Math.max(12, (W - box.offsetWidth) / 2) : Math.min(Math.max(12, r.left), W - box.offsetWidth - 12);
     if (top + box.offsetHeight > window.innerHeight - 12) top = Math.max(12, r.top - box.offsetHeight - 6);
     box.style.top = top + "px"; box.style.left = left + "px";
     state.pop = el;
@@ -1662,7 +1668,7 @@ a.ni { text-decoration: none; color: inherit; }
         if (tg.some(function (x) { return x === "AWP" || /^Снайпер/.test(x); })) roles.push(["AWP", "awp"]);
         tg.forEach(function (x) { if (/^В аренде/.test(x)) extra.push(esc(x.toLowerCase())); else if (x === "Замена") extra.push("замена"); });
         var real = [p.first_name, p.last_name].filter(Boolean).join(" ");
-        html += personRow(p, roles, real, extra, statsTeam ? pstat(statsTeam, p.nick) : "", clickable ? ' data-player="' + esc(p.nick) + '"' : "");
+        html += personRow(p, roles, real, extra, statsTeam ? pstat(statsTeam, p.nick) : "", "");
       });
     (coach || []).forEach(function (c) {
       html += personRow({ nick: c.nick, flag: c.flag, name_ru: c.name_ru, age: c.age }, [["Тренер", ""]], c.name || "", [], "", "");

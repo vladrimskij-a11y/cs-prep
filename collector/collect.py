@@ -3478,6 +3478,7 @@ def hltv_player_info(nick: str) -> dict | None:
     c = hltv_cache.get(key)
     if c and (parse_iso(c.get("t")) or NOW) > NOW - timedelta(days=7):
         return c["data"]
+    c = c or hltv_cache.get(f"pinfo:{pl['id']}")  # старая запись — пока не перечитали
     if _mvp_new[0] >= 30 or _hltv_blocked[0] or STATS:
         return c["data"] if c else None
     _mvp_new[0] += 1
