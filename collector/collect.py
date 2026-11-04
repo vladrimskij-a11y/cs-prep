@@ -1615,6 +1615,13 @@ def tg_keep(info: dict, p: dict) -> bool:
             if not SERIES_RESULT.search(text[:400]):
                 return False  # итог только серии/турнира: вышли в плей-офф, вылетели, финал
             tour = info.get("tour")
+            if not tour:  # турнир не назван нейросетью — смотрим, какой упомянут в тексте
+                ms = [m.group(0) for m in re.finditer(r"\b(?:PGL|IEM|BLAST|ESL|StarLadder|Esports World Cup|EWC|FISSURE|CCT|Thunderpick)\b[\w .:-]{0,30}", text[:500])]
+                if ms and not any(any(tour_same(x, tour_norm(t)) or tour_same(t, tour_norm(x)) or
+                                      any(w in t.lower() for w in re.findall(r"[a-z]{4,}", x.lower()) if w not in ("masters", "major", "league", "season", "world"))
+                                      for t in CURRENT_TOURS) for x in ms):
+                    return False
+                return True
             return not tour or any(tour_same(tour, tour_norm(t)) or tour_same(t, tour_norm(tour)) for t in CURRENT_TOURS)
         return True
     # нейросеть ещё не разобрала — простые правила
@@ -2943,7 +2950,7 @@ def build_news(teams: list[dict]) -> dict:
 
 # ---------------------------------------------------------------- факты для эфира
 
-FACTS_CACHE_F = CACHE / "facts_v9.json"
+FACTS_CACHE_F = CACHE / "facts_v10.json"
 facts_cache: dict = load_json(FACTS_CACHE_F, {})
 FACTS_TTL_H = 6
 FACTS_SYSTEM = """Ты помогаешь русскоязычному комментатору CS2 подготовиться к матчу.
@@ -3136,7 +3143,7 @@ def build_facts(d: dict, prev: dict | None) -> list | None:
                 continue  # число, которого нет в данных, — модель что-то посчитала или придумала
             if not _risky_ok(f["text"], data):
                 continue  # «три турнира подряд», «чемпион», «впервые» — только если это прямо есть в данных
-            if re.search(r"нет новост|не поступал|не было новост", f["text"], re.IGNORECASE):
+            if re.search(r"нет новост|не поступал|не было новост|^\s*нет\b|не найден|отсутству", f["text"], re.IGNORECASE):
                 continue
             if re.search(r"капитан\w* (команды|является)|является капитан|на позиции AWP|позицию AWP|играет на AWP|в аренде из|"
                          r"последн\w+ (личн\w+ )?встреч", f["text"], re.IGNORECASE) and not re.search(r"стал|назнач|перешёл|перешел|подписал", f["text"], re.IGNORECASE):
