@@ -9,27 +9,11 @@ def get(url, h=None):
             return b.decode("utf-8", "replace")
     except Exception as e:
         return "ERR " + repr(e)
-def show(title, s, n=1500):
-    print("=====", title); print(s[:n]); print()
-def ctx(h, pat, w=1500, k=3):
-    out = []
-    for m in list(re.finditer(pat, h))[:k]:
-        out.append(re.sub(r"\s+", " ", h[max(0, m.start()-300):m.start()+w]))
-    return "\n---\n".join(out)
 t = get("https://www.hltv.org/team/9565/vitality")
-i = t.find('id="achievementsBox"')
-show("achievements box", re.sub(r"<img[^>]*>", "", re.sub(r"\s+", " ", t[i:i+6000])), 6000)
-links = re.findall(r'href="(/matches/\d+/[^"]+)"', t)
-print("MATCH LINKS", links[:5])
-time = __import__("time")
-for L in links[:1]:
-    time.sleep(3)
-    h = get("https://www.hltv.org" + L)
-    print("MATCH", L, len(h), h[:60])
-    show("vrs ctx", ctx(h, r"(?i)vrs|valve ranking|points", 1200, 5), 8000)
-time.sleep(3)
-h = get("https://www.hltv.org/results?event=8000")
-print("RESULTS", len(h), h[:60])
-time.sleep(3)
-h = get("https://www.hltv.org/matches")
-print("MATCHES", len(h), h[:60])
+for m in re.finditer(r'achievement', t):
+    pass
+idx = [m.start() for m in re.finditer(r'achievement-table|achievementsBox|achievement', t)]
+print(len(idx), idx[:20])
+i = t.find('class="achievement-table')
+if i < 0: i = t.find('id="achievementsBox"', t.find('id="achievementsBox"') + 10)
+print(re.sub(r"<img[^>]*>", "", re.sub(r"\s+", " ", t[i-200:i+5000])))
