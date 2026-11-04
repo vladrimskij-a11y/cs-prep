@@ -9,27 +9,12 @@ jobs:
           import json, urllib.request
           B = "https://api.bo3.gg/api/v1"
           def get(u):
-              try:
-                  r = urllib.request.urlopen(urllib.request.Request(u, headers={"Accept": "application/json", "User-Agent": "Mozilla/5.0"}), timeout=30)
-                  return json.loads(r.read())
-              except Exception as e:
-                  print("PR: ERR", u, e); return None
-          for tid in (5109, 5111, 4204, 5338):
-              j = get(f"{B}/tournaments?filter[tournaments.id][eq]={tid}")
-              t = ((j or {}).get("results") or [{}])[0]
-              print("PR: PAST", tid, t.get("name"), "tier", t.get("tier"), "tier_rank", t.get("tier_rank"))
-          j = get(f"{B}/tournaments?page[limit]=30&sort=start_date&filter[tournaments.tier][in]=a&filter[tournaments.status][in]=upcoming,current")
-          for t in (j or {}).get("results") or []:
-              print("PR: A", t.get("id"), t.get("slug"), t.get("name"), "tp", json.dumps(t.get("teams_prize"))[:200])
-              d = get(f"{B}/tournaments/{t.get('slug')}")
-              if d:
-                  print("PR:   keys", sorted(d.keys()))
-                  for k in d:
-                      if "team" in k or "partic" in k:
-                          print("PR:  ", k, json.dumps(d[k])[:300])
-              for u in (f"{B}/tournaments/{t.get('slug')}/teams", f"{B}/teams?filter[teams.tournament_id][eq]={t.get('id')}&page[limit]=5",
-                        f"{B}/tournament_teams?filter[tournament_teams.tournament_id][eq]={t.get('id')}&page[limit]=40"):
-                  x = get(u)
-                  if x: print("PR:   OK", u, json.dumps(x)[:400])
-              break
+              r = urllib.request.urlopen(urllib.request.Request(u, headers={"Accept": "application/json", "User-Agent": "Mozilla/5.0"}), timeout=30)
+              return json.loads(r.read())
+          for tid in (6132, 4227, 5260, 6010, 6130):
+              t = get(f"{B}/tournaments?filter[tournaments.id][eq]={tid}")["results"][0]
+              d = get(f"{B}/tournaments/{t['slug']}")
+              tm = d.get("teams") or []
+              print("PR|", tid, t["name"], "tier", t.get("tier"), "teams", len(tm))
+              if tm: print("PR|  ", json.dumps(tm[0])[:300].replace(", ", ","))
           X
