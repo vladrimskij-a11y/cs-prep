@@ -52,7 +52,7 @@ STATS = os.environ.get("STATS_ONLY") == "1"   # быстрый сбор стат
 DAYS_AHEAD = int(os.environ.get("DAYS_AHEAD", "21"))  # расписание: BLAST и др. публикуют заранее
 DETAIL_HOURS = int(os.environ.get("DETAIL_HOURS", "72"))
 NEWS_DAYS = int(os.environ.get("NEWS_DAYS", "7"))
-MAPS_WINDOW_DAYS = 120
+MAPS_WINDOW_DAYS = 90  # статистика карт — за 3 месяца, как и остальная
 
 # Ленты профильных сайтов. Любую можно убрать или добавить свою.
 # Новостные Telegram-каналы про CS (лента на главном экране + новости в карточках матчей).

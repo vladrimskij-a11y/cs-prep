@@ -426,7 +426,18 @@ html { overflow-anchor: none; }
 .mev.none { opacity: .5; }
 .tcount { font-size: 13px; font-weight: 700; white-space: nowrap; text-align: right; }
 .roster .hd { grid-template-columns: 1fr auto; }
-.pmaj { grid-column: 1 / -1; font-size: 12px; color: var(--muted); }
+.pmaj { grid-column: 1 / -1; font-size: 12px; color: var(--muted); margin-top: 2px; }
+.pmaj.tap { cursor: pointer; }
+/* статистика игрока: таблица из двух строк, числа ровно под числами */
+.ps { grid-column: 1 / -1; display: grid; gap: 4px; margin-top: 8px; padding: 8px 10px; border-radius: var(--r-s, 10px); background: var(--sunk); }
+.ps-r { display: grid; grid-template-columns: minmax(84px, 1.25fr) repeat(3, minmax(0, 1fr)); align-items: center; gap: 6px; }
+.ps-l { font-size: 12px; font-weight: 600; display: flex; flex-direction: column; line-height: 1.2; }
+.ps-l small { font-weight: 400; font-size: 10.5px; color: var(--muted); }
+.ps-c { display: flex; flex-direction: column; align-items: flex-end; line-height: 1.15; }
+.ps-c small { font-size: 10px; color: var(--muted); letter-spacing: .02em; }
+.ps-c b { font-family: var(--mono); font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.ps-r + .ps-r { padding-top: 4px; border-top: 1px dashed var(--line); }
+.ps-r + .ps-r .ps-c small { visibility: hidden; height: 0; }
 .pmaj b { color: var(--fg); }
 .tlogo { width: 44px; height: 44px; object-fit: contain; }
 .hero.thero { display: flex; flex-direction: row; align-items: center; gap: 12px; padding: 14px; }
@@ -502,11 +513,18 @@ html { overflow-anchor: none; }
 .toast { position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--fg); color: var(--bg); padding: 10px 16px; border-radius: 12px; font-size: 13px; z-index: 99; max-width: calc(100vw - 32px); transition: opacity .3s; }
 .toast.out { opacity: 0; }
 .vr-ar { font-style: normal; font-size: .72em; margin-right: 3px; vertical-align: 1px; } .vr-ar.up { color: var(--win); } .vr-ar.dn { color: var(--loss); }
+.prz-g.vrs { display: flex; align-items: center; gap: 6px; color: var(--fg); font-weight: 700; }
+.vrs-b { font-size: 10px; font-weight: 800; letter-spacing: .04em; padding: 2px 6px; border-radius: 5px; background: var(--ct); color: #fff; }
 .stake { padding: 4px 14px; }
 .stk { display: grid; grid-template-columns: 22px 1fr; gap: 8px; padding: 10px 0; border-top: 1px solid var(--line); font-size: 14px; line-height: 1.4; }
 .stk:first-child { border-top: 0; }
-.stk-m { font-size: 12.5px; color: var(--muted); } .stk-m b { color: var(--fg); font-weight: 600; }
-.stk i { font-style: normal; font-size: 16px; line-height: 1.25; text-align: center; }
+.stk-m { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.mc { display: inline-flex; flex-direction: column; padding: 4px 9px; border-radius: 8px; background: var(--sunk); line-height: 1.15; }
+.mc small { font-size: 10px; color: var(--muted); } .mc b { font-family: var(--mono); font-size: 13px; font-weight: 700; }
+.mc.tot { background: color-mix(in srgb, var(--win) 16%, var(--sunk)); } .mc.tot b { color: var(--win); }
+.stk { grid-template-columns: 30px 1fr; gap: 10px; padding: 12px 0; }
+.stk i { font-style: normal; font-size: 15px; width: 30px; height: 30px; border-radius: 50%; background: var(--sunk); display: grid; place-items: center; line-height: 1; }
+.stk > span { font-weight: 500; }
 .stk .slot { display: inline-block; margin-top: 4px; font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: color-mix(in srgb, var(--accent, #4c8dff) 16%, transparent); color: var(--fg); }
 .pstat.tf { margin-top: 2px; color: var(--muted); } .pstat.tf small { color: var(--muted); }
 .pop { position: fixed; inset: 0; z-index: 50; pointer-events: none; }  /* страница под окном листается */
@@ -1148,7 +1166,8 @@ a.ni { text-decoration: none; color: inherit; }
   }
 
   // ---------- рейтинг
-  var REG_ABBR = { "Европа": "EU", "Америка": "AM", "Азия": "AS" };
+  var REG_ABBR = { "Европа": "Европа", "Америка": "Америка", "Азия": "Азия" };  // регионы везде по-русски
+  var REG_MINI = { "Европа": "Евр", "Америка": "Амер", "Азия": "Азия" };  // для тонкой шапки, где мало места
   function getRanking() {
     if (state.ranking) return Promise.resolve(state.ranking);
     return dfetch("data/ranking.json" + bust()).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); }).then(function (j) { state.ranking = j; ((j.vrs || {}).teams || []).forEach(function (t) { rememberLogo(t.name, t.logo); }); return j; });
@@ -1194,7 +1213,7 @@ a.ni { text-decoration: none; color: inherit; }
       return { i: c[0], l: cups.filter(function (x) { return c[1].indexOf(x.place) >= 0; }).map(function (x) { return withYear(x.event, x.date); }) };
     });
     var tiles = [];
-    if (v.rank) tiles.push('<div class="th-t"><b class="num">#' + esc(v.rank) + '</b><span>в мире</span></div>');
+    if (v.rank) tiles.push('<div class="th-t"><b class="num">#' + esc(v.rank) + '</b><span>Мир</span></div>');
     if (v.region && v.reg_rank) tiles.push('<div class="th-t"><b class="num">#' + esc(v.reg_rank) + '</b><span>' + esc(REG_RU[v.region] || v.region) + '</span></div>');
     if (v.points) tiles.push('<div class="th-t"><b class="num">' + esc(v.points) + '</b><span>очков</span></div>');
     if (cups.length) tiles.push('<div class="th-t cupt" role="button" data-pop="' + esc(JSON.stringify({ t: "🏆 Трофеи с 1 января: " + cups.length, c: cols })) + '"><b class="num">🏆 ' + cups.length + '</b><span>трофеи</span></div>');
@@ -1223,7 +1242,7 @@ a.ni { text-decoration: none; color: inherit; }
   // квадрат сыгранной карты: картинка карты, счёт цветом команд и раунды по сторонам (CT — голубой, T — золотой)
   function mapSquare(g, i, A, B, small) {
     var sd = g.sides, side = "";
-    if (sd && sd.length === 2) {
+    if (sd && sd.length === 2 && !small) {  // в списке «Завершённых» стороны не показываем — только внутри матча
       side = '<span class="sides">' + [A, B].map(function (t, k) {
         return '<span class="sd-r"><em>' + esc(abbr(t)) + '</em><i class="sct">' + sd[k][0] + '</i><i class="st">' + sd[k][1] + '</i></span>';
       }).join("") + '</span>';
@@ -1422,7 +1441,7 @@ a.ni { text-decoration: none; color: inherit; }
             getResults(id).then(function () { if (state.view === "tour:" + id) showTour(id); }).catch(function () {});
             return '<div class="empty">Загружаю результаты…</div>';
           }
-          var html = (R.matches || []).some(function (x) { return (x.maps || []).some(function (g) { return g.sides; }); }) ? SIDES_LEGEND : "", cur = null;
+          var html = "", cur = null;
           (R.matches || []).forEach(function (x) {
             var dk = dayKey(x.date);
             if (dk !== cur) { if (cur) html += '</section>'; cur = dk; html += '<section class="day"><h2>' + esc(dayTitle(x.date)) + '</h2>'; }
@@ -1466,10 +1485,11 @@ a.ni { text-decoration: none; color: inherit; }
 
   function prizeBlock(h) {
     var html = '<div class="sec"><h3>Призовые и слоты <span>' + esc(usd(h.prize)) + '</span></h3><div class="box prz">';
-    if (h.player_share || h.club_share) html += '<div class="prz-share">игрокам ' + esc(usd(h.player_share)) + ' · клубам ' + esc(usd(h.club_share)) + '</div>';
+    if (h.player_share || h.club_share) html += '<div class="prz-share">клубам ' + esc(usd(h.club_share)) + ' · командам ' + esc(usd(h.player_share)) + '</div>';
     (h.places || []).forEach(function (p) {
       html += '<div class="prz-row"><span class="prz-pl">' + esc(placeRu(p.place)) + (p.count > 1 ? ' <small>×' + p.count + '</small>' : '') + '</span>' +
-        '<span class="prz-money num">' + (p.prize ? esc(usd(p.prize)) : '') + (p.club ? '<small>+ клубу ' + esc(usd(p.club)) + '</small>' : '') + '</span>' +
+        '<span class="prz-money num">' + ((p.prize || 0) + (p.club || 0) ? esc(usd((p.prize || 0) + (p.club || 0))) : '') +
+          (p.club ? '<small>клубу ' + esc(usd(p.club)) + (p.prize ? ' · команде ' + esc(usd(p.prize)) : '') + '</small>' : '') + '</span>' +
         ((p.spots || []).length ? '<span class="prz-spot">→ ' + esc(p.spots.join(", ")) + '</span>' : '') +
         ((p.teams || []).length ? '<span class="prz-team">' + esc(p.teams.join(", ")) + '</span>' : '') + '</div>';
     });
@@ -1479,16 +1499,16 @@ a.ni { text-decoration: none; color: inherit; }
       var list = h.teams.map(function (t, i) { return [t, i]; }).sort(function (a, b) { return ord(a[0]) - ord(b[0]) || String(a[0].how).localeCompare(String(b[0].how)) || a[1] - b[1]; }).map(function (x) { return x[0]; });
       var cur = null;
       html += '<div class="sec"><h3>Участники <span>как попали</span></h3><div class="box">' + list.map(function (t) {
-        var g = howRu(t.how), head = g !== cur ? (cur = g, '<div class="prz-g">' + esc(g) + '</div>') : '';
+        var g = howRu(t.how), head = g !== cur ? (cur = g, '<div class="prz-g' + (/^VRS/.test(g) ? ' vrs' : '') + '">' + (/^VRS/.test(g) ? '<span class="vrs-b">VRS</span>' + esc(g.replace(/^VRS\s*/, "")) : esc(g)) + '</div>') : '';
         return head + '<div class="prz-row" data-tname="' + esc(t.name) + '"><span class="prz-pl">' + logo(t.name) + esc(t.name) + '</span></div>';
       }).join("") + '</div></div>';
     }
     return html;
   }
   function howRu(s) {
-    return String(s || "").replace(/^VRS \(Global\).*/, "VRS мир").replace(/^VRS \(Europe\).*/, "VRS Европа")
+    return String(s || "").replace(/^VRS \(Global\).*/, "VRS Мир").replace(/^VRS \(Europe\).*/, "VRS Европа")
       .replace(/^VRS \(Americas\).*/, "VRS Америка").replace(/^VRS \(Asia\).*/, "VRS Азия")
-      .replace(/Closed Qualifier/, "закрытая квалификация").replace(/Open Qualifier/, "открытая квалификация").replace(/^Invited$/, "приглашение");
+      .replace(/Closed Qualifier/, "Закрытая квалификация").replace(/Open Qualifier/, "Открытая квалификация").replace(/^Invited$/, "Приглашение");
   }
 
   // ---------- мейджор
@@ -1760,7 +1780,7 @@ a.ni { text-decoration: none; color: inherit; }
         '<span class="vr-c"><b class="num">#' + t.vrs.rank + '</b><small class="num">' + t.vrs.points + '</small></span>' +
         cell(O.win0[i], t.vrs.rank) + cell(O.win1[i], t.vrs.rank) + '</div>';
     });
-    return html + '<div class="note">' + (O.model === "valve" ? 'Оценка по модели Valve: победа даёт очки за личную встречу и за силу побеждённого (баунти, сеть соперников, LAN). Считается по коду рейтинга Valve с учётом матчей идущего турнира; от прогноза HLTV обычно отличается на 1–5 очков.' : 'Оценка только по личной встрече.') + '</div></div></div>';
+    return html + '</div></div>';  // пояснение к расчёту убрано по просьбе владельца
   }
 
   function newsFor(m, who) {
@@ -1775,19 +1795,20 @@ a.ni { text-decoration: none; color: inherit; }
     var m = state.details[state.openId]; if (!m || !t || !t.name) return "";
     var i = m.teams.indexOf(t); if (i < 0) return "";
     var f = tourForm(m, i).find(function (x) { return x.nick.toLowerCase() === String(nick || "").toLowerCase(); });
-    return f ? '<span class="pstat tf"><span>На турнире:</span><span>K/D <b>' + f.kd.toFixed(2) + '</b></span><span>ADR <b>' + Math.round(f.adr) + '</b></span><span>KAST <b>' + Math.round(f.kast) + '%</b></span><small>' + f.n + ' сер.</small></span>' : "";
+    return f ? statRow("🏆", "Турнир", f.n + " " + plural(f.n, "серия", "серии", "серий"), f.kd.toFixed(2), Math.round(f.adr), Math.round(f.kast)) : "";
+  }
+  // строка статистики игрока: подпись слева, затем K/D, ADR, KAST — столбцы ровно под столбцами
+  function statRow(icon, label, sub, kd, adr, kast) {
+    function c(l, v, suf) { return '<span class="ps-c"><small>' + l + '</small><b>' + (v == null || v === "" || isNaN(Number(v)) ? "–" : esc(v) + (suf || "")) + '</b></span>'; }
+    return '<span class="ps-r"><span class="ps-l">' + icon + ' ' + esc(label) + (sub ? '<small>' + esc(sub) + '</small>' : '') + '</span>' + c("K/D", kd) + c("ADR", adr) + c("KAST", kast, "%") + '</span>';
   }
   function pstat(t, nick) {
     var key = String(nick || "").toLowerCase().replace(/[^a-z0-9а-я]/g, "");
     var st = (t.stats || []).find(function (x) { return String(x.nick).toLowerCase().replace(/[^a-z0-9а-я]/g, "") === key; });
     if (!st) return "";
-    var h = st.hltv || {};
-    function it(label, v, suf) { return v == null ? "" : '<span>' + label + ' <b>' + esc(v) + (suf || "") + '</b></span>'; }
-    var fx = function (v, d) { return v == null ? null : Number(v).toFixed(d); };
-    return '<span class="pstat">' +
-      it("K/D", fx(h.kd != null ? h.kd : st.kd, 2)) +
-      it("ADR", fx(h.adr != null ? h.adr : st.adr, 1)) +
-      it("KAST", fx(h.kast != null ? h.kast : st.kast, 1), "%") + '</span>';
+    var h = st.hltv || {}, fx = function (v, d) { return v == null ? null : Number(v).toFixed(d); };
+    var kast = h.kast != null ? h.kast : st.kast;
+    return statRow("📊", "3 мес.", st.maps ? st.maps + " " + plural(st.maps, "карта", "карты", "карт") : "", fx(h.kd != null ? h.kd : st.kd, 2), fx(h.adr != null ? h.adr : st.adr, 1), kast == null ? null : Math.round(kast));
   }
 
   // без знаков ударения (комбинируемые акценты), й и ё не трогаем
@@ -1808,18 +1829,23 @@ a.ni { text-decoration: none; color: inherit; }
   }
 
   function vrsShort(t) { vrsLine(t); var v = t.vrs; return v ? 'Мир #' + esc(v.rank) + (v.region ? ' · ' + esc(REG_ABBR[v.region] || v.region) + (v.reg_rank ? ' #' + esc(v.reg_rank) : '') : '') : ''; }
-  function miniVrs(t) { vrsLine(t); var v = t.vrs; return v ? '<small>Мир#' + esc(v.rank) + (v.region ? ' ' + esc(REG_ABBR[v.region] || v.region) + '#' + esc(v.reg_rank || "") : '') + '</small>' : ''; }
+  function miniVrs(t) { vrsLine(t); var v = t.vrs; return v ? '<small>Мир#' + esc(v.rank) + (v.region ? ' ' + esc(REG_MINI[v.region] || v.region) + '#' + esc(v.reg_rank || "") : '') + '</small>' : ''; }
   function heroVrs(t) { var x = vrsShort(t); return x ? '<span class="tvrs">' + x + '</span>' : ''; }
+  function majLine(x) {  // «PGL Major Copenhagen 2024 — 1st» → «🏆 PGL Major Copenhagen 2024 — чемпион»
+    var m = String(x).match(/^(.*) — (\S+)$/);
+    if (!m) return String(x);
+    return (/^1st$/.test(m[2]) ? "🏆 " + m[1] + " — чемпион" : m[1] + " — " + placeRu(m[2]));
+  }
   function personRow(p, roles, real, extra, statsHtml, attrs) {
     var info = [real ? esc(real) + (p.name_ru ? ' <span class="pron">[' + esc(plain(p.name_ru)) + ']</span>' : '') : (p.name_ru ? esc(plain(p.name_ru)) : ""),
       p.age ? esc(p.age) + " " + years(p.age) : ""].concat(extra || []).filter(Boolean);
-    var majTxt = 'Мейджоры: <b>' + esc(p.majors) + '</b>' + (p.major_wins ? ' · выиграл <b>' + esc(p.major_wins) + '</b>' : '');
+    var majTxt = '🏟 Мейджоры <b>' + esc(p.majors) + '</b>' + (p.major_wins ? ' · 🏆 выиграл <b>' + esc(p.major_wins) + '</b>' : '');
     var maj = !p.majors ? '' : (p.major_events || []).length
-      ? '<span class="pmaj tap" role="button" data-pop="' + esc(JSON.stringify({ t: "🏟 Мейджоры: " + p.majors + (p.major_wins ? ", выиграл " + p.major_wins : ""), l: p.major_events.map(function (x) { return String(x).replace(/ — (\S+)$/, function (_, pl) { return " — " + placeRu(pl); }); }) })) + '">' + majTxt + ' ›</span>'
+      ? '<span class="pmaj tap" role="button" data-pop="' + esc(JSON.stringify({ t: "🏟 Мейджоры: " + p.majors + (p.major_wins ? ", выиграл " + p.major_wins : ""), l: p.major_events.map(majLine) })) + '">' + majTxt + ' ›</span>'
       : '<span class="pmaj">' + majTxt + '</span>';
     return '<' + (attrs ? 'button class="pl"' + attrs : 'div class="pl"') + '><span class="nickline"><span class="pflag">' + esc(flag(p.nationality || p.flag)) + '</span><span class="nick">' + esc(p.nick) + '</span>' + mvpBadge(p) + '</span>' +
       (roles.length ? '<span class="rcol">' + roles.map(function (r) { return '<span class="rt ' + r[1] + '">' + esc(r[0]) + '</span>'; }).join("") + '</span>' : '') +
-      '<span class="rn">' + info.join(" · ") + '</span>' + maj + (statsHtml || "") + '</' + (attrs ? 'button' : 'div') + '>';
+      '<span class="rn">' + info.join(" · ") + '</span>' + maj + (statsHtml ? '<span class="ps">' + statsHtml + '</span>' : "") + '</' + (attrs ? 'button' : 'div') + '>';
   }
 
   // медали по столбцам: золото, серебро, бронза — под каждой турниры
@@ -2161,15 +2187,15 @@ a.ni { text-decoration: none; color: inherit; }
     function reward(n) {  // деньги и путёвки за место
       var p = placeOf(n); if (!p) return "";
       var f = function (x) { return '$' + Number(x).toLocaleString("en-US"); }, parts = [];
-      if (p.prize) parts.push('команде <b>' + f(p.prize) + '</b>');
-      if (p.club) parts.push('клубу <b>' + f(p.club) + '</b>');
-      if (p.prize && p.club) parts.push('всего <b>' + f(p.prize + p.club) + '</b>');
+      if (p.prize && p.club) parts.push('<span class="mc tot"><small>всего</small><b>' + f(p.prize + p.club) + '</b></span>');
+      if (p.club) parts.push('<span class="mc"><small>клубу</small><b>' + f(p.club) + '</b></span>');
+      if (p.prize) parts.push('<span class="mc"><small>команде</small><b>' + f(p.prize) + '</b></span>');
       var sl = (p.spots || []).concat(p.other || []).filter(Boolean);
-      return (parts.length ? '<br><span class="stk-m">' + parts.join(' · ') + '</span>' : '') + (sl.length ? '<br><span class="slot">Путёвка: ' + esc(sl.join(", ")) + '</span>' : '');
+      return (parts.length ? '<span class="stk-m">' + parts.join('') + '</span>' : '') + (sl.length ? '<br><span class="slot">Путёвка: ' + esc(sl.join(", ")) + '</span>' : '');
     }
     var rounds = hit.st.rounds, rd = hit.rd, nextR = rounds[hit.ri + 1], name = String(rd.name || "");
     var third = stages.some(function (st) { return (st.rounds || []).some(function (r) { return /3rd|3-е|третье/i.test(r.name || ""); }); });
-    if (/гранд|grand/i.test(name + " " + (rd.bracket || ""))) return [["🏆", 'Победитель — чемпион' + reward(1)], ["🥈", 'Проигравший — 2-е место' + reward(2)]];
+    if (/гранд|grand/i.test(name + " " + (rd.bracket || ""))) return [["🏆", 'Победитель — <b>чемпион</b>' + reward(1)], ["🥈", 'Проигравший — <b>2-е место</b>' + reward(2)]];
     if (/3rd|3-е|третье/i.test(name)) return [["🥉", 'Победитель — 3-е место' + reward(3)], ["✗", 'Проигравший — 4-е место' + reward(4)]];
     var out = [];
     if (rd.bracket === "upper") {
