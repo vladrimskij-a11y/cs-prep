@@ -1517,7 +1517,7 @@ def vrs_outcomes_valve(a: dict, b: dict, table: list[dict], lan: bool = True, hi
         if not bid:
             continue
         for m in hist or []:
-            if (m.get("start_date") or "")[:10] <= snap or m.get("winner_team_id") != bid:
+            if (m.get("start_date") or "")[:10] < snap or m.get("winner_team_id") != bid:
                 continue
             on = opp_of(m, bid).get("name") or ""
             od = valve_detail(on)
