@@ -517,6 +517,15 @@ html { overflow-anchor: none; }
 .prz-g.vrs { display: flex; align-items: center; gap: 6px; color: var(--fg); font-weight: 700; }
 .vrs-b { font-size: 10px; font-weight: 800; letter-spacing: .04em; padding: 2px 6px; border-radius: 5px; background: var(--ct); color: #fff; }
 .h2h .it.tap { display: block; width: 100%; text-align: left; } .h2h .it .go { color: var(--muted); font-weight: 700; margin-left: 4px; }
+.ptiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.ptile { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 4px 8px; border-radius: var(--r-s, 10px); background: var(--surface); border: 1px solid var(--line); text-align: center; min-width: 0; }
+.pt-lg { width: 36px; height: 36px; display: grid; place-items: center; }
+.pt-lg .lg { width: 32px; height: 32px; object-fit: contain; margin: 0; }
+.pt-lg i { font-style: normal; font-weight: 800; font-size: 13px; color: var(--muted); width: 32px; height: 32px; border-radius: 8px; background: var(--sunk); display: grid; place-items: center; }
+.ptile b { font-size: 11.5px; line-height: 1.2; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ptile small { font-size: 9.5px; line-height: 1.2; color: var(--muted); display: flex; flex-wrap: wrap; justify-content: center; gap: 2px; align-items: center; }
+.ptile small .vrs-b { font-size: 8.5px; padding: 1px 4px; }
+@media (max-width: 340px) { .ptiles { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 .stake { padding: 4px 14px; }
 .stk { display: grid; grid-template-columns: 22px 1fr; gap: 8px; padding: 10px 0; border-top: 1px solid var(--line); font-size: 14px; line-height: 1.4; }
 .stk:first-child { border-top: 0; }
@@ -1145,9 +1154,12 @@ a.ni { text-decoration: none; color: inherit; }
 
   // ---------- турниры
   function toursPane(c, sub) {
-    var today = dayKey(new Date().toISOString()), list = c[sub], html = "";
-    if (!list.length) return '<div class="empty"><strong>' + (sub === "live" ? "Сейчас турниров нет" : sub === "up" ? "Ближайших турниров нет" : "Завершённых турниров пока нет") + '</strong></div>';
-    if (sub !== "up") return '<div class="tours center">' + list.map(function (t) { return tourCard(t, today, ""); }).join("") + '</div>';
+    var today = dayKey(new Date().toISOString()), html = "";
+    if (sub === "done") return c.done.length ? '<div class="tours center">' + c.done.map(function (t) { return tourCard(t, today, ""); }).join("") + '</div>' : '<div class="empty"><strong>Завершённых турниров пока нет</strong></div>';
+    // «Актуальные»: идущие сверху с пометкой «идёт», ниже грядущие по месяцам; всё по центру
+    if (!c.live.length && !c.up.length) return '<div class="empty"><strong>Ближайших турниров нет</strong></div>';
+    if (c.live.length) html += '<h2 class="sect-title month">Идут сейчас</h2><div class="tours center">' + c.live.map(function (t) { return tourCard(t, today, ""); }).join("") + '</div>';
+    var list = c.up;
     var months = {};  // турнир — в месяце начала; «продолжится в…», если заходит на следующий
     list.forEach(function (t) {
       var b = t.begin || t.next, e = t.end || b;
@@ -1157,7 +1169,7 @@ a.ni { text-decoration: none; color: inherit; }
     });
     Object.keys(months).map(Number).sort(function (a, b) { return a - b; }).forEach(function (k) {
       var y = Math.floor(k / 12), m = k % 12;
-      html += '<h2 class="sect-title month">' + MONTHS[m].charAt(0).toUpperCase() + MONTHS[m].slice(1) + ' ' + y + '</h2><div class="tours">';
+      html += '<h2 class="sect-title month">' + MONTHS[m].charAt(0).toUpperCase() + MONTHS[m].slice(1) + ' ' + y + '</h2><div class="tours center">';
       months[k].sort(function (a, b) { return tierW(a.t) - tierW(b.t); }).forEach(function (x) {
         html += tourCard(x.t, today, x.ek > x.bk ? '<span class="span">→ продолжится в ' + MONTHS_IN[(x.bk + 1) % 12] + '</span>' : '');
       });
@@ -1167,14 +1179,14 @@ a.ni { text-decoration: none; color: inherit; }
   }
   function showTours() {
     var c = tourBuckets();
-    renderShell({ id: "tours", back: "Главная", title: "Турниры", def: c.live.length ? "live" : "up",
-      tabs: [{ key: "live", label: "Идущие" }, { key: "up", label: "Грядущие" }, { key: "done", label: "Завершённые" }],
+    renderShell({ id: "tours", back: "Главная", title: "Турниры", def: "now",
+      tabs: [{ key: "now", label: "Актуальные" }, { key: "done", label: "Завершённые" }],
       pane: function (k) { return toursPane(c, k); } });
   }
 
   // ---------- рейтинг
   var REG_ABBR = { "Европа": "Европа", "Америка": "Америка", "Азия": "Азия" };  // регионы везде по-русски
-  var REG_MINI = { "Европа": "Евр", "Америка": "Амер", "Азия": "Азия" };  // для тонкой шапки, где мало места
+  var REG_MINI = { "Европа": "EU", "Америка": "AM", "Азия": "AS" };  // в свёрнутом версусе — короткие английские (по просьбе владельца)
   function getRanking() {
     if (state.ranking) return Promise.resolve(state.ranking);
     return dfetch("data/ranking.json" + bust()).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); }).then(function (j) { state.ranking = j; ((j.vrs || {}).teams || []).forEach(function (t) { rememberLogo(t.name, t.logo); }); return j; });
@@ -1454,7 +1466,7 @@ a.ni { text-decoration: none; color: inherit; }
         if (k === "overview") {
           var R0 = (state.results || {})[id];
           if (!R0) { getResults(id).then(function () { if (state.view === "tour:" + id) showTour(id); }).catch(function () {}); return '<div class="empty">Загружаю сетку…</div>'; }
-          return bracketHtml(R0) + (t && t.hltv ? prizeBlock(t.hltv) : '');
+          return bracketHtml(R0) + (t && (t.hltv || t.major) ? prizeBlock(Object.assign({}, t.hltv || {}, { major: t.major })) : '');
         }
         if (k === "done") {
           var R = (state.results || {})[id];
@@ -1475,7 +1487,7 @@ a.ni { text-decoration: none; color: inherit; }
         if (ms.length) out += byDays(ms, false) + mj;
         else out += mj + (mj ? '<div class="note" style="padding:12px 0 0">Расписание матчей пока не опубликовано — появится здесь, как только организаторы его объявят.</div>'
           : '<div class="empty"><strong>Расписание пока не опубликовано</strong>Матчи появятся здесь, как только организаторы их объявят.</div>');
-        if (t && t.hltv && !t.bracket) out += prizeBlock(t.hltv);
+        if (t && (t.hltv || t.major) && !t.bracket) out += prizeBlock(Object.assign({}, t.hltv || {}, { major: t.major }));
         return out;
       } });
   }
@@ -1505,7 +1517,9 @@ a.ni { text-decoration: none; color: inherit; }
   function placeRu(p) { return String(p || "").replace(/(st|nd|rd|th)$/i, "").replace(/-/, "–") + " место"; }
 
   function prizeBlock(h) {
-    var html = '<div class="sec"><h3>Призовые и слоты <span>' + esc(usd(h.prize)) + '</span></h3><div class="box prz">';
+    var html = "";
+    if (!(h.places || []).length && !h.prize) return participantsBlock(h.teams || [], h.major);
+    html += '<div class="sec"><h3>Призовые и слоты <span>' + esc(usd(h.prize)) + '</span></h3><div class="box prz">';
     if (h.player_share || h.club_share) html += '<div class="prz-share">клубам ' + esc(usd(h.club_share)) + ' · командам ' + esc(usd(h.player_share)) + '</div>';
     (h.places || []).forEach(function (p) {
       html += '<div class="prz-row"><span class="prz-pl">' + esc(placeRu(p.place)) + (p.count > 1 ? ' <small>×' + p.count + '</small>' : '') + '</span>' +
@@ -1515,22 +1529,40 @@ a.ni { text-decoration: none; color: inherit; }
         ((p.teams || []).length ? '<span class="prz-team">' + esc(p.teams.join(", ")) + '</span>' : '') + '</div>';
     });
     html += '</div></div>';
-    if ((h.teams || []).length) {
-      var ord = function (t) { var x = String(t.how || ""); return /^Invited|приглаш/i.test(x) ? 0 : /VRS \(Global\)/.test(x) ? 1 : /^VRS/.test(x) ? 2 : /Closed/i.test(x) ? 4 : /Open/i.test(x) ? 5 : 3; };
-      var list = h.teams.map(function (t, i) { return [t, i]; }).sort(function (a, b) { return ord(a[0]) - ord(b[0]) || String(a[0].how).localeCompare(String(b[0].how)) || a[1] - b[1]; }).map(function (x) { return x[0]; });
-      var cur = null;
-      html += '<div class="sec"><h3>Участники <span>как попали</span></h3><div class="box">' + list.map(function (t) {
-        var g = howRu(t.how), head = g !== cur ? (cur = g, '<div class="prz-g' + (/^VRS/.test(g) ? ' vrs' : '') + '">' + (/^VRS/.test(g) ? '<span class="vrs-b">VRS</span>' + esc(g.replace(/^VRS\s*/, "")) : esc(g)) + '</div>') : '';
-        return head + '<div class="prz-row" data-tname="' + esc(t.name) + '"><span class="prz-pl">' + logo(t.name) + esc(t.name) + '</span></div>';
-      }).join("") + '</div></div>';
-    }
+    html += participantsBlock(h.teams || [], h.major);
     return html;
   }
+  // как попали на турнир — по-русски: «VRS Мир», «VRS Северная Америка», «Закрытая квалификация Азии», «Приглашение»
+  var REG_GEN = { Europe: "Европы", Asia: "Азии", Americas: "Америки", "North America": "Северной Америки", "South America": "Южной Америки", Oceania: "Океании", CIS: "СНГ", China: "Китая", "Middle East": "Ближнего Востока", Global: "мировая" };
+  var REG_NOM = { Global: "Мир", Europe: "Европа", Asia: "Азия", Americas: "Америка", "North America": "Северная Америка", "South America": "Южная Америка", Oceania: "Океания", CIS: "СНГ", China: "Китай", "Middle East": "Ближний Восток" };
   function howRu(s) {
-    return String(s || "").replace(/^VRS \(Global\).*/, "VRS Мир").replace(/^VRS \(Europe\).*/, "VRS Европа")
-      .replace(/^VRS \(Americas\).*/, "VRS Америка").replace(/^VRS \(Asia\).*/, "VRS Азия")
-      .replace(/Closed Qualifier/, "Закрытая квалификация").replace(/Open Qualifier/, "Открытая квалификация").replace(/^Invited$/, "Приглашение");
+    s = String(s || "").trim();
+    var m = s.match(/^VRS\s*\(([^)]+)\)/);
+    if (m) return "VRS " + (REG_NOM[m[1]] || m[1]);
+    m = s.match(/^(.*?)\s*(Closed|Open)\s+Qualifier/i);
+    if (m) { var kind = /closed/i.test(m[2]) ? "Закрытая" : "Открытая", r = m[1].trim(); return kind + " квалификация" + (r ? " " + (REG_GEN[r] || r) : ""); }
+    if (/^Invited$/i.test(s)) return "Приглашение";
+    m = s.match(/^Stage\s*(\d)/i);
+    if (m) return "Стадия " + m[1];
+    return s;
   }
+  // участники плиткой: логотип, название, как попали; по 4 в строке, сгруппированы по способу попадания
+  function participantsBlock(teams, major) {
+    var list = teams.slice(), seen = {};
+    list.forEach(function (t) { seen[nkey(t.name)] = 1; });
+    ((major || {}).stages || []).forEach(function (st) {  // мажор: добираем всех по стадиям, на которые их пригласили
+      (st.teams || []).forEach(function (x) { if (!seen[nkey(x.name)]) { seen[nkey(x.name)] = 1; list.push({ name: x.name, how: st.stage }); } });
+    });
+    if (!list.length) return "";
+    var ord = function (t) { var x = String(t.how || ""); return /^Invited/i.test(x) ? 0 : /^Stage 3/i.test(x) ? 1 : /^Stage 2/i.test(x) ? 2 : /^Stage 1/i.test(x) ? 3 : /VRS \(Global\)/.test(x) ? 4 : /^VRS/.test(x) ? 5 : /Closed/i.test(x) ? 7 : /Open/i.test(x) ? 8 : 6; };
+    list = list.map(function (t, i) { return [t, i]; }).sort(function (a, b) { return ord(a[0]) - ord(b[0]) || String(a[0].how).localeCompare(String(b[0].how)) || a[1] - b[1]; }).map(function (x) { return x[0]; });
+    return '<div class="sec"><h3>Участники <span>' + list.length + ' ' + plural(list.length, "команда", "команды", "команд") + '</span></h3><div class="ptiles">' + list.map(function (t) {
+      var g = howRu(t.how), vrs = /^VRS/.test(g);
+      return '<button class="ptile" data-tname="' + esc(t.name) + '"><span class="pt-lg">' + (logo(t.name) || '<i>' + esc(String(t.name || "?").slice(0, 2)) + '</i>') + '</span>' +
+        '<b>' + esc(t.name) + '</b><small class="' + (vrs ? "vrs" : "") + '">' + (vrs ? '<span class="vrs-b">VRS</span>' + esc(g.replace(/^VRS\s*/, "")) : esc(g || "—")) + '</small></button>';
+    }).join("") + '</div></div>';
+  }
+
 
   // ---------- мейджор
   function getMajor() {

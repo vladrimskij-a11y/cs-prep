@@ -2285,12 +2285,30 @@ def hclean(h: str) -> str:
     return re.sub(r"\s+", " ", re.sub(r"<img[^>]*>|<svg.*?</svg>|<source[^>]*>", "", h, flags=re.S))
 
 
+_events_cache: dict = {}
+
+
 def hltv_events() -> dict:
-    """slug → путь страницы события."""
-    h = hltv_get("/events") or ""
+    """slug → путь страницы события: текущие и будущие (/events) + сыгранные в этом году (архив, раз в сутки)."""
+    if _events_cache:
+        return _events_cache
     out = {}
-    for href, slug in re.findall(r'href="(/events/\d+/([^"#?]+))"', h):
+    for href, slug in re.findall(r'href="(/events/\d+/([^"#?]+))"', hltv_get("/events") or ""):
         out.setdefault(slug, href)
+
+    def arch():
+        h = hltv_get(f"/events/archive?startDate={NOW.year}-01-01&endDate={NOW.date().isoformat()}")
+        return dict((slug, href) for href, slug in re.findall(r'href="(/events/\d+/([^"#?]+))"', h or "")) or None
+    c = hltv_cache.get("evarch")
+    if c and (parse_iso(c.get("t")) or NOW) > NOW - timedelta(hours=24):
+        a = c["data"]
+    else:
+        a = arch() or (c or {}).get("data") or {}
+        if a:
+            hltv_cache["evarch"] = {"t": iso(NOW), "data": a}
+    for slug, href in a.items():
+        out.setdefault(slug, href)
+    _events_cache.update(out)
     return out
 
 
@@ -2353,6 +2371,8 @@ def parse_hltv_event(html: str) -> dict:
 
 
 def hltv_event_for(name: str, events: dict) -> str | None:
+    """Событие HLTV по названию: все слова — точное совпадение; иначе лучшее по доле слов при совпадении года
+    (у HLTV бывает «blast-rivals-2026-season-2» вместо «BLAST Rivals Fall 2026»)."""
     toks = [t for t in re.findall(r"[a-z0-9]+", name.lower()) if t not in ("the",)]
     toks = ["iem" if t == "intel" else t for t in toks if t not in ("extreme", "masters")] if "intel" in toks else toks
     best = None
@@ -2360,7 +2380,19 @@ def hltv_event_for(name: str, events: dict) -> str | None:
         st = slug.split("-")
         if all(t in st for t in toks) and (best is None or len(slug) < len(best[0])):
             best = (slug, href)
-    return best[1] if best else None
+    if best:
+        return best[1]
+    year = next((t for t in toks if re.fullmatch(r"20\d\d", t)), None)
+    soft = [t for t in toks if t not in ("fall", "spring", "summer", "winter", "season", "finals", "final") and not re.fullmatch(r"20\d\d", t)]
+    cand = []
+    for slug, href in events.items():
+        st = slug.split("-")
+        if year and year not in st or not soft:
+            continue
+        sc = sum(1 for t in soft if t in st) / len(soft)
+        if sc >= 0.75 and not any(x in st for x in ("qualifier", "qualification", "closed", "open")):
+            cand.append((-sc, len(slug), href))
+    return min(cand)[2] if cand else None
 
 
 def hltv_cached(key: str, fn):
@@ -2378,7 +2410,10 @@ def hltv_cached(key: str, fn):
     return c["data"] if c else None
 
 
-def tournament_extras(name: str) -> dict | None:
+def tournament_extras(name: str, final: bool = False) -> dict | None:
+    c = hltv_cache.get("event3:" + name)
+    if final and c and c.get("data"):
+        return c["data"]  # у сыгранного турнира призовые и участники уже не меняются
     def fn():
         href = hltv_event_for(name, hltv_events())
         if not href:
@@ -4563,11 +4598,17 @@ def main() -> int:
             tr["bg"] = tr.get("bg") or bo3_tour_bg(tr["name"])
         except Exception as e:
             warn(f"Фон турнира {tr.get('name')}: {e!r}")
+    new_ev = 0
     for tr in tour_list:
         b = parse_iso(tr.get("begin"))
-        if (b and b - NOW > timedelta(days=21)) or tr.get("tier") != "s" or tr.get("finished"):
-            continue  # призовые и участники с HLTV — только для ближайших, чтобы лишний раз туда не ходить
-        ex = tournament_extras(tr["name"])
+        if b and b - NOW > timedelta(days=60):
+            continue  # призовые и участники с HLTV — для идущих, ближайших (2 мес.) и сыгранных
+        fin = bool(tr.get("finished"))
+        if not hltv_cache.get("event3:" + tr["name"]):
+            if new_ev >= 8:
+                continue  # новых страниц событий — не больше 8 за сбор, остальные в следующий раз
+            new_ev += 1
+        ex = tournament_extras(tr["name"], final=fin)
         if ex:
             tr["hltv"] = ex
             if ex.get("prize"):
