@@ -1998,7 +1998,7 @@ a.ni { text-decoration: none; color: inherit; }
       var z = x.score && x.score[0] === 0 && x.score[1] === 0;
       return '<div class="pp-m ' + (x.by === 0 ? "a" : x.by === 1 ? "b" : "n") + mapBg(x.map) + '"><span class="pp-n">Карта ' + (i + 1) + (who ? ' · ' + esc(who) : '') + '</span><b>' + esc(x.map) + '</b>' +
         '<span class="num pp-s"><span class="a">' + esc(x.score ? x.score[0] : "–") + '</span>:<span class="b">' + esc(x.score ? x.score[1] : "–") + '</span></span>' +
-        (z ? '<small>скорее всего не понадобится</small>' : '<small class="num">' + esc(abbr(A)) + ' ' + esc(x.p) + '%</small>') + '</div>';
+        (z ? '<small>скорее всего не понадобится</small>' : '<small class="num">' + esc(abbr(A)) + ' ' + esc(x.p) + '% · ' + esc(abbr(B)) + ' ' + (x.p != null && x.p !== "" ? (100 - x.p) : "–") + '%</small>') + '</div>';  // шанс обеих команд на карте
     }).join("") + '</div></div></div>';
     return html;
   }
