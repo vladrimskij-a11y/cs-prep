@@ -1,0 +1,31 @@
+name: probe lp
+on: workflow_dispatch
+jobs:
+  p:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - name: probe
+        run: |
+          cd collector && python - <<'PY'
+          import re, collect as c
+          # составы: замена и неактивные
+          for team in ("Legacy", "Nemiga"):
+              t = c.lp_pages([team]).get(team) or ""
+              i = t.find("{{Squad"); print("=== TEAM", team); print(t[i:i+3500])
+          # страница арендованного игрока: инфобокс и история
+          for pl in ("Krimbo", "SYPH0"):
+              t = c.lp_pages([pl]).get(pl) or ""
+              print("=== PLAYER", pl); print(c.infobox(t)[:2500])
+          # правила вето на страницах турниров
+          for nm in ("IEM Beijing 2026", "PGL Masters Bucharest 2026", "BLAST Premier Fall Final 2026", "ESL Pro League Season 24"):
+              pg = c.lp_search(nm); print("=== TOUR", nm, "->", pg)
+              if not pg: continue
+              t = c.lp_pages([pg]).get(pg) or ""
+              for m in re.finditer(r"(?i)(veto|seed|higher|pick|ban)", t):
+                  pass
+              i = t.lower().find("format"); print(t[max(0,i-200):i+3000] if i >= 0 else t[:2000])
+          PY
