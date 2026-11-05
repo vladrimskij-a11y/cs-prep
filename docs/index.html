@@ -176,10 +176,6 @@ a { color: inherit; }
 .pbad.awp { color: #c98a00; border-color: rgba(201,138,0,.45); }
 .psrc { font-size: 11px; color: var(--muted); text-align: center; margin: 4px 0 16px; line-height: 1.5; }
 .psrc a { color: var(--muted); text-decoration: underline; }
-.vtag { display: block; font-size: 10.5px; font-weight: 700; margin-top: 2px; color: var(--muted); }
-.vtag.pick, .vtag.decider { color: #2fae5f; }
-.vtag.ban { color: #e5484d; }
-tr.vban td { opacity: .55; }
 .mapsel { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }
 .recent { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .recent .col { display: flex; flex-direction: column; gap: 0; min-width: 0; }
@@ -1800,16 +1796,10 @@ a.ni { text-decoration: none; color: inherit; }
   function mapsTable(m) {
     var M = m.maps, A = m.teams[0], B = m.teams[1];
     if (!M || !M.available || !M.table.length) return '<div class="sec"><h3>Карты</h3><div class="box note">Нет данных по картам за последние 4 месяца.</div></div>';
-    var V = vetoNow(m), rows = M.table.slice();
-    if (V) {  // вето уже провели: сначала карты в порядке игры, потом остальные; забаненные — с пометкой
-      V.order.forEach(function (k) { if (!rows.some(function (r) { return mkey(r.map) === k; })) rows.push({ map: V.info[k].map, teams: [{ played: 0 }, { played: 0 }] }); });
-      rows.sort(function (a, b) { var ia = V.order.indexOf(mkey(a.map)), ib = V.order.indexOf(mkey(b.map)); return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib); });
-    }
-    var html = '<div class="sec"><h3>Карты <span>' + (V ? 'в порядке игры · ' : '') + 'за ' + Math.round(M.window_days / 30) + ' мес.</span></h3><div class="box" style="overflow-x:auto"><table class="mtab"><thead><tr><th>Карта</th><th>' + esc(abbr(A)) + '</th><th>' + esc(abbr(B)) + '</th></tr></thead><tbody>';
-    rows.forEach(function (r) {
-      var ta = r.teams[0], tb = r.teams[1], vi = V && V.info[mkey(r.map)], tag = "";
-      if (vi) tag = '<span class="vtag ' + vi.act + '">' + (vi.act === "ban" ? "бан " + esc(vi.who) : (vi.no ? "Карта " + vi.no + " · " : "") + (vi.act === "decider" ? "десайдер" : "пик " + esc(vi.who))) + '</span>';
-      html += '<tr' + (vi && vi.act === "ban" ? ' class="vban"' : '') + '><td class="mn">' + esc(r.map) + tag + '</td><td class="a">' + cell(ta, pct(ta.won, ta.played)) + '</td><td class="b">' + cell(tb, pct(tb.won, tb.played)) + '</td></tr>';
+    var html = '<div class="sec"><h3>Карты <span>за ' + Math.round(M.window_days / 30) + ' мес.</span></h3><div class="box" style="overflow-x:auto"><table class="mtab"><thead><tr><th>Карта</th><th>' + esc(abbr(A)) + '</th><th>' + esc(abbr(B)) + '</th></tr></thead><tbody>';
+    M.table.forEach(function (r) {
+      var ta = r.teams[0], tb = r.teams[1];
+      html += '<tr><td class="mn">' + esc(r.map) + '</td><td class="a">' + cell(ta, pct(ta.won, ta.played)) + '</td><td class="b">' + cell(tb, pct(tb.won, tb.played)) + '</td></tr>';
     });
     return html + '</tbody></table></div></div>';
     function cell(t, p) {
