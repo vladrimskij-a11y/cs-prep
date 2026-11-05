@@ -4462,6 +4462,15 @@ def build_detail(m: dict, prev: dict | None) -> dict:
         detail["tbd_side"] = 0 if re.match(r"(?i)^tbd\s+vs\b", nm) else 1
         if prev and prev.get("opp"):
             detail["opp"] = prev["opp"]
+        if teams and bids[0]:  # карты и стороны известной команды — на её месте в паре, половина соперника пустая
+            pb, ph = [None, None], [[], []]
+            k = 1 - detail["tbd_side"]
+            pb[k], ph[k] = bids[0], hists[0]
+            try:
+                detail["maps"] = build_maps(pb, ph)
+                detail["sides"] = build_sides(pb, ph)
+            except Exception as e:
+                warn(f"Карты одной команды: {e!r}")
     if len(bids) == 2 and all(bids):
         detail["h2h"] = build_h2h(bids[0], bids[1], hists[0])
     else:

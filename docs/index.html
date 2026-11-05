@@ -1814,6 +1814,7 @@ a.ni { text-decoration: none; color: inherit; }
   function h2hBlock(m) {
     var h = m.h2h || [];
     var YR = new Date().getFullYear();
+    if (m.tbd) return '<div class="sec"><h3>Личные встречи</h3><div class="box note">Ждём соперника.</div></div>';
     if (!h.length) return '<div class="sec"><h3>Личные встречи</h3><div class="box note">В ' + YR + ' году команды не встречались.</div></div>';
     var wa = h.filter(function (x) { return x.winner === 0; }).length, wb = h.filter(function (x) { return x.winner === 1; }).length;
     var mapsA = 0, mapsB = 0;
@@ -1864,7 +1865,7 @@ a.ni { text-decoration: none; color: inherit; }
     var html = '<div class="sec"><h3>Карты <span>за ' + Math.round(M.window_days / 30) + ' мес.</span></h3><div class="box" style="overflow-x:auto"><table class="mtab"><thead><tr><th>Карта</th><th>' + esc(abbr(A)) + '</th><th>' + esc(abbr(B)) + '</th></tr></thead><tbody>';
     M.table.forEach(function (r) {
       var ta = r.teams[0], tb = r.teams[1];
-      html += '<tr><td class="mn">' + esc(r.map) + '</td><td class="a">' + cell(ta, pct(ta.won, ta.played)) + '</td><td class="b">' + cell(tb, pct(tb.won, tb.played)) + '</td></tr>';
+      html += '<tr><td class="mn">' + esc(r.map) + '</td><td class="a">' + (A && A.tbd ? '' : cell(ta, pct(ta.won, ta.played))) + '</td><td class="b">' + (B && B.tbd ? '' : cell(tb, pct(tb.won, tb.played))) + '</td></tr>';
     });
     return html + '</tbody></table></div></div>';
     function cell(t, p) {
@@ -1901,6 +1902,7 @@ a.ni { text-decoration: none; color: inherit; }
     var html = '<div class="mzsec"><h3 class="mzh">Последние игры на карте</h3><div class="recent2">';
     [0, 1].forEach(function (i) {
       var t = m.teams[i];
+      if (t.tbd) { html += '<div class="box ' + (i ? "b" : "a") + '"><div class="hd">' + esc(t.name) + '</div></div>'; return; }
       var list = rec.filter(function (g) { return g.team === i; }).slice(0, 8);
       var w = list.filter(function (g) { return g.won; }).length;
       html += '<div class="box ' + (i ? "b" : "a") + '"><div class="hd">' + esc(t.name) + (list.length ? '<span>' + w + '–' + (list.length - w) + '</span>' : '') + '</div>';
@@ -1924,6 +1926,7 @@ a.ni { text-decoration: none; color: inherit; }
       '<div class="sd-head"><span></span><span>CT</span><span>T</span><span>Пистолетки</span></div>';
     [0, 1].forEach(function (i) {
       var r = rows[i], tot = (S.total || [])[i];
+      if ((m.teams[i] || {}).tbd) { html += '<div class="sd-row ' + (i ? "b" : "a") + '"><span class="sd-t">' + esc(abbr(m.teams[i])) + '</span><span></span><span></span><span></span></div>'; return; }
       html += '<div class="sd-row ' + (i ? "b" : "a") + '"><span class="sd-t">' + esc(abbr(m.teams[i])) + '<small>' + (r ? r.maps + ' карт' : 'не играли') + '</small></span>' +
         cell(r && r.ct) + cell(r && r.t) + '<span class="num">' + (r && r.pistol != null ? r.pistol + '%<small>' + r.pistol_n[0] + '/' + r.pistol_n[1] + '</small>' : '—') + '</span></div>';
       if (tot) html += '<div class="sd-all"><span>все карты:</span> CT ' + (tot.ct != null ? tot.ct + '%' : '—') + ' · T ' + (tot.t != null ? tot.t + '%' : '—') + ' · пистолетки ' + (tot.pistol != null ? tot.pistol + '%' : '—') + '</div>';
@@ -1958,6 +1961,7 @@ a.ni { text-decoration: none; color: inherit; }
     var S = m.series || {};
     var html = '<div class="sec"><h3>Форма <span>последние 10 серий · нажми на матч</span></h3>';
     m.teams.forEach(function (t, i) {
+      if (t.tbd) { html += '<div class="box form"><div class="tmh ' + (i ? "b" : "a") + '">' + esc(t.name) + '</div></div>'; return; }
       var f = t.form || [];
       var w = f.filter(function (x) { return x.won; }).length;
       html += '<div class="box form"><div class="tmh ' + (i ? "b" : "a") + '">' + esc(t.name) + '<span>' + w + '–' + (f.length - w) + '</span></div>';
@@ -1997,19 +2001,29 @@ a.ni { text-decoration: none; color: inherit; }
   }
   // вероятный пик: вето по привычкам команд за 3 месяца, счёт — по винрейту карт
   function pickBlock(m) {
-    var P = m.prediction, A = m.teams[0] || {}, B = m.teams[1] || {};
+    var P = m.prediction;
+    if (m.tbd) return '<div class="sec"><h3>Вероятный пик</h3><div class="box note">Ждём соперника.</div></div>';
     if (!P || !(P.maps || []).length) return "";
     var html = '<div class="sec" data-nav><h3>Вероятный пик <span>по вето за 3 мес.</span></h3><div class="box ppick"><div class="pp-maps">' + P.maps.map(function (x, i) {
-      var who = x.by === 0 ? abbr(A) : x.by === 1 ? abbr(B) : "";
-      var z = x.score && x.score[0] === 0 && x.score[1] === 0;
-      return '<div class="pp-m ' + (x.by === 0 ? "a" : x.by === 1 ? "b" : "n") + mapBg(x.map) + '"><span class="pp-n">Карта ' + (i + 1) + (who ? ' · ' + esc(who) : '') + '</span><b>' + esc(x.map) + '</b>' +
-        '<span class="num pp-s"><span class="a">' + esc(x.score ? x.score[0] : "–") + '</span>:<span class="b">' + esc(x.score ? x.score[1] : "–") + '</span></span>' +
-        (z ? '<small>скорее всего не понадобится</small>' : '<small class="num">' + esc(abbr(A)) + ' ' + esc(x.p) + '% · ' + esc(abbr(B)) + ' ' + (x.p != null && x.p !== "" ? (100 - x.p) : "–") + '%</small>') + '</div>';  // шанс обеих команд на карте
+      var z = x.score && x.score[0] === 0 && x.score[1] === 0;  // по прогнозу серия кончится раньше
+      return '<div class="pp-m n' + mapBg(x.map) + '"><span class="pp-n">Карта ' + (i + 1) + '</span><b>' + esc(x.map) + '</b>' +
+        (z ? '<small>скорее всего не понадобится</small>' : '') + '</div>';  // без команд и процентов — по просьбе владельца
     }).join("") + '</div></div></div>';
     return html;
   }
   function vrsBlock(m) {
     var O = m.vrs_outcomes, A = m.teams[0] || {}, B = m.teams[1] || {};
+    if (m.tbd) {  // соперник не определён: текущее место известной команды, прогноз после матча — пусто
+      var K = A.tbd ? B : A;
+      if (!K.vrs) return "";
+      var h0 = '<div class="sec"><h3>Рейтинг VRS <span>что будет после матча</span></h3><div class="box vrs">' +
+        '<div class="vr-r vr-h"><span></span><span>Сейчас</span><span>Победа ' + esc(abbr(A)) + '</span><span>Победа ' + esc(abbr(B)) + '</span></div>';
+      [A, B].forEach(function (t, i) {
+        h0 += '<div class="vr-r ' + (i ? "b" : "a") + '"><span class="vr-t">' + esc(abbr(t)) + '</span>' +
+          (t.tbd || !t.vrs ? '<span class="vr-c"></span>' : '<span class="vr-c"><b class="num">#' + t.vrs.rank + '</b><small class="num">' + t.vrs.points + '</small></span>') + '<span class="vr-c"></span><span class="vr-c"></span></div>';
+      });
+      return h0 + '</div></div>';
+    }
     if (!O || !A.vrs || !B.vrs) return "";
     function cell(x, cur) {  // место после матча: стрелка вверх зелёная, вниз красная
       var mv = cur && x.rank !== cur ? (x.rank < cur ? '<i class="vr-ar up" aria-label="поднимется">▲</i>' : '<i class="vr-ar dn" aria-label="опустится">▼</i>') : '';
@@ -2447,7 +2461,6 @@ a.ni { text-decoration: none; color: inherit; }
   function tabBodyHtml(m, key) {
     if (key === "team:players") return playersTab(m);
     if (key === "team:pos") return posBlock(m);
-    if (key === "stats" && m.tbd) return '<div class="sec"><div class="box note">Соперник ещё не определён — статистика пары появится, когда станет известна вторая команда.</div></div>';
     if (key === "stats") return stakeBlock(m) + vrsBlock(m) + pickBlock(m) + mapsTable(m) + mapZone(m) + h2hBlock(m) + formBlock(m);  // форма — после карт (по просьбе владельца)
     return (key === "news:all" ? factsBlock(m) : "") + newsList(m, key.slice(5));
   }
@@ -2576,13 +2589,14 @@ a.ni { text-decoration: none; color: inherit; }
     }).catch(drop);
   }
   function stakeRows(m, R0) {
-    var A = m.teams[0] || {}, B = m.teams[1] || {}, an = String(A.name || "").toLowerCase(), bn = String(B.name || "").toLowerCase();
+    var A = m.teams[0] || {}, B = m.teams[1] || {}, an = A.tbd ? "" : String(A.name || "").toLowerCase(), bn = B.tbd ? "" : String(B.name || "").toLowerCase();
     function is(x, n) { x = String(x || "").toLowerCase(); return x && n && (x === n || x.indexOf(n) >= 0 || n.indexOf(x) >= 0); }
+    function sd(x, n) { return n ? is(x, n) : (!x || /^tbd$/i.test(String(x).trim())); }  // соперник не определён — в сетке пусто или TBD
     var stages = (R0 && R0.stages) || [], hit = null;
     stages.forEach(function (st, si) {
       (st.rounds || []).forEach(function (rd, ri) {
         (rd.matches || []).forEach(function (x, mi) {
-          if (x.st !== "finished" && ((is(x.a, an) && is(x.b, bn)) || (is(x.a, bn) && is(x.b, an)))) hit = { st: st, si: si, rd: rd, ri: ri, mi: mi };
+          if (x.st !== "finished" && ((sd(x.a, an) && sd(x.b, bn)) || (sd(x.a, bn) && sd(x.b, an)))) hit = { st: st, si: si, rd: rd, ri: ri, mi: mi };
         });
       });
     });
