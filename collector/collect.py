@@ -67,6 +67,29 @@ RSS_FEEDS = [
 UA = "Mozilla/5.0 (compatible; cs-prep-bot/1.0; +https://github.com)"
 NOW = datetime.now(timezone.utc)
 
+try:
+    sys.stdout.reconfigure(line_buffering=True)  # строки в логе — сразу, с отметкой времени GitHub: видно, на что уходит время
+except Exception:
+    pass
+_t0 = time.time()
+_tsrc: dict = {}   # хост → секунды ожидания ответа (сводка «Время» в конце сбора)
+
+
+def _urlopen(req, timeout=30, **kw):
+    host = urllib.parse.urlsplit(req.full_url if hasattr(req, "full_url") else str(req)).hostname or "?"
+    host = re.sub(r"^(www|api)\.", "", host)
+    t = time.time()
+    try:
+        return urllib.request.urlopen(req, timeout=timeout, **kw)
+    finally:
+        _tsrc[host] = _tsrc.get(host, 0.0) + time.time() - t
+
+
+def time_report() -> str:
+    top = sorted(_tsrc.items(), key=lambda x: -x[1])[:8]
+    return f"Время: всего {(time.time() - _t0) / 60:.1f} мин; ожидание ответов — " + ", ".join(f"{h} {v / 60:.1f} мин" for h, v in top)
+
+
 stats = {"panda_requests": 0, "bo3_requests": 0, "liquipedia_requests": 0, "translations": 0, "warnings": []}
 
 
@@ -85,7 +108,7 @@ def http_get(url: str, headers: dict | None = None, timeout: int = 30, retry429:
     last: Exception | None = None
     for attempt in range(3):
         try:
-            with urllib.request.urlopen(req, timeout=timeout) as r:
+            with _urlopen(req, timeout=timeout) as r:
                 body = r.read()
                 if r.headers.get("Content-Encoding") == "gzip":
                     body = gzip.decompress(body)
@@ -2074,7 +2097,7 @@ def giga_upload(data: bytes, name: str = "image.jpg") -> str | None:
         req = urllib.request.Request("https://gigachat.devices.sberbank.ru/api/v1/files", data=body, method="POST",
                                      headers={"Authorization": f"Bearer {giga_token()}",
                                               "Content-Type": f"multipart/form-data; boundary={boundary}"})
-        with urllib.request.urlopen(req, timeout=60, context=giga_ctx()) as r:
+        with _urlopen(req, timeout=60, context=giga_ctx()) as r:
             return json.loads(r.read()).get("id")
     except Exception as e:
         warn(f"GigaChat загрузка картинки: {e!r}")
@@ -2111,7 +2134,7 @@ def giga_read_image(url: str) -> str | None:
     try:
         req = urllib.request.Request("https://gigachat.devices.sberbank.ru/api/v1/chat/completions", data=body, method="POST",
                                      headers={"Authorization": f"Bearer {giga_token()}", "Content-Type": "application/json"})
-        with urllib.request.urlopen(req, timeout=90, context=giga_ctx()) as r:
+        with _urlopen(req, timeout=90, context=giga_ctx()) as r:
             j = json.loads(r.read())
         stats["giga_vision"] = stats.get("giga_vision", 0) + 1
         giga_spend("max", (j.get("usage") or {}).get("total_tokens", 0))
@@ -3384,7 +3407,7 @@ def gnews_decode(url: str) -> str | None:
         req = urllib.request.Request("https://news.google.com/_/DotsSplashUi/data/batchexecute", data=body.encode(),
                                      method="POST", headers={"User-Agent": UA,
                                                              "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8"})
-        with urllib.request.urlopen(req, timeout=20) as r:
+        with _urlopen(req, timeout=20) as r:
             txt = r.read().decode("utf-8", "replace")
         for chunk in txt.split("\n"):
             chunk = chunk.strip()
@@ -3470,7 +3493,7 @@ def giga_token() -> str | None:
                                  method="POST", headers={"Authorization": f"Basic {GIGA_KEY}", "RqUID": str(uuid.uuid4()),
                                                          "Content-Type": "application/x-www-form-urlencoded",
                                                          "Accept": "application/json"})
-    with urllib.request.urlopen(req, timeout=30, context=giga_ctx()) as r:
+    with _urlopen(req, timeout=30, context=giga_ctx()) as r:
         j = json.loads(r.read())
     _giga["token"] = j["access_token"]
     _giga["exp"] = (j.get("expires_at") or 0) / 1000 or time.time() + 1500
@@ -3524,7 +3547,7 @@ def gemini_call(system: str | None, parts: list, max_tokens: int = 900, json_mod
         try:
             req = urllib.request.Request(url, data=json.dumps(body).encode(), method="POST",
                                          headers={"Content-Type": "application/json", "x-goog-api-key": GEMINI_KEY})
-            with urllib.request.urlopen(req, timeout=120) as r:
+            with _urlopen(req, timeout=120) as r:
                 j = json.loads(r.read())
             day = NOW.strftime("%Y-%m-%d")
             giga_usage.setdefault(day, {})["gemini"] = (giga_usage.get(day) or {}).get("gemini", 0) + 1
@@ -3601,7 +3624,7 @@ def gigachat_call(system: str, user: str, max_tokens: int = 900, model: str | No
             req = urllib.request.Request("https://gigachat.devices.sberbank.ru/api/v1/chat/completions", data=body,
                                          method="POST", headers={"Authorization": f"Bearer {giga_token()}",
                                                                  "Content-Type": "application/json", "Accept": "application/json"})
-            with urllib.request.urlopen(req, timeout=90, context=giga_ctx()) as r:
+            with _urlopen(req, timeout=90, context=giga_ctx()) as r:
                 j = json.loads(r.read())
             stats["giga_calls"] = stats.get("giga_calls", 0) + 1
             stats["giga_tokens"] = stats.get("giga_tokens", 0) + (j.get("usage") or {}).get("total_tokens", 0)
@@ -5507,6 +5530,7 @@ def main() -> int:
             apply_name_ru(d)
             if json.dumps(d, ensure_ascii=False) != before:
                 save_json(f, d)
+    print(time_report())
     print(f"Готово: {len(listing)} матчей, PandaScore: {stats['panda_requests']}, bo3: {stats['bo3_requests']}, "
           f"переводов: {stats['translations']}, предупреждений: {len(stats['warnings'])}")
     return 0
