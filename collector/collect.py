@@ -2076,7 +2076,8 @@ def tg_fetch_channel(ch: str) -> tuple[str, list[dict]]:
 
 def tg_text_html(b: str) -> str | None:
     """Весь текст поста: внутри бывают вложенные блоки (цитаты, эмодзи), поэтому ищем парный закрывающий тег."""
-    m = re.search(r'<div class="tgme_widget_message_text[^"]*"[^>]*>', b)
+    # у поста-ответа сначала идёт цитата того, на что он отвечает (js-message_reply_text, короткая, с «…») — её пропускаем
+    m = re.search(r'<div class="tgme_widget_message_text(?![^"]*reply)[^"]*"[^>]*>', b)
     if not m:
         return None
     depth, i = 1, m.end()
@@ -2317,8 +2318,51 @@ def tg_posts() -> list[dict]:
             "photos": p.get("photos") or [], "video": p.get("video"), "tg": True, "cat": info.get("cat"), "tour": info.get("tour"),
         })
     res.sort(key=lambda x: x["date"], reverse=True)
+    tg_photo_hashes(res)
     _tg_all = res
     return res
+
+
+def _dhash(data: bytes) -> str | None:
+    """Отпечаток картинки 64 бита: одна и та же картинка в разных каналах (пережатая, другого размера) даёт почти тот же."""
+    try:
+        from PIL import Image
+        import io
+        im = Image.open(io.BytesIO(data)).convert("L").resize((9, 8))
+        px = list(im.getdata())
+        bits = 0
+        for y in range(8):
+            for x in range(8):
+                bits = (bits << 1) | (px[y * 9 + x] > px[y * 9 + x + 1])
+        return f"{bits:016x}"
+    except Exception:
+        return None
+
+
+def tg_photo_hashes(posts: list[dict]) -> None:
+    """Отпечатки фото постов за 2 суток (для склейки одной новости из разных каналов). Считаются один раз на пост."""
+    try:
+        import PIL  # noqa: F401
+    except Exception:
+        return
+    n = 0
+    for p in posts:
+        if not p.get("photo") or p.get("video") or (NOW - p["date"]) > timedelta(hours=48):
+            continue
+        key = "/".join(p["url"].split("t.me/")[1].split("/")[:2])
+        info = tg_cache.setdefault(key, {"t": iso(NOW)})
+        if "ph" not in info and n < 400:
+            n += 1
+            try:
+                info["ph"] = _dhash(http_get(p["photo"], {"Accept": "image/*"}, timeout=20))
+            except Exception:
+                info["ph"] = None
+        if info.get("ph"):
+            p["ph"] = info["ph"]
+
+
+def _ph_close(a: str | None, b: str | None) -> bool:
+    return bool(a and b) and bin(int(a, 16) ^ int(b, 16)).count("1") <= 6
 
 
 def tg_text_preview(text: str, limit: int = 420) -> str:
@@ -2406,6 +2450,11 @@ def dedupe_strict(items: list[dict]) -> list[list[dict]]:
             rk = _toks((r.get("text") or "") + " " + (r.get("title") or ""))
             small = min(len(tk), len(rk)) or 1
             if len(tk & rk) / small >= 0.75 and len(tk & rk) >= 6:  # одна новость, перепечатанная или чуть сокращённая
+                hit = cl
+                break
+            # одна новость своими словами в разных каналах: та же картинка, в пределах 12 ч и общие слова
+            if it.get("ph") and any(_ph_close(it["ph"], x.get("ph")) and abs((x["date"] - it["date"]).total_seconds()) <= 12 * 3600
+                                    and len(tk & _toks((x.get("text") or "") + " " + (x.get("title") or ""))) >= 3 for x in cl):
                 hit = cl
                 break
         if hit is None:
