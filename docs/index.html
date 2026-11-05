@@ -525,6 +525,11 @@ html { overflow-anchor: none; }
 .medal.mvp { background: var(--t-soft); color: var(--t); }
 .roster .hd .medals { justify-self: end; }
 .medal { cursor: pointer; }
+/* зона нажатия на награды больше самой плашки: палец попадает с первого раза */
+[data-pop] { position: relative; }
+.medal[data-pop]::after, .pmaj[data-pop]::after { content: ""; position: absolute; inset: -10px -8px; }
+.pmaj.tap { display: inline-block; padding: 4px 0; }
+
 .pop .pop-in.wide { box-sizing: border-box; width: min(calc(100vw - 24px), 440px); max-width: none; max-height: 70vh; }
 .pcols { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 8px; }
 .pcol { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
@@ -2705,7 +2710,7 @@ a.ni { text-decoration: none; color: inherit; }
       html += '<div class="pane' + (hasSub(k) ? ' np' : '') + '" data-key="' + esc(k) + '"><div class="pin"><div class="tabbody">' + tabBodyHtml(m, k) + '</div></div></div>';
     });
     $app.innerHTML = html + '</div></div><div class="mhead"><div class="pin">' + headHtml(m) + '</div></div>' +
-      '<div class="snav"><button data-snav="-1" aria-label="Предыдущий раздел">↑</button><button data-snav="1" aria-label="Следующий раздел">↓</button></div></div>';
+      '</div>';  // стрелки разделов в «Статистике» убраны по просьбе владельца
     q(".mshell").classList.toggle("on-stats", curKey() === "stats");
     measureHead();
     trackTo(Math.max(0, keys.indexOf(curKey())), false);
