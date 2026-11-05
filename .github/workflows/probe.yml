@@ -15,7 +15,17 @@ jobs:
           j = get(f"{B}/games?filter[games.match_id][eq]=132254")
           g = sorted(j["results"], key=lambda x: x.get("number") or 0)[0]
           print("POS| game", g["id"], g.get("map_name"), "demo_url:", g.get("demo_url"))
-          url = g.get("demo_url")
+          rel = g.get("demo_url")
+          if not rel:
+              raise SystemExit
+          url = None
+          for base in ("https://files.bo3.gg/", "https://demos.bo3.gg/", "https://bo3.gg/", "https://storage.bo3.gg/", "https://cdn.bo3.gg/", "https://files.bo3.gg/uploads/"):
+              try:
+                  r = urllib.request.urlopen(urllib.request.Request(base + rel, method="HEAD", headers={"User-Agent": "Mozilla/5.0"}), timeout=20)
+                  print("POS| OK", base, r.status, r.headers.get("Content-Length"), r.headers.get("Content-Type"))
+                  url = url or base + rel
+              except Exception as e:
+                  print("POS| нет", base, e)
           if not url:
               raise SystemExit
           t = time.time()
