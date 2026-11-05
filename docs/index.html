@@ -518,18 +518,18 @@ html { overflow-anchor: none; }
 .swr:nth-child(-n+2) { border-top: 0; }
 .swn { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .swr.q b { color: var(--win); } .swr.out { opacity: .55; } .swr.out b { color: var(--loss); }
-/* швейцарка «по счёту»: столбцы раундов, в них группы по счёту побед-поражений; сверху — кто прошёл, снизу — кто вылетел */
-.swg { display: flex; gap: 10px; overflow-x: auto; scrollbar-width: none; padding: 12px; align-items: stretch; }
-.swc { flex: none; min-width: 116px; display: flex; flex-direction: column; gap: 6px; }
-.swc .sp { flex: 1; min-height: 6px; }
-.swh { font-family: var(--mono); font-weight: 700; font-size: 15px; color: var(--muted); margin-top: 4px; }
-.sw-m { display: flex; justify-content: space-between; align-items: center; gap: 6px; padding: 7px 9px; border-radius: 10px; background: var(--sunk); width: 116px; box-sizing: border-box; }
-.sw-l { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; background: var(--surface); flex: none; overflow: hidden; font-size: 10px; font-weight: 700; color: var(--muted); }
-.sw-l { position: relative; }
-.sw-l .lg { position: absolute; left: 6px; top: 6px; width: 28px; height: 28px; object-fit: contain; margin: 0; background: var(--surface); }  /* нет логотипа — видны буквы под ним */
+/* швейцарка «по счёту»: столбцы раундов, в них группы по счёту побед-поражений; сверху — кто прошёл, снизу — кто вылетел.
+   Компактно, чтобы вся таблица от верхней плашки до нижней помещалась в один экран телефона */
+.swg { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; padding: 10px; align-items: stretch; overscroll-behavior-x: contain; }
+.swc { flex: none; min-width: 78px; display: flex; flex-direction: column; gap: 4px; }
+.swc .sp { flex: 1; min-height: 4px; }
+.swh { font-family: var(--mono); font-weight: 700; font-size: 12px; color: var(--muted); margin-top: 2px; line-height: 1.2; }
+.sw-m { display: flex; justify-content: space-between; align-items: center; gap: 4px; padding: 4px 6px; border-radius: 8px; background: var(--sunk); width: 78px; box-sizing: border-box; }
+.sw-l { position: relative; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: var(--surface); flex: none; overflow: hidden; font-size: 8px; font-weight: 700; color: var(--muted); }
+.sw-l .lg { position: absolute; left: 4px; top: 4px; width: 20px; height: 20px; object-fit: contain; margin: 0; background: var(--surface); }  /* нет логотипа — видны буквы под ним */
 .sw-l.w { box-shadow: 0 0 0 2px var(--win); }
 .sw-l.l { opacity: .35; filter: grayscale(1); }
-.sw-box { border-radius: 10px; padding: 8px; display: grid; gap: 6px 4px; justify-items: center; }
+.sw-box { border-radius: 8px; padding: 6px; display: grid; gap: 4px; justify-items: center; }
 .sw-box.q { background: color-mix(in srgb, var(--win) 22%, var(--surface)); }
 .sw-box.out { background: color-mix(in srgb, var(--loss) 22%, var(--surface)); }
 .sw-box .swh { color: var(--fg); margin: 0; }
@@ -1232,9 +1232,9 @@ a.ni { text-decoration: none; color: inherit; }
     if (!SH || !q(".sshell") || state.ovl || e.touches.length !== 1) return;
     var x = e.touches[0].clientX;
     if (x < 20 || x > window.innerWidth - 20 || e.target.closest("video, input")) return;
-    var sc = e.target.closest(".filt, .bracket"), edge = null;
+    var sc = e.target.closest(".filt, .bracket, .swg"), edge = null;
     if (sc && sc.scrollWidth > sc.clientWidth + 2) {
-      if (!sc.classList.contains("bracket")) return;
+      if (!sc.classList.contains("bracket") && !sc.classList.contains("swg")) return;  // сетка и швейцарка листаются сами
       edge = sc;  // сетка: свайп за её край переключает вкладку
     }
     ss = { edge: edge, x: x, y: e.touches[0].clientY, t: Date.now(), dx: 0, lock: null, i: SH.keys.indexOf(SH.key) };
@@ -1610,6 +1610,11 @@ a.ni { text-decoration: none; color: inherit; }
       var by = {}, ks = [];
       list.forEach(function (t) { if (!by[t.r]) { by[t.r] = []; ks.push(t.r); } by[t.r].push(t.n); });
       ks.sort(function (a, b) { var x = a.split(":"), y = b.split(":"); return cls === "q" ? (x[1] - y[1]) : (y[0] - x[0]) * -1; });
+      if (ks.length === 1) {  // один счёт (3:0, 0:3) — команды по две в ряд, так ниже по высоте
+        var k1 = ks[0];
+        return '<div class="sw-box ' + cls + '" style="grid-template-columns:repeat(2,1fr)"><div class="swh num" style="grid-column:1/-1">' + k1 + '</div>' +
+          by[k1].map(function (n) { return circ(n, cls === "q" ? "w" : ""); }).join("") + '</div>';
+      }
       var h = '<div class="sw-box ' + cls + '" style="grid-template-columns:repeat(' + ks.length + ',1fr)">';
       ks.forEach(function (k) { h += '<div class="swh num">' + k + '</div>'; });
       var mx = Math.max.apply(null, ks.map(function (k) { return by[k].length; }));
