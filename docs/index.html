@@ -2021,7 +2021,7 @@ a.ni { text-decoration: none; color: inherit; }
       var K = A.tbd ? B : A;
       if (!K.vrs) return "";
       var h0 = '<div class="sec"><h3>Рейтинг VRS <span>что будет после матча</span></h3><div class="box vrs">' +
-        '<div class="vr-r vr-h"><span></span><span>Сейчас</span><span>Победа ' + esc(abbr(A)) + '</span><span>Победа ' + esc(abbr(B)) + '</span></div>';
+        '<div class="vr-r vr-h"><span></span><span>Сейчас</span><span>Победа</span><span>Поражение</span></div>';
       [A, B].forEach(function (t, i) {
         h0 += '<div class="vr-r ' + (i ? "b" : "a") + '"><span class="vr-t">' + esc(abbr(t)) + '</span>' +
           (t.tbd ? '<span class="vr-c"><b class="num">0</b><small class="num">0</small></span><span class="vr-c"><b class="num">0</b></span><span class="vr-c"><b class="num">0</b></span>' :
@@ -2035,11 +2035,11 @@ a.ni { text-decoration: none; color: inherit; }
       return '<span class="vr-c"><b class="num">' + mv + '#' + x.rank + '</b><small class="num ' + (x.delta > 0 ? "up" : x.delta < 0 ? "dn" : "") + '">' + (x.delta > 0 ? "+" : x.delta < 0 ? "−" : "±") + Math.abs(x.delta) + '</small></span>';
     }
     var html = '<div class="sec"><h3>Рейтинг VRS <span>что будет после матча</span></h3><div class="box vrs">' +
-      '<div class="vr-r vr-h"><span></span><span>Сейчас</span><span>Победа ' + esc(abbr(A)) + '</span><span>Победа ' + esc(abbr(B)) + '</span></div>';
+      '<div class="vr-r vr-h"><span></span><span>Сейчас</span><span>Победа</span><span>Поражение</span></div>';
     [A, B].forEach(function (t, i) {
       html += '<div class="vr-r ' + (i ? "b" : "a") + '"><span class="vr-t">' + esc(abbr(t)) + '</span>' +
         '<span class="vr-c"><b class="num">#' + t.vrs.rank + '</b><small class="num">' + t.vrs.points + '</small></span>' +
-        cell(O.win0[i], t.vrs.rank) + cell(O.win1[i], t.vrs.rank) + '</div>';
+        cell((i ? O.win1 : O.win0)[i], t.vrs.rank) + cell((i ? O.win0 : O.win1)[i], t.vrs.rank) + '</div>';  // у каждой команды: если выиграет / если проиграет
     });
     return html + '</div></div>';  // пояснение к расчёту убрано по просьбе владельца
   }
