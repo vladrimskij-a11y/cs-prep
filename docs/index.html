@@ -2003,13 +2003,15 @@ a.ni { text-decoration: none; color: inherit; }
   }
   // вероятный пик: вето по привычкам команд за 3 месяца, счёт — по винрейту карт
   function pickBlock(m) {
-    var P = m.prediction;
+    var P = m.prediction, A = m.teams[0] || {}, B = m.teams[1] || {};
     if (m.tbd) return '<div class="sec"><h3>Вероятный пик</h3><div class="box note">Ждём соперника.</div></div>';
     if (!P || !(P.maps || []).length) return "";
     var html = '<div class="sec" data-nav><h3>Вероятный пик <span>по вето за 3 мес.</span></h3><div class="box ppick"><div class="pp-maps">' + P.maps.map(function (x, i) {
-      var z = x.score && x.score[0] === 0 && x.score[1] === 0;  // по прогнозу серия кончится раньше
-      return '<div class="pp-m n' + mapBg(x.map) + '"><span class="pp-n">Карта ' + (i + 1) + '</span><b>' + esc(x.map) + '</b>' +
-        (z ? '<small>скорее всего не понадобится</small>' : '') + '</div>';  // без команд и процентов — по просьбе владельца
+      var who = x.by === 0 ? abbr(A) : x.by === 1 ? abbr(B) : "";  // кто пикает карту
+      var z = x.score && x.score[0] === 0 && x.score[1] === 0;
+      return '<div class="pp-m ' + (x.by === 0 ? "a" : x.by === 1 ? "b" : "n") + mapBg(x.map) + '"><span class="pp-n">Карта ' + (i + 1) + (who ? ' · ' + esc(who) : '') + '</span><b>' + esc(x.map) + '</b>' +
+        '<span class="num pp-s"><span class="a">' + esc(x.score ? x.score[0] : "–") + '</span>:<span class="b">' + esc(x.score ? x.score[1] : "–") + '</span></span>' +
+        (z ? '<small>скорее всего не понадобится</small>' : '') + '</div>';  // строки с процентами нет — по просьбе владельца
     }).join("") + '</div></div></div>';
     return html;
   }
