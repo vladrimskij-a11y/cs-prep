@@ -526,6 +526,7 @@ html { overflow-anchor: none; }
 .ptile small { font-size: 9.5px; line-height: 1.2; color: var(--muted); display: flex; flex-wrap: wrap; justify-content: center; gap: 2px; align-items: center; }
 .ptile small .vrs-b { font-size: 8.5px; padding: 1px 4px; }
 @media (max-width: 340px) { .ptiles { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.rt.sub { background: color-mix(in srgb, var(--muted) 22%, transparent); color: var(--fg); } .rt.loan { background: color-mix(in srgb, var(--ct) 22%, transparent); color: var(--ct); }
 .stake { padding: 4px 14px; }
 .stk { display: grid; grid-template-columns: 22px 1fr; gap: 8px; padding: 10px 0; border-top: 1px solid var(--line); font-size: 14px; line-height: 1.4; }
 .stk:first-child { border-top: 0; }
@@ -1989,7 +1990,13 @@ a.ni { text-decoration: none; color: inherit; }
         var tg = p.tags || [], roles = [], extra = [];
         if (tg.indexOf("Капитан") >= 0) roles.push(["Капитан", "cap"]);
         if (tg.some(function (x) { return x === "AWP" || /^Снайпер/.test(x); })) roles.push(["AWP", "awp"]);
-        tg.forEach(function (x) { if (/^В аренде/.test(x)) extra.push(esc(x.toLowerCase())); else if (x === "Замена") extra.push("замена"); });
+        // статус в составе — заметной плашкой, одинаково во вкладке «Игроки» и на странице команды
+        tg.forEach(function (x) {
+          if (x === "Замена") roles.push(["Замена", "sub"]);
+          else if (/^trial$/i.test(x)) roles.push(["На просмотре", "sub"]);
+          else if (/^В аренде/.test(x)) { roles.push(["Аренда", "loan"]); var fr = x.replace(/^В аренде\s*(из\s*)?/, ""); if (fr) extra.push("в аренде из " + esc(fr.replace(/\b\w/g, function (c) { return c.toUpperCase(); }))); }
+          else if (x === "Неактивен") roles.push(["Неактивен", "sub"]);
+        });
         var real = [p.first_name, p.last_name].filter(Boolean).join(" ");
         // во вкладке «Игроки» матча статистику не показываем (просьба владельца), на странице команды — оставляем
         html += personRow(p, roles, real, extra, clickable ? "" : (statsTeam ? pstat(statsTeam, p.nick) : ""), "");
