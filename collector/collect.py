@@ -548,6 +548,16 @@ def infobox(wikitext: str) -> str:
     return wikitext[i:i + 8000]
 
 
+def loan_owner(wikitext: str, cur: set) -> str | None:
+    """Клуб, из которого игрок в аренде: в истории команд — другая запись «по сей день» (обычно с пометкой Inactive)."""
+    for start, team, note in re.findall(r"\{\{TH\|\s*([^|}]*?)\s*[—-]+\s*'*Present'*\s*\|\s*([^|}]+?)\s*(?:\|\s*([^|}]*))?\}\}", wikitext):
+        k = norm(team)
+        if (note or "").strip().lower() == "loan" or not k or k in cur or any(len(c) >= 3 and (c in k or k in c) for c in cur):
+            continue
+        return team.strip()
+    return None
+
+
 def infobox_team(wikitext: str) -> str | None:
     """Команда игрока по инфобоксу (|team=…) — для аренды это клуб, которому принадлежит контракт."""
     m = re.search(r"\|\s*team\s*=\s*([^\n|}]*)", infobox(wikitext))
@@ -612,6 +622,8 @@ def lp_roster(t: dict) -> dict | None:
         age = NOW - (parse_iso(cached.get("t")) or NOW)
         d = cached.get("data") or {}
         incomplete = not d or any(not p.get("roles") for p in d.get("players") or []) or not d.get("coach")
+        if d and any(p.get("note") for p in d.get("players") or []) and age >= timedelta(days=1):
+            incomplete, age = True, timedelta(hours=3)  # замена/аренда/просмотр: статус меняется — сверяем ежедневно
         # полный состав живёт ROSTER_TTL_DAYS; неполный (нет ролей или тренера) перепроверяем каждые 3 часа
         if age < timedelta(days=ROSTER_TTL_DAYS) and not (incomplete and age >= timedelta(hours=3)):
             return cached.get("data")
@@ -659,11 +671,31 @@ def lp_roster(t: dict) -> dict | None:
                     "loan_from": lp_param(line, "team"),
                 })
             players = [p for p in people if not p["coach"]]
+            # замена: кого заменяет — шаблон {{Stand-in|id=…|for=…}}, иначе неактивный, выбывший в день прихода замены,
+            # иначе единственный неактивный игрок
+            inactive = []
+            j = text.find("Squad|status=inactive")
+            if j >= 0:
+                for line in text[j: text.find("\n}}", j)].split("\n"):
+                    if "{{Person" in line and lp_param(line, "id") and "coach" not in (lp_param(line, "role") or "").lower():
+                        inactive.append({"nick": lp_param(line, "id"), "date": (lp_param(line, "inactivedate") or "")[:10]})
+            for p in players:
+                if not (p.get("note") or "").startswith("stand-in"):
+                    continue
+                f = next((lp_param(x, "for") for x in re.findall(r"\{\{Stand-in\|[^\n]*", text)
+                          if norm(lp_param(x, "id")) == norm(p["nick"]) and lp_param(x, "for")), None)
+                if not f:
+                    jd = next((lp_param(ln, "joindate") or "" for ln in block.split("\n") if "{{Person" in ln and norm(lp_param(ln, "id")) == norm(p["nick"])), "")[:10]
+                    f = next((x["nick"] for x in inactive if jd and x["date"] == jd), None) or (inactive[0]["nick"] if len(inactive) == 1 else None)
+                p["stand_for"] = f
             ppages = lp_pages([p["page"] for p in people]) if people else {}
             for p in people:
                 p["birth"] = birth_date(ppages.get(p["page"], ""))
                 if p.get("note") and "loan" in p["note"]:
                     owner = p.get("loan_from") or infobox_team(ppages.get(p["page"], ""))
+                    cur = {norm(t.get("name")), norm(t.get("acronym"))} - {""}
+                    if not owner or norm(owner) in cur or any(len(c) >= 3 and c in norm(owner) for c in cur):
+                        owner = loan_owner(ppages.get(p["page"], ""), cur) or owner
                     if owner and norm(owner) not in (norm(t.get("name")), norm(t.get("acronym"))):
                         p["loan_from"] = owner
                     else:
@@ -676,7 +708,7 @@ def lp_roster(t: dict) -> dict | None:
                     p["igl"] = True  # в составе капитан не отмечен — берём со страницы игрока
             data = {
                 "coach": [{"nick": p["nick"], "name": p["name"], "flag": p["flag"], "birth": p["birth"]} for p in people if p["coach"]],
-                "players": [{k: p.get(k) for k in ("nick", "name", "flag", "igl", "roles", "note", "birth", "loan_from")} for p in players],
+                "players": [{k: p.get(k) for k in ("nick", "name", "flag", "igl", "roles", "note", "birth", "loan_from", "stand_for")} for p in players],
             }
     except Exception as e:
         warn(f"Liquipedia {t.get('name')}: {e!r}")
@@ -713,7 +745,10 @@ def merge_roster(panda_players: list[dict], lp: dict | None) -> tuple[list[dict]
             if "loan" in note:
                 tags.append("В аренде из " + lp_p["loan_from"] if lp_p.get("loan_from") else "В аренде")
             else:
-                tags.append({"stand-in": "Замена", "inactive": "Неактивен"}.get(note, note))
+                tag = {"stand-in": "Замена", "inactive": "Неактивен"}.get(note, note)
+                if note == "stand-in" and lp_p.get("stand_for"):
+                    tag = "Замена вместо " + lp_p["stand_for"]
+                tags.append(tag)
         first, last = pp.get("first_name"), pp.get("last_name")
         if not (first or last) and lp_p.get("name"):
             first, last = lp_p["name"], None
@@ -4442,6 +4477,16 @@ def build_prediction(d: dict, bids: list) -> dict | None:
         return mp
     odds = bo3_odds(bids) if len(bids) == 2 and all(bids) else None
     st0 = _bo3_starter.get(tuple(bids), 0) if len(bids) == 2 else 0
+    # в именных группах (Group A, B… — GSL у IEM, ESL, FISSURE) вето чаще начинает команда ниже в VRS:
+    # сильный посев выбирает и уступает первый бан (проверка на 357 сериях: начинающий 72% → 79%, пики 33% → 35%)
+    if re.search(r"(?i)\bgroup\s+[a-h]\b", d.get("stage") or "") and len(d.get("teams") or []) == 2:
+        try:
+            tab = vrs_table()
+            rr = [(vrs_find(t, tab) or {}).get("rank") for t in d["teams"]]
+            if all(rr) and rr[0] != rr[1]:
+                st0 = 0 if rr[0] > rr[1] else 1
+        except Exception as e:
+            warn(f"Начинающий вето: {e!r}")
     bo = int(d.get("bo") or 3)
     order = {1: [(0, "ban"), (1, "ban"), (0, "ban"), (1, "ban"), (0, "ban"), (1, "ban")],
              3: [(0, "ban"), (1, "ban"), (0, "pick"), (1, "pick"), (0, "ban"), (1, "ban")],

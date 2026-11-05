@@ -2203,7 +2203,7 @@ a.ni { text-decoration: none; color: inherit; }
         if (tg.some(function (x) { return x === "AWP" || /^Снайпер/.test(x); })) roles.push(["AWP", "awp"]);
         // статус в составе — заметной плашкой, одинаково во вкладке «Игроки» и на странице команды
         tg.forEach(function (x) {
-          if (x === "Замена") roles.push(["Замена", "sub"]);
+          if (/^Замена/.test(x)) { roles.push(["Замена", "sub"]); var fo = x.replace(/^Замена\s*(вместо\s*)?/, ""); if (fo) extra.push("заменяет " + esc(fo)); }
           else if (/^trial$/i.test(x)) roles.push(["На просмотре", "sub"]);
           else if (/^В аренде/.test(x)) { roles.push(["Аренда", "loan"]); var fr = x.replace(/^В аренде\s*(из\s*)?/, ""); if (fr) extra.push("в аренде из " + esc(fr.replace(/\b\w/g, function (c) { return c.toUpperCase(); }))); }
           else if (x === "Неактивен") roles.push(["Неактивен", "sub"]);
