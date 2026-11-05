@@ -302,6 +302,7 @@ html { overflow-anchor: none; }
 .mhead .tfilt, .mhead.sub-team .nfilt { display: none; }
 .mhead.sub-team .tfilt { display: flex; }
 .tfilt .chip { flex: 1; text-align: center; }
+.poswrap { position: relative; }
 .poswrap > .mapsel { position: sticky; top: var(--hcur, 0px); z-index: 2; background: var(--bg); padding-block: 8px; margin: -8px 0 8px; }
 .mini { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 10px; padding: 6px 2px 2px; }
 .mini .ma { font-family: var(--display); font-weight: 700; font-size: 17px; color: var(--ct); }
@@ -1808,13 +1809,22 @@ a.ni { text-decoration: none; color: inherit; }
     }
   }
 
-  function mapNames() { var M = state.details[state.openId].maps; return M && M.table ? M.table.map(function (r) { return r.map; }) : []; }
+  function mapNames() {  // как в ряду кнопок зоны карты: после вето — сначала карты в порядке игры
+    var m = state.details[state.openId], M = m.maps, names = M && M.table ? M.table.map(function (r) { return r.map; }) : [], Vz = vetoNow(m);
+    if (Vz) names = names.slice().sort(function (a, b) { var ia = Vz.order.indexOf(mkey(a)), ib = Vz.order.indexOf(mkey(b)); return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib); });
+    return names;
+  }
+  // свайп по картам: в «Статистике» — зона карты, в «Позициях» — таблицы позиций
+  function zctx() {
+    var m = state.details[state.openId];
+    if (curKey() === "team:pos") return { names: function () { return posMapNames(m); }, cur: function () { return state.posMap; }, set: function (x) { state.posMap = x; }, body: posBody, attr: "data-pmap" };
+    return { names: mapNames, cur: function () { return state.map; }, set: function (x) { state.map = x; }, body: mapBody, attr: "data-map" };
+  }
 
   // зона карты: липкая шапка с картами, ниже — стороны и пистолетки, потом последние игры; свайп по зоне листает карты
   function mapZone(m) {
-    var names = mapNames(), Vz = vetoNow(m);
+    var names = mapNames();
     if (!names.length) return "";
-    if (Vz) names = names.slice().sort(function (a, b) { var ia = Vz.order.indexOf(mkey(a)), ib = Vz.order.indexOf(mkey(b)); return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib); });
     if (!state.map || names.indexOf(state.map) < 0) state.map = names[0];
     return '<div class="sec mapzone"><div class="mapsel" role="group" aria-label="Карта">' +
       names.map(function (n) { return '<button class="chip" data-map="' + esc(n) + '" aria-pressed="' + (n === state.map) + '">' + esc(n) + '</button>'; }).join("") +
@@ -2169,16 +2179,24 @@ a.ni { text-decoration: none; color: inherit; }
       }
       return '<div class="sec"><div class="box note">Загружаю позиции…</div></div>';
     }
-    var P = state.pos, T = m.teams.map(function (t) { return posTeam(P, t); });
-    var maps = (P.maps || []).filter(function (mp) { return T.some(function (x) { return x && x[mp]; }); });
+    var P = state.pos, maps = posMapNames(m);
     if (!maps.length) return '<div class="sec"><div class="box note">По этим командам позиций пока нет: ProRoles разбирает демо только команд из топ-50.</div></div>' + posSrc(P);
-    // порядок: сначала карты из статистики матча (пулы команд), потом остальные
-    var Vn = vetoNow(m), order = (Vn ? Vn.order.filter(function (k) { return Vn.info[k].act !== "ban"; }) : []).concat(((m.maps || {}).table || []).map(function (r) { return mkey(r.map); }));
-    maps.sort(function (a, b) { var ia = order.indexOf(a), ib = order.indexOf(b); return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib); });
-    var cur = maps.indexOf(state.posMap) >= 0 ? state.posMap : maps[0];
-    var html = '<div class="poswrap"><div class="mapsel" role="group" aria-label="Карта">' + maps.map(function (mp) {
+    if (maps.indexOf(state.posMap) < 0) state.posMap = maps[0];
+    var cur = state.posMap;
+    return '<div class="poswrap"><div class="mapsel" role="group" aria-label="Карта">' + maps.map(function (mp) {
       return '<button class="chip" data-pmap="' + esc(mp) + '" aria-pressed="' + (mp === cur) + '">' + esc(POS_MAPNAME[mp] || mp) + '</button>';
-    }).join("") + '</div>';
+    }).join("") + '</div><div class="mzbody">' + posBody(m, cur) + '</div>' + posSrc(P) + '</div>';
+  }
+  // карты, по которым есть позиции; после вето — сначала в порядке игры, потом по пулам команд
+  function posMapNames(m) {
+    var P = state.pos; if (!P) return [];
+    var T = m.teams.map(function (t) { return posTeam(P, t); });
+    var maps = (P.maps || []).filter(function (mp) { return T.some(function (x) { return x && x[mp]; }); });
+    var Vn = vetoNow(m), order = (Vn ? Vn.order.filter(function (k) { return Vn.info[k].act !== "ban"; }) : []).concat(((m.maps || {}).table || []).map(function (r) { return mkey(r.map); }));
+    return maps.sort(function (a, b) { var ia = order.indexOf(a), ib = order.indexOf(b); return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib); });
+  }
+  function posBody(m, cur) {
+    var P = state.pos, T = m.teams.map(function (t) { return posTeam(P, t); }), html = "";
     m.teams.forEach(function (t, i) {
       var D = (T[i] || {})[cur] || {}, low = {};
       Object.keys(D).forEach(function (n) { low[n.toLowerCase()] = n; });
@@ -2202,7 +2220,7 @@ a.ni { text-decoration: none; color: inherit; }
       }
       html += '</div></div>';
     });
-    return html + posSrc(P) + '</div>';
+    return html;
   }
   function posSrc(P) {
     return '<div class="psrc">CT — где игрок стоит с 15-й по 30-ю секунду раунда, T — куда идёт в первые 18 секунд. Посчитано по демо турниров последних месяцев.<br>' +
@@ -2647,7 +2665,7 @@ a.ni { text-decoration: none; color: inherit; }
     if (!swipeOk(e)) return;
     var keys = paneKeys();
     sw = { x: e.touches[0].clientX, y: e.touches[0].clientY, t: Date.now(), dx: 0, lock: null, keys: keys,
-           i: Math.max(0, keys.indexOf(curKey())), zone: state.tab === "stats" && e.target.closest(".mapzone") ? "map" : null, dir: 0 };
+           i: Math.max(0, keys.indexOf(curKey())), zone: (state.tab === "stats" && e.target.closest(".mapzone")) || (curKey() === "team:pos" && e.target.closest(".poswrap")) ? "map" : null, dir: 0 };
   }, { passive: true });
   document.addEventListener("touchmove", function (e) {
     if (!sw || sw.lock === "v") return;
@@ -2656,7 +2674,7 @@ a.ni { text-decoration: none; color: inherit; }
       if (Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy) * 1.5) {
         sw.lock = "h";
         if (sw.zone === "map") {  // на крайней карте свайп дальше листает вкладки
-          var N0 = mapNames(), k0 = Math.max(0, N0.indexOf(state.map)) + (dx < 0 ? 1 : -1);
+          var Z0 = zctx(), N0 = Z0.names(), k0 = Math.max(0, N0.indexOf(Z0.cur())) + (dx < 0 ? 1 : -1);
           if (k0 < 0 || k0 >= N0.length) sw.zone = null;
         }
         if (sw.zone !== "map") { var cp = paneOf(sw.keys[sw.i]); [sw.i - 1, sw.i + 1].forEach(function (j) { if (j >= 0 && j < sw.keys.length) syncPane(paneOf(sw.keys[j]), cp); }); }
@@ -2719,18 +2737,18 @@ a.ni { text-decoration: none; color: inherit; }
     var pane = activePane(), el = pane && pane.querySelector(".mzbody");
     if (!el) return null;
     var g = document.createElement("div");
-    g.className = "mzbody swipe-ghost"; g.innerHTML = mapBody(state.details[state.openId], mp);
+    g.className = "mzbody swipe-ghost"; g.innerHTML = zctx().body(state.details[state.openId], mp);
     g.style.top = el.offsetTop + "px"; g.style.left = el.offsetLeft + "px"; g.style.width = el.offsetWidth + "px";
     el.parentNode.appendChild(g);
     return { el: el, g: g };
   }
-  function markMap(mp) { var pane = activePane(); if (pane) pane.querySelectorAll("[data-map]").forEach(function (b) { b.setAttribute("aria-pressed", String(b.getAttribute("data-map") === mp)); }); }
+  function markMap(mp) { var pane = activePane(), at = zctx().attr; if (pane) pane.querySelectorAll("[" + at + "]").forEach(function (b) { b.setAttribute("aria-pressed", String(b.getAttribute(at) === mp)); }); }
   function mapMove(s0, dx) {
     var dir = dx < 0 ? 1 : -1;
     if (dir !== s0.dir) {
       if (s0.g && s0.g.parentNode) s0.g.parentNode.removeChild(s0.g);
       s0.dir = dir;
-      var N = mapNames(), k = N.indexOf(state.map) + dir;
+      var Z = zctx(), N = Z.names(), k = N.indexOf(Z.cur()) + dir;
       s0.mp = k >= 0 && k < N.length ? N[k] : null;
       var gg = s0.mp ? mapGhost(s0.mp) : null;
       var pane = activePane();
@@ -2742,7 +2760,7 @@ a.ni { text-decoration: none; color: inherit; }
     s0.el.style.transition = "none"; s0.el.style.transform = "translate3d(" + s0.dx + "px,0,0)";
     if (s0.g) { s0.g.style.transition = "none"; s0.g.style.transform = "translate3d(" + (s0.dx + s0.dir * D) + "px,0,0)"; }
     var past = !!s0.g && Math.abs(s0.dx) > D / 2;
-    if (past !== s0.marked) { markMap(past ? s0.mp : state.map); s0.marked = past; }
+    if (past !== s0.marked) { markMap(past ? s0.mp : zctx().cur()); s0.marked = past; }
   }
   function mapEnd(s0) {
     if (!s0.el) return;
@@ -2750,7 +2768,7 @@ a.ni { text-decoration: none; color: inherit; }
     var go = s0.g && (Math.abs(s0.dx) > W * 0.22 || (v > 0.45 && Math.abs(s0.dx) > 35));
     var t = "transform " + Math.round(Math.max(120, Math.min(220, (D - Math.abs(s0.dx)) / Math.max(v * 1.6, 1.4)))) + "ms cubic-bezier(.2,.7,.3,1)";
     if (!go) {
-      if (s0.marked) markMap(state.map);
+      if (s0.marked) markMap(zctx().cur());
       s0.el.style.transition = t; s0.el.style.transform = "";
       if (s0.g) { s0.g.style.transition = t; s0.g.style.transform = "translate3d(" + (s0.dir * D) + "px,0,0)"; }
       setTimeout(function () { if (s0.g && s0.g.parentNode) s0.g.parentNode.removeChild(s0.g); }, 240);
@@ -2762,7 +2780,7 @@ a.ni { text-decoration: none; color: inherit; }
     var done = false;
     function fin() {
       if (done) return; done = true;
-      state.map = s0.mp;
+      zctx().set(s0.mp);
       var frag = document.createDocumentFragment();
       while (s0.g.firstChild) frag.appendChild(s0.g.firstChild);
       s0.el.style.transition = "none"; s0.el.style.transform = "";
@@ -3031,8 +3049,8 @@ a.ni { text-decoration: none; color: inherit; }
     if (t.hasAttribute("data-tsub")) { goKey("team:" + t.getAttribute("data-tsub")); return; }  // «Команда»: Игроки / Позиции — как фильтры новостей
     if (t.hasAttribute("data-pmap")) {  // карта в «Позициях»: перерисовываем только эту страницу, прокрутка остаётся
       state.posMap = t.getAttribute("data-pmap");
-      var mt = state.details[state.openId], pp = paneOf("team:pos");
-      if (mt && pp) { var ms = pp.querySelector(".mapsel"), sl = ms ? ms.scrollLeft : 0; pp.querySelector(".tabbody").innerHTML = posBlock(mt); var ms2 = pp.querySelector(".mapsel"); if (ms2) ms2.scrollLeft = sl; }
+      var mt = state.details[state.openId], pp = paneOf("team:pos"), pb = pp && pp.querySelector(".mzbody");
+      if (mt && pb) { pb.innerHTML = posBody(mt, state.posMap); markMap(state.posMap); revealSel(pp.querySelector(".mapsel")); }
       return;
     }
     if (t.hasAttribute("data-formall")) {  // показать всю форму команды / свернуть обратно
