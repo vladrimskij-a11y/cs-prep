@@ -17,13 +17,13 @@ jobs:
           B = "https://proroles.gamesenselab.pro"
           st, ct, h = get(B + "/")
           v = re.search(r"PP_VER = '(\w+)'", h).group(1)
-          top = re.search(r"const TOP = (\[.*?\]);", h, re.S)
-          T = json.loads(top.group(1)); print("PR| TOP", len(T), [t["name"] for t in T])
-          st, ct, b = get(B + "/pp/index.json?v=" + v); print("PR| IDX", st, ct, len(b))
-          d = json.loads(b); print("PR| keys", list(d.keys()), {k: (type(x).__name__, len(x) if hasattr(x, "__len__") else x) for k, x in d.items()})
-          m = d["maps"][0]; print("PR| map keys", [(k, type(x).__name__) for k, x in m.items()], m.get("id"), len(m["players"]))
-          for mm in d["maps"]: print("PR| map", mm["id"], len(mm["players"]), sorted({p["team"] for p in mm["players"]})[:40])
-          pl = next(p for p in m["players"] if p["name"].lower() == "zywoo") if any(p["name"].lower()=="zywoo" for p in m["players"]) else m["players"][0]
-          small = {k: (x if not isinstance(x, dict) else {kk: (vv if not isinstance(vv, str) or len(vv) < 60 else vv[:20]+"...") for kk, vv in x.items()}) for k, x in pl.items()}
-          print("PR| PLAYER", json.dumps(small)[:3000])
+          st, ct, b = get(B + "/pp/index.json?v=" + v); d = json.loads(b)
+          from collections import Counter
+          R = Counter(); Z = Counter(); A = Counter()
+          for m in d["maps"]:
+              for p in m["players"]:
+                  R[p["ctRole"][0]] += 1; R[p["tRole"][0]] += 1; Z[p.get("zct")] += 1; Z[p.get("zt")] += 1
+                  for r in p.get("roles") or []: A[r] += 1
+          print("PR| ROLES", R.most_common(80)); print("PR| Z", Z.most_common(60)); print("PR| R2", A.most_common(30))
+          print("PR| src", d["maps"][0]["src"][:5], d["maps"][0]["label"], d["maps"][0]["rounds"])
           X
