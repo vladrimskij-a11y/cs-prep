@@ -166,9 +166,6 @@ a { color: inherit; }
 .a .pct { color: var(--ct); } .b .pct { color: var(--t); }
 .best { font-size: 10px; font-weight: 700; color: var(--win); text-transform: uppercase; letter-spacing: .06em; }
 
-.tsub { display: flex; gap: 4px; padding: 3px; margin: 0 0 12px; border-radius: 12px; background: var(--surface); border: 1px solid var(--line); }
-.tsub button { flex: 1; padding: 8px 10px; border-radius: 9px; font-size: 13px; font-weight: 600; color: var(--muted); transition: background .15s, color .15s; }
-.tsub button[aria-pressed="true"] { background: var(--bg); color: var(--fg); box-shadow: 0 1px 3px rgba(0,0,0,.25); }
 .ptab2 td { vertical-align: top; }
 .ptab2 .pn b { display: block; font-weight: 700; }
 .ptab2 .pn i { font-style: normal; font-size: 11px; color: var(--muted); }
@@ -301,7 +298,11 @@ html { overflow-anchor: none; }
 .nf-wrap { height: 0; opacity: 0; visibility: hidden; }
 .mhead.anim .fold { transition: height .26s cubic-bezier(.2,.7,.3,1), opacity .2s ease; }
 .mhead.anim .fold > .fi { transition: transform .26s cubic-bezier(.2,.7,.3,1); }
-.mhead .nfilt { position: static; padding-block: 0 8px; }
+.mhead .nfilt, .mhead .tfilt { position: static; padding-block: 0 8px; }
+.mhead .tfilt, .mhead.sub-team .nfilt { display: none; }
+.mhead.sub-team .tfilt { display: flex; }
+.tfilt .chip { flex: 1; text-align: center; }
+.poswrap > .mapsel { position: sticky; top: var(--hcur, 0px); z-index: 2; background: var(--bg); padding-block: 8px; margin: -8px 0 8px; }
 .mini { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 10px; padding: 6px 2px 2px; }
 .mini .ma { font-family: var(--display); font-weight: 700; font-size: 17px; color: var(--ct); }
 .mini .mb { font-family: var(--display); font-weight: 700; font-size: 17px; color: var(--t); text-align: right; }
@@ -2094,10 +2095,7 @@ a.ni { text-decoration: none; color: inherit; }
     return html;
   }
   function playersTab(m) {
-    var sub = state.teamSub || "players";
     var html = '<div id="livebox">' + (state.live && state.live.id === m.id ? state.live.html || "" : "") + '</div>';
-    html += '<div class="sec"><div class="tsub" role="tablist"><button data-tsub="players" aria-pressed="' + (sub === "players") + '">Игроки</button><button data-tsub="pos" aria-pressed="' + (sub === "pos") + '">Позиции</button></div></div>';
-    if (sub === "pos") return html + posBlock(m);
     m.teams.forEach(function (t, i) {
       html += '<div class="sec"><div class="box roster ' + (i ? "b" : "a") + '"><div class="hd"><span class="tn tlink" data-tname="' + esc(t.name) + '">' + esc(t.name) + ' ›</span>' + trophyCount(t.prizes) + medalsHtml(t.prizes) + '</div>';
       if (!(t.players || []).length) html += '<div class="note">Состав не указан.</div>';
@@ -2108,13 +2106,26 @@ a.ni { text-decoration: none; color: inherit; }
 
   // ---- позиции игроков по картам (ProRoles, по демо турниров)
   var POS_MAPNAME = { mirage: "Mirage", inferno: "Inferno", nuke: "Nuke", ancient: "Ancient", anubis: "Anubis", dust2: "Dust II", train: "Train", overpass: "Overpass", cache: "Cache" };
+  // зоны и коллауты — по-русски, как говорят в эфире (шорт, лонг, мейн…)
+  var CALL_RU = { "A Halls": "Холлы A", "A Main": "Мейн A", "A Site": "Плент A", "A Stairs": "Лестница A", "ARamp": "Рампа A", "Admin": "Админ", "Alley": "Аллея", "Apartments": "Апартаменты",
+    "Arch": "Арка", "B Doors": "Двери B", "B Halls": "Холлы B", "B Main": "Мейн B", "B Site": "Плент B", "Back Alley": "Бэк-аллея", "Backof B": "За плентом B", "Balcony": "Балкон", "Banana": "Банан",
+    "Bricks": "Кирпичи", "Bridge": "Мост", "CT Lane": "КТ-проход", "CT Spawn": "КТ-спавн", "CT": "КТ-спавн", "Canal": "Канал", "Canals": "Каналы", "Catwalk": "Кэтвок", "Checkers": "Шашки", "Connector": "Коннектор",
+    "Corner": "Угол", "Crane": "Кран", "Electrical Box": "Щиток", "Extended A": "Экстендед A", "Fork Lift": "Погрузчик", "Fountain": "Фонтан", "Garage": "Гараж", "Heaven": "Хевен", "Highway": "Хайвей",
+    "House": "Дом", "Hut Roof": "Крыша хата", "Jungle": "Джангл", "Ladder": "Лестница", "Lobby": "Лобби", "Long": "Лонг", "Long A": "Лонг A", "Long Doors": "Двери лонга", "Lower Mid": "Нижний мид",
+    "Lower Tunnel": "Нижний туннель", "Main": "Мейн", "Mid": "Мид", "Middle": "Мид", "Mid Brawl": "Бой за мид", "Mid Doors": "Двери мида", "Mid Roof": "Крыша мида", "Mini": "Мини", "Outside": "Аутсайд",
+    "Outside A": "Аутсайд A", "Outside B": "Аутсайд B", "Outside Long": "Выход на лонг", "Outside Tunnel": "Выход из туннеля", "Palace Alley": "Аллея пэласа", "Palace Interior": "Пэлас", "Pit": "Яма",
+    "Quad": "Квад", "Rafters": "Балки", "Ramp": "Рампа", "Roof": "Крыша", "Ruins": "Руины", "Sandbags": "Мешки", "Second Mid": "Второй мид", "Short Stairs": "Лестница шорта", "B Short": "Шорт B",
+    "Side Alley": "Боковая аллея", "Side Entrance": "Боковой вход", "Side Hall": "Боковой холл", "Silo": "Сило", "Squeaky": "Скрипка", "Street": "Улица", "Sun Room": "Санрум", "T Ramp": "Т-рампа",
+    "T Spawn": "Т-спавн", "T Yard": "Т-ярд", "TSide Lower": "Низ Т-стороны", "TSide Upper": "Верх Т-стороны", "TStairs": "Т-лестница", "Top of Mid": "Топ мида", "Tree Room": "Три-рум", "Truck": "Грузовик",
+    "Tunnels": "Туннели", "Under A": "Под A", "Underpass": "Андерпасс", "Upper Tunnel": "Верхний туннель", "Vending": "Автомат", "Walkway": "Вокэй", "Window": "Окно", "Apps": "Аппсы", "B Cave": "Кейв B",
+    "Upper B": "Аппер B", "Lower B": "Нижний B", "Door": "Дверь", "Vent": "Вент", "Rotator": "Ротатор", "Roamer": "Роумер", "Support": "Поддержка" };
+  function callRu(s) { s = String(s || "").trim(); return CALL_RU[s] || s; }
   function roleRu(s) {
     s = String(s || "").trim(); if (!s) return "—";
     var awp = /^AWPer,\s*/.test(s); s = s.replace(/^AWPer,\s*/, "");
-    var W = { Anchor: "Якорь", Extremity: "Край", Support: "Поддержка", Aggressive: "Агрессия", Connector: "Коннектор", Rifle: "Винтовка" };
+    var W = { Anchor: "Опорник", Extremity: "Край", Support: "Поддержка", Aggressive: "Агрессия", Connector: "Коннектор", Rifle: "Рифл" };
     var mm = s.match(/^(A|B)\s+(Anchor|Extremity|Support|Aggressive|Connector|Rifle)$/);
-    if (mm) s = W[mm[2]] + " " + mm[1];
-    else s = { "Middle": "Центр", "Mid Brawl": "Бой за мид", "Rotator": "Ротатор", "Roamer": "Роумер", "Support": "Поддержка", "Mid": "Мид" }[s] || s;
+    s = mm ? W[mm[2]] + " " + mm[1] : callRu(s);
     return s + (awp ? " · AWP" : "");
   }
   function posTeam(P, t) {
@@ -2135,7 +2146,7 @@ a.ni { text-decoration: none; color: inherit; }
       if (!state.posLoading) {
         state.posLoading = true;
         dfetch("data/positions.json" + bust()).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; })
-          .then(function (j) { state.pos = j || { teams: {} }; state.posLoading = false; var md = state.details[state.openId]; if (md && state.teamSub === "pos") keepFilterScroll(function () { renderMatch(md); }); });
+          .then(function (j) { state.pos = j || { teams: {} }; state.posLoading = false; var md = state.details[state.openId], pp = paneOf("team:pos"); if (md && pp) pp.querySelector(".tabbody").innerHTML = posBlock(md); });
       }
       return '<div class="sec"><div class="box note">Загружаю позиции…</div></div>';
     }
@@ -2146,9 +2157,9 @@ a.ni { text-decoration: none; color: inherit; }
     var order = ((m.maps || {}).table || []).map(function (r) { return String(r.map || "").toLowerCase().replace(/[^a-z0-9]/g, "").replace("dustii", "dust2"); });
     maps.sort(function (a, b) { var ia = order.indexOf(a), ib = order.indexOf(b); return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib); });
     var cur = maps.indexOf(state.posMap) >= 0 ? state.posMap : maps[0];
-    var html = '<div class="sec"><div class="mapsel" role="group" aria-label="Карта">' + maps.map(function (mp) {
+    var html = '<div class="poswrap"><div class="mapsel" role="group" aria-label="Карта">' + maps.map(function (mp) {
       return '<button class="chip" data-pmap="' + esc(mp) + '" aria-pressed="' + (mp === cur) + '">' + esc(POS_MAPNAME[mp] || mp) + '</button>';
-    }).join("") + '</div></div>';
+    }).join("") + '</div>';
     m.teams.forEach(function (t, i) {
       var D = (T[i] || {})[cur] || {}, low = {};
       Object.keys(D).forEach(function (n) { low[n.toLowerCase()] = n; });
@@ -2165,14 +2176,14 @@ a.ni { text-decoration: none; color: inherit; }
           var badges = (r.awp ? '<span class="pbad awp">AWP</span>' : '') + (r.entry ? '<span class="pbad">Энтри</span>' : '');
           var few = Math.min(r.cn, r.tn) < 12 ? " · мало раундов" : "";
           html += '<tr><td class="pn"><b>' + esc(nk) + badges + '</b><i>раундов ' + r.cn + ' / ' + r.tn + few + '</i></td>' +
-            '<td><span class="rl">' + esc(roleRu(r.ct)) + '</span>' + (r.cs ? '<span class="ar">' + esc(r.cs[0]) + ' · ' + r.cs[1] + '%</span>' : '') + '</td>' +
-            '<td><span class="rl">' + esc(roleRu(r.t)) + '</span>' + (r.ts ? '<span class="ar">' + esc(r.ts[0]) + ' · ' + r.ts[1] + '%</span>' : '') + '</td></tr>';
+            '<td><span class="rl">' + esc(roleRu(r.ct)) + '</span>' + (r.cs ? '<span class="ar">' + esc(callRu(r.cs[0])) + ' · ' + r.cs[1] + '%</span>' : '') + '</td>' +
+            '<td><span class="rl">' + esc(roleRu(r.t)) + '</span>' + (r.ts ? '<span class="ar">' + esc(callRu(r.ts[0])) + ' · ' + r.ts[1] + '%</span>' : '') + '</td></tr>';
         });
         html += '</tbody></table>';
       }
       html += '</div></div>';
     });
-    return html + posSrc(P);
+    return html + posSrc(P) + '</div>';
   }
   function posSrc(P) {
     return '<div class="psrc">CT — где игрок стоит с 15-й по 30-ю секунду раунда, T — куда идёт в первые 18 секунд. Посчитано по демо турниров последних месяцев.<br>' +
@@ -2304,14 +2315,19 @@ a.ni { text-decoration: none; color: inherit; }
     if (state.newsFilter && L.indexOf(state.newsFilter) < 0) L.push(state.newsFilter);  // личные новости игрока
     return L;
   }
-  function viewKey(tab, nf) { return tab === "news" ? "news:" + nf : tab; }
-  function paneKeys() { return ["players", "stats"].concat(newsSteps().map(function (f) { return "news:" + f; })); }
-  function curKey() { return viewKey(state.tab, state.newsFilter); }
-  function setKey(k) { if (k.indexOf("news:") === 0) { state.tab = "news"; state.newsFilter = k.slice(5); } else state.tab = k; }
+  // «Команда» — две страницы (Игроки, Позиции), «Новости» — по странице на фильтр; у обеих под вкладками строка подвкладок
+  function viewKey(tab, nf) { return tab === "news" ? "news:" + nf : tab === "players" ? "team:" + (nf || state.teamSub || "players") : tab; }
+  function paneKeys() { return ["team:players", "team:pos", "stats"].concat(newsSteps().map(function (f) { return "news:" + f; })); }
+  function curKey() { return viewKey(state.tab, state.tab === "news" ? state.newsFilter : state.teamSub); }
+  function setKey(k) { if (k.indexOf("news:") === 0) { state.tab = "news"; state.newsFilter = k.slice(5); } else if (k.indexOf("team:") === 0) { state.tab = "players"; state.teamSub = k.slice(5); } else state.tab = k; }
   function isNews(k) { return k.indexOf("news:") === 0; }
+  function isTeamK(k) { return k.indexOf("team:") === 0; }
+  function hasSub(k) { return isNews(k) || isTeamK(k); }
+  function subGroup(k) { var h = q(".mhead"); if (h && hasSub(k)) { h.classList.toggle("sub-team", isTeamK(k)); } }
 
   function tabBodyHtml(m, key) {
-    if (key === "players") return playersTab(m);
+    if (key === "team:players") return playersTab(m);
+    if (key === "team:pos") return posBlock(m);
     if (key === "stats") return stakeBlock(m) + vrsBlock(m) + pickBlock(m) + mapsTable(m) + mapZone(m) + h2hBlock(m) + formBlock(m);  // форма — после карт (по просьбе владельца)
     return (key === "news:all" ? factsBlock(m) : "") + newsList(m, key.slice(5));
   }
@@ -2329,7 +2345,9 @@ a.ni { text-decoration: none; color: inherit; }
       '<div class="tm b" data-tname="' + esc(B.name) + '"><span class="acr">' + esc(abbr(B)) + '</span><span class="full">' + esc(B.name) + '</span>' + heroVrs(B) + '</div></div>' +
       heroOutcomes(m) + '</section></div></div>' +
       '<nav class="tabs" role="tablist">' + tabBtn("players", "Команда") + tabBtn("stats", "Статистика") + tabBtn("news", "Новости", nCount) + '</nav>' +
-      '<div class="fold nf-wrap"><div class="fi"><div class="filt nfilt" role="group" aria-label="О ком">' + opts.map(function (o) {
+      '<div class="fold nf-wrap"><div class="fi"><div class="filt tfilt" role="group" aria-label="Команда">' +
+        '<button class="chip" data-tsub="players" aria-pressed="' + ((state.teamSub || "players") === "players") + '">Игроки</button><button class="chip" data-tsub="pos" aria-pressed="' + (state.teamSub === "pos") + '">Позиции</button></div>' +
+      '<div class="filt nfilt" role="group" aria-label="О ком">' + opts.map(function (o) {
         return '<button class="chip" data-nf="' + esc(o[0]) + '" aria-pressed="' + (state.newsFilter === o[0]) + '">' + esc(o[1]) + '<span class="c">' + newsFor(m, o[0]).length + '</span></button>';
       }).join("") + '</div></div></div>';
   }
@@ -2363,7 +2381,7 @@ a.ni { text-decoration: none; color: inherit; }
     HD.sh.style.setProperty("--hcur", (HD.base + HD.heroH * (1 - p) + HD.miniH * p + HD.nfH * nf) + "px");
   }
   function ease(x) { return x * x * (3 - 2 * x); }
-  function headNow(anim) { var p = activePane(); applyHead(p ? p.scrollTop : 0, isNews(curKey()) ? 1 : 0, anim); }
+  function headNow(anim) { var p = activePane(); subGroup(curKey()); applyHead(p ? p.scrollTop : 0, hasSub(curKey()) ? 1 : 0, anim); }
   // соседняя страница встаёт так же, как текущая: шапка не прыгает (свёрнута — остаётся свёрнутой)
   function syncPane(target, from) {
     if (!HD || !target || !from || target === from) return;
@@ -2372,7 +2390,9 @@ a.ni { text-decoration: none; color: inherit; }
     else if (ty < D) target.scrollTop = y;
   }
   function markTabs(key) {
-    var tab = isNews(key) ? "news" : key, nf = isNews(key) ? key.slice(5) : null;
+    var tab = isNews(key) ? "news" : isTeamK(key) ? "players" : key, nf = isNews(key) ? key.slice(5) : null;
+    if (isTeamK(key)) document.querySelectorAll(".mhead [data-tsub]").forEach(function (b) { b.setAttribute("aria-pressed", String(b.getAttribute("data-tsub") === key.slice(5))); });
+    subGroup(key);
     var shl = q(".mshell"); if (shl) shl.classList.toggle("on-stats", key === "stats");
     document.querySelectorAll(".mhead [data-tab]").forEach(function (b) { b.setAttribute("aria-selected", String(b.getAttribute("data-tab") === tab)); });
     if (nf != null) {
@@ -2558,10 +2578,10 @@ a.ni { text-decoration: none; color: inherit; }
     state.scrolls = state.scrolls || {};
     panes().forEach(function (p) { state.scrolls[p.getAttribute("data-key")] = p.scrollTop; });
     var keys = paneKeys();
-    if (keys.indexOf(curKey()) < 0) setKey("players");
+    if (keys.indexOf(curKey()) < 0) setKey("team:players");
     var html = '<div class="mshell"><div class="mviewport"><div class="mtrack">';
     keys.forEach(function (k) {
-      html += '<div class="pane' + (isNews(k) ? ' np' : '') + '" data-key="' + esc(k) + '"><div class="pin"><div class="tabbody">' + tabBodyHtml(m, k) + '</div></div></div>';
+      html += '<div class="pane' + (hasSub(k) ? ' np' : '') + '" data-key="' + esc(k) + '"><div class="pin"><div class="tabbody">' + tabBodyHtml(m, k) + '</div></div></div>';
     });
     $app.innerHTML = html + '</div></div><div class="mhead"><div class="pin">' + headHtml(m) + '</div></div>' +
       '<div class="snav"><button data-snav="-1" aria-label="Предыдущий раздел">↑</button><button data-snav="1" aria-label="Следующий раздел">↓</button></div></div>';
@@ -2575,7 +2595,7 @@ a.ni { text-decoration: none; color: inherit; }
       p.addEventListener("scroll", function () {
         state.scrolls[k] = p.scrollTop;
         if (k !== curKey() || raf) return;
-        raf = requestAnimationFrame(function () { raf = 0; if (k === curKey() && !(sw && sw.lock === "h")) applyHead(p.scrollTop, isNews(k) ? 1 : 0, false); });
+        raf = requestAnimationFrame(function () { raf = 0; if (k === curKey() && !(sw && sw.lock === "h")) applyHead(p.scrollTop, hasSub(k) ? 1 : 0, false); });
       }, { passive: true });
     });
     headNow(false);
@@ -2639,7 +2659,8 @@ a.ni { text-decoration: none; color: inherit; }
     tr.style.transition = "none";
     tr.style.transform = "translate3d(" + (-sw.i * W + sw.dx) + "px,0,0)";
     if (next < sw.keys.length) {  // строка фильтров новостей проявляется вместе со свайпом
-      var a = isNews(sw.keys[sw.i]) ? 1 : 0, b = isNews(sw.keys[next]) ? 1 : 0, f = Math.min(1, Math.abs(sw.dx) / W);
+      var a = hasSub(sw.keys[sw.i]) ? 1 : 0, b = hasSub(sw.keys[next]) ? 1 : 0, f = Math.min(1, Math.abs(sw.dx) / W);
+      if (b && !a) subGroup(sw.keys[next]);
       if (a !== b) { var cp2 = paneOf(sw.keys[sw.i]); applyHead(cp2 ? cp2.scrollTop : 0, a + (b - a) * f, false); }
     }
     var past = next >= 0 && next < sw.keys.length && Math.abs(sw.dx) > W / 2;
@@ -2740,7 +2761,7 @@ a.ni { text-decoration: none; color: inherit; }
     var pane = activePane();
     if (!pane || !HD) return;
     var secs = [].slice.call(pane.querySelectorAll(".tabbody > .sec > h3, .mapzone, .mzsec > .mzh")).map(function (h) { return h.classList.contains("mapzone") ? h : h; });
-    var top = HD.base + HD.miniH + (isNews(curKey()) ? HD.nfH : 0);
+    var top = HD.base + HD.miniH + (hasSub(curKey()) ? HD.nfH : 0);
     var chips = pane.querySelector(".mapzone .mapsel"), chipH = chips ? chips.offsetHeight : 0;
     var pr = pane.getBoundingClientRect().top;
     var targets = secs.map(function (el) {
@@ -2865,7 +2886,7 @@ a.ni { text-decoration: none; color: inherit; }
     if (mt) {
       SH = null;
       var id = mt[1];
-      if (state.openId !== id) { state.openId = id; state.tab = "players"; state.newsFilter = "all"; state.map = null; state.scrolls = {}; state.factsAll = false; window.scrollTo(0, 0); }
+      if (state.openId !== id) { state.openId = id; state.tab = "players"; state.teamSub = "players"; state.newsFilter = "all"; state.map = null; state.scrolls = {}; state.factsAll = false; window.scrollTo(0, 0); }
       $app.innerHTML = '<div class="empty">Загружаю матч…</div>';
       getDetail(id).then(renderMatch).catch(function () {
         $app.innerHTML = '<div class="empty"><strong>Подробностей пока нет</strong>Карточка появится после ближайшего сбора — как только станут известны обе команды. <button class="chip" id="back" style="margin-top:8px">Назад</button></div>';
@@ -2988,9 +3009,11 @@ a.ni { text-decoration: none; color: inherit; }
     }
     if (t.id === "facts-more") { state.factsAll = !state.factsAll; renderMatch(state.details[state.openId]); return; }
     if (t.hasAttribute("data-tg")) { if (TG) { e.preventDefault(); try { TG.openTelegramLink(t.getAttribute("data-tg")); } catch (x) { openLink(t.getAttribute("data-tg")); } } return; }
-    if (t.hasAttribute("data-tsub") || t.hasAttribute("data-pmap")) {  // вкладка «Команда»: Игроки / Позиции и выбор карты
-      if (t.hasAttribute("data-tsub")) state.teamSub = t.getAttribute("data-tsub"); else state.posMap = t.getAttribute("data-pmap");
-      var mt = state.details[state.openId]; if (mt) keepFilterScroll(function () { renderMatch(mt); });
+    if (t.hasAttribute("data-tsub")) { goKey("team:" + t.getAttribute("data-tsub")); return; }  // «Команда»: Игроки / Позиции — как фильтры новостей
+    if (t.hasAttribute("data-pmap")) {  // карта в «Позициях»: перерисовываем только эту страницу, прокрутка остаётся
+      state.posMap = t.getAttribute("data-pmap");
+      var mt = state.details[state.openId], pp = paneOf("team:pos");
+      if (mt && pp) { var ms = pp.querySelector(".mapsel"), sl = ms ? ms.scrollLeft : 0; pp.querySelector(".tabbody").innerHTML = posBlock(mt); var ms2 = pp.querySelector(".mapsel"); if (ms2) ms2.scrollLeft = sl; }
       return;
     }
     if (t.hasAttribute("data-formall")) {  // показать всю форму команды / свернуть обратно
@@ -3026,7 +3049,7 @@ a.ni { text-decoration: none; color: inherit; }
     if (t.hasAttribute("data-link")) { if (TG) { e.preventDefault(); openLink(t.getAttribute("data-link")); } return; }
     if (t.hasAttribute("data-open")) { go("#m-" + t.getAttribute("data-open")); return; }
     if (t.hasAttribute("data-tour")) { go("#t-" + t.getAttribute("data-tour")); window.scrollTo(0, 0); return; }
-    if (t.hasAttribute("data-tab")) { var nt = t.getAttribute("data-tab"); goKey(nt === "news" ? viewKey("news", state.newsFilter || "all") : nt); return; }
+    if (t.hasAttribute("data-tab")) { var nt = t.getAttribute("data-tab"); goKey(nt === "news" ? viewKey("news", state.newsFilter || "all") : viewKey(nt)); return; }
     if (t.hasAttribute("data-map")) { setMap(t.getAttribute("data-map")); return; }
     if (t.hasAttribute("data-nf")) { goKey(viewKey("news", t.getAttribute("data-nf"))); return; }
     if (t.hasAttribute("data-player")) {
