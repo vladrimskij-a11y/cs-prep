@@ -19,13 +19,19 @@ jobs:
           if not rel:
               raise SystemExit
           url = None
-          for base in ("https://files.bo3.gg/", "https://demos.bo3.gg/", "https://bo3.gg/", "https://storage.bo3.gg/", "https://cdn.bo3.gg/", "https://files.bo3.gg/uploads/"):
+          gid = g["id"]
+          cands = [f"{B}/games/{gid}/demo", f"{B}/games/{gid}/demo_url", f"{B}/games/{gid}/download", f"{B}/games/{gid}/download_demo",
+                   f"{B}/demos/{gid}", f"{B}/games/{gid}?with=demo", "https://api.bo3.gg/" + rel, "https://api.bo3.gg/api/v1/" + rel,
+                   "https://files.bo3.gg/" + rel.replace("demos/", "uploads/demos/"), "https://bo3.gg/api/v1/" + rel]
+          for u in cands:
               try:
-                  r = urllib.request.urlopen(urllib.request.Request(base + rel, method="HEAD", headers={"User-Agent": "Mozilla/5.0"}), timeout=20)
-                  print("POS| OK", base, r.status, r.headers.get("Content-Length"), r.headers.get("Content-Type"))
-                  url = url or base + rel
+                  r = urllib.request.urlopen(urllib.request.Request(u, headers={"User-Agent": "Mozilla/5.0", "Range": "bytes=0-300"}), timeout=20)
+                  body = r.read(300)
+                  print("POS| OK", u, r.status, r.headers.get("Content-Type"), r.headers.get("Content-Range"), body[:120])
+                  if b"PBDEMS2" in body[:16] or (r.headers.get("Content-Type") or "").startswith(("application/octet", "binary")):
+                      url = url or u
               except Exception as e:
-                  print("POS| нет", base, e)
+                  print("POS| нет", u, e)
           if not url:
               raise SystemExit
           t = time.time()
