@@ -12,6 +12,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta charset="utf-8">
 <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://raw.githubusercontent.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&family=Unbounded:wght@600;800&display=swap">
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <style>
@@ -541,6 +543,19 @@ html { overflow-anchor: none; }
 .home-brand { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 0 4px 10px; }
 .home-brand h1 { margin: 0; font-family: var(--display); font-weight: 800; font-size: 34px; line-height: 1; letter-spacing: .01em; }
 .home-brand h1 b { color: var(--onair); }
+/* плавные переходы: страница въезжает чуть снизу и проявляется; окна раскрываются; всё на transform/opacity */
+@keyframes viewIn { from { opacity: 0; transform: translate3d(0, 10px, 0); } to { opacity: 1; transform: none; } }
+@keyframes popIn { from { opacity: 0; transform: translate3d(0, 6px, 0) scale(.97); } to { opacity: 1; transform: none; } }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+body.nav #app > .view, body.nav #app > .sshell .pane, body.nav #app > .mshell .mviewport { animation: viewIn .28s cubic-bezier(.2,.8,.25,1) both; }
+body.nav #app > .sshell .shead, body.nav #app > .mshell .mhead { animation: fadeIn .2s ease-out both; }
+.pop .pop-in { animation: popIn .18s cubic-bezier(.2,.8,.25,1) both; transform-origin: top center; }
+.empty { animation: fadeIn .25s ease-out both; }
+.tab, .chip, .mcard, .match, .tour-card, .bm, .rk, .gbtn, .ptile, .pp-m, .fact.link, .ni { -webkit-tap-highlight-color: transparent; }
+.mcard, .ptile, button.rk { transition: transform .14s ease, opacity .14s ease; }
+.mcard:active, .ptile:active { transform: scale(.98); opacity: .9; }
+.mtrack, .ov-track { backface-visibility: hidden; }
+@media (prefers-reduced-motion: reduce) { body.nav #app > *, .pop .pop-in, .empty { animation: none !important; } }
 .stake { padding: 4px 14px; }
 .stk { display: grid; grid-template-columns: 22px 1fr; gap: 8px; padding: 10px 0; border-top: 1px solid var(--line); font-size: 14px; line-height: 1.4; }
 .stk:first-child { border-top: 0; }
@@ -844,7 +859,7 @@ a.ni { text-decoration: none; color: inherit; }
   // Данные читаем прямо из ветки data (обновляется сразу после каждого сбора); если недоступна — копия, опубликованная с сайтом
   var RAW = "https://raw.githubusercontent.com/vladrimskij-a11y/cs-prep/data/";
   var rawOk = true;
-  function dfetch(u) {
+  function netFetch(u) {
     var local = function () { return fetch(u); };
     if (!rawOk || location.protocol === "file:") return local();
     return fetch(RAW + u.slice(5), { cache: "no-store" }).then(function (r) {
@@ -852,6 +867,51 @@ a.ni { text-decoration: none; color: inherit; }
       if (r.status === 404) return r;  // файла нет и в ветке — так и отвечаем
       return local();
     }, function () { rawOk = false; return local(); });
+  }
+  // быстрая загрузка: что уже видели — показываем сразу из памяти устройства, а свежее тихо подкачиваем в фоне
+  var DC = {}, DC_INFLIGHT = {};
+  function dkey(u) { return String(u).split("?")[0]; }
+  function dcGet(k) {
+    if (DC[k]) return DC[k];
+    try { var x = localStorage.getItem("dc:" + k); if (x) return (DC[k] = JSON.parse(x)); } catch (e) {}
+    return null;
+  }
+  function dcPut(k, txt) {
+    var v = { t: Date.now(), body: txt }; DC[k] = v;
+    try { if (txt.length < 600000) localStorage.setItem("dc:" + k, JSON.stringify(v)); } catch (e) { try { dcTrim(); } catch (e2) {} }
+  }
+  function dcTrim() {  // память устройства переполнена — убираем самые старые записи
+    var ks = []; for (var i = 0; i < localStorage.length; i++) { var k = localStorage.key(i); if (k && k.indexOf("dc:") === 0) ks.push(k); }
+    ks.map(function (k) { try { return [k, JSON.parse(localStorage.getItem(k)).t]; } catch (e) { return [k, 0]; } })
+      .sort(function (a, b) { return a[1] - b[1]; }).slice(0, Math.ceil(ks.length / 2)).forEach(function (x) { localStorage.removeItem(x[0]); });
+  }
+  function fromNet(u, k) {
+    if (DC_INFLIGHT[k]) return DC_INFLIGHT[k];
+    var p = netFetch(u).then(function (r) {
+      if (!r.ok) { delete DC_INFLIGHT[k]; return r; }
+      return r.text().then(function (txt) { dcPut(k, txt); delete DC_INFLIGHT[k]; return new Response(txt, { status: 200, headers: { "Content-Type": "application/json" } }); });
+    }, function (e) { delete DC_INFLIGHT[k]; throw e; });
+    DC_INFLIGHT[k] = p;
+    return p.then(function (r) { return r.clone ? r.clone() : r; });
+  }
+  function dfetch(u, fresh) {
+    var k = dkey(u), c = !fresh && !state.refreshing && dcGet(k);
+    if (c && c.body) {
+      if (Date.now() - c.t > 20000) fromNet(u, k).catch(function () {});  // старше 20 с — обновим в фоне к следующему открытию
+      return Promise.resolve(new Response(c.body, { status: 200, headers: { "Content-Type": "application/json" } }));
+    }
+    return fromNet(u, k);
+  }
+  // в свободное время подкачиваем то, куда обычно идут дальше: рейтинг, ленту, сетки идущих турниров, ближайшие матчи
+  function prefetchAll() {
+    var idle = window.requestIdleCallback || function (f) { return setTimeout(f, 400); };
+    idle(function () {
+      var L = state.list || {}, list = ["data/ranking.json", "data/feed.json"];
+      (L.tournaments || []).filter(function (t) { return !t.finished && (t.results || t.bracket); }).slice(0, 4).forEach(function (t) { list.push("data/results/" + String(t.id).replace(/[^\w-]/g, "-") + ".json"); });
+      (L.matches || []).filter(function (m) { return m.has_detail; }).slice(0, 6).forEach(function (m) { list.push("data/match/" + m.id + ".json"); });
+      var i = 0;
+      (function next() { if (i >= list.length) return; var u = list[i++]; if (!dcGet(dkey(u)) || Date.now() - dcGet(dkey(u)).t > 60000) fromNet(u, dkey(u)).catch(function () {}).then(function () { setTimeout(next, 120); }); else next(); })();
+    });
   }
   function bust() { return "?t=" + Math.floor(Date.now() / 60000); }
   var PRIMARY = {};  // цветные логотипы из справочника (bo3.gg → PandaScore → HLTV)
@@ -2704,7 +2764,10 @@ a.ni { text-decoration: none; color: inherit; }
 
   // ---------- роутинг: "" турниры, #t-ID турнир, #m-ID матч, #feed лента
   var depth = 0;
+  var navT = 0;
   function route() {
+    // плавное появление новой страницы — только при переходе, не при тихом обновлении данных
+    document.body.classList.add("nav"); clearTimeout(navT); navT = setTimeout(function () { document.body.classList.remove("nav"); }, 360);
     var h = location.hash.replace("#", "");
     var mt = /^m-(\d+)$/.exec(h), tt = /^t-([\w-]+)$/.exec(h);
     closeOverlay(true);
@@ -2792,7 +2855,7 @@ a.ni { text-decoration: none; color: inherit; }
   // само обновляется: раз в минуту проверяем, не пришли ли свежие данные
   setInterval(function () {
     if (document.hidden || !state.list || state.ovl || state.pop || state.refreshing || sw || ss || pr) return;
-    dfetch("data/matches.json?t=" + Date.now()).then(function (r) { return r.ok ? r.json() : null; }).then(function (L) {
+    dfetch("data/matches.json?t=" + Date.now(), true).then(function (r) { return r.ok ? r.json() : null; }).then(function (L) {
       if (!L || L.updated === state.list.updated || state.ovl || sw || ss) return;
       var feedOld = state.feed;
       state.list = L; state.details = {}; state.results = {};
@@ -2885,7 +2948,7 @@ a.ni { text-decoration: none; color: inherit; }
   });
 
   $app.innerHTML = '<div class="empty">Загружаю матчи…</div>';
-  getList().then(function (L) { state.list = L; route(); })
+  getList().then(function (L) { state.list = L; route(); prefetchAll(); })
     .catch(function () { $app.innerHTML = '<div class="empty"><strong>Не получилось загрузить матчи</strong>Проверь интернет и открой ещё раз. Если не помогает — сборщик данных ещё ни разу не запускался.</div>'; });
 })();
 </script>
