@@ -1753,8 +1753,102 @@ def team_achievements(hltv_team: dict) -> list[dict]:
     return res
 
 
-def prize_places(hltv_team: dict | None, hist: list[dict], days: int = 92) -> list[dict]:
-    """Призовые места (1–4) за последние 3 месяца: турниры берём из истории матчей bo3 (там даты), места — с HLTV."""
+BO3_PLACES_F = CACHE / "bo3_places.json"
+bo3_places_cache: dict = load_json(BO3_PLACES_F, {})  # slug турнира bo3 → {"t", "places": {id команды: место}}; доигранные — навсегда
+BO3_PLACES_NEW = [0]
+BO3_PLACES_NEW_LIMIT = 300  # новых турниров за сбор (bo3 не блокирует)
+
+
+def bo3_tour_places(slug: str) -> dict:
+    """Места 1–4 доигранного турнира bo3.gg по сетке: финал — 1-е и 2-е; матч за 3-е — 3-е;
+    иначе проигравшие финалистам в их предыдущем матче: один и тот же (двойная сетка) — 3-е, двое — 3–4-е."""
+    c = bo3_places_cache.get(slug)
+    if c and (c.get("done") or (NOW - (parse_iso(c.get("t")) or NOW)) < timedelta(hours=12)):
+        return c.get("places") or {}
+    if BO3_PLACES_NEW[0] >= BO3_PLACES_NEW_LIMIT:
+        return (c or {}).get("places") or {}
+    BO3_PLACES_NEW[0] += 1
+    T = bo3(f"/tournaments/{slug}")
+    tier = str(T.get("tier") or "").lower()
+    done = T.get("status") == "finished"
+    places: dict = {}
+    if done and (not tier or tier in TIERS):
+        ms, third = [], []
+        for st in T.get("stages") or []:
+            for rd in st.get("rounds") or []:
+                is3 = bool(re.search(r"3rd|third|3-е|bronze", rd.get("name") or "", re.I))
+                for m in rd.get("matches") or []:
+                    if m.get("status") == "finished" and m.get("winner_team_id") and m.get("team1_id") and m.get("team2_id"):
+                        (third if is3 else ms).append(m)
+        ms.sort(key=lambda m: m.get("start_date") or "")
+        if ms:
+            gf = ms[-1]
+            w = gf["winner_team_id"]
+            l = gf["team2_id"] if w == gf["team1_id"] else gf["team1_id"]
+            places[str(w)], places[str(l)] = "1st", "2nd"
+            if third:
+                m3 = third[-1]
+                w3 = m3["winner_team_id"]
+                places.setdefault(str(w3), "3rd")
+            else:
+                semi = set()
+                for fin in (w, l):  # предыдущий матч финалиста — кому он проиграл
+                    prev = [m for m in ms[:-1] if fin in (m["team1_id"], m["team2_id"]) and m["winner_team_id"] == fin]
+                    if prev:
+                        p = prev[-1]
+                        semi.add(p["team2_id"] if p["team1_id"] == fin else p["team1_id"])
+                semi -= {w, l}
+                for tid in semi:
+                    places.setdefault(str(tid), "3rd" if len(semi) == 1 else "3-4th")
+    bo3_places_cache[slug] = {"t": iso(NOW), "done": done, "places": places}
+    return places
+
+
+def bo3_prize_places(bid: int | None, hist: list[dict]) -> list[dict]:
+    """Места 1–4 команды в этом году по сеткам bo3.gg (турниры — из её истории матчей)."""
+    if not bid:
+        return []
+    since = iso(datetime(NOW.year, 1, 1, tzinfo=timezone.utc))
+    tours: dict = {}
+    for m in hist:
+        if (m.get("start_date") or "") < since:
+            continue
+        tr = m.get("tournament") or {}
+        if tr.get("slug") and tr["slug"] not in tours:
+            tours[tr["slug"]] = (tr.get("name") or "", m.get("start_date"))
+    out = []
+    for slug, (name, date) in tours.items():
+        try:
+            pl = bo3_tour_places(slug).get(str(bid))
+        except Exception as e:
+            warn(f"bo3 места {slug}: {e!r}")
+            continue
+        if pl and name:
+            out.append({"place": pl, "event": name, "date": date})
+    return out
+
+
+def prize_places(hltv_team: dict | None, hist: list[dict], days: int = 92, bid: int | None = None) -> list[dict]:
+    """Призовые места (1–4) этого года: сначала по сеткам bo3.gg, к ним — места с HLTV, которых у bo3 нет."""
+    try:
+        out = bo3_prize_places(bid, hist)
+    except Exception as e:
+        warn(f"bo3 призовые: {e!r}")
+        out = []
+    try:
+        extra = prize_places_hltv(hltv_team, hist)
+    except Exception as e:
+        warn(f"HLTV призовые: {e!r}")
+        extra = []
+    for a in extra:
+        if not any(tour_same(a["event"], tour_norm(x["event"])) or tour_same(x["event"], tour_norm(a["event"])) for x in out):
+            out.append(a)
+    out.sort(key=lambda x: x.get("date") or "", reverse=True)
+    return out
+
+
+def prize_places_hltv(hltv_team: dict | None, hist: list[dict]) -> list[dict]:
+    """Места 1–4 с HLTV (страница команды): даты — из истории матчей bo3."""
     if not hltv_team:
         return []
     ach = team_achievements(hltv_team)
@@ -4548,13 +4642,13 @@ def build_detail(m: dict, prev: dict | None) -> dict:
         warn(f"VRS: {e!r}")
         table = []
     rows = []
-    for t, hist in zip(teams, hists):
+    for t, hist, bid in zip(teams, hists, bids):
         r = vrs_find(t, table) if table else None
         rows.append(r)
         if r:
             t["vrs"] = {"rank": r["rank"], "points": r["points"], "region": r.get("region"), "reg_rank": r.get("reg_rank")}
         try:
-            t["prizes"] = prize_places((r or {}).get("hltv") or hltv_team_for(t), hist)
+            t["prizes"] = prize_places((r or {}).get("hltv") or hltv_team_for(t), hist, bid=bid)
         except Exception as e:
             warn(f"Призовые места {t.get('name')}: {e!r}")
     if len(rows) == 2 and all(rows):
@@ -4639,12 +4733,13 @@ def build_team_page(r: dict) -> dict | None:
     key = "n:" + norm(r["name"])
     # призовые и id игроков с HLTV — раньше состава: по этим id ищутся MVP и мейджоры игроков
     ach = []
-    if r.get("hltv") and (hltv_cache.get(f"ach:{r['hltv']['id']}") or TEAM_GAMES_NEW[0] < 30):
+    hl = r.get("hltv") if r.get("hltv") and (hltv_cache.get(f"ach:{r['hltv']['id']}") or TEAM_GAMES_NEW[0] < 30) else None
+    if hl:
         TEAM_GAMES_NEW[0] += 1
-        try:
-            ach = prize_places(r["hltv"], hist)
-        except Exception as e:
-            warn(f"Призовые {r['name']}: {e!r}")
+    try:  # места по сеткам bo3 — у всех команд, HLTV — дополнительно, когда отвечает
+        ach = prize_places(hl, hist, bid=bid)
+    except Exception as e:
+        warn(f"Призовые {r['name']}: {e!r}")
     if roster_cache.get(key) or _team_lp_new[0] < 40:
         if not roster_cache.get(key):
             _team_lp_new[0] += 1
@@ -5136,6 +5231,7 @@ def main() -> int:
     save_json(GAMES_CACHE_F, games_cache)
     save_json(DETAILS_CACHE_F, details_cache)
     save_json(BO3_PLAYERS_F, bo3_players)
+    save_json(BO3_PLACES_F, bo3_places_cache)
     save_json(TEAMS_CACHE_F, teams_map)
     save_json(TR_CACHE_F, tr_cache)
     save_json(ROSTER_CACHE_F, roster_cache)
