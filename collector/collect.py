@@ -3810,8 +3810,8 @@ def hltv_players_warm() -> None:
         pl = hltv_player_ids.get(norm(n))
         if not pl:
             continue
-        c = hltv_cache.get(f"pinfo4:{pl['id']}")
-        old = any(hltv_cache.get(f"{v}:{pl['id']}") for v in ("pinfo3", "pinfo2", "pinfo"))
+        c = hltv_cache.get(f"pinfo5:{pl['id']}")
+        old = any(hltv_cache.get(f"{v}:{pl['id']}") for v in ("pinfo4", "pinfo3", "pinfo2", "pinfo"))
         rank = 0 if not c and not old else 1 if not c else 2  # ничего нет → старая версия → давно не обновлялось
         if c and (parse_iso(c.get("t")) or NOW) > NOW - timedelta(days=7):
             continue
@@ -3829,19 +3829,16 @@ def hltv_players_warm() -> None:
     print(f"HLTV игроки: в очереди {len(queue)}, обновлено {done}, запросов {_mvp_new[0]}" + (" (HLTV попросил остановиться)" if _hltv_blocked[0] else ""))
 
 
-_ach_dumped = [False]
-
-
 def hltv_player_info(nick: str) -> dict | None:
     """Со страницы игрока HLTV: медали MVP, сколько мейджоров сыграл и выиграл. Кэш на неделю, до 12 новых страниц за запуск."""
     pl = hltv_player_ids.get(norm(nick))
     if not pl:
         return None
-    key = f"pinfo4:{pl['id']}"
+    key = f"pinfo5:{pl['id']}"
     c = hltv_cache.get(key)
     if c and (parse_iso(c.get("t")) or NOW) > NOW - timedelta(days=7):
         return c["data"]
-    c = c or hltv_cache.get(f"pinfo3:{pl['id']}") or hltv_cache.get(f"pinfo2:{pl['id']}") or hltv_cache.get(f"pinfo:{pl['id']}")  # старая запись (без названий мейджоров) — пока не перечитали
+    c = c or hltv_cache.get(f"pinfo4:{pl['id']}") or hltv_cache.get(f"pinfo3:{pl['id']}") or hltv_cache.get(f"pinfo2:{pl['id']}") or hltv_cache.get(f"pinfo:{pl['id']}")  # старая запись (без названий мейджоров) — пока не перечитали
     path = f"/player/{pl['id']}/{pl['slug']}"
     if _mvp_new[0] >= MVP_PER_RUN or _hltv_blocked[0] or STATS or hltv_page_skip(path):
         return c["data"] if c else None  # лимит, стоп или страница недавно отказывала — берём что есть
@@ -3872,11 +3869,6 @@ def hltv_player_info(nick: str) -> dict | None:
         mvp = max(mvp, len(ev))
     pm = re.search(r'<div class="stat">(\d+)</div><div class="description">Majors? played', b)
     wm = re.search(r'<div class="stat">(\d+)</div><div class="description">Majors? won', b)
-    if not _ach_dumped[0]:  # один образец за запуск — чтобы по логу сверить разметку таблицы мест (запросов не добавляет)
-        _ach_dumped[0] = True
-        for mark in ("achievement-table", "Achievements", "majorAchievement", "trophy-row"):
-            k0 = b.find(mark)
-            print(f"HLTV-ОБРАЗЕЦ {nick} [{mark}] @{k0}: " + (b[max(0, k0 - 200):k0 + 1800] if k0 >= 0 else "нет"))
     # места на турнирах — таблица .achievement-table (так её разбирают gigobyte/HLTV и hltv-scraper-api):
     # строка .team, место в .achievement, турнир в .tournament-name-cell a
     mj, wins = [], []
@@ -3884,7 +3876,8 @@ def hltv_player_info(nick: str) -> dict | None:
     if k >= 0:
         seg = b[k:k + 120000].split("</table>", 1)[0]
         for row in re.split(r'<tr[^>]*class="[^"]*\bteam\b', seg)[1:]:
-            m_pl = re.search(r'class="achievement[^"]*"[^>]*>\s*([^<]+?)\s*<', row)
+            # место: <div class="text-ellipsis achievement "><i class="fa fa-trophy "></i>1/4 final</div> (разметка HLTV, 11.2026)
+            m_pl = re.search(r'class="[^"]*\bachievement\b[^"]*"[^>]*>(?:\s*<i[^>]*>\s*</i>)?\s*([^<]+?)\s*<', row)
             m_ev = re.search(r'class="tournament-name-cell"[^>]*>.*?<a [^>]*href="/events/\d+/[^"]*"[^>]*>(?:<[^>]+>)*\s*([^<]+?)\s*<', row)
             if not m_ev:
                 continue
@@ -3893,11 +3886,12 @@ def hltv_player_info(nick: str) -> dict | None:
                 lab = name + (f" — {place}" if place else "")
                 if lab not in mj:
                     mj.append(lab)
-            if re.match(r"1st$", place) and name not in wins:
+            if re.match(r"1st$|winner", place, re.I) and name not in wins:
                 wins.append(name)
     # трофеи игрока: ряд .trophy-row-trophy (название — в title картинки) и подписи span.trophyDescription
     tro = []
-    for t in re.findall(r'class="trophy-row-trophy"[^>]*>.*?<img[^>]*title="([^"]+)"', b) + re.findall(r'class="trophyDescription"[^>]*title="([^"]+)"', b):
+    cells = re.findall(r'<td class="trophy-row-trophy"[^>]*>(.*?)</td>', b)  # в ячейке команды несколько трофеев подряд
+    for t in [x for c0 in cells for x in re.findall(r'<img[^>]*title="([^"]+)"', c0)] + re.findall(r'class="trophyDescription"[^>]*title="([^"]+)"', b):
         t = _html.unescape(t).strip()
         if t and t not in tro:
             tro.append(t)

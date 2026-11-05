@@ -1869,10 +1869,20 @@ a.ni { text-decoration: none; color: inherit; }
   function vrsShort(t) { vrsLine(t); var v = t.vrs; return v ? 'Мир #' + esc(v.rank) + (v.region ? ' · ' + esc(REG_ABBR[v.region] || v.region) + (v.reg_rank ? ' #' + esc(v.reg_rank) : '') : '') : ''; }
   function miniVrs(t) { vrsLine(t); var v = t.vrs; return v ? '<small>Мир#' + esc(v.rank) + (v.region ? ' ' + esc(REG_MINI[v.region] || v.region) + '#' + esc(v.reg_rank || "") : '') + '</small>' : ''; }
   function heroVrs(t) { var x = vrsShort(t); return x ? '<span class="tvrs">' + x + '</span>' : ''; }
+  // место на мажоре по-русски: 1st → чемпион, 1/4 final → четвертьфинал, 9-11th → 9–11 место, Group stage → групповой этап
+  function majPlace(pl) {
+    pl = String(pl || "").trim();
+    var M = { "1/2 final": "полуфинал", "1/4 final": "четвертьфинал", "1/8 final": "1/8 финала", "final": "финал", "group stage": "групповой этап",
+      "challengers stage": "стадия претендентов", "legends stage": "стадия легенд", "opening stage": "первая стадия", "elimination stage": "стадия на вылет",
+      "new legends stage": "стадия новых легенд", "new challengers stage": "стадия новых претендентов", "stage 1": "стадия 1", "stage 2": "стадия 2", "stage 3": "стадия 3" };
+    if (/^1st$/i.test(pl)) return "чемпион";
+    if (/^2nd$/i.test(pl)) return "финалист, 2 место";
+    return M[pl.toLowerCase()] || (/\d(st|nd|rd|th)$/i.test(pl) ? placeRu(pl) : pl);
+  }
   function majLine(x, wins) {  // «PGL Major Copenhagen 2024 — 1st» → «🏆 PGL Major Copenhagen 2024 — чемпион»
-    var m = String(x).match(/^(.*) — (\S+)$/);
+    var m = String(x).match(/^(.*) — (.+)$/);
     if (!m) return (wins || []).indexOf(String(x)) >= 0 ? "🏆 " + x + " — чемпион" : String(x);
-    return (/^1st$/.test(m[2]) ? "🏆 " + m[1] + " — чемпион" : m[1] + " — " + placeRu(m[2]));
+    return (/^1st$/i.test(m[2]) ? "🏆 " : "") + m[1] + " — " + majPlace(m[2]);
   }
   function personRow(p, roles, real, extra, statsHtml, attrs) {
     var info = [real ? esc(real) + (p.name_ru ? ' <span class="pron">[' + esc(plain(p.name_ru)) + ']</span>' : '') : (p.name_ru ? esc(plain(p.name_ru)) : ""),
