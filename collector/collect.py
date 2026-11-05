@@ -2339,16 +2339,24 @@ def hltv_events() -> dict:
     for href, slug in re.findall(r'href="(/events/\d+/([^"#?]+))"', hltv_get("/events") or ""):
         out.setdefault(slug, href)
 
-    def arch():
-        h = hltv_get(f"/events/archive?startDate={NOW.year}-01-01&endDate={NOW.date().isoformat()}")
-        return dict((slug, href) for href, slug in re.findall(r'href="(/events/\d+/([^"#?]+))"', h or "")) or None
-    c = hltv_cache.get("evarch")
+    def arch():  # архив листается страницами по 50 — берём до 6 страниц (весь год), раз в сутки
+        res: dict = {}
+        for off in range(0, 300, 50):
+            h = hltv_get(f"/events/archive?startDate={NOW.year}-01-01&endDate={NOW.date().isoformat()}" + (f"&offset={off}" if off else ""))
+            got = dict((slug, href) for href, slug in re.findall(r'href="(/events/\d+/([^"#?]+))"', h or ""))
+            new = {k: v for k, v in got.items() if k not in res}
+            res.update(new)
+            if len(new) < 10:
+                break
+        print(f"Архив событий HLTV за год: {len(res)}")
+        return res or None
+    c = hltv_cache.get("evarch2")
     if c and (parse_iso(c.get("t")) or NOW) > NOW - timedelta(hours=24):
         a = c["data"]
     else:
         a = arch() or (c or {}).get("data") or {}
         if a:
-            hltv_cache["evarch"] = {"t": iso(NOW), "data": a}
+            hltv_cache["evarch2"] = {"t": iso(NOW), "data": a}
     for slug, href in a.items():
         out.setdefault(slug, href)
     _events_cache.update(out)
