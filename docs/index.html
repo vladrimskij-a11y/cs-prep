@@ -1155,10 +1155,10 @@ a.ni { text-decoration: none; color: inherit; }
   // ---------- турниры
   function toursPane(c, sub) {
     var today = dayKey(new Date().toISOString()), html = "";
-    if (sub === "done") return c.done.length ? '<div class="tours center">' + c.done.map(function (t) { return tourCard(t, today, ""); }).join("") + '</div>' : '<div class="empty"><strong>Завершённых турниров пока нет</strong></div>';
+    if (sub === "done") return c.done.length ? '<div class="tours">' + c.done.map(function (t) { return tourCard(t, today, ""); }).join("") + '</div>' : '<div class="empty"><strong>Завершённых турниров пока нет</strong></div>';
     // «Актуальные»: идущие сверху с пометкой «идёт», ниже грядущие по месяцам; всё по центру
     if (!c.live.length && !c.up.length) return '<div class="empty"><strong>Ближайших турниров нет</strong></div>';
-    if (c.live.length) html += '<h2 class="sect-title month">Идут сейчас</h2><div class="tours center">' + c.live.map(function (t) { return tourCard(t, today, ""); }).join("") + '</div>';
+    if (c.live.length) html += '<h2 class="sect-title month">Идут сейчас</h2><div class="tours">' + c.live.map(function (t) { return tourCard(t, today, ""); }).join("") + '</div>';
     var list = c.up;
     var months = {};  // турнир — в месяце начала; «продолжится в…», если заходит на следующий
     list.forEach(function (t) {
@@ -1169,7 +1169,7 @@ a.ni { text-decoration: none; color: inherit; }
     });
     Object.keys(months).map(Number).sort(function (a, b) { return a - b; }).forEach(function (k) {
       var y = Math.floor(k / 12), m = k % 12;
-      html += '<h2 class="sect-title month">' + MONTHS[m].charAt(0).toUpperCase() + MONTHS[m].slice(1) + ' ' + y + '</h2><div class="tours center">';
+      html += '<h2 class="sect-title month">' + MONTHS[m].charAt(0).toUpperCase() + MONTHS[m].slice(1) + ' ' + y + '</h2><div class="tours">';
       months[k].sort(function (a, b) { return tierW(a.t) - tierW(b.t); }).forEach(function (x) {
         html += tourCard(x.t, today, x.ek > x.bk ? '<span class="span">→ продолжится в ' + MONTHS_IN[(x.bk + 1) % 12] + '</span>' : '');
       });
@@ -2067,9 +2067,9 @@ a.ni { text-decoration: none; color: inherit; }
     var keys = S.players ? [-1].concat(maps.map(function (g, i) { return g.players ? i : null; }).filter(function (x) { return x != null; })) : [];
     var head = '<div class="ovtop">' + (TG ? '' : '<button class="back" data-close>' + ARROW + esc(backLabel) + '</button>') + '</div>' +
       '<div class="rd-meta">' + esc([withYear(S.tournament, S.date), S.stage, S.round].filter(Boolean).join(" · ")) + (S.date ? ' · ' + esc(dmy(S.date)) : '') + '</div>' +
-      '<section class="hero sres"><div class="face"><div class="tm a">' + logo(A.name, A.logo).replace('class="lg"', 'class="lg big"') + '<span class="acr' + ((A.acronym || A.name || "").length > 6 ? ' sm' : '') + '">' + esc(A.acronym || A.name) + '</span></div>' +
+      '<section class="hero sres"><div class="face"><div class="tm a" data-tname="' + esc(A.name) + '">' + logo(A.name, A.logo).replace('class="lg"', 'class="lg big"') + '<span class="acr' + ((A.acronym || A.name || "").length > 6 ? ' sm' : '') + '">' + esc(A.acronym || A.name) + '</span></div>' +
       '<div class="mid"><b class="num">' + esc(A.score) + ' : ' + esc(B.score) + '</b>BO' + esc(S.bo || "?") + '</div>' +
-      '<div class="tm b">' + logo(B.name, B.logo).replace('class="lg"', 'class="lg big"') + '<span class="acr' + ((B.acronym || B.name || "").length > 6 ? ' sm' : '') + '">' + esc(B.acronym || B.name) + '</span></div></div>' +
+      '<div class="tm b" data-tname="' + esc(B.name) + '">' + logo(B.name, B.logo).replace('class="lg"', 'class="lg big"') + '<span class="acr' + ((B.acronym || B.name || "").length > 6 ? ' sm' : '') + '">' + esc(B.acronym || B.name) + '</span></div></div>' +
       (maps.length ? '<div class="pp-maps">' + maps.map(function (g, i) {
         return mapSquare(g, i, A, B);
       }).join("") + unplayed.map(function (v, j) {
