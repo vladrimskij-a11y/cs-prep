@@ -4654,7 +4654,16 @@ def main() -> int:
                         added += bool(sd.get("veto"))
                 if added:
                     save_json(path, rj)
+                if not rj.get("stages"):  # итоги собраны до появления сетки — достраиваем сетку один раз (bo3 не блокирует)
+                    try:
+                        res = build_results(tr)
+                        if res and res.get("stages"):
+                            rj["stages"] = res["stages"]
+                            save_json(path, rj)
+                    except Exception as ex:
+                        warn(f"Сетка {tr['name']}: {ex!r}")
             tr["results"] = len(rj.get("matches") or [])
+            tr["bracket"] = bool(rj.get("stages"))  # вкладка «Обзор» у сыгранного турнира: сетка, призовые, участники
             continue
         try:
             res = build_results(tr)

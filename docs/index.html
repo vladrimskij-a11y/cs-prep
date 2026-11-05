@@ -1455,9 +1455,10 @@ a.ni { text-decoration: none; color: inherit; }
     var L = state.list, t = findTour(id);
     var ms = (L.matches || []).filter(function (m) { return tourOf(m) === String(id); });
     var tabs = [];
-    if (t && t.bracket) tabs.push({ key: "overview", label: "Обзор" });
-    if (ms.length || !(t && t.results)) tabs.push({ key: "matches", label: "Матчи" });
-    if (t && t.results) tabs.push({ key: "done", label: "Завершённые" });
+    var fin = t && t.finished;
+    if (t && (t.bracket || (fin && (t.hltv || t.major)))) tabs.push({ key: "overview", label: "Обзор" });  // у сыгранного — сетка, призовые, участники
+    if (!fin && (ms.length || !(t && t.results))) tabs.push({ key: "matches", label: "Матчи" });
+    if (t && t.results) tabs.push({ key: "done", label: fin ? "Матчи" : "Завершённые" });
     var sub = t ? '<span class="pill ' + esc(t.tier) + '">' + esc((t.tier || "?").toUpperCase()) + '</span>' + (t.begin ? esc(dm(t.begin) + (t.end ? " – " + dm(t.end) : "")) : "") + (t.prize_usd ? " · " + esc(usd(t.prize_usd)) : t.prize ? " · " + esc(prize(t.prize)) : "") : "";
     setTimeout(drawBrackets, 0);
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { if (q(".brk-row")) drawBrackets(); });
@@ -1466,7 +1467,8 @@ a.ni { text-decoration: none; color: inherit; }
         if (k === "overview") {
           var R0 = (state.results || {})[id];
           if (!R0) { getResults(id).then(function () { if (state.view === "tour:" + id) showTour(id); }).catch(function () {}); return '<div class="empty">Загружаю сетку…</div>'; }
-          return bracketHtml(R0) + (t && (t.hltv || t.major) ? prizeBlock(Object.assign({}, t.hltv || {}, { major: t.major })) : '');
+          var pz = t && (t.hltv || t.major) ? prizeBlock(Object.assign({}, t.hltv || {}, { major: t.major })) : '';
+          return ((R0.stages || []).length ? bracketHtml(R0) : '') + pz || '<div class="empty"><strong>Сетка и призовые ещё собираются</strong>Появятся после ближайшего полного сбора.</div>';
         }
         if (k === "done") {
           var R = (state.results || {})[id];
