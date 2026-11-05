@@ -1,0 +1,30 @@
+name: probe lp
+on: workflow_dispatch
+jobs:
+  p:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - name: probe
+        run: |
+          cd collector && python - <<'PY'
+          import re, collect as c
+          T = ["Intel_Extreme_Masters/2026/Beijing", "PGL/2026/Bucharest", "ESL/Pro_League/Season_24", "Intel_Extreme_Masters/2026/Cologne",
+               "PGL/2026/Singapore", "BLAST/Major/2025/Austin", "Perfect_World/Major/2025/Shanghai", "PGL/2024/Copenhagen",
+               "Valve_Regional_Standings", "Majors", "Counter-Strike_Major_Championships"]
+          P = c.lp_pages(T)
+          for t in T:
+              x = P.get(t)
+              print("=== PAGE", t, "len", len(x) if x else None)
+              if not x: continue
+              for kw in ("prize", "Prize", "mvp", "MVP", "qualif", "TeamCard", "Opponent", "{{Slot", "placement", "place=", "|p1", "standings", "Standings", "points"):
+                  n = x.count(kw)
+                  if n: print("   count", repr(kw), n)
+              shown = 0
+              for ln in x.split("\n"):
+                  if re.search(r"(?i)mvp|prize ?pool|\{\{Slot|qualifies|\|place=|TeamCard|^\|p\d|opponent=|award", ln) and shown < 25:
+                      print("   |", ln[:260]); shown += 1
+          PY
