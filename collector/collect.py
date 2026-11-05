@@ -458,20 +458,26 @@ def lp_pages(titles: list[str]) -> dict[str, str]:
     """Вики-текст страниц Liquipedia: {запрошенное название: текст}. Не чаще запроса в 2,5 с (правила Liquipedia)."""
     if _lp_blocked[0]:
         raise RuntimeError("Liquipedia ограничила запросы в этом запуске")
-    wait = 2.5 - (time.time() - _lp_last[0])
-    if wait > 0:
-        time.sleep(wait)
-    _lp_last[0] = time.time()
-    stats["liquipedia_requests"] += 1
     url = LP_API + "?" + urllib.parse.urlencode({
         "action": "query", "prop": "revisions", "rvprop": "content", "rvslots": "main",
         "titles": "|".join(titles), "redirects": 1, "format": "json"})
-    try:
-        data = json.loads(http_get(url, {"User-Agent": LP_UA, "Accept": "application/json"}))
-    except urllib.error.HTTPError as e:
-        if e.code == 429:
-            _lp_blocked[0] = True  # больше не стучимся до следующего запуска
-        raise
+    for attempt in (0, 1):
+        wait = 4.0 - (time.time() - _lp_last[0])  # бережнее правил Liquipedia (2 с) — составов за сбор стало больше
+        if wait > 0:
+            time.sleep(wait)
+        _lp_last[0] = time.time()
+        stats["liquipedia_requests"] += 1
+        try:
+            data = json.loads(http_get(url, {"User-Agent": LP_UA, "Accept": "application/json"}))
+            break
+        except urllib.error.HTTPError as e:
+            if e.code == 429 and attempt == 0:
+                warn("Liquipedia: «слишком часто» — жду 90 с и пробую ещё раз")
+                time.sleep(90)
+                continue
+            if e.code == 429:
+                _lp_blocked[0] = True  # повторно — больше не стучимся до следующего запуска
+            raise
     q = data.get("query") or {}
     alias = {}
     for k in ("normalized", "redirects"):
