@@ -78,7 +78,7 @@ def warn(msg: str) -> None:
 
 # ---------------------------------------------------------------- HTTP
 
-def http_get(url: str, headers: dict | None = None, timeout: int = 30) -> bytes:
+def http_get(url: str, headers: dict | None = None, timeout: int = 30, retry429: bool = True) -> bytes:
     h = {"User-Agent": UA, "Accept": "*/*", "Accept-Encoding": "gzip"}
     h.update(headers or {})
     req = urllib.request.Request(url, headers=h)
@@ -91,7 +91,7 @@ def http_get(url: str, headers: dict | None = None, timeout: int = 30) -> bytes:
                     body = gzip.decompress(body)
                 return body
         except urllib.error.HTTPError as e:
-            if e.code in (429, 500, 502, 503, 504) and attempt < 2:
+            if e.code in ((429,) if retry429 else ()) + (500, 502, 503, 504) and attempt < 2:
                 time.sleep(4 * (attempt + 1))
                 last = e
                 continue
@@ -454,8 +454,27 @@ for _f in ("liquipedia_rosters_v2.json", "liquipedia_rosters.json"):
             _roster_fallback[_k] = _v
 
 
+_lp_mem: dict = {}      # название → вики-текст (за этот запуск)
+_lp_none: set = set()   # названия, которых на Liquipedia нет
+
+
 def lp_pages(titles: list[str]) -> dict[str, str]:
-    """Вики-текст страниц Liquipedia: {запрошенное название: текст}. Не чаще запроса в 2,5 с (правила Liquipedia)."""
+    """Вики-текст страниц Liquipedia: {запрошенное название: текст}. Уже запрошенное — из памяти;
+    новое — пачками до 50 страниц одним запросом (API это позволяет), не чаще запроса в 4 с."""
+    titles = [t for t in dict.fromkeys(titles) if t]
+    need = [t for t in titles if t not in _lp_mem and t not in _lp_none]
+    for i in range(0, len(need), 50):
+        part = need[i:i + 50]
+        got = _lp_pages_net(part)
+        for t in part:
+            if t in got:
+                _lp_mem[t] = got[t]
+            else:
+                _lp_none.add(t)
+    return {t: _lp_mem[t] for t in titles if t in _lp_mem}
+
+
+def _lp_pages_net(titles: list[str]) -> dict[str, str]:
     if _lp_blocked[0]:
         raise RuntimeError("Liquipedia ограничила запросы в этом запуске")
     url = LP_API + "?" + urllib.parse.urlencode({
@@ -468,7 +487,7 @@ def lp_pages(titles: list[str]) -> dict[str, str]:
         _lp_last[0] = time.time()
         stats["liquipedia_requests"] += 1
         try:
-            data = json.loads(http_get(url, {"User-Agent": LP_UA, "Accept": "application/json"}))
+            data = json.loads(http_get(url, {"User-Agent": LP_UA, "Accept": "application/json"}, retry429=False))
             break
         except urllib.error.HTTPError as e:
             if e.code == 429 and attempt == 0:
@@ -614,25 +633,60 @@ def age_from(birth: str | None) -> int | None:
         return None
 
 
-def lp_roster(t: dict) -> dict | None:
-    """Активный состав с Liquipedia: тренер, капитан, роли. Кэш на ROSTER_TTL_DAYS дней."""
-    key = str(t["id"])
+def lp_fresh(key: str) -> bool:
+    """Состав в кэше ещё свежий: полный — ROSTER_TTL_DAYS; с заменой/арендой/просмотром или неполный (нет ролей
+    или тренера — у многих команд их на Liquipedia просто нет) — сутки. Раньше неполные перепроверялись каждые 3 ч,
+    и десятки таких команд в каждом сборе упирались в лимит Liquipedia."""
     cached = roster_cache.get(key)
-    if cached:
-        age = NOW - (parse_iso(cached.get("t")) or NOW)
-        d = cached.get("data") or {}
-        incomplete = not d or any(not p.get("roles") for p in d.get("players") or []) or not d.get("coach")
-        if d and any(p.get("note") for p in d.get("players") or []) and age >= timedelta(days=1):
-            incomplete, age = True, timedelta(hours=3)  # замена/аренда/просмотр: статус меняется — сверяем ежедневно
-        # полный состав живёт ROSTER_TTL_DAYS; неполный (нет ролей или тренера) перепроверяем каждые 3 часа
-        if age < timedelta(days=ROSTER_TTL_DAYS) and not (incomplete and age >= timedelta(hours=3)):
-            return cached.get("data")
+    if not cached:
+        return False
+    age = NOW - (parse_iso(cached.get("t")) or NOW)
+    d = cached.get("data") or {}
+    shaky = not d or any(not p.get("roles") for p in d.get("players") or []) or not d.get("coach") \
+        or any(p.get("note") for p in d.get("players") or [])
+    return age < (timedelta(days=1) if shaky else timedelta(days=ROSTER_TTL_DAYS))
+
+
+def lp_names(t: dict) -> list[str]:
     names = []
     base = re.sub(r"\s+(esports|e-sports|gaming|team|clan|club|cs2?|counter-strike)$", "", t.get("name") or "", flags=re.IGNORECASE).strip()
     for nm in (t.get("name"), re.sub(r"(?<=[a-z])(?=[A-Z])", " ", t.get("name") or ""), t.get("acronym"), base or None,  # «DENDELE CS» → DENDELE
                "Team " + base if base else None, base + " Esports" if base else None):  # на Liquipedia: «Team Spirit», «FUT Esports»
         if nm and nm not in names:
             names.append(nm)
+    return names
+
+
+def lp_prefetch(teams: list[dict]) -> None:
+    """Страницы команд, которым нужен свежий состав, и страницы их игроков — пачками по 50 за запрос
+    (вместо двух запросов на каждую команду). Потом lp_roster берёт всё из памяти."""
+    need = [t for t in teams if t.get("name") and not lp_fresh(str(t["id"]))]
+    if not need or _lp_blocked[0]:
+        return
+    try:
+        pages = lp_pages([n for t in need for n in lp_names(t)])
+        people = []
+        for t in need:
+            text = next((pages[n] for n in lp_names(t) if n in pages and "Squad|status=active" in pages[n]), None)
+            i = text.find("Squad|status=active") if text else -1
+            while i >= 0:
+                for line in text[i: text.find("\n}}", i)].split("\n"):
+                    if "{{Person" in line and lp_param(line, "id"):
+                        people.append(lp_param(line, "link") or lp_param(line, "id"))
+                i = text.find("Squad|status=active", i + 10)
+        lp_pages(people)
+        print(f"Liquipedia: предзагрузка {len(need)} команд, {len(people)} игроков")
+    except Exception as e:
+        warn(f"Liquipedia предзагрузка: {e!r}")
+
+
+def lp_roster(t: dict) -> dict | None:
+    """Активный состав с Liquipedia: тренер, капитан, роли. Кэш (см. lp_fresh)."""
+    key = str(t["id"])
+    cached = roster_cache.get(key)
+    if cached and lp_fresh(key):
+        return cached.get("data")
+    names = lp_names(t)
     data = None
     try:
         pages = lp_pages(names)
@@ -2810,6 +2864,40 @@ def hltv_team_for(t: dict) -> dict | None:
     return None
 
 
+def team_veto_matches(t: dict, ht: dict | None) -> list[dict]:
+    """Матчи команды для сводки «что пикает / банит» — из своего архива вето (dust2): лента dust2 за месяц
+    и уже сохранённые вето за 3 месяца. HLTV (/results?team=) — только если своих матчей меньше 5."""
+    vs = set()
+    for x in (t.get("name"), (ht or {}).get("name"), re.sub(r"^(the|team)\s+|\s+(team|esports|gaming|club)$", "", t.get("name") or "", flags=re.IGNORECASE)):
+        k = norm(x)
+        if len(k) >= 4 or (k and k == norm(t.get("name"))):
+            vs.add(k)
+    if not vs:
+        return []
+    def mine(tn):
+        k = norm(tn)
+        return bool(k) and any(k == v or (min(len(k), len(v)) >= 4 and (v in k or k in v)) for v in vs)
+    out = {}
+    try:
+        for mt in d2_recent_matches():
+            sl = norm(mt.get("slug"))
+            if any(v in sl for v in vs):
+                out[str(mt["id"])] = {"id": mt["id"], "slug": mt["slug"], "date": mt.get("date")}
+    except Exception as e:
+        warn(f"Лента dust2 для вето {t.get('name')}: {e!r}")
+    since = iso(NOW - timedelta(days=STATS_WINDOW_DAYS))
+    for k, v in veto_cache.items():
+        if not k.startswith("match:") or not v.get("steps") or (v.get("date") or "") < since:
+            continue
+        if any(mine(x.get("team")) for x in v["steps"] if x.get("team")):
+            out.setdefault(k[6:], {"id": k[6:], "slug": "", "date": v.get("date")})
+    res = sorted(out.values(), key=lambda x: x.get("date") or "", reverse=True)
+    if len(res) < 5 and ht and not STATS:  # новая или редко играющая команда — дополняем с HLTV
+        for x in hltv_team_matches(ht):
+            res.append(x) if str(x["id"]) not in out else None
+    return res
+
+
 def hltv_team_matches(team: dict) -> list[dict]:
     key = f"results4:{team['id']}"
     c = veto_cache.get(key)
@@ -3005,13 +3093,15 @@ def build_veto(teams: list[dict]) -> dict | None:
     """По каждой команде: что пикает, что банит первым и вообще, по последним матчам; плюс вероятный маппул."""
     res = []
     for t in teams:
-        ht = hltv_team_for(t)
-        if not ht:
+        hreal = hltv_team_for(t)
+        ht = hreal or {"name": t.get("name") or ""}
+        mlist = team_veto_matches(t, hreal)
+        if not mlist:
             res.append(None)
             continue
         picks, bans, first_bans, n, deciders = {}, {}, {}, 0, {}
         wp, wb, wf, wn, vs = {}, {}, {}, 0.0, {}  # то же с весом свежести (полураспад 60 дней) и пики против конкретных соперников
-        for mt in hltv_team_matches(ht)[:VETO_MATCHES]:
+        for mt in mlist[:VETO_MATCHES]:
             v = hltv_veto(mt)
             if not v or not v.get("steps"):
                 continue
@@ -4145,13 +4235,28 @@ def hltv_players_warm() -> None:
             for n, x in ((v or {}).get("data") or {}).items():
                 hltv_player_ids.setdefault(n, x)
     nicks: list = []
+    forms: dict = {}  # ник → форма его команды (турнир, дата серии)
     files = sorted((load_json(f, {}) or {} for f in (OUT / "match").glob("*.json")), key=lambda d: d.get("begin_at") or "9999")
     for d in files:
         for t in d.get("teams") or []:
-            nicks += [p.get("nick") for p in (t.get("players") or []) + (t.get("coach") or [])]
+            ps = [p.get("nick") for p in (t.get("players") or []) + (t.get("coach") or [])]
+            nicks += ps
+            for n in ps:
+                forms.setdefault(n, t.get("form") or [])
     for f in sorted((OUT / "team").glob("*.json")):
         d = load_json(f, {}) or {}
-        nicks += [p.get("nick") for p in (d.get("roster") or []) + (d.get("coach") or [])]
+        ps = [p.get("nick") for p in (d.get("roster") or []) + (d.get("coach") or [])]
+        nicks += ps
+        for n in ps:
+            forms.setdefault(n, d.get("form") or [])
+    running = [tour_norm(x) for x in CURRENT_TOURS]
+    def event_ended_since(n, since):
+        """Команда игрока доиграла турнир после прошлой проверки — могли дать MVP, мог закончиться мейджор."""
+        for x in forms.get(n) or []:
+            tn = x.get("tournament") or ""
+            if (x.get("date") or "") > since and tn and not any(tour_same(tn, r) for r in running):
+                return True
+        return False
     queue = []
     for i, n in enumerate(dict.fromkeys(x for x in nicks if x)):
         pl = hltv_player_ids.get(norm(n))
@@ -4160,7 +4265,9 @@ def hltv_players_warm() -> None:
         c = hltv_cache.get(f"pinfo5:{pl['id']}")
         old = any(hltv_cache.get(f"{v}:{pl['id']}") for v in ("pinfo4", "pinfo3", "pinfo2", "pinfo"))
         rank = 0 if not c and not old else 1 if not c else 2  # ничего нет → старая версия → давно не обновлялось
-        if c and (parse_iso(c.get("t")) or NOW) > NOW - timedelta(days=7):
+        # MVP и мейджоры меняются только по итогам турниров: страницу перечитываем, когда команда доиграла турнир
+        # после прошлой проверки, а без этого — раз в 3 недели (раньше — каждую неделю всех подряд)
+        if c and (parse_iso(c.get("t")) or NOW) > NOW - timedelta(days=PINFO_TTL_DAYS) and not event_ended_since(n, c.get("t") or ""):
             continue
         queue.append((rank, (c or {}).get("t") or "", i, n))
     queue.sort()
@@ -4169,22 +4276,25 @@ def hltv_players_warm() -> None:
         if _mvp_new[0] >= MVP_PER_RUN or _hltv_blocked[0]:
             break
         try:
-            if hltv_player_info(n):
+            if hltv_player_info(n, force=True):
                 done += 1
         except Exception as e:
             warn(f"Игрок HLTV {n}: {e!r}")
     print(f"HLTV игроки: в очереди {len(queue)}, обновлено {done}, запросов {_mvp_new[0]}" + (" (HLTV попросил остановиться)" if _hltv_blocked[0] else ""))
 
 
-def hltv_player_info(nick: str) -> dict | None:
+PINFO_TTL_DAYS = 21
+
+
+def hltv_player_info(nick: str, force: bool = False) -> dict | None:
     """Со страницы игрока HLTV: медали MVP, сколько мейджоров сыграл и выиграл. Кэш на неделю, до 12 новых страниц за запуск."""
     pl = hltv_player_ids.get(norm(nick))
     if not pl:
         return None
     key = f"pinfo5:{pl['id']}"
     c = hltv_cache.get(key)
-    if c and (parse_iso(c.get("t")) or NOW) > NOW - timedelta(days=7):
-        return c["data"]
+    if c and (not force or _mvp_new[0] >= MVP_PER_RUN) and (parse_iso(c.get("t")) or NOW) > NOW - timedelta(days=PINFO_TTL_DAYS):
+        return c["data"]  # свежее — из кэша; очередь (force) перечитывает тех, чья команда доиграла турнир
     c = c or hltv_cache.get(f"pinfo4:{pl['id']}") or hltv_cache.get(f"pinfo3:{pl['id']}") or hltv_cache.get(f"pinfo2:{pl['id']}") or hltv_cache.get(f"pinfo:{pl['id']}")  # старая запись (без названий мейджоров) — пока не перечитали
     path = f"/player/{pl['id']}/{pl['slug']}"
     if _mvp_new[0] >= MVP_PER_RUN or _hltv_blocked[0] or STATS or hltv_page_skip(path):
@@ -4861,6 +4971,14 @@ def build_ranking() -> dict:
         r["hltv_rank"] = hm0.get(norm(r["name"]))
     (OUT / "team").mkdir(parents=True, exist_ok=True)
     keep = set()
+    if not STATS:  # составы команд рейтинга — тоже пачками (новых — не больше 40 за сбор, как в build_team_page)
+        cand, new = [], 0
+        for r in vrs:
+            k = "n:" + norm(r["name"])
+            if roster_cache.get(k) or new < 40:
+                new += 0 if roster_cache.get(k) else 1
+                cand.append({"id": k, "name": r["name"]})
+        lp_prefetch(cand)
     for r in vrs:
         r["slug"] = team_slug(r["name"])
         path = OUT / "team" / f"{r['slug']}.json"
@@ -5076,6 +5194,8 @@ def main() -> int:
             warn(f"Очередь HLTV: {e!r}")
     listing = []
     keep_ids = set()
+    if not STATS:  # составы всех команд недели с Liquipedia — пачками, а не по два запроса на команду
+        lp_prefetch([t for m in matches for t in match_brief(m)["teams"]])
     for m in matches:
         b = match_brief(m)
         begin = parse_iso(b["begin_at"])
