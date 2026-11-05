@@ -1,4 +1,13 @@
-<title>RIM CS</title>
+<title>RIM·CS</title>
+<link rel="icon" type="image/svg+xml" href="img/icon/icon.svg">
+<link rel="icon" type="image/png" sizes="192x192" href="img/icon/icon-192.png">
+<link rel="apple-touch-icon" href="img/icon/apple-touch-icon.png">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="apple-mobile-web-app-title" content="RIM·CS">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0d1017">
 <meta name="claude:viewport-fit-sides" content="cover">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta charset="utf-8">
@@ -527,6 +536,11 @@ html { overflow-anchor: none; }
 .ptile small .vrs-b { font-size: 8.5px; padding: 1px 4px; }
 @media (max-width: 340px) { .ptiles { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 .rt.sub { background: color-mix(in srgb, var(--muted) 22%, transparent); color: var(--fg); } .rt.loan { background: color-mix(in srgb, var(--ct) 22%, transparent); color: var(--ct); }
+/* главная: название над первой плиткой, вместе с плитками по центру экрана */
+.view.home .menu { min-height: calc(var(--tg-viewport-stable-height, 100dvh) - 40px); }
+.home-brand { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 0 4px 10px; }
+.home-brand h1 { margin: 0; font-family: var(--display); font-weight: 800; font-size: 34px; line-height: 1; letter-spacing: .01em; }
+.home-brand h1 b { color: var(--onair); }
 .stake { padding: 4px 14px; }
 .stk { display: grid; grid-template-columns: 22px 1fr; gap: 8px; padding: 10px 0; border-top: 1px solid var(--line); font-size: 14px; line-height: 1.4; }
 .stk:first-child { border-top: 0; }
@@ -1018,8 +1032,8 @@ a.ni { text-decoration: none; color: inherit; }
   function renderMenu() {
     var L = state.list, c = tourBuckets();
     function card(h, t, sub) { return '<button class="mcard" data-goto="' + h + '"><span class="mc-t">' + t + '</span><span class="mc-s">' + esc(sub) + '</span><i class="chev2">›</i></button>'; }
-    $app.innerHTML = '<div class="view"><header class="top"><div class="brand"><h1>RIM<b>·</b>CS</h1><span class="upd">обновлено ' + esc(ago(L.updated)) + ' · время МСК</span></div></header>' +
-      '<div class="menu">' + card("feed", "Лента", "Новости Telegram-каналов без повторов и мусора") +
+    $app.innerHTML = '<div class="view home">' +
+      '<div class="menu"><div class="home-brand"><h1>RIM<b>·</b>CS</h1><span class="upd">обновлено ' + esc(ago(L.updated)) + ' · время МСК</span></div>' + card("feed", "Лента", "Новости Telegram-каналов без повторов и мусора") +
       card("tours", "Турниры", c.live[0] ? "Идёт: " + c.live.map(function (t) { return t.name; }).slice(0, 2).join(", ") : c.up[0] ? "Скоро: " + c.up[0].name : "Тир-1 и тир-2") +
       card("rating", "Рейтинг", "Топ-100 команд по VRS") + majorCard() + '</div></div>';
     function majorCard() {
