@@ -4488,6 +4488,52 @@ def logo_rank(url: str, src: str) -> int:
     return 2
 
 
+def build_positions() -> None:
+    """data/positions.json: позиции игроков по картам с ProRoles (GameSenseLab, по демо турниров).
+    Один открытый файл, обновляем не чаще раза в 20 часов: 2 запроса в сутки."""
+    path = OUT / "positions.json"
+    old = load_json(path, None) or {}
+    if old.get("updated") and old["updated"] > iso(NOW - timedelta(hours=20)):
+        return
+    base = "https://proroles.gamesenselab.pro"
+    page = http_get(base + "/", {"User-Agent": "cs-prep/1.0 (+https://github.com/vladrimskij-a11y/cs-prep)"}).decode("utf-8", "replace")
+    mv = re.search(r"PP_VER\s*=\s*'(\w+)'", page)
+    raw = http_get(base + "/pp/index.json" + (f"?v={mv.group(1)}" if mv else ""), {"User-Agent": "cs-prep/1.0 (+https://github.com/vladrimskij-a11y/cs-prep)", "Accept": "application/json"})
+    d = json.loads(raw)
+
+    def top(lst, n):
+        if not lst or not n:
+            return None
+        a, c = lst[0][0], lst[0][-1]
+        return [a, round(100 * c / n)]
+
+    teams: dict = {}
+    days = []
+    for m in d.get("maps") or []:
+        mid = str(m.get("id") or "").lower()
+        for s0 in m.get("src") or []:
+            days.append(s0.get("day") or "")
+        for p in m.get("players") or []:
+            tn = p.get("team") or ""
+            if not tn or tn.lower() in ("other team", "private"):
+                continue
+            ct, t = p.get("ct") or {}, p.get("t") or {}
+            row = {"ct": (p.get("ctRole") or [""])[0], "t": (p.get("tRole") or [""])[0],
+                   "cs": top(ct.get("setup"), ct.get("n")), "ts": top(t.get("early"), t.get("n")),
+                   "cn": ct.get("n") or 0, "tn": t.get("n") or 0}
+            if (p.get("awp") or 0) >= 0.3:
+                row["awp"] = round(100 * p["awp"])
+            if "Entry" in (p.get("roles") or []):
+                row["entry"] = 1
+            if p.get("open"):
+                row["op"] = [p["open"], p.get("openwin") or 0]
+            teams.setdefault(tn, {}).setdefault(mid, {})[p.get("name") or ""] = row
+    out = {"updated": iso(NOW), "source": "ProRoles · GameSenseLab", "url": base,
+           "maps": [str(m.get("id") or "").lower() for m in d.get("maps") or []], "teams": teams}
+    save_json(path, out)
+    print(f"Позиции ProRoles: команд {len(teams)}, карт {len(out['maps'])}")
+
+
 def build_logos() -> None:
     """data/logos.json: название команды → лучший (цветной) логотип. Недостающие ищем на bo3.gg."""
     path = OUT / "logos.json"
@@ -4808,6 +4854,10 @@ def main() -> int:
         build_logos()
     except Exception as e:
         warn(f"Логотипы: {e!r}")
+    try:
+        build_positions()
+    except Exception as e:
+        warn(f"Позиции ProRoles: {e!r}")
     # «Будущие игры» на страницах команд — на каждом сборе (страницы целиком пересобираются раз в 3–12 ч, а расписание меняется чаще)
     # и сверка со свежими карточками матчей: состав, трофеи, MVP и мажоры у команды должны совпадать с тем, что в матче
     PFIELDS = ("mvp", "mvp_events", "majors", "major_wins", "major_events", "trophies", "event_wins", "name_ru", "tags")

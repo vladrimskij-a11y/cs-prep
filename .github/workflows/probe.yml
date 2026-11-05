@@ -4,26 +4,12 @@ jobs:
   p:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
       - run: |
-          python3 - <<'X'
-          import re, urllib.request, json
-          UA = "cs-prep/1.0 (+https://github.com/vladrimskij-a11y/cs-prep)"
-          def get(u):
-              try:
-                  r = urllib.request.urlopen(urllib.request.Request(u, headers={"User-Agent": UA}), timeout=30)
-                  return r.status, r.headers.get("Content-Type"), r.read().decode("utf-8", "replace")
-              except Exception as e:
-                  return str(e), None, ""
-          B = "https://proroles.gamesenselab.pro"
-          st, ct, h = get(B + "/")
-          v = re.search(r"PP_VER = '(\w+)'", h).group(1)
-          st, ct, b = get(B + "/pp/index.json?v=" + v); d = json.loads(b)
-          from collections import Counter
-          R = Counter(); Z = Counter(); A = Counter()
-          for m in d["maps"]:
-              for p in m["players"]:
-                  R[p["ctRole"][0]] += 1; R[p["tRole"][0]] += 1; Z[p.get("zct")] += 1; Z[p.get("zt")] += 1
-                  for r in p.get("roles") or []: A[r] += 1
-          print("PR| ROLES", R.most_common(80)); print("PR| Z", Z.most_common(60)); print("PR| R2", A.most_common(30))
-          print("PR| src", d["maps"][0]["src"][:5], d["maps"][0]["label"], d["maps"][0]["rounds"])
-          X
+          mkdir -p docs/data
+          python -c "import sys; sys.path.insert(0,'collector'); import collect; collect.build_positions()"
+          ls -la docs/data
+      - uses: actions/upload-artifact@v4
+        with: { name: pos, path: docs/data/positions.json }
