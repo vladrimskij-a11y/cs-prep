@@ -1150,7 +1150,7 @@ a.ni { text-decoration: none; color: inherit; }
     var L = state.list, c = tourBuckets();
     function card(h, t, sub) { return '<button class="mcard" data-goto="' + h + '"><span class="mc-t">' + t + '</span><span class="mc-s">' + esc(sub) + '</span><i class="chev2">›</i></button>'; }
     $app.innerHTML = '<div class="view home">' +
-      '<div class="menu"><div class="home-brand"><h1>RIM<b>·</b>CS</h1><span class="upd">обновлено ' + esc(ago(L.updated)) + ' · время МСК</span></div>' + card("feed", "Лента", "Новости Telegram-каналов без повторов и мусора") +
+      '<div class="menu"><div class="home-brand"><h1>RIM<b>·</b>CS</h1><span class="upd">обновлено ' + esc(ago(L.updated)) + ' · время МСК' + (BUILD.indexOf("__") ? ' · v' + esc(BUILD) : '') + '</span></div>' + card("feed", "Лента", "Новости Telegram-каналов без повторов и мусора") +
       card("tours", "Турниры", c.live[0] ? "Идёт: " + c.live.map(function (t) { return t.name; }).slice(0, 2).join(", ") : c.up[0] ? "Скоро: " + c.up[0].name : "Тир-1 и тир-2") +
       card("rating", "Рейтинг", "Топ-100 команд по VRS") + majorCard() + '</div></div>';
     function majorCard() {
