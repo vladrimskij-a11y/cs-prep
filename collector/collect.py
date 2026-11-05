@@ -1685,7 +1685,7 @@ def valve_detail_path(path: str) -> dict | None:
              "seed": num(r"Starting Rank Value \(([\d.]+)\)")}
         mm = re.search(r"400 \+ \( \( [\d.]+ - ([\d.]+) \) / \( ([\d.]+) - [\d.]+ \) \)", t)
         d["min"], d["max"] = (float(mm.group(1)), float(mm.group(2))) if mm else (0.0, 1.0)
-        bc, net, lan, opp = [], [], [], {}
+        bc, net, lan, opp, rows = [], [], [], {}, []
         for line in t.split('id="table1"', 1)[-1].split('id="table2"', 1)[0].splitlines():
             c = [x.strip() for x in line.split("|")]
             if len(c) < 12 or not c[1].isdigit():
@@ -1696,6 +1696,11 @@ def valve_detail_path(path: str) -> dict | None:
                 v = adj(c[col])
                 if v is not None:
                     lst.append(v)
+            if c[5] == "W" and re.match(r"\d{4}-\d\d-\d\d$", c[3]):
+                # «сырые» значения победы и вес турнира — чтобы пересчитать вес давности на сегодня (см. valve_aged)
+                ew = base(c[7]) if c[7] != "-" else None
+                rows.append({"d": c[3], "ew": ew, "bc": base(c[8]) if c[8] != "-" else None,
+                             "net": base(c[9]) if c[9] != "-" else None, "lan": base(c[10]) if c[10] != "-" else None})
             # «сырые» баунти и сеть соперника (до весов) — нужны, чтобы посчитать, что даст новая победа над ним
             if c[5] == "W":  # «-» — значение не попало в десятку лучших, его не видно; берём только видимые
                 o = opp.setdefault(norm(c[4]), {"date": c[3]})
@@ -1703,9 +1708,34 @@ def valve_detail_path(path: str) -> dict | None:
                     v = base(c[col])
                     if v is not None and f not in o:
                         o[f] = v
-        d.update({"bc": bc, "net": net, "lanl": lan, "opp": opp})
+        d.update({"bc": bc, "net": net, "lanl": lan, "opp": opp, "rows": rows})
         return d
-    return hltv_cached("valvedet2:" + path, fn)
+    return hltv_cached("valvedet3:" + path, fn)
+
+
+def valve_age(day: str, at: datetime) -> float:
+    """Вес давности Valve: 1 за последние 30 дней, дальше линейно до 0 за 180 дней (сверено со всеми снимками 2026)."""
+    d = parse_iso(day + "T00:00:00Z")
+    if not d:
+        return 0.0
+    return min(1.0, max(0.0, ((d - at).total_seconds() / 86400 + 180) / 150))
+
+
+def valve_aged(W: dict, at: datetime) -> dict:
+    """Факторы из разбора Valve, пересчитанные на сегодня: разбор — на начало месяца, а старые победы с тех пор
+    подешевели. Проверка на снимках 2026 (tools/vrs_backtest.py): ошибка вклада победы меньше на 7–24%."""
+    if not W.get("rows"):
+        return W
+    bc, net, lan = [], [], []
+    for r in W["rows"]:
+        a = valve_age(r["d"], at)
+        if r.get("bc") is not None and r.get("ew") is not None:
+            bc.append(r["bc"] * r["ew"] * a)
+        if r.get("net") is not None and r.get("ew") is not None:
+            net.append(r["net"] * r["ew"] * a)
+        if r.get("lan") is not None:
+            lan.append(r["lan"] * a)
+    return dict(W, bc=bc, net=net, lanl=lan)
 
 
 def valve_bases() -> dict:
@@ -1770,6 +1800,7 @@ def vrs_outcomes_valve(a: dict, b: dict, table: list[dict], lan: bool = True, hi
         x = x or {}
         return x.get("bounty", valve_inv_curve(W["offered"])), x.get("network", W["network"])  # запасной вариант
     ew_cur = valve_curve(min(max(prize_usd(prize), 1.0), 1e6) / 1e6) if prize_usd(prize) else 0.5
+    da, db = valve_aged(da, NOW), valve_aged(db, NOW)  # старые победы подешевели с начала месяца
     da, db = dict(da, bc=list(da["bc"]), net=list(da["net"]), lanl=list(da["lanl"])), dict(db, bc=list(db["bc"]), net=list(db["net"]), lanl=list(db["lanl"]))
     def top(vals, v=None):
         return sum(sorted(vals + ([v] if v is not None else []), reverse=True)[:10]) / 10
@@ -2494,6 +2525,8 @@ HLTV = "https://www.hltv.org"
 HLTV_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Safari/537.36"
 HLTV_CACHE_F = CACHE / "hltv.json"
 hltv_cache: dict = load_json(HLTV_CACHE_F, {})
+for _k in [k for k in hltv_cache if k.startswith("valvedet2:")]:  # старый формат разбора Valve (без сырых значений)
+    del hltv_cache[_k]
 HLTV_TTL_H = 6
 _hltv_pages: dict = {}
 _hltv_last = [0.0]
