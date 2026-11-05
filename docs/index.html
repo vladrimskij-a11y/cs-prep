@@ -1929,7 +1929,7 @@ a.ni { text-decoration: none; color: inherit; }
       var x = o.score.split(":"), side = +x[0] > +x[1] ? "a" : "b", r = rank.indexOf(o.score);
       var c = r === 0 ? "g" : r === rank.length - 1 ? "r" : ["g", "y", "o"][Math.min(r, 2)];
       return '<span class="oc ' + side + ' pc-' + c + (o === P.outcomes[0] ? ' top' : '') + '"><b class="num">' + esc(o.score) + '</b><small class="num">' + esc(o.p) + '%</small></span>';
-    }).join("") + '<span class="oc-src">' + (P.source === "букмекеры" ? "по коэффициентам букмекеров" : "оценка по статистике карт") + '</span></div>';
+    }).join("") + '<span class="oc-src">' + (P.source === "букмекеры" ? "по коэффициентам " + (P.provider ? esc(String(P.provider).charAt(0).toUpperCase() + String(P.provider).slice(1)) : "букмекеров") : "оценка по статистике карт") + '</span></div>';
   }
   // вероятный пик: вето по привычкам команд за 3 месяца, счёт — по винрейту карт
   function pickBlock(m) {

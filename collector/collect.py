@@ -4118,6 +4118,66 @@ def attach_veto(sd: dict) -> None:
     # старше месяца не ищем: владельцу не нужно, а это лишние запросы к HLTV
 
 
+ODDS_LOG_F = OUT / "odds_log.json"
+odds_log: dict = {}
+
+
+def odds_log_put(m: dict, bids: list, win: list, provider) -> None:
+    """Журнал прогнозов: последняя линия до начала матча — чтобы потом сравнить с итогом."""
+    if not odds_log:
+        odds_log.update((load_json(ODDS_LOG_F, {}) or {}).get("entries") or {})
+    st = parse_iso(m.get("start_date"))
+    if not st or st < NOW:
+        return  # после начала линия уже лайвовая — в журнал не пишем
+    e = odds_log.setdefault(str(m.get("id")), {})
+    e.update({"slug": m.get("slug"), "begin": m.get("start_date"), "ids": bids, "p": win, "prov": provider, "t": iso(NOW)})
+
+
+def odds_log_resolve() -> None:
+    """Итоги матчей из журнала (bo3.gg) и сводка: как часто фаворит букмекера побеждал."""
+    if not odds_log:
+        odds_log.update((load_json(ODDS_LOG_F, {}) or {}).get("entries") or {})
+    if not odds_log:
+        return
+    n_new = 0
+    for k, e in sorted(odds_log.items(), key=lambda kv: kv[1].get("begin") or ""):
+        if "w" in e or n_new >= 60:
+            continue
+        st = parse_iso(e.get("begin"))
+        if not st or st > NOW - timedelta(hours=5):
+            continue
+        try:
+            x = bo3(f"/matches/{e['slug']}")
+        except Exception:
+            x = None
+        n_new += 1
+        if not x:
+            continue
+        w = x.get("winner_team_id")
+        if not w and x.get("status") == "finished" and x.get("team1_score") is not None:
+            w = x.get("team1_id") if (x.get("team1_score") or 0) > (x.get("team2_score") or 0) else x.get("team2_id")
+        ids = e.get("ids") or []
+        if w and w in ids:
+            e["w"] = ids.index(w)
+        elif st < NOW - timedelta(days=3):
+            e["w"] = None  # отменён или без итога — больше не спрашиваем
+    for k in [k for k, e in odds_log.items() if (parse_iso(e.get("begin")) or NOW) < NOW - timedelta(days=120)]:
+        del odds_log[k]
+    done = [e for e in odds_log.values() if e.get("w") in (0, 1) and e.get("p")]
+    summ = {"n": len(done)}
+    if done:
+        fav = [e for e in done if e["p"][0] != e["p"][1]]
+        summ["fav_won"] = round(100 * sum(1 for e in fav if e["p"][e["w"]] > e["p"][1 - e["w"]]) / max(1, len(fav)))
+        summ["brier"] = round(sum((e["p"][0] / 100 - (1 if e["w"] == 0 else 0)) ** 2 for e in done) / len(done), 3)
+        bins = {}
+        for e in done:
+            pf = max(e["p"]); b = min(90, pf // 10 * 10)
+            c = bins.setdefault(f"{b}-{b + 9}", [0, 0]); c[0] += 1; c[1] += 1 if e["p"][e["w"]] == pf else 0
+        summ["by_prob"] = {kb: {"n": c[0], "fav_won": round(100 * c[1] / c[0])} for kb, c in sorted(bins.items())}
+    save_json(ODDS_LOG_F, {"updated": iso(NOW), "summary": summ, "entries": odds_log})
+    print(f"Прогнозы букмекера: сыграно {summ['n']}, фаворит победил {summ.get('fav_won', '—')}%, Брайер {summ.get('brier', '—')}")
+
+
 def bo3_odds(bids: list) -> dict | None:
     """Коэффициенты букмекеров на ближайший матч двух команд (bo3.gg) → вероятности победы и точного счёта."""
     if len(bids) != 2 or not all(bids):
@@ -4135,7 +4195,11 @@ def bo3_odds(bids: list) -> dict | None:
         return None  # нет линии или матч уже фактически решён
     flip = m.get("team1_id") == bids[1]
     p1 = (1 / c1) / (1 / c1 + 1 / c2)
-    out = {"win": [round(100 * (1 - p1 if flip else p1)), round(100 * (p1 if flip else 1 - p1))]}
+    out = {"win": [round(100 * (1 - p1 if flip else p1)), round(100 * (p1 if flip else 1 - p1))], "provider": bu.get("provider")}
+    try:
+        odds_log_put(m, bids, out["win"], bu.get("provider"))
+    except Exception as e:
+        warn(f"Журнал прогнозов: {e!r}")
     sc = {}
     for mk in bu.get("additional_markets") or []:
         mt = re.match(r"score_(\d)_(\d)$", mk.get("bet_type") or "")
@@ -4218,6 +4282,7 @@ def build_prediction(d: dict, bids: list) -> dict | None:
         res["odds"] = odds
         if odds.get("scores"):
             res["outcomes"], res["source"] = odds["scores"], "букмекеры"
+            res["provider"] = odds.get("provider")
     top = res["outcomes"][0]["score"] if res["outcomes"] else ""
     if bo == 3 and top in ("2:0", "0:2") and len(maps) == 3:
         maps[2]["score"] = [0, 0]  # самый вероятный исход — 2:0, до десайдера дело не дойдёт
@@ -4901,6 +4966,10 @@ def main() -> int:
         del giga_usage[k]
     save_json(GIGA_USAGE_F, giga_usage)
     save_json(HLTV_STATS_CACHE_F, hltv_stats_cache)
+    try:
+        odds_log_resolve()
+    except Exception as e:
+        warn(f"Журнал прогнозов: {e!r}")
     prune_caches()
     save_json(GAMES_CACHE_F, games_cache)
     save_json(DETAILS_CACHE_F, details_cache)
