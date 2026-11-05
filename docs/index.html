@@ -527,6 +527,28 @@ html { overflow-anchor: none; }
 .ptile small .vrs-b { font-size: 8.5px; padding: 1px 4px; }
 @media (max-width: 340px) { .ptiles { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 .rt.sub { background: color-mix(in srgb, var(--muted) 22%, transparent); color: var(--fg); } .rt.loan { background: color-mix(in srgb, var(--ct) 22%, transparent); color: var(--ct); }
+/* чат «Спросить» */
+.view.ask { padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px)); }
+.chat { display: flex; flex-direction: column; gap: 10px; margin-top: 8px; }
+.ask-hint { margin-top: 24px; padding: 16px; border-radius: var(--r); background: var(--surface); border: 1px solid var(--line); color: var(--muted); font-size: 14px; line-height: 1.5; }
+.ask-hint b { display: block; color: var(--fg); font-size: 16px; margin-bottom: 6px; }
+.msg { max-width: 88%; padding: 10px 13px; border-radius: 16px; font-size: 14.5px; line-height: 1.45; overflow-wrap: anywhere; }
+.msg.me { align-self: flex-end; background: var(--ct); color: #fff; border-bottom-right-radius: 5px; }
+.msg.ai { align-self: flex-start; background: var(--surface); border: 1px solid var(--line); border-bottom-left-radius: 5px; }
+.msg.ai p { margin: 0 0 8px; } .msg.ai p:last-child { margin-bottom: 0; } .msg.ai ul { margin: 0 0 8px; padding-left: 18px; }
+.msg.err { color: var(--loss); }
+.msg.pend { color: var(--muted); display: flex; align-items: center; gap: 8px; }
+.dots { display: inline-flex; gap: 3px; } .dots i { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); animation: dt 1s infinite ease-in-out; }
+.dots i:nth-child(2) { animation-delay: .15s; } .dots i:nth-child(3) { animation-delay: .3s; }
+@keyframes dt { 0%, 80%, 100% { opacity: .25; } 40% { opacity: 1; } }
+.srcs { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 9px; padding-top: 8px; border-top: 1px solid var(--line); }
+.src-chip { display: inline-flex; align-items: center; gap: 5px; max-width: 100%; font-size: 11.5px; color: var(--muted); text-decoration: none; padding: 3px 8px 3px 4px; border-radius: 999px; background: var(--sunk); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.src-chip span { font-size: 10px; font-weight: 700; width: 16px; height: 16px; border-radius: 50%; background: var(--line); color: var(--fg); display: grid; place-items: center; flex: none; }
+.ask-bar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; display: flex; gap: 8px; align-items: flex-end; padding: 10px max(16px, env(safe-area-inset-right, 0px)) calc(10px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); background: var(--bg); border-top: 1px solid var(--line); }
+.ask-bar textarea { flex: 1; resize: none; font: inherit; font-size: 15px; color: var(--fg); background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 9px 14px; max-height: 140px; outline: none; }
+.ask-bar textarea:focus { border-color: var(--ct); }
+.ask-bar button { flex: none; width: 40px; height: 40px; border-radius: 50%; background: var(--ct); color: #fff; font-size: 18px; font-weight: 700; }
+@media (min-width: 680px) { .ask-bar { max-width: 640px; margin: 0 auto; } }
 .stake { padding: 4px 14px; }
 .stk { display: grid; grid-template-columns: 22px 1fr; gap: 8px; padding: 10px 0; border-top: 1px solid var(--line); font-size: 14px; line-height: 1.4; }
 .stk:first-child { border-top: 0; }
@@ -1015,13 +1037,68 @@ a.ni { text-decoration: none; color: inherit; }
   }
 
   // ---------- главная: три больших раздела
+  // ---------- «Спросить»: чат с Gemini через наш воркер (поиск Google, ссылки на источники)
+  function chatLoad() { try { return JSON.parse(localStorage.getItem("rimcs_chat") || "[]"); } catch (e) { return []; } }
+  function chatSave() { try { localStorage.setItem("rimcs_chat", JSON.stringify((state.chat || []).slice(-30))); } catch (e) {} }
+  function mdLite(t) {  // **жирный**, списки (подряд идущие строки «- …» / «1. …»), переносы — остальное как текст
+    function inl(x) { return esc(x).replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>").replace(/(^|\s)\*([^*\s][^*]*)\*/g, "$1<i>$2</i>"); }
+    var LI = /^\s*([-*•]|\d+[.)])\s+/;
+    return String(t || "").split(/\n{2,}/).map(function (blk) {
+      var out = "", list = [], para = [];
+      function flushP() { if (para.length) { out += '<p>' + para.map(inl).join("<br>") + '</p>'; para = []; } }
+      function flushL() { if (list.length) { out += '<ul>' + list.map(function (l) { return '<li>' + inl(l.replace(LI, "")) + '</li>'; }).join("") + '</ul>'; list = []; } }
+      blk.split("\n").forEach(function (l) { if (LI.test(l)) { flushP(); list.push(l); } else { flushL(); para.push(l); } });
+      flushP(); flushL();
+      return out;
+    }).join("");
+  }
+  function srcName(s) { var t = String(s.title || ""); if (t) return t.replace(/^www\./, ""); try { return new URL(s.url).hostname.replace(/^www\./, ""); } catch (e) { return "источник"; } }
+  function chatHtml() {
+    var C = state.chat || [];
+    if (!C.length) return '<div class="ask-hint"><b>Спроси что угодно про CS2</b>Например: «Кто сейчас в составе Spirit?», «Как NAVI сыграли последний турнир?», «Кто лучший AWP по рейтингу за 3 месяца?»<br><br>Ответ ищется в Google — со ссылками на источники.</div>';
+    return C.map(function (m) {
+      if (m.role === "user") return '<div class="msg me">' + esc(m.text).replace(/\n/g, "<br>") + '</div>';
+      if (m.pending) return '<div class="msg ai pend"><span class="dots"><i></i><i></i><i></i></span>Ищу в Google…</div>';
+      return '<div class="msg ai' + (m.error ? ' err' : '') + '">' + mdLite(m.text) +
+        ((m.sources || []).length ? '<div class="srcs">' + m.sources.map(function (x, i) { return '<a class="src-chip" href="' + esc(x.url) + '" data-link="' + esc(x.url) + '" target="_blank" rel="noopener"><span>' + (i + 1) + '</span>' + esc(srcName(x)) + '</a>'; }).join("") + '</div>' : '') + '</div>';
+    }).join("");
+  }
+  function showAsk() {
+    if (!state.chat) state.chat = chatLoad();
+    $app.innerHTML = '<div class="view ask"><header class="top"><div class="hbar">' + backBtn("Главная") + '</div><div class="brand"><h1>Спросить</h1>' +
+      ((state.chat || []).length ? '<button class="chip" id="ask-clear">Новый диалог</button>' : '') + '</div></header>' +
+      '<div class="chat" id="chat">' + chatHtml() + '</div>' +
+      '<form class="ask-bar" id="ask-form"><textarea id="ask-in" rows="1" placeholder="Вопрос про CS2…" maxlength="2000"></textarea><button type="submit" aria-label="Отправить">↑</button></form></div>';
+    var f = document.getElementById("ask-form"), inp = document.getElementById("ask-in");
+    inp.addEventListener("input", function () { inp.style.height = "auto"; inp.style.height = Math.min(inp.scrollHeight, 140) + "px"; });
+    inp.addEventListener("keydown", function (e) { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); f.requestSubmit ? f.requestSubmit() : f.dispatchEvent(new Event("submit", { cancelable: true })); } });
+    f.addEventListener("submit", function (e) { e.preventDefault(); askSend(inp.value); });
+    var cl = document.getElementById("ask-clear"); if (cl) cl.addEventListener("click", function () { state.chat = []; chatSave(); showAsk(); });
+    window.scrollTo(0, document.body.scrollHeight);
+  }
+  function askRedraw() { var el = document.getElementById("chat"); if (!el) return; el.innerHTML = chatHtml(); window.scrollTo(0, document.body.scrollHeight); }
+  function askSend(text) {
+    text = String(text || "").trim();
+    if (!text || (state.chat || []).some(function (m) { return m.pending; })) return;
+    var inp = document.getElementById("ask-in"); if (inp) { inp.value = ""; inp.style.height = "auto"; }
+    state.chat.push({ role: "user", text: text });
+    var hist = state.chat.filter(function (m) { return !m.error && !m.pending; }).map(function (m) { return { role: m.role, text: m.text }; });
+    var ans = { role: "model", pending: true }; state.chat.push(ans);
+    if (!document.getElementById("ask-clear")) showAsk(); else askRedraw();
+    fetch(LIVE + "/ask", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ messages: hist }) })
+      .then(function (r) { return r.json().catch(function () { return { error: "Ответ не разобрался" }; }); })
+      .then(function (j) { delete ans.pending; if (j && j.text) { ans.text = j.text; ans.sources = j.sources || []; } else { ans.error = true; ans.text = (j && j.error) || "Не получилось ответить"; } })
+      .catch(function () { delete ans.pending; ans.error = true; ans.text = "Нет связи с сервером чата. Проверь интернет и попробуй ещё раз."; })
+      .then(function () { chatSave(); if (state.view === "ask") askRedraw(); });
+  }
+
   function renderMenu() {
     var L = state.list, c = tourBuckets();
     function card(h, t, sub) { return '<button class="mcard" data-goto="' + h + '"><span class="mc-t">' + t + '</span><span class="mc-s">' + esc(sub) + '</span><i class="chev2">›</i></button>'; }
     $app.innerHTML = '<div class="view"><header class="top"><div class="brand"><h1>RIM<b>·</b>CS</h1><span class="upd">обновлено ' + esc(ago(L.updated)) + ' · время МСК</span></div></header>' +
       '<div class="menu">' + card("feed", "Лента", "Новости Telegram-каналов без повторов и мусора") +
       card("tours", "Турниры", c.live[0] ? "Идёт: " + c.live.map(function (t) { return t.name; }).slice(0, 2).join(", ") : c.up[0] ? "Скоро: " + c.up[0].name : "Тир-1 и тир-2") +
-      card("rating", "Рейтинг", "Топ-100 команд по VRS") + majorCard() + '</div></div>';
+      card("rating", "Рейтинг", "Топ-100 команд по VRS") + majorCard() + card("ask", "Спросить", "Чат с нейросетью: свежие данные из Google со ссылками") + '</div></div>';
     function majorCard() {
       var maj = (L.tournaments || []).find(function (t) { return /major/i.test(t.name) && t.major && t.major.final && !t.finished && new Date(t.end || t.begin) >= new Date(); });
       if (maj) return card("t-" + maj.id, "Мейджор", maj.name + " · инвайты разосланы — кто с какой стадии");
@@ -2715,6 +2792,7 @@ a.ni { text-decoration: none; color: inherit; }
       pane: function () { return state.list.major_next ? majorBlock(state.list.major_next) : '<div class="empty"><strong>Прогноза пока нет</strong></div>'; } }); }
     else if (h === "rating") { state.view = "rating"; showRating(); if (!state.ranking) getRanking().then(function () { if (state.view === "rating") showRating(); }).catch(function () { state.rankingErr = true; if (state.view === "rating") showRating(); }); }
     else if (/^r-/.test(h)) { var sl = h.slice(2); state.view = "team:" + sl; state.teamErr = false; showTeam(sl); getTeam(sl).then(function () { if (state.view === "team:" + sl) showTeam(sl); }).catch(function () { state.teamErr = true; if (state.view === "team:" + sl) showTeam(sl); }); }
+    else if (h === "ask") { state.view = "ask"; SH = null; showAsk(); }
     else if (h === "feed") { state.view = "feed"; showFeed(); if (!state.feed) getFeed().then(function () { if (state.view === "feed") showFeed(); }).catch(function () { state.feedErr = true; if (state.view === "feed") showFeed(); }); }
     else { state.view = "home"; SH = null; renderMenu(); }
   }
