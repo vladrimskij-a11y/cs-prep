@@ -616,8 +616,8 @@ def lp_roster(t: dict) -> dict | None:
         if age < timedelta(days=ROSTER_TTL_DAYS) and not (incomplete and age >= timedelta(hours=3)):
             return cached.get("data")
     names = []
-    base = re.sub(r"\s+(esports|e-sports|gaming|team|clan|club)$", "", t.get("name") or "", flags=re.IGNORECASE).strip()
-    for nm in (t.get("name"), re.sub(r"(?<=[a-z])(?=[A-Z])", " ", t.get("name") or ""), t.get("acronym"),
+    base = re.sub(r"\s+(esports|e-sports|gaming|team|clan|club|cs2?|counter-strike)$", "", t.get("name") or "", flags=re.IGNORECASE).strip()
+    for nm in (t.get("name"), re.sub(r"(?<=[a-z])(?=[A-Z])", " ", t.get("name") or ""), t.get("acronym"), base or None,  # «DENDELE CS» → DENDELE
                "Team " + base if base else None, base + " Esports" if base else None):  # на Liquipedia: «Team Spirit», «FUT Esports»
         if nm and nm not in names:
             names.append(nm)
@@ -744,7 +744,7 @@ def bo3_team_id(t: dict) -> int | None:
         tries.append({"filter[teams.slug][eq]": t["slug"]})
     if t.get("name"):
         spaced = re.sub(r"(?<=[a-z])(?=[A-Z])", " ", t["name"])  # TheMongolz → The Mongolz
-        bare = re.sub(r"\s+(esports|e-sports|gaming|team|clan|club)$", "", t["name"], flags=re.IGNORECASE).strip()  # FUT Esports → FUT
+        bare = re.sub(r"\s+(esports|e-sports|gaming|team|clan|club|cs2?|counter-strike)$", "", t["name"], flags=re.IGNORECASE).strip()  # FUT Esports → FUT
         for nm in dict.fromkeys([t["name"], spaced, bare]):
             tries.append({"filter[teams.name][eq]": nm})
             tries.append({"filter[teams.slug][eq]": re.sub(r"[^a-z0-9]+", "-", nm.lower()).strip("-")})

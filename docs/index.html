@@ -1867,7 +1867,7 @@ a.ni { text-decoration: none; color: inherit; }
     var html = '<div class="sec"><h3>Карты <span>за ' + Math.round(M.window_days / 30) + ' мес.</span></h3><div class="box" style="overflow-x:auto"><table class="mtab"><thead><tr><th>Карта</th><th>' + esc(abbr(A)) + '</th><th>' + esc(abbr(B)) + '</th></tr></thead><tbody>';
     M.table.forEach(function (r) {
       var ta = r.teams[0], tb = r.teams[1];
-      html += '<tr><td class="mn">' + esc(r.map) + '</td><td class="a">' + (A && A.tbd ? '' : cell(ta, pct(ta.won, ta.played))) + '</td><td class="b">' + (B && B.tbd ? '' : cell(tb, pct(tb.won, tb.played))) + '</td></tr>';
+      html += '<tr><td class="mn">' + esc(r.map) + '</td><td class="a">' + (A && A.tbd ? '<span class="wr"><span class="pct">0%</span><span class="track"><i style="width:0"></i></span><span class="gp">0/0</span></span>' : cell(ta, pct(ta.won, ta.played))) + '</td><td class="b">' + (B && B.tbd ? '<span class="wr"><span class="pct">0%</span><span class="track"><i style="width:0"></i></span><span class="gp">0/0</span></span>' : cell(tb, pct(tb.won, tb.played))) + '</td></tr>';
     });
     return html + '</tbody></table></div></div>';
     function cell(t, p) {
@@ -1904,7 +1904,7 @@ a.ni { text-decoration: none; color: inherit; }
     var html = '<div class="mzsec"><h3 class="mzh">Последние игры на карте</h3><div class="recent2">';
     [0, 1].forEach(function (i) {
       var t = m.teams[i];
-      if (t.tbd) { html += '<div class="box ' + (i ? "b" : "a") + '"><div class="hd">' + esc(t.name) + '</div></div>'; return; }
+      if (t.tbd) { html += '<div class="box ' + (i ? "b" : "a") + '"><div class="hd">' + esc(t.name) + '<span>0–0</span></div></div>'; return; }
       var list = rec.filter(function (g) { return g.team === i; }).slice(0, 8);
       var w = list.filter(function (g) { return g.won; }).length;
       html += '<div class="box ' + (i ? "b" : "a") + '"><div class="hd">' + esc(t.name) + (list.length ? '<span>' + w + '–' + (list.length - w) + '</span>' : '') + '</div>';
@@ -1928,7 +1928,7 @@ a.ni { text-decoration: none; color: inherit; }
       '<div class="sd-head"><span></span><span>CT</span><span>T</span><span>Пистолетки</span></div>';
     [0, 1].forEach(function (i) {
       var r = rows[i], tot = (S.total || [])[i];
-      if ((m.teams[i] || {}).tbd) { html += '<div class="sd-row ' + (i ? "b" : "a") + '"><span class="sd-t">' + esc(abbr(m.teams[i])) + '</span><span></span><span></span><span></span></div>'; return; }
+      if ((m.teams[i] || {}).tbd) { html += '<div class="sd-row ' + (i ? "b" : "a") + '"><span class="sd-t">' + esc(abbr(m.teams[i])) + '<small>0 карт</small></span><span class="num">0%</span><span class="num">0%</span><span class="num">0%<small>0/0</small></span></div>'; return; }  // соперник не определён — нули
       html += '<div class="sd-row ' + (i ? "b" : "a") + '"><span class="sd-t">' + esc(abbr(m.teams[i])) + '<small>' + (r ? r.maps + ' карт' : 'не играли') + '</small></span>' +
         cell(r && r.ct) + cell(r && r.t) + '<span class="num">' + (r && r.pistol != null ? r.pistol + '%<small>' + r.pistol_n[0] + '/' + r.pistol_n[1] + '</small>' : '—') + '</span></div>';
       if (tot) html += '<div class="sd-all"><span>все карты:</span> CT ' + (tot.ct != null ? tot.ct + '%' : '—') + ' · T ' + (tot.t != null ? tot.t + '%' : '—') + ' · пистолетки ' + (tot.pistol != null ? tot.pistol + '%' : '—') + '</div>';
@@ -1963,7 +1963,7 @@ a.ni { text-decoration: none; color: inherit; }
     var S = m.series || {};
     var html = '<div class="sec"><h3>Форма <span>последние 10 серий · нажми на матч</span></h3>';
     m.teams.forEach(function (t, i) {
-      if (t.tbd) { html += '<div class="box form"><div class="tmh ' + (i ? "b" : "a") + '">' + esc(t.name) + '</div></div>'; return; }
+      if (t.tbd) { html += '<div class="box form"><div class="tmh ' + (i ? "b" : "a") + '">' + esc(t.name) + '<span>0–0</span></div></div>'; return; }
       var f = t.form || [];
       var w = f.filter(function (x) { return x.won; }).length;
       html += '<div class="box form"><div class="tmh ' + (i ? "b" : "a") + '">' + esc(t.name) + '<span>' + w + '–' + (f.length - w) + '</span></div>';
@@ -2024,7 +2024,8 @@ a.ni { text-decoration: none; color: inherit; }
         '<div class="vr-r vr-h"><span></span><span>Сейчас</span><span>Победа ' + esc(abbr(A)) + '</span><span>Победа ' + esc(abbr(B)) + '</span></div>';
       [A, B].forEach(function (t, i) {
         h0 += '<div class="vr-r ' + (i ? "b" : "a") + '"><span class="vr-t">' + esc(abbr(t)) + '</span>' +
-          (t.tbd || !t.vrs ? '<span class="vr-c"></span>' : '<span class="vr-c"><b class="num">#' + t.vrs.rank + '</b><small class="num">' + t.vrs.points + '</small></span>') + '<span class="vr-c"></span><span class="vr-c"></span></div>';
+          (t.tbd ? '<span class="vr-c"><b class="num">0</b><small class="num">0</small></span><span class="vr-c"><b class="num">0</b></span><span class="vr-c"><b class="num">0</b></span>' :
+          (t.vrs ? '<span class="vr-c"><b class="num">#' + t.vrs.rank + '</b><small class="num">' + t.vrs.points + '</small></span>' : '<span class="vr-c"></span>') + '<span class="vr-c"></span><span class="vr-c"></span>') + '</div>';
       });
       return h0 + '</div></div>';
     }
