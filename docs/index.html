@@ -2403,7 +2403,7 @@ a.ni { text-decoration: none; color: inherit; }
   }
   // «Команда» — две страницы (Игроки, Позиции), «Новости» — по странице на фильтр; у обеих под вкладками строка подвкладок
   function viewKey(tab, nf) { return tab === "news" ? "news:" + nf : tab === "players" ? "team:" + (nf || state.teamSub || "players") : tab; }
-  function paneKeys() { return ["team:players", "team:pos", "stats"].concat(newsSteps().map(function (f) { return "news:" + f; })); }
+  function paneKeys() { return ["team:pos", "team:players", "stats"].concat(newsSteps().map(function (f) { return "news:" + f; })); }
   function curKey() { return viewKey(state.tab, state.tab === "news" ? state.newsFilter : state.teamSub); }
   function setKey(k) { if (k.indexOf("news:") === 0) { state.tab = "news"; state.newsFilter = k.slice(5); } else if (k.indexOf("team:") === 0) { state.tab = "players"; state.teamSub = k.slice(5); } else state.tab = k; }
   function isNews(k) { return k.indexOf("news:") === 0; }
@@ -2437,7 +2437,7 @@ a.ni { text-decoration: none; color: inherit; }
       heroOutcomes(m) + '</section></div></div>' +
       '<nav class="tabs" role="tablist">' + tabBtn("players", "Команда") + tabBtn("stats", "Статистика") + tabBtn("news", "Новости", nCount) + '</nav>' +
       '<div class="fold nf-wrap"><div class="fi"><div class="filt tfilt" role="group" aria-label="Команда">' +
-        '<button class="chip" data-tsub="players" aria-pressed="' + ((state.teamSub || "players") === "players") + '">Игроки</button><button class="chip" data-tsub="pos" aria-pressed="' + (state.teamSub === "pos") + '">Позиции</button></div>' +
+        '<button class="chip" data-tsub="pos" aria-pressed="' + (state.teamSub === "pos") + '">Позиции</button><button class="chip" data-tsub="players" aria-pressed="' + ((state.teamSub || "players") === "players") + '">Игроки</button></div>' +
       '<div class="filt nfilt" role="group" aria-label="О ком">' + opts.map(function (o) {
         return '<button class="chip" data-nf="' + esc(o[0]) + '" aria-pressed="' + (state.newsFilter === o[0]) + '">' + esc(o[1]) + '<span class="c">' + newsFor(m, o[0]).length + '</span></button>';
       }).join("") + '</div></div></div>';
