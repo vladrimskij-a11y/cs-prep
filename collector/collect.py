@@ -1593,7 +1593,8 @@ def vrs_table() -> list[dict]:
             if ids:
                 hltv_cache["rkpl"] = {"t": iso(NOW), "data": ids}
         return parse_ranked(h) if h else None
-    return hltv_cached("vrs3", fn) or []
+    # живые очки — на каждом полном сборе (раз в 3 ч, один запрос): прогноз «Победа/Поражение» считается от них
+    return hltv_cached("vrs3", fn, ttl_h=1) or []
 
 
 def hltv_world_ranking() -> list[dict]:
@@ -2711,9 +2712,9 @@ def hltv_event_for(name: str, events: dict) -> str | None:
     return min(cand)[2] if cand else None
 
 
-def hltv_cached(key: str, fn):
+def hltv_cached(key: str, fn, ttl_h: float | None = None):
     c = hltv_cache.get(key)
-    if c and (parse_iso(c.get("t")) or NOW) > NOW - timedelta(hours=HLTV_TTL_H):
+    if c and (parse_iso(c.get("t")) or NOW) > NOW - timedelta(hours=HLTV_TTL_H if ttl_h is None else ttl_h):
         return c["data"]
     try:
         data = fn()

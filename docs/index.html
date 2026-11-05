@@ -2324,9 +2324,9 @@ a.ni { text-decoration: none; color: inherit; }
         if (tg.some(function (x) { return x === "AWP" || /^Снайпер/.test(x); })) roles.push(["AWP", "awp"]);
         // статус в составе — заметной плашкой, одинаково во вкладке «Игроки» и на странице команды
         tg.forEach(function (x) {
-          if (/^Замена/.test(x)) { var fo = x.replace(/^Замена\s*(вместо\s*)?/, ""); roles.push([fo ? "Замена · вместо " + fo : "Замена", "st"]); }
+          if (/^Замена/.test(x)) { var fo = x.replace(/^Замена\s*(вместо\s*)?/, ""); roles.push([fo ? "Замена " + fo : "Замена", "st"]); }
           else if (/^trial$/i.test(x)) roles.push(["На просмотре", "st"]);
-          else if (/^В аренде/.test(x)) { var fr = x.replace(/^В аренде\s*(из\s*)?/, "").replace(/\b\w/g, function (c) { return c.toUpperCase(); }); roles.push([fr ? "В аренде из " + fr : "В аренде", "st"]); }
+          else if (/^В аренде/.test(x)) { var fr = x.replace(/^В аренде\s*(из\s*)?/, "").replace(/\b\w/g, function (c) { return c.toUpperCase(); }); roles.push([fr ? "Аренда у " + fr : "Аренда", "st"]); }
           else if (x === "Неактивен") roles.push(["Неактивен", "st"]);
         });
         var real = [p.first_name, p.last_name].filter(Boolean).join(" ");
