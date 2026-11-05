@@ -16,15 +16,16 @@ jobs:
                "PGL/2026/Singapore", "BLAST/Major/2025/Austin", "Perfect_World/Major/2025/Shanghai", "PGL/2024/Copenhagen",
                "Valve_Regional_Standings", "Majors", "Counter-Strike_Major_Championships"]
           P = c.lp_pages(T)
-          for t in T:
-              x = P.get(t)
-              print("=== PAGE", t, "len", len(x) if x else None)
-              if not x: continue
-              for kw in ("prize", "Prize", "mvp", "MVP", "qualif", "TeamCard", "Opponent", "{{Slot", "placement", "place=", "|p1", "standings", "Standings", "points"):
-                  n = x.count(kw)
-                  if n: print("   count", repr(kw), n)
-              shown = 0
-              for ln in x.split("\n"):
-                  if re.search(r"(?i)mvp|prize ?pool|\{\{Slot|qualifies|\|place=|TeamCard|^\|p\d|opponent=|award", ln) and shown < 25:
-                      print("   |", ln[:260]); shown += 1
+          def ctx(x, kw, n=900, k=2):
+              out, i = [], x.find(kw)
+              while i >= 0 and len(out) < k:
+                  out.append(x[max(0, i - 150): i + n]); i = x.find(kw, i + n)
+              return out
+          for t in ("PGL/2026/Bucharest", "ESL/Pro_League/Season_24", "BLAST/Major/2025/Austin", "Valve_Regional_Standings"):
+              x = P.get(t) or ""
+              print("=== PAGE", t)
+              for kw, n, k in (("MVP", 500, 3), ("{{Slot", 700, 2), ("{{TeamCard", 1200, 1), ("{{Opponent", 300, 2), ("qualifies", 300, 1)):
+                  for sn in ctx(x, kw, n, k):
+                      print("--- " + kw); print(sn)
+          print("=== VRS FULL"); print((P.get("Valve_Regional_Standings") or "")[:2500])
           PY
