@@ -177,7 +177,7 @@ ROSTER_CACHE_F = CACHE / "liquipedia_rosters_v3.json"  # тренер, роли,
 PRON_CACHE_F = CACHE / "pronunciation_v2.json"       # имена и ники по-русски с ударением
 games_cache: dict = load_json(GAMES_CACHE_F, {})
 details_cache: dict = load_json(DETAILS_CACHE_F, {})
-DETAILS_NEW_LIMIT = int(os.environ.get("DETAILS_NEW_LIMIT", "1200"))  # bo3 — открытый API; 450 не хватало, мелкие команды оставались без статистики игроков  # новых карт с раундами за запуск
+DETAILS_NEW_LIMIT = int(os.environ.get("DETAILS_NEW_LIMIT", "1500" if os.environ.get("STATS_ONLY") == "1" else "3500"))  # bo3 — открытый API; 450 не хватало, мелкие команды оставались без статистики игроков  # новых карт с раундами за запуск
 _details_new = [0]
 teams_map: dict = load_json(TEAMS_CACHE_F, {})
 tr_cache: dict = load_json(TR_CACHE_F, {})
@@ -813,7 +813,7 @@ def map_title(raw: str | None) -> str | None:
     return r[:1].upper() + r[1:]
 
 
-GAMES_NEW_LIMIT = int(os.environ.get("GAMES_NEW_LIMIT", "700"))
+GAMES_NEW_LIMIT = int(os.environ.get("GAMES_NEW_LIMIT", "2000"))  # bo3 — открытый API
 _games_new = [0]
 
 
@@ -2223,35 +2223,57 @@ _hltv_blocked = [False]
 _hltv_403 = [0]  # отказов подряд
 
 
+HLTV_BACKOFF_DAYS = [1, 3, 7]  # страница отказала 1-й, 2-й, 3-й+ раз — не просим её столько дней
+
+
+def hltv_page_skip(path: str) -> bool:
+    """Страница недавно отвечала отказом — не тратим на неё запрос (пауза растёт с каждым отказом)."""
+    f = hltv_cache.get("hfail:" + path)
+    if not f:
+        return False
+    days = HLTV_BACKOFF_DAYS[min(f.get("n", 1), len(HLTV_BACKOFF_DAYS)) - 1]
+    return (parse_iso(f.get("t")) or NOW - timedelta(days=30)) > NOW - timedelta(days=days)
+
+
 def hltv_get(path: str) -> str | None:
     if path in _hltv_pages:
         return _hltv_pages[path]
-    if _hltv_blocked[0]:
+    if _hltv_blocked[0] or hltv_page_skip(path):
         return None
-    wait = 2.5 - (time.time() - _hltv_last[0])
-    if wait > 0:
-        time.sleep(wait)
-    _hltv_last[0] = time.time()
-    stats["hltv_requests"] = stats.get("hltv_requests", 0) + 1
-    try:
-        html = http_get(HLTV + path, {"User-Agent": HLTV_UA, "Accept": "text/html", "Accept-Language": "en-US,en;q=0.9"},
-                        timeout=30).decode("utf-8", "replace")
-        _hltv_403[0] = 0
-    except urllib.error.HTTPError as e:
-        # отказ на странице одного игрока (у некоторых он постоянный) — пропускаем только её;
-        # два отказа подряд, 429/503 или отказ на любой другой странице — HLTV просит остановиться, до следующего запуска не обращаемся
-        single = e.code == 403 and path.startswith("/player/") and _hltv_403[0] == 0
-        _hltv_403[0] = _hltv_403[0] + 1 if e.code == 403 else 0
-        if e.code in (403, 429, 503) and not single:
-            _hltv_blocked[0] = True
-        warn(f"HLTV {path}: {e!r}")
-        html = None
-    except Exception as e:
-        warn(f"HLTV {path}: {e!r}")
-        html = None
+    html = None
+    for attempt in (0, 1):
+        wait = 2.5 - (time.time() - _hltv_last[0])
+        if wait > 0:
+            time.sleep(wait)
+        _hltv_last[0] = time.time()
+        stats["hltv_requests"] = stats.get("hltv_requests", 0) + 1
+        try:
+            html = http_get(HLTV + path, {"User-Agent": HLTV_UA, "Accept": "text/html", "Accept-Language": "en-US,en;q=0.9"},
+                            timeout=30).decode("utf-8", "replace")
+            _hltv_403[0] = 0
+            hltv_cache.pop("hfail:" + path, None)
+            break
+        except urllib.error.HTTPError as e:
+            warn(f"HLTV {path}: {e!r}")
+            if e.code in (429, 503) and attempt == 0:
+                time.sleep(60)  # «слишком часто» — минуту ждём и пробуем один раз ещё
+                continue
+            if e.code in (429, 503):
+                _hltv_blocked[0] = True  # повторный — HLTV просит остановиться, до следующего запуска не обращаемся
+                break
+            if e.code == 403:
+                # единичный отказ — пропускаем только эту страницу (с растущей паузой), два подряд — стоп до следующего запуска
+                f = hltv_cache.get("hfail:" + path) or {}
+                hltv_cache["hfail:" + path] = {"t": iso(NOW), "n": f.get("n", 0) + 1}
+                _hltv_403[0] += 1
+                if _hltv_403[0] >= 2:
+                    _hltv_blocked[0] = True
+            break
+        except Exception as e:
+            warn(f"HLTV {path}: {e!r}")
+            break
     _hltv_pages[path] = html
     return html
-
 
 def hclean(h: str) -> str:
     return re.sub(r"\s+", " ", re.sub(r"<img[^>]*>|<svg.*?</svg>|<source[^>]*>", "", h, flags=re.S))
@@ -3764,6 +3786,47 @@ def build_facts(d: dict, prev: dict | None) -> list | None:
 # ---------------------------------------------------------------- main
 
 _mvp_new = [0]
+MVP_PER_RUN = int(os.environ.get("MVP_PER_RUN", "80"))  # страниц игроков HLTV за полный сбор (темп тот же — раз в 2,5 с)
+
+
+def hltv_players_warm() -> None:
+    """Очередь страниц игроков HLTV: сначала те, о ком ничего нет, потом давно не обновлённые; ближайшие матчи — вперёд.
+    Отказавшие недавно страницы ждут своей паузы и не стоят в начале. Всё полученное до остановки остаётся в кэше,
+    следующий сбор продолжает с того же места очереди."""
+    for k, v in list(hltv_cache.items()):  # id игроков со страниц команд из прошлых сборов
+        if k.startswith("tpl:"):
+            for n, x in ((v or {}).get("data") or {}).items():
+                hltv_player_ids.setdefault(n, x)
+    nicks: list = []
+    files = sorted((load_json(f, {}) or {} for f in (OUT / "match").glob("*.json")), key=lambda d: d.get("begin_at") or "9999")
+    for d in files:
+        for t in d.get("teams") or []:
+            nicks += [p.get("nick") for p in (t.get("players") or []) + (t.get("coach") or [])]
+    for f in sorted((OUT / "team").glob("*.json")):
+        d = load_json(f, {}) or {}
+        nicks += [p.get("nick") for p in (d.get("roster") or []) + (d.get("coach") or [])]
+    queue = []
+    for i, n in enumerate(dict.fromkeys(x for x in nicks if x)):
+        pl = hltv_player_ids.get(norm(n))
+        if not pl:
+            continue
+        c = hltv_cache.get(f"pinfo4:{pl['id']}")
+        old = any(hltv_cache.get(f"{v}:{pl['id']}") for v in ("pinfo3", "pinfo2", "pinfo"))
+        rank = 0 if not c and not old else 1 if not c else 2  # ничего нет → старая версия → давно не обновлялось
+        if c and (parse_iso(c.get("t")) or NOW) > NOW - timedelta(days=7):
+            continue
+        queue.append((rank, (c or {}).get("t") or "", i, n))
+    queue.sort()
+    done = 0
+    for _, _, _, n in queue:
+        if _mvp_new[0] >= MVP_PER_RUN or _hltv_blocked[0]:
+            break
+        try:
+            if hltv_player_info(n):
+                done += 1
+        except Exception as e:
+            warn(f"Игрок HLTV {n}: {e!r}")
+    print(f"HLTV игроки: в очереди {len(queue)}, обновлено {done}, запросов {_mvp_new[0]}" + (" (HLTV попросил остановиться)" if _hltv_blocked[0] else ""))
 
 
 _ach_dumped = [False]
@@ -3779,15 +3842,12 @@ def hltv_player_info(nick: str) -> dict | None:
     if c and (parse_iso(c.get("t")) or NOW) > NOW - timedelta(days=7):
         return c["data"]
     c = c or hltv_cache.get(f"pinfo3:{pl['id']}") or hltv_cache.get(f"pinfo2:{pl['id']}") or hltv_cache.get(f"pinfo:{pl['id']}")  # старая запись (без названий мейджоров) — пока не перечитали
-    if _mvp_new[0] >= 60 or _hltv_blocked[0] or STATS:
-        return c["data"] if c else None
-    fk = f"pfail:{pl['id']}"
-    if (parse_iso((hltv_cache.get(fk) or {}).get("t")) or NOW - timedelta(days=30)) > NOW - timedelta(days=7):
-        return c["data"] if c else None  # эта страница недавно отвечала отказом — не просим её снова неделю
+    path = f"/player/{pl['id']}/{pl['slug']}"
+    if _mvp_new[0] >= MVP_PER_RUN or _hltv_blocked[0] or STATS or hltv_page_skip(path):
+        return c["data"] if c else None  # лимит, стоп или страница недавно отказывала — берём что есть
     _mvp_new[0] += 1
-    h = hltv_get(f"/player/{pl['id']}/{pl['slug']}")
+    h = hltv_get(path)
     if not h:
-        hltv_cache[fk] = {"t": iso(NOW)}
         return c["data"] if c else None
     b = re.sub(r"\s+", " ", h)
     mvp = 0
@@ -4418,6 +4478,11 @@ def main() -> int:
                 hltv_player_ids[norm(p["nick"])] = {"id": p["id"], "slug": p["slug"]}
         for tn, ti in (ex.get("team_ids") or {}).items():
             hltv_team_ids[norm(tn)] = {**ti, "name": tn}
+    if not STATS:  # очередь игроков HLTV — до сборки карточек, чтобы они сразу взяли свежие MVP и мажоры
+        try:
+            hltv_players_warm()
+        except Exception as e:
+            warn(f"Очередь HLTV: {e!r}")
     if not STATS:  # команды из рейтинга Valve тоже: нужны для вето прошедших турниров
         try:
             for r in vrs_table():
