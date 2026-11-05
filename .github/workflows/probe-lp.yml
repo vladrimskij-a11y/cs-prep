@@ -11,21 +11,17 @@ jobs:
       - name: probe
         run: |
           cd collector && python - <<'PY'
-          import re, collect as c
-          # составы: замена и неактивные
-          for team in ("Legacy", "Nemiga"):
-              t = c.lp_pages([team]).get(team) or ""
-              i = t.find("{{Squad"); print("=== TEAM", team); print(t[i:i+3500])
-          # страница арендованного игрока: инфобокс и история
-          for pl in ("Krimbo", "SYPH0"):
-              t = c.lp_pages([pl]).get(pl) or ""
-              print("=== PLAYER", pl); print(c.infobox(t)[:2500])
-          # правила вето на страницах турниров
-          for nm in ("IEM Beijing 2026", "PGL Masters Bucharest 2026", "BLAST Premier Fall Final 2026", "ESL Pro League Season 24"):
-              pg = c.lp_search(nm); print("=== TOUR", nm, "->", pg)
-              if not pg: continue
+          import re, json, time, urllib.parse, collect as c
+          def osearch(q):
+              time.sleep(4)
+              u = c.LP_API + "?" + urllib.parse.urlencode({"action": "opensearch", "search": q, "limit": 8, "format": "json"})
+              return json.loads(c.http_get(u, {"User-Agent": c.LP_UA, "Accept": "application/json"}))[1]
+          for q in ("Intel Extreme Masters Beijing 2026", "IEM Beijing 2026", "PGL Masters Bucharest", "ESL Pro League Season 24", "BLAST Open Fall 2026", "StarLadder Budapest Major"):
+              print("SEARCH", q, "->", osearch(q))
+          for pg in ("ESL/Pro_League/Season_24", "Intel_Extreme_Masters/2026/Beijing", "PGL/2026/Bucharest"):
               t = c.lp_pages([pg]).get(pg) or ""
-              for m in re.finditer(r"(?i)(veto|seed|higher|pick|ban)", t):
-                  pass
-              i = t.lower().find("format"); print(t[max(0,i-200):i+3000] if i >= 0 else t[:2000])
+              print("=== PAGE", pg, len(t))
+              for ln in t.split("\n"):
+                  if re.search(r"(?i)veto|seed|higher|coin|choose|first ban|pick", ln):
+                      print("  |", ln[:400])
           PY
