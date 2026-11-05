@@ -4178,6 +4178,26 @@ def odds_log_resolve() -> None:
     print(f"Прогнозы букмекера: сыграно {summ['n']}, фаворит победил {summ.get('fav_won', '—')}%, Брайер {summ.get('brier', '—')}")
 
 
+def devig(coeffs: list) -> list:
+    """Коэффициенты → честные вероятности. Не делим наценку поровну, а степенным методом: букмекер (особенно
+    с высокой наценкой, как Thunderpick) закладывает больше маржи в андердога, поэтому фаворит у него недооценён.
+    Ищем k: сумма (1/c)^k = 1 — так получаются вероятности ближе к линии точных букмекеров (Pinnacle)."""
+    q = [1 / c for c in coeffs if c and c > 1]
+    if len(q) != len(coeffs) or sum(q) <= 1:
+        t = sum(q) or 1
+        return [x / t for x in q] if q else []
+    lo, hi = 1.0, 3.0
+    for _ in range(60):
+        k = (lo + hi) / 2
+        if sum(x ** k for x in q) > 1:
+            lo = k
+        else:
+            hi = k
+    p = [x ** ((lo + hi) / 2) for x in q]
+    t = sum(p)
+    return [x / t for x in p]
+
+
 def bo3_odds(bids: list) -> dict | None:
     """Коэффициенты букмекеров на ближайший матч двух команд (bo3.gg) → вероятности победы и точного счёта."""
     if len(bids) != 2 or not all(bids):
@@ -4194,7 +4214,7 @@ def bo3_odds(bids: list) -> dict | None:
     if not c1 or not c2 or min(c1, c2) < 1.02:
         return None  # нет линии или матч уже фактически решён
     flip = m.get("team1_id") == bids[1]
-    p1 = (1 / c1) / (1 / c1 + 1 / c2)
+    p1 = devig([c1, c2])[0]
     out = {"win": [round(100 * (1 - p1 if flip else p1)), round(100 * (p1 if flip else 1 - p1))], "provider": bu.get("provider")}
     try:
         odds_log_put(m, bids, out["win"], bu.get("provider"))
@@ -4207,8 +4227,9 @@ def bo3_odds(bids: list) -> dict | None:
             a, b = int(mt.group(1)), int(mt.group(2))
             sc[(b, a) if flip else (a, b)] = 1 / mk["coeff"]
     if len(sc) >= 3:
-        tot = sum(sc.values())
-        out["scores"] = [{"score": f"{a}:{b}", "p": round(100 * v / tot)} for (a, b), v in sorted(sc.items(), key=lambda kv: -kv[1])]
+        ks = list(sc.keys()); pv = devig([1 / sc[k] for k in ks])
+        sc = dict(zip(ks, pv))
+        out["scores"] = [{"score": f"{a}:{b}", "p": round(100 * v)} for (a, b), v in sorted(sc.items(), key=lambda kv: -kv[1])]
     return out
 
 

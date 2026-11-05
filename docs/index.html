@@ -812,6 +812,19 @@ a.ni { text-decoration: none; color: inherit; }
   }
   var $app = document.getElementById("app");
   var DEMO = window.__DATA__ || null;
+  // Telegram держит старую страницу в кэше: сверяем версию и, если на сайте новее, перезагружаемся на новый адрес
+  var BUILD = "__BUILD__";
+  function checkVersion() {
+    if (BUILD.indexOf("__") === 0 || location.protocol === "file:") return;
+    fetch("version.txt?t=" + Date.now(), { cache: "no-store" }).then(function (r) { return r.ok ? r.text() : ""; }).then(function (v) {
+      v = String(v || "").trim();
+      if (!v || v === BUILD) return;
+      try { if (sessionStorage.getItem("rl") === v) return; sessionStorage.setItem("rl", v); } catch (e) {}
+      location.replace(location.pathname + "?v=" + v + location.hash);
+    }).catch(function () {});
+  }
+  checkVersion();
+  document.addEventListener("visibilitychange", function () { if (!document.hidden) checkVersion(); });
   var state = { list: null, details: {}, view: "home", tab: "stats", newsFilter: "all", map: null };
 
   // ---------- хранилище «комментирую»
@@ -1929,7 +1942,7 @@ a.ni { text-decoration: none; color: inherit; }
       var x = o.score.split(":"), side = +x[0] > +x[1] ? "a" : "b", r = rank.indexOf(o.score);
       var c = r === 0 ? "g" : r === rank.length - 1 ? "r" : ["g", "y", "o"][Math.min(r, 2)];
       return '<span class="oc ' + side + ' pc-' + c + (o === P.outcomes[0] ? ' top' : '') + '"><b class="num">' + esc(o.score) + '</b><small class="num">' + esc(o.p) + '%</small></span>';
-    }).join("") + '<span class="oc-src">' + (P.source === "букмекеры" ? "по коэффициентам " + (P.provider ? esc(String(P.provider).charAt(0).toUpperCase() + String(P.provider).slice(1)) : "букмекеров") : "оценка по статистике карт") + '</span></div>';
+    }).join("") + (P.source === "букмекеры" ? "" : '<span class="oc-src">оценка по статистике карт</span>') + '</div>';
   }
   // вероятный пик: вето по привычкам команд за 3 месяца, счёт — по винрейту карт
   function pickBlock(m) {

@@ -26,6 +26,9 @@ jobs:
         run: |
           mkdir -p docs/data
           if git fetch -q --depth 1 origin data; then git archive FETCH_HEAD | tar -x -C docs/data; fi
+      - name: Версия сайта
+        run: sh tools/stamp.sh
+
       - uses: actions/upload-pages-artifact@v3
         with:
           path: docs
