@@ -616,7 +616,9 @@ def lp_roster(t: dict) -> dict | None:
         if age < timedelta(days=ROSTER_TTL_DAYS) and not (incomplete and age >= timedelta(hours=3)):
             return cached.get("data")
     names = []
-    for nm in (t.get("name"), re.sub(r"(?<=[a-z])(?=[A-Z])", " ", t.get("name") or ""), t.get("acronym")):
+    base = re.sub(r"\s+(esports|e-sports|gaming|team|clan|club)$", "", t.get("name") or "", flags=re.IGNORECASE).strip()
+    for nm in (t.get("name"), re.sub(r"(?<=[a-z])(?=[A-Z])", " ", t.get("name") or ""), t.get("acronym"),
+               "Team " + base if base else None, base + " Esports" if base else None):  # на Liquipedia: «Team Spirit», «FUT Esports»
         if nm and nm not in names:
             names.append(nm)
     data = None
@@ -632,8 +634,12 @@ def lp_roster(t: dict) -> dict | None:
         if text is None:
             warn(f"Liquipedia: нет страницы команды {t.get('name')}")
         else:
-            i = text.find("Squad|status=active")
-            block = text[i: text.find("\n}}", i)]
+            # активный состав бывает несколькими блоками: игроки и отдельно штаб (type=staff — тренеры); запасные (inactive) не берём
+            blocks, i = [], text.find("Squad|status=active")
+            while i >= 0:
+                blocks.append(text[i: text.find("\n}}", i)])
+                i = text.find("Squad|status=active", i + 10)
+            block = "\n".join(blocks)
             people = []
             for line in block.split("\n"):
                 if "{{Person" not in line:
