@@ -2350,13 +2350,7 @@ def hltv_events() -> dict:
                 break
         print(f"Архив событий HLTV за год: {len(res)}")
         return res or None
-    c = hltv_cache.get("evarch2")
-    if c and (parse_iso(c.get("t")) or NOW) > NOW - timedelta(hours=24):
-        a = c["data"]
-    else:
-        a = arch() or (c or {}).get("data") or {}
-        if a:
-            hltv_cache["evarch2"] = {"t": iso(NOW), "data": a}
+    a = {}  # архив сыгранных не читаем: обзор сыгранного турнира — из данных, собранных, пока он шёл
     for slug, href in a.items():
         out.setdefault(slug, href)
     _events_cache.update(out)
@@ -4656,6 +4650,8 @@ def main() -> int:
         if b and b - NOW > timedelta(days=60):
             continue  # призовые и участники с HLTV — для идущих, ближайших (2 мес.) и сыгранных
         fin = bool(tr.get("finished"))
+        if fin and not hltv_cache.get("event3:" + tr["name"]):
+            continue  # сыгранные турниры не дособираем (решение владельца) — их обзор берётся из того, что собрали, пока они шли
         if not hltv_cache.get("event3:" + tr["name"]):
             if new_ev >= 8:
                 continue  # новых страниц событий — не больше 8 за сбор, остальные в следующий раз
