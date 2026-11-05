@@ -4685,6 +4685,21 @@ def main() -> int:
         build_logos()
     except Exception as e:
         warn(f"Логотипы: {e!r}")
+    # «Будущие игры» на страницах команд — на каждом сборе (страницы целиком пересобираются раз в 3–12 ч, а расписание меняется чаще)
+    n_up = 0
+    for f in (OUT / "team").glob("*.json"):
+        d = load_json(f, None)
+        if not d or not d.get("name"):
+            continue
+        try:
+            bid = team_by_name(d["name"])
+            if bid:
+                d["upcoming"] = bo3_upcoming(bid)
+                save_json(f, d)
+                n_up += 1
+        except Exception as e:
+            warn(f"Будущие игры {d.get('name')}: {e!r}")
+    print(f"Будущие игры обновлены у {n_up} команд")
     for f in list((OUT / "team").glob("*.json")) + list((OUT / "match").glob("*.json")):  # ручные имена — и в старых файлах
         d = load_json(f, None)
         if d is not None and NAME_RU:
