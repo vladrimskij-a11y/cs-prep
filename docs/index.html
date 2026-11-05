@@ -1957,7 +1957,8 @@ a.ni { text-decoration: none; color: inherit; }
         if (tg.some(function (x) { return x === "AWP" || /^Снайпер/.test(x); })) roles.push(["AWP", "awp"]);
         tg.forEach(function (x) { if (/^В аренде/.test(x)) extra.push(esc(x.toLowerCase())); else if (x === "Замена") extra.push("замена"); });
         var real = [p.first_name, p.last_name].filter(Boolean).join(" ");
-        html += personRow(p, roles, real, extra, (statsTeam ? pstat(statsTeam, p.nick) : "") + tourStat(statsTeam, p.nick), "");
+        // во вкладке «Игроки» матча статистику не показываем (просьба владельца), на странице команды — оставляем
+        html += personRow(p, roles, real, extra, clickable ? "" : (statsTeam ? pstat(statsTeam, p.nick) : ""), "");
       });
     (coach || []).forEach(function (c) {
       html += personRow(Object.assign({}, c, { nationality: c.nationality || c.flag }), [["Тренер", ""]], c.name || "", [], "", "");  // у тренера тоже мажоры и MVP, если есть
