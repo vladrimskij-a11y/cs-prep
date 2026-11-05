@@ -4376,6 +4376,76 @@ def odds_log_put(m: dict, bids: list, win: list, provider) -> None:
     e.update({"slug": m.get("slug"), "begin": m.get("start_date"), "ids": bids, "p": win, "prov": provider, "t": iso(NOW)})
 
 
+VRS_LOG_F = OUT / "vrs_log.json"
+vrs_log: dict = {}
+
+
+def vrs_log_put(brief: dict, bids: list, rows: list, O: dict | None) -> None:
+    """Журнал прогноза VRS: последний прогноз до начала матча (место и очки при победе каждой из команд)."""
+    if not O or not O.get("win0") or not O.get("win1") or len(bids) != 2:
+        return
+    st = parse_iso(brief.get("begin_at"))
+    if not st or st < NOW:
+        return
+    if not vrs_log:
+        vrs_log.update((load_json(VRS_LOG_F, {}) or {}).get("entries") or {})
+    vrs_log[str(brief["id"])] = {
+        "begin": brief.get("begin_at"), "slug": _bo3_slug.get(tuple(bids)), "ids": bids, "t": iso(NOW),
+        "names": [r["name"] for r in rows], "cur": [[r["rank"], r["points"]] for r in rows],
+        "pred": [[[x["rank"], x["delta"]] for x in O["win0"]], [[x["rank"], x["delta"]] for x in O["win1"]]]}
+
+
+def vrs_log_resolve(table: list[dict]) -> None:
+    """Итог по журналу VRS: победитель (bo3.gg) и настоящие место и очки после матча по живому рейтингу.
+    Снимок берём на первом полном сборе, где очки хоть одной команды изменились (не раньше 6 ч после начала),
+    а если не изменились за 3 дня — то, что есть. Сводка: средняя ошибка в очках, как часто угадано место."""
+    if not vrs_log:
+        vrs_log.update((load_json(VRS_LOG_F, {}) or {}).get("entries") or {})
+    if not vrs_log:
+        return
+    by = {norm(r["name"]): r for r in table or []}
+    asked = 0
+    for e in vrs_log.values():
+        st = parse_iso(e.get("begin"))
+        if "act" in e or not st or st > NOW - timedelta(hours=6):
+            continue
+        if "w" not in e and e.get("slug") and asked < 60:
+            asked += 1
+            try:
+                x = bo3(f"/matches/{e['slug']}")
+            except Exception:
+                x = None
+            w = (x or {}).get("winner_team_id")
+            if w in (e.get("ids") or []):
+                e["w"] = e["ids"].index(w)
+        if e.get("w") not in (0, 1):
+            if st < NOW - timedelta(days=4):
+                e["act"] = None  # итога нет — больше не ждём
+            continue
+        now = [by.get(norm(n)) for n in e["names"]]
+        if not by or not all(now):
+            continue
+        moved = any(now[i]["points"] != e["cur"][i][1] for i in (0, 1))
+        if moved or st < NOW - timedelta(days=3):
+            e["act"] = [[r["rank"], r["points"] - e["cur"][i][1]] for i, r in enumerate(now)]
+            e["act_t"] = iso(NOW)
+    for k in [k for k, e in vrs_log.items() if (parse_iso(e.get("begin")) or NOW) < NOW - timedelta(days=120)]:
+        del vrs_log[k]
+    done = [e for e in vrs_log.values() if e.get("act") and e.get("w") in (0, 1)]
+    summ = {"n": len(done)}
+    if done:
+        err, rank_ok, rank_near, n = 0.0, 0, 0, 0
+        for e in done:
+            pr = e["pred"][e["w"]]
+            for i in (0, 1):
+                n += 1
+                err += abs(pr[i][1] - e["act"][i][1])
+                rank_ok += pr[i][0] == e["act"][i][0]
+                rank_near += abs(pr[i][0] - e["act"][i][0]) <= 1
+        summ.update({"points_mae": round(err / n, 1), "rank_exact": round(100 * rank_ok / n), "rank_pm1": round(100 * rank_near / n)})
+    save_json(VRS_LOG_F, {"updated": iso(NOW), "summary": summ, "entries": vrs_log})
+
+
 def odds_log_resolve() -> None:
     """Итоги матчей из журнала (bo3.gg) и сводка: как часто фаворит букмекера побеждал."""
     if not odds_log:
@@ -4442,6 +4512,7 @@ def devig(coeffs: list) -> list:
 
 
 _bo3_starter: dict = {}
+_bo3_slug: dict = {}
 
 
 def bo3_odds(bids: list) -> dict | None:
@@ -4457,6 +4528,7 @@ def bo3_odds(bids: list) -> dict | None:
     m = next((x for x in res if {x.get("team1_id"), x.get("team2_id")} == set(bids)), None)
     if m:  # вето обычно начинает вторая команда в паре bo3.gg (так в ~72% из 357 серий BO3)
         _bo3_starter[tuple(bids)] = bids.index(m.get("team2_id")) if m.get("team2_id") in bids else 0
+        _bo3_slug[tuple(bids)] = m.get("slug")  # для журнала VRS: по нему потом узнаём победителя
     bu = (m or {}).get("bet_updates") or {}
     c1, c2 = (bu.get("team_1") or {}).get("coeff"), (bu.get("team_2") or {}).get("coeff")
     if not c1 or not c2 or min(c1, c2) < 1.02:
@@ -4758,6 +4830,10 @@ def build_detail(m: dict, prev: dict | None) -> dict:
         except Exception as e:
             warn(f"VRS прогноз: {e!r}")
             detail["vrs_outcomes"] = vrs_outcomes(rows[0], rows[1], table)
+        try:
+            vrs_log_put(brief, bids, rows, detail.get("vrs_outcomes"))
+        except Exception as e:
+            warn(f"Журнал VRS: {e!r}")
     begin = parse_iso(brief["begin_at"])
     soon = begin is not None and begin - NOW <= timedelta(hours=DETAIL_HOURS)
     if STATS and prev and prev.get("news"):
@@ -5335,6 +5411,11 @@ def main() -> int:
     save_json(HLTV_STATS_CACHE_F, hltv_stats_cache)
     try:
         odds_log_resolve()
+    except Exception as e:
+        warn(f"Журнал прогнозов: {e!r}")
+    try:
+        if vrs_log or VRS_LOG_F.exists():
+            vrs_log_resolve(vrs_table())  # в быстром сборе — рейтинг из кэша полного
     except Exception as e:
         warn(f"Журнал прогнозов: {e!r}")
     prune_caches()
