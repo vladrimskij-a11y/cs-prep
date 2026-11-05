@@ -4370,16 +4370,23 @@ def build_prediction(d: dict, bids: list) -> dict | None:
         maps.append({"map": left[0], "by": None})
     # Без коэффициентов: основа — разница очков VRS (проверка на 122 сериях последних 45 дней: угадан победитель в 74%,
     # Брайер 0.18), а винрейты на картах лишь слегка сдвигают карту — сами по себе они почти не лучше монетки.
+    # С коэффициентами — карты считаются от шанса букмекера на серию (так проценты карт с ним согласованы).
     pv = None
     try:
-        tbl = vrs_table()
-        ra, rb = (vrs_find(t, tbl) if tbl else None for t in (d.get("teams") or [{}, {}])[:2])
-        if ra and rb and ra.get("points") and rb.get("points"):
-            ps = 1 / (1 + 10 ** (-(ra["points"] - rb["points"]) / 400))
+        ps = None
+        if odds and odds.get("win"):
+            ps = min(0.97, max(0.03, odds["win"][0] / 100))
+        else:
+            tbl = vrs_table()
+            ra, rb = (vrs_find(t, tbl) if tbl else None for t in (d.get("teams") or [{}, {}])[:2])
+            if ra and rb and ra.get("points") and rb.get("points"):
+                ps = 1 / (1 + 10 ** (-(ra["points"] - rb["points"]) / 400))
+        if ps is not None:
             lo, hi = 0.0, 1.0  # вероятность выиграть карту, при которой серия BO3 выигрывается с вероятностью ps
             for _ in range(40):
                 mid = (lo + hi) / 2
-                if mid * mid * (3 - 2 * mid) < ps:
+                ser = mid if bo == 1 else mid ** 3 * (10 - 15 * mid + 6 * mid * mid) if bo == 5 else mid * mid * (3 - 2 * mid)
+                if ser < ps:
                     lo = mid
                 else:
                     hi = mid

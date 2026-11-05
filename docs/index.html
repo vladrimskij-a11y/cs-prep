@@ -183,6 +183,7 @@ a { color: inherit; }
 .mixlg > .h1 { clip-path: polygon(0 0, 100% 0, 0 100%); }
 .mixlg > .h2 { clip-path: polygon(100% 0, 100% 100%, 0 100%); }
 .mixlg::after { content: ""; position: absolute; left: 50%; top: -10%; height: 120%; width: 1.5px; background: var(--muted); opacity: .5; transform: rotate(45deg); }
+.hwin { font-size: 12px; font-weight: 700; color: var(--fg); }
 .tbdnote { font-size: 12px; color: var(--muted); }
 .mapsel { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }
 .recent { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
@@ -1981,7 +1982,7 @@ a.ni { text-decoration: none; color: inherit; }
       var x = o.score.split(":"), side = +x[0] > +x[1] ? "a" : "b", r = rank.indexOf(o.score);
       var c = r === 0 ? "g" : r === rank.length - 1 ? "r" : ["g", "y", "o"][Math.min(r, 2)];
       return '<span class="oc ' + side + ' pc-' + c + (o === P.outcomes[0] ? ' top' : '') + '"><b class="num">' + esc(o.score) + '</b><small class="num">' + esc(o.p) + '%</small></span>';
-    }).join("") + (P.source === "букмекеры" ? "" : '<span class="oc-src">оценка по статистике карт</span>') + '</div>';
+    }).join("") + (P.source === "букмекеры" ? "" : '<span class="oc-src">оценка по рейтингу VRS</span>') + '</div>';
   }
   // вероятный пик: вето по привычкам команд за 3 месяца, счёт — по винрейту карт
   function pickBlock(m) {
@@ -1993,7 +1994,7 @@ a.ni { text-decoration: none; color: inherit; }
       return '<div class="pp-m ' + (x.by === 0 ? "a" : x.by === 1 ? "b" : "n") + mapBg(x.map) + '"><span class="pp-n">Карта ' + (i + 1) + (who ? ' · ' + esc(who) : '') + '</span><b>' + esc(x.map) + '</b>' +
         '<span class="num pp-s"><span class="a">' + esc(x.score ? x.score[0] : "–") + '</span>:<span class="b">' + esc(x.score ? x.score[1] : "–") + '</span></span>' +
         (z ? '<small>скорее всего не понадобится</small>' : '<small class="num">' + esc(abbr(A)) + ' ' + esc(x.p) + '%</small>') + '</div>';
-    }).join("") + '</div>' + (P.odds && P.odds.win ? '<div class="note">Букмекеры: ' + esc(abbr(A)) + ' ' + P.odds.win[0] + '% · ' + esc(abbr(B)) + ' ' + P.odds.win[1] + '%</div>' : '') + '</div></div>';
+    }).join("") + '</div></div></div>';
     return html;
   }
   function vrsBlock(m) {
@@ -2440,9 +2441,17 @@ a.ni { text-decoration: none; color: inherit; }
     return (key === "news:all" ? factsBlock(m) : "") + newsList(m, key.slice(5));
   }
 
-  function heroSide(T) {
+  // шанс команды выиграть серию: по коэффициентам, а без них — сумма исходов прогноза
+  function winPct(m, i) {
+    var P = m.prediction; if (!P || m.tbd) return null;
+    if (P.odds && P.odds.win) return P.odds.win[i];
+    var s0 = 0, any = false;
+    (P.outcomes || []).forEach(function (o) { var x = o.score.split(":"); any = true; if ((+x[0] > +x[1]) === (i === 0)) s0 += +o.p || 0; });
+    return any ? Math.round(s0) : null;
+  }
+  function heroSide(T, wp) {
     if (T.tbd) return '<span class="acr">' + mixLogo(T, true) + '</span><span class="full">' + esc(T.name) + '</span><span class="tbdnote">' + oppWord(T) + ' матча</span>';
-    return '<span class="acr">' + esc(abbr(T)) + '</span><span class="full">' + esc(T.name) + '</span>' + heroVrs(T);
+    return '<span class="acr">' + esc(abbr(T)) + '</span><span class="full">' + esc(T.name) + '</span>' + heroVrs(T) + (wp != null ? '<span class="hwin num">Победа ' + wp + '%</span>' : '');
   }
   function headHtml(m) {
     var A = m.teams[0] || {}, B = m.teams[1] || {};
@@ -2452,9 +2461,9 @@ a.ni { text-decoration: none; color: inherit; }
     return '<div class="hbar">' + backBtn(m.tournament || "Назад") + '</div>' +
       '<div class="fold mini-wrap"><div class="fi"><div class="mini"><span class="ma"' + tnAttr(A) + '>' + esc(abbr(A)) + miniVrs(A) + '</span><span class="mm">BO' + esc(m.bo) + miniOutc(m) + '</span><span class="mb"' + tnAttr(B) + '>' + esc(abbr(B)) + miniVrs(B) + '</span></div></div></div>' +
       '<div class="fold hero-wrap"><div class="fi"><section class="hero"><div class="meta"><span class="pill ' + esc(m.tier) + '">' + esc((m.tier || "").toUpperCase()) + '</span><span>' + esc(withYear(m.tournament, (m.serie || {}).begin || m.begin_at)) + (m.stage ? " · " + esc(m.stage) : "") + '</span></div>' +
-      '<div class="face"><div class="tm a"' + tnAttr(A) + '>' + heroSide(A) + '</div>' +
+      '<div class="face"><div class="tm a"' + tnAttr(A) + '>' + heroSide(A, winPct(m, 0)) + '</div>' +
       '<div class="mid"><b>' + esc(hm(m.begin_at)) + '</b>' + esc(dm(m.begin_at)) + ' · BO' + esc(m.bo) + '</div>' +
-      '<div class="tm b"' + tnAttr(B) + '>' + heroSide(B) + '</div></div>' +
+      '<div class="tm b"' + tnAttr(B) + '>' + heroSide(B, winPct(m, 1)) + '</div></div>' +
       heroOutcomes(m) + '</section></div></div>' +
       '<nav class="tabs" role="tablist">' + tabBtn("players", "Команда") + tabBtn("stats", "Статистика") + tabBtn("news", "Новости", nCount) + '</nav>' +
       '<div class="fold nf-wrap"><div class="fi"><div class="filt tfilt" role="group" aria-label="Команда">' +
