@@ -1470,6 +1470,10 @@ def vrs_table() -> list[dict]:
     """Живой рейтинг Valve с HLTV: место, очки, регион (учитывает и незавершённые турниры)."""
     def fn():
         h = hltv_get("/valve-ranking/teams")
+        if h:  # на странице рейтинга есть ссылки на игроков составов — запоминаем их id без лишних запросов
+            ids = {norm(sl): {"id": int(i), "slug": sl} for i, sl in re.findall(r'href="/player/(\d+)/([^"/?#]+)"', h)}
+            if ids:
+                hltv_cache["rkpl"] = {"t": iso(NOW), "data": ids}
         return parse_ranked(h) if h else None
     return hltv_cached("vrs3", fn) or []
 
@@ -2272,7 +2276,7 @@ def hltv_get(path: str) -> str | None:
                 f = hltv_cache.get("hfail:" + path) or {}
                 hltv_cache["hfail:" + path] = {"t": iso(NOW), "n": f.get("n", 0) + 1}
                 _hltv_403[0] += 1
-                if _hltv_403[0] >= 2:
+                if _hltv_403[0] >= 3:  # три разные страницы подряд отказали — HLTV явно против, стоп до следующего запуска
                     _hltv_blocked[0] = True
             break
         except Exception as e:
@@ -3834,8 +3838,8 @@ def hltv_players_warm() -> None:
     """Очередь страниц игроков HLTV: сначала те, о ком ничего нет, потом давно не обновлённые; ближайшие матчи — вперёд.
     Отказавшие недавно страницы ждут своей паузы и не стоят в начале. Всё полученное до остановки остаётся в кэше,
     следующий сбор продолжает с того же места очереди."""
-    for k, v in list(hltv_cache.items()):  # id игроков со страниц команд из прошлых сборов
-        if k.startswith("tpl:"):
+    for k, v in list(hltv_cache.items()):  # id игроков со страниц команд и рейтинга из прошлых сборов
+        if k.startswith("tpl:") or k == "rkpl":
             for n, x in ((v or {}).get("data") or {}).items():
                 hltv_player_ids.setdefault(n, x)
     nicks: list = []
@@ -4513,18 +4517,18 @@ def main() -> int:
                 hltv_player_ids[norm(p["nick"])] = {"id": p["id"], "slug": p["slug"]}
         for tn, ti in (ex.get("team_ids") or {}).items():
             hltv_team_ids[norm(tn)] = {**ti, "name": tn}
-    if not STATS:  # очередь игроков HLTV — до сборки карточек, чтобы они сразу взяли свежие MVP и мажоры
-        try:
-            hltv_players_warm()
-        except Exception as e:
-            warn(f"Очередь HLTV: {e!r}")
-    if not STATS:  # команды из рейтинга Valve тоже: нужны для вето прошедших турниров
+    if not STATS:  # команды из рейтинга Valve (заодно id игроков составов) — до очереди игроков
         try:
             for r in vrs_table():
                 if r.get("hltv") and r.get("name"):
                     hltv_team_ids.setdefault(norm(r["name"]), {**r["hltv"], "name": r["name"]})
         except Exception as e:
             warn(f"VRS для вето: {e!r}")
+    if not STATS:  # очередь игроков HLTV — до сборки карточек, чтобы они сразу взяли свежие MVP и мажоры
+        try:
+            hltv_players_warm()
+        except Exception as e:
+            warn(f"Очередь HLTV: {e!r}")
     listing = []
     keep_ids = set()
     for m in matches:
