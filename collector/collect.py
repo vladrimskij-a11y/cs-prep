@@ -1646,6 +1646,11 @@ def vrs_find(t: dict, table: list[dict]) -> dict | None:
         n = norm(r["name"])
         if any(len(k) >= 4 and len(n) >= 4 and (k in n or n in k) for k in keys):
             return r
+    for r in table:  # сокращение по первым буквам: NIP → Ninjas in Pyjamas
+        words = re.findall(r"[A-Za-z0-9]+", r["name"])
+        ini = "".join(w[0] for w in words).lower()
+        if len(words) >= 3 and ini in keys:
+            return r
     return None
 
 
@@ -1854,6 +1859,9 @@ def vrs_outcomes_valve(a: dict, b: dict, table: list[dict], lan: bool = True, hi
 
 
 VRS_DS_F = CACHE / "vrs_dataset.json"
+# одиночные матчи (история bo3, форма) — не старше 10 дней до снимка: более ранних у HLTV нет (Wildcard 06.11: +11 очков);
+# итоги турниров (results) — целиком: турнир, шедший во время снимка, Valve пропустил, а HLTV учитывает
+VRS_FORM_DAYS = 10
 _vrs_live: dict = {}
 
 
@@ -1915,7 +1923,7 @@ def vrs_live():
         for m in hist:
             t, w = _days(m.get("start_date")), m.get("winner_team_id")
             a, b = (m.get("team1") or {}).get("name"), (m.get("team2") or {}).get("name")
-            if t is None or not w or not a or not b:
+            if t is None or not w or not a or not b or t < ds["end"] - VRS_FORM_DAYS:
                 continue
             s_ = ((m.get("tournament") or {}).get("tier") or m.get("tier") or "").lower() == "s"
             L.add_match(t, a, b, w == m.get("team1_id"), 1.0 if s_ else 0.5, s_)
@@ -1923,7 +1931,7 @@ def vrs_live():
         tj = load_json(f, {}) or {}
         for x in tj.get("form") or []:
             t = _days(x.get("date"))
-            if t is not None and x.get("won") is not None and tj.get("name"):
+            if t is not None and t >= ds["end"] - VRS_FORM_DAYS and x.get("won") is not None and tj.get("name"):
                 s_ = (x.get("tier") or "").lower() == "s"
                 L.add_match(t, tj["name"], x.get("opponent_name"), x["won"], 1.0 if s_ else 0.5, s_)
     now = _days(NOW)
@@ -1945,6 +1953,14 @@ def vrs_live():
                 L.prizes.setdefault(k, []).append((now, g))
     L.played = played
     L.base = L.compute(now)["rating"]
+    if not _vrs_live:  # контроль раз за запуск: насколько «живой» пересчёт совпадает с очками HLTV
+        try:
+            d = [abs(L.base[k] - r["points"]) for r in vrs_table()[:40]
+                 for k in [L.key(r["name"])] if k in L.base]
+            if d:
+                print(f"VRS: живой пересчёт против HLTV, топ-40 — ср. расхождение {sum(d) / len(d):.1f}, макс {max(d):.0f} (команд {len(d)})")
+        except Exception as e:
+            warn(f"VRS контроль: {e!r}")
     _vrs_live.update(sig=sig, L=L)
     return L
 
