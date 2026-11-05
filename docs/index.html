@@ -491,12 +491,18 @@ html { overflow-anchor: none; }
 .mini .mm { display: flex; flex-direction: column; align-items: center; gap: 2px; }
 .mini .mo { font-size: 10px; color: var(--muted); white-space: nowrap; }
 .stage .brk { border-left: 3px solid var(--stc); }
+.sshell .pane:has(.stage) { scroll-snap-type: y proximity; scroll-padding-top: calc(var(--shh, 120px) + 6px); }
+.stage { scroll-snap-align: start; }
 .stage > h3 { color: var(--stc); }
-.bracket { overflow-x: auto; scrollbar-width: none; padding-bottom: 4px; }
+.bracket { overflow-x: hidden; padding-bottom: 4px; }
 .brk-h { position: sticky; left: 0; color: var(--stc); }
-.brk-row { position: relative; display: flex; gap: 22px; padding: 0 12px 10px; width: max-content; color: var(--stc); }
+.brk-row { position: relative; display: flex; gap: 16px; padding: 0 10px 10px; width: auto; color: var(--stc); }
 .brk-lines { position: absolute; left: 0; top: 0; pointer-events: none; opacity: .55; }
-.brk-col { position: relative; display: flex; flex-direction: column; width: 160px; color: var(--fg); }
+.brk-col { position: relative; display: flex; flex-direction: column; flex: 1 1 0; min-width: 0; width: auto; color: var(--fg); }  /* сетка во всю ширину экрана, без прокрутки вбок */
+.bm .bt i { font-style: normal; } .bm .bt .ns { display: none; }
+.brk-row.tight .bm .bt .nf { display: none; } .brk-row.tight .bm .bt .ns { display: inline; }
+.brk-row.tight .bm .bt { padding: 5px 6px; gap: 4px; font-size: 12px; }
+.brk-row.tight .bm .bt .lg { width: 14px; height: 14px; }
 .brk-ms { flex: 1; display: flex; flex-direction: column; justify-content: space-around; gap: 10px; }
 .brk-3 { margin-top: 14px; }
 .gfw { position: relative; }
@@ -518,22 +524,26 @@ html { overflow-anchor: none; }
 .swr:nth-child(-n+2) { border-top: 0; }
 .swn { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .swr.q b { color: var(--win); } .swr.out { opacity: .55; } .swr.out b { color: var(--loss); }
-/* швейцарка «по счёту»: столбцы раундов, в них группы по счёту побед-поражений; сверху — кто прошёл, снизу — кто вылетел.
-   Компактно, чтобы вся таблица от верхней плашки до нижней помещалась в один экран телефона */
-.swg { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; padding: 10px; align-items: stretch; overscroll-behavior-x: contain; }
-.swc { flex: none; min-width: 78px; display: flex; flex-direction: column; gap: 4px; }
+/* швейцарка «по счёту»: столбцы раундов делят ширину экрана (без прокрутки вбок), в них группы по счёту;
+   сверху — кто прошёл, снизу — кто вылетел; стрелки: зелёная — куда идёт победитель, красная — проигравший */
+.swg { position: relative; display: flex; gap: 14px; padding: 10px 8px; align-items: stretch; background: var(--sunk); border-radius: var(--r); }
+.swc { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 6px; position: relative; z-index: 1; }
+.swgr { display: flex; flex-direction: column; gap: 6px; }
 .swc .sp { flex: 1; min-height: 4px; }
 .swh { font-family: var(--mono); font-weight: 700; font-size: 12px; color: var(--muted); margin-top: 2px; line-height: 1.2; }
-.sw-m { display: flex; justify-content: space-between; align-items: center; gap: 4px; padding: 4px 6px; border-radius: 8px; background: var(--sunk); width: 78px; box-sizing: border-box; }
-.sw-l { position: relative; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: var(--surface); flex: none; overflow: hidden; font-size: 8px; font-weight: 700; color: var(--muted); }
-.sw-l .lg { position: absolute; left: 4px; top: 4px; width: 20px; height: 20px; object-fit: contain; margin: 0; background: var(--surface); }  /* нет логотипа — видны буквы под ним */
-.sw-l.w { box-shadow: 0 0 0 2px var(--win); }
+.sw-m { display: flex; justify-content: space-between; align-items: center; gap: 3px; padding: 4px; border-radius: 8px; background: var(--surface); border: 1px solid var(--line); box-shadow: 0 1px 2px rgba(0,0,0,.08); width: 100%; box-sizing: border-box; }
+.sw-l { position: relative; width: calc(50% - 2px); max-width: 30px; aspect-ratio: 1; border-radius: 50%; display: grid; place-items: center; background: var(--sunk); flex: none; overflow: hidden; font-size: 7.5px; font-weight: 700; color: var(--muted); }
+.sw-l .lg { position: absolute; inset: 15%; width: 70%; height: 70%; object-fit: contain; margin: 0; background: var(--sunk); }  /* нет логотипа — видны буквы под ним */
+.sw-l.w { box-shadow: 0 0 0 2px var(--win); background: var(--surface); }
+.sw-l.w .lg { background: var(--surface); }
 .sw-l.l { opacity: .35; filter: grayscale(1); }
-.sw-box { border-radius: 8px; padding: 6px; display: grid; gap: 4px; justify-items: center; }
-.sw-box.q { background: color-mix(in srgb, var(--win) 22%, var(--surface)); }
-.sw-box.out { background: color-mix(in srgb, var(--loss) 22%, var(--surface)); }
+.sw-box { border-radius: 8px; padding: 5px 4px; display: grid; gap: 4px; justify-items: center; }
+.sw-box .sw-l { width: 100%; max-width: 30px; }
+.sw-box.q { background: color-mix(in srgb, var(--win) 28%, var(--surface)); }
+.sw-box.out { background: color-mix(in srgb, var(--loss) 28%, var(--surface)); }
 .sw-box .swh { color: var(--fg); margin: 0; }
 .sw-box .sw-l { background: var(--surface); }
+.sw-arr { position: absolute; left: 0; top: 0; pointer-events: none; z-index: 0; }
 .brk-row.nolines .brk-ms { justify-content: flex-start; }
 .medals { display: inline-flex; gap: 4px; flex-wrap: wrap; grid-column: auto; margin: 0; }
 .medal { display: inline-flex; align-items: center; gap: 2px; padding: 1px 6px; border-radius: 6px; background: var(--sunk); font-size: 13px; }
@@ -1496,6 +1506,15 @@ a.ni { text-decoration: none; color: inherit; }
   }
 
   function cap(x) { return x ? x.charAt(0).toUpperCase() + x.slice(1) : x; }
+  // короткое название команды для узких сеток: аббревиатура из расписания или начало названия
+  function shortName(n) {
+    if (!n) return "TBD";
+    var k = nkey(n), hit = null;
+    ((state.list || {}).matches || []).some(function (m) { return (m.teams || []).some(function (t) { if (nkey(t.name) === k && t.acronym) { hit = t.acronym; return true; } }); });
+    if (hit) return hit;
+    var w = String(n).replace(/^(the|team)\s+/i, "").split(/\s+/);
+    return w[0].length <= 7 ? w[0] : w[0].slice(0, 6);
+  }
   var BR_RU = { upper: "Верхняя сетка", lower: "Нижняя сетка" };
   var STAGE_COL = ["#6f8fc9", "#c49a52", "#62a983", "#a07cc4", "#c47b7b", "#5fa8b5"];
   function bracketHtml(R) {
@@ -1503,7 +1522,7 @@ a.ni { text-decoration: none; color: inherit; }
     (R.matches || []).forEach(function (x) { have[String(x.id)] = 1; });
     function side(name, lgo, sc, cls, fin) {
       return '<span class="bt' + cls + '">' + logo(name, lgo) +
-        '<span>' + esc(name || "TBD") + '</span><b class="num">' + esc(fin || sc ? (sc == null ? "" : sc) : "") + '</b></span>';
+        '<span><i class="nf">' + esc(name || "TBD") + '</i><i class="ns">' + esc(shortName(name)) + '</i></span><b class="num">' + esc(fin || sc ? (sc == null ? "" : sc) : "") + '</b></span>';
     }
     function openKey(x) {  // будущий/идущий матч → карточка матча из расписания
       var A = nkey(x.a), B = nkey(x.b);
@@ -1540,13 +1559,23 @@ a.ni { text-decoration: none; color: inherit; }
       st.rounds.forEach(function (rd) { po.rounds.push(Object.assign({}, rd, { _third: true })); });
       return false;
     });
-    // группы сыграны, впереди плей-офф — несыгранные стадии наверх, сыгранные ниже (порядок внутри сохраняем)
-    var done = stages.filter(function (st) { return st.status === "finished"; }), live = stages.filter(function (st) { return st.status !== "finished"; });
-    if (done.length && live.length) stages = live.concat(done);
-    stages.forEach(function (st, si) {
+    // порядок стадий: доигранный турнир — плей-офф сверху; идущий — сначала текущая стадия (группы A, потом B),
+    // плей-офф поднимается наверх, когда идёт или до его начала меньше 12 часов
+    stages.forEach(function (st, i) { st._i = i; st._last = i === stages.length - 1; });
+    function isPO(st) { return /плей|playoff/i.test(st.title || "") || (st.format === "playoff" && !/групп|group|стади|stage/i.test(st.title || "")); }
+    function firstDate(st) { var d = null; st.rounds.forEach(function (rd) { rd.matches.forEach(function (x) { if (x.date && (!d || x.date < d)) d = x.date; }); }); return d ? new Date(d).getTime() : null; }
+    var poSt = stages.filter(isPO), rest = stages.filter(function (st) { return !isPO(st); });
+    if (stages.every(function (st) { return st.status === "finished"; })) stages = poSt.concat(rest);
+    else {
+      var soon = poSt.some(function (st) { var d = firstDate(st); return st.status === "current" || (d && d - Date.now() <= 12 * 3600e3); });
+      var by = function (f) { return stages.filter(function (st) { return f(st) && !(soon && isPO(st)); }); };
+      stages = (soon ? poSt : []).concat(by(function (st) { return st.status === "current"; }), by(function (st) { return st.status !== "current" && st.status !== "finished"; }), by(function (st) { return st.status === "finished"; }));
+    }
+    stages.forEach(function (st) {
+      var si = st._i;
       if (isSwiss(st)) { html += swissHtml(st, si, box); return; }
       var upper = [], lower = [], other = [], third = [];
-      var po = /плей|playoff/i.test(st.title || "") || st.format === "playoff" || si === stages.length - 1;
+      var po = isPO(st) || st.format === "playoff" || st._last;
       st.rounds.forEach(function (rd) {
         if (rd._third || (po && THIRD.test(rd.name || ""))) third.push(rd);
         else (rd.bracket === "lower" ? lower : rd.bracket === "upper" ? upper : other).push(rd);
@@ -1563,7 +1592,7 @@ a.ni { text-decoration: none; color: inherit; }
       html += '<div class="sec stage" style="--stc:' + STAGE_COL[si % STAGE_COL.length] + '"><h3>' + esc(st.title) + (st.status === "current" ? ' <span>идёт</span>' : '') + '</h3><div class="box brk"><div class="bracket">';
       rows.forEach(function (row, ri) {
         var has3 = t3 && ri === gf.ri;
-        html += (row.t ? '<div class="brk-h">' + row.t + '</div>' : '') + '<div class="brk-row' + (has3 ? ' has3' : '') + '">' + row.r.map(function (rd, k) {
+        html += (row.t ? '<div class="brk-h">' + row.t + '</div>' : '') + '<div class="brk-row' + (has3 ? ' has3' : '') + (row.r.length >= 3 ? ' tight' : '') + '">' + row.r.map(function (rd, k) {
           var ms = rd.matches.map(function (x) { return box(x); });
           if (has3 && k === gf.k && ms.length) ms[ms.length - 1] = '<div class="gfw">' + ms[ms.length - 1] + '<div class="brk-3">' + t3 + '</div></div>';
           return '<div class="brk-col"><div class="brk-rn">' + esc(rname(rd.name)) + '</div><div class="brk-ms">' + ms.join("") + '</div></div>';
@@ -1612,10 +1641,10 @@ a.ni { text-decoration: none; color: inherit; }
       ks.sort(function (a, b) { var x = a.split(":"), y = b.split(":"); return cls === "q" ? (x[1] - y[1]) : (y[0] - x[0]) * -1; });
       if (ks.length === 1) {  // один счёт (3:0, 0:3) — команды по две в ряд, так ниже по высоте
         var k1 = ks[0];
-        return '<div class="sw-box ' + cls + '" style="grid-template-columns:repeat(2,1fr)"><div class="swh num" style="grid-column:1/-1">' + k1 + '</div>' +
+        return '<div class="sw-box ' + cls + '" data-recs="' + k1 + '" style="grid-template-columns:repeat(2,1fr)"><div class="swh num" style="grid-column:1/-1">' + k1 + '</div>' +
           by[k1].map(function (n) { return circ(n, cls === "q" ? "w" : ""); }).join("") + '</div>';
       }
-      var h = '<div class="sw-box ' + cls + '" style="grid-template-columns:repeat(' + ks.length + ',1fr)">';
+      var h = '<div class="sw-box ' + cls + '" data-recs="' + ks.join(",") + '" style="grid-template-columns:repeat(' + ks.length + ',1fr)">';
       ks.forEach(function (k) { h += '<div class="swh num">' + k + '</div>'; });
       var mx = Math.max.apply(null, ks.map(function (k) { return by[k].length; }));
       for (var r = 0; r < mx; r++) ks.forEach(function (k) { h += by[k][r] ? circ(by[k][r], cls === "q" ? "w" : "") : '<span></span>'; });
@@ -1629,17 +1658,51 @@ a.ni { text-decoration: none; color: inherit; }
     }
     var last = cols.length - 1;
     var html = '<div class="sec stage" style="--stc:' + STAGE_COL[si % STAGE_COL.length] + '"><h3>' + esc(st.title) + (st.status === "current" ? ' <span>идёт · швейцарская система</span>' : ' <span>швейцарская система</span>') + '</h3>';
-    html += '<div class="box"><div class="swg">' + cols.map(function (c, ci) {
+    html += '<div class="swg">' + cols.map(function (c, ci) {
       var prev = ci ? cols[ci - 1].done : { q: [], out: [] };
       var q = prev.q.concat(ci === last ? c.done.q : []), out = prev.out.concat(ci === last ? c.done.out : []);
       var gk = Object.keys(c.groups).sort(function (a, b) { var x = a.split(":"), y = b.split(":"); return (y[0] - y[1]) - (x[0] - x[1]) || y[0] - x[0]; });
-      return '<div class="swc">' + boxOf(q, "q") + gk.map(function (g) { return '<div class="swh num">' + g + '</div>' + c.groups[g].map(tile).join(""); }).join("") +
+      return '<div class="swc">' + boxOf(q, "q") + gk.map(function (g) { return '<div class="swgr" data-rec="' + g + '"><div class="swh num">' + g + '</div>' + c.groups[g].map(tile).join("") + '</div>'; }).join("") +
         '<div class="sp"></div>' + boxOf(out, "out") + '</div>';
-    }).join("") + '</div></div></div>';
+    }).join("") + '</div></div>';
     return html;
   }
   // ниточки между матчами соседних раундов
+  // стрелки швейцарки: из группы (w:l) победители идут в (w+1:l) — зелёная, проигравшие в (w:l+1) — красная
+  function drawSwiss() {
+    document.querySelectorAll(".swg").forEach(function (g) {
+      var old = g.querySelector("svg.sw-arr"); if (old) old.remove();
+      var cols = [].slice.call(g.querySelectorAll(".swc")), R0 = g.getBoundingClientRect(), paths = { w: "", l: "" };
+      function arrow(kind, a, b) {
+        var x1 = a.right - R0.left + 1, x2 = b.left - R0.left - 2, y1 = a.top + a.height / 2 - R0.top;
+        var y2 = Math.max(b.top - R0.top + 10, Math.min(b.bottom - R0.top - 10, y1));
+        var dx = x2 - x1, dy = y2 - y1, len = Math.sqrt(dx * dx + dy * dy) || 1, ux = dx / len, uy = dy / len, h = 4;
+        paths[kind] += "M" + x1.toFixed(1) + " " + y1.toFixed(1) + "L" + x2.toFixed(1) + " " + y2.toFixed(1) +
+          "M" + (x2 - h * ux - h * uy).toFixed(1) + " " + (y2 - h * uy + h * ux).toFixed(1) + "L" + x2.toFixed(1) + " " + y2.toFixed(1) +
+          "L" + (x2 - h * ux + h * uy).toFixed(1) + " " + (y2 - h * uy - h * ux).toFixed(1);
+      }
+      for (var c = 1; c < cols.length; c++) {
+        var src = {};
+        [].forEach.call(cols[c - 1].querySelectorAll(".swgr[data-rec]"), function (e) { src[e.getAttribute("data-rec")] = e; });
+        [].forEach.call(cols[c].querySelectorAll("[data-rec], [data-recs]"), function (e) {
+          (e.getAttribute("data-rec") || e.getAttribute("data-recs")).split(",").forEach(function (rc) {
+            var p = rc.split(":").map(Number), fw = src[(p[0] - 1) + ":" + p[1]], fl = src[p[0] + ":" + (p[1] - 1)];
+            var sameW = fw, sameL = fl;
+            if (sameW) arrow("w", sameW.getBoundingClientRect(), e.getBoundingClientRect());
+            if (sameL) arrow("l", sameL.getBoundingClientRect(), e.getBoundingClientRect());
+          });
+        });
+      }
+      if (!paths.w && !paths.l) return;
+      var svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      svg.setAttribute("class", "sw-arr"); svg.setAttribute("width", g.scrollWidth); svg.setAttribute("height", g.scrollHeight);
+      svg.innerHTML = '<path d="' + paths.w + '" fill="none" stroke="var(--win)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity=".75"/>' +
+        '<path d="' + paths.l + '" fill="none" stroke="var(--loss)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity=".75"/>';
+      g.insertBefore(svg, g.firstChild);
+    });
+  }
   function drawBrackets() {
+    drawSwiss();
     document.querySelectorAll(".brk-row:not(.nolines)").forEach(function (row) {
       var old = row.querySelector("svg.brk-lines"); if (old) old.remove();
       var cols = [].slice.call(row.children).filter(function (c) { return c.classList.contains("brk-col"); });
@@ -1661,7 +1724,7 @@ a.ni { text-decoration: none; color: inherit; }
       row.insertBefore(svg, row.firstChild);
     });
   }
-  window.addEventListener("resize", function () { if (q(".brk-row")) drawBrackets(); });
+  window.addEventListener("resize", function () { if (q(".brk-row, .swg")) drawBrackets(); });
   function showTour(id) {
     var L = state.list, t = findTour(id);
     var ms = (L.matches || []).filter(function (m) { return tourOf(m) === String(id); });
@@ -1672,7 +1735,7 @@ a.ni { text-decoration: none; color: inherit; }
     if (t && t.results) tabs.push({ key: "done", label: fin ? "Матчи" : "Завершённые" });
     var sub = t ? '<span class="pill ' + esc(t.tier) + '">' + esc((t.tier || "?").toUpperCase()) + '</span>' + (t.begin ? esc(dm(t.begin) + (t.end ? " – " + dm(t.end) : "")) : "") + (t.prize_usd ? " · " + esc(usd(t.prize_usd)) : t.prize ? " · " + esc(prize(t.prize)) : "") : "";
     setTimeout(drawBrackets, 0);
-    if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { if (q(".brk-row")) drawBrackets(); });
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { if (q(".brk-row, .swg")) drawBrackets(); });
     renderShell({ id: "tour:" + id, back: "Турниры", def: tabs.some(function (x) { return x.key === "matches"; }) ? "matches" : undefined, title: esc(t ? withYear(t.name, t.begin || t.next) : "Турнир") + '<span class="upd shsub">' + sub + '</span>', tabs: tabs,
       pane: function (k) {
         if (k === "overview") {
