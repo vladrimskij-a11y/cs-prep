@@ -1814,29 +1814,11 @@ PLACE_TOP = re.compile(r"^(1st|2nd|3rd|3-4th)$")
 
 
 def team_achievements(hltv_team: dict) -> list[dict]:
-    """LAN-достижения команды на HLTV: [{'place','event','event_id'}] — от свежих к старым."""
-    def fn():
-        h = hltv_get(f"/team/{hltv_team['id']}/{hltv_team['slug']}")
-        if not h:
-            return None
-        ids = {}
-        for pid, slug, nick in re.findall(r'href="/player/(\d+)/([^"]+)"[^>]*>.{0,400}?<div class="text-ellipsis">([^<]+)</div>', h[:400000], re.S)[:12]:
-            ids.setdefault(norm(strip_html(nick)), {"id": int(pid), "slug": slug})
-        for pid, slug in re.findall(r'href="/player/(\d+)/([^"/]+)"', h[:400000])[:20]:
-            ids.setdefault(norm(slug), {"id": int(pid), "slug": slug})
-        hltv_cache[f"tpl:{hltv_team['id']}"] = {"t": iso(NOW), "data": ids}  # id игроков нужны и когда достижения из кэша
-        for k, v in ids.items():
-            hltv_player_ids.setdefault(k, v)
-        i = h.find('id="lanAchievement"')
-        if i < 0:
-            return []
-        sec = h[i:i + 60000].split("</table>", 1)[0]
-        out = []
-        for pl, eid, ev in re.findall(r'class="text-ellipsis achievement[^"]*">(?:<i[^>]*></i>)?\s*([^<]+?)\s*</div>.*?'
-                                      r'<a href="/events/(\d+)/[^"]+">([^<]+)</a>', sec, re.S):
-            out.append({"place": pl.strip(), "event": strip_html(ev), "event_id": int(eid)})
-        return out
-    res = hltv_cached(f"ach:{hltv_team['id']}", fn) or []
+    """LAN-достижения команды на HLTV из кэша прошлых сборов: [{'place','event','event_id'}] — от свежих к старым."""
+    # на страницах команд HLTV чаще всего и отказывал (05.11 — NAVI, PARIVISION, FURIA, BetBoom). Решение владельца 06.11:
+    # HLTV — только MVP, путёвки и рейтинг. Новых запросов к /team/ нет; что уже было в кэше — используем
+    c = hltv_cache.get(f"ach:{hltv_team['id']}")
+    res = (c or {}).get("data") or []
     for k, v in ((hltv_cache.get(f"tpl:{hltv_team['id']}") or {}).get("data") or {}).items():
         hltv_player_ids.setdefault(k, v)
     return res
@@ -2892,44 +2874,7 @@ def team_veto_matches(t: dict, ht: dict | None) -> list[dict]:
         if any(mine(x.get("team")) for x in v["steps"] if x.get("team")):
             out.setdefault(k[6:], {"id": k[6:], "slug": "", "date": v.get("date")})
     res = sorted(out.values(), key=lambda x: x.get("date") or "", reverse=True)
-    if len(res) < 5 and ht and not STATS:  # новая или редко играющая команда — дополняем с HLTV
-        for x in hltv_team_matches(ht):
-            res.append(x) if str(x["id"]) not in out else None
-    return res
-
-
-def hltv_team_matches(team: dict) -> list[dict]:
-    key = f"results4:{team['id']}"
-    c = veto_cache.get(key)
-    if c and (parse_iso(c.get("t")) or NOW) > NOW - timedelta(hours=12):
-        return c["data"]
-    # dust2.us перестал фильтровать результаты по команде — список матчей берём с HLTV (страница результатов открыта),
-    # а само вето по-прежнему со страницы матча dust2 (тот же id)
-    h = hltv_get(f"/results?team={team['id']}")
-    if not h:
-        return c["data"] if c else []
-    out = []
-    own = norm(team.get("slug") or team.get("name"))
-    # дата матча — из заголовка блока «Results for November 4th 2026», под которым он стоит
-    heads = [(m.start(), m.group(1), m.group(2), m.group(3)) for m in
-             re.finditer(r'Results for (\w+) (\d+)(?:st|nd|rd|th) (\d{4})', h)]
-    for mm in re.finditer(r'href="/matches/(\d+)/([^"#?]+)"', h):
-        mid, slug = mm.group(1), mm.group(2)
-        if own and own not in norm(slug):
-            continue  # блоки «избранное» и чужие матчи на странице
-        if mid not in [x["id"] for x in out]:
-            day = None
-            hd = [x for x in heads if x[0] < mm.start()]
-            if hd:
-                try:
-                    day = datetime.strptime(f"{hd[-1][1]} {hd[-1][2]} {hd[-1][3]}", "%B %d %Y").date().isoformat()
-                except ValueError:
-                    day = None
-            out.append({"id": mid, "slug": slug, "day": day})
-        if len(out) >= VETO_LIST:
-            break
-    veto_cache[key] = {"t": iso(NOW), "data": out}
-    return out
+    return res  # /results?team= на HLTV больше не запрашиваем (решение владельца 06.11)
 
 
 def hltv_veto(match: dict) -> dict | None:
