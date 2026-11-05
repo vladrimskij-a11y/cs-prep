@@ -40,6 +40,9 @@ import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import vrs_model as VM  # noqa: E402  модель VRS Valve (полный пересчёт, как прогноз HLTV)
+
 ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "docs" / "data"
 CACHE = ROOT / "cache"
@@ -1847,6 +1850,142 @@ def vrs_outcomes_valve(a: dict, b: dict, table: list[dict], lan: bool = True, hi
         rb = 1 + sum(1 for p in others + [pa] if p > pb)
         res["win" + str(win)] = [{"delta": dA, "points": pa, "rank": ra}, {"delta": dB, "points": pb, "rank": rb}]
     res["model"] = "valve"
+    return res
+
+
+VRS_DS_F = CACHE / "vrs_dataset.json"
+_vrs_live: dict = {}
+
+
+def vrs_dataset() -> dict | None:
+    """Набор данных модели Valve по последнему снимку: все матчи и призовые из разборов команд (live/<год>/details).
+    Строится раз на снимок (раз в месяц): git sparse-clone одной папки, ~380 файлов; дальше — из кэша."""
+    day = (valve_links().get("date") or "").replace("-", "_")
+    if not day:
+        return None
+    c = load_json(VRS_DS_F, None)
+    if c and c.get("day") == day and c.get("v") == VM.VERSION:
+        return c
+    import subprocess
+    import tempfile
+    with tempfile.TemporaryDirectory() as tmp:
+        repo = os.path.join(tmp, "valve")
+        url = "https://github.com/ValveSoftware/counter-strike_regional_standings"
+        subprocess.run(["git", "clone", "-q", "--depth", "1", "--filter=blob:none", "--sparse", url, repo], check=True, timeout=900)
+        subprocess.run(["git", "-C", repo, "sparse-checkout", "set", f"live/{day[:4]}/details/{day}"], check=True, timeout=900)
+        ds = VM.prepare(os.path.join(repo, "live", day[:4]), day)
+    save_json(VRS_DS_F, ds)
+    print(f"VRS: набор данных снимка {day} — команд {sum(1 for d in ds['teams'].values() if d.get('listed'))}, матчей {len(ds['matches'])}")
+    return ds
+
+
+def _days(s) -> float | None:
+    d = parse_iso(s) if isinstance(s, str) else s
+    return d.timestamp() / 86400 if d else None
+
+
+def vrs_live():
+    """«Живой» рейтинг, как на HLTV: снимок Valve + матчи после него (итоги турниров, история bo3, форма команд)
+    + гарантированные призовые идущих турниров (выбывшим — их место, остальным сыгравшим — худшее незанятое)."""
+    sig = len(_bo3_hist)
+    if _vrs_live.get("sig") == sig:
+        return _vrs_live.get("L")
+    ds = vrs_dataset()
+    if not ds:
+        return None
+    L = VM.Live(ds)
+    played: dict = {}
+    last: dict = {}
+    for f in sorted((OUT / "results").glob("*.json")):
+        r = load_json(f, {}) or {}
+        tn = r.get("tournament") or ""
+        ex = (hltv_cache.get("event3:" + tn) or {}).get("data") or {}
+        pool = ex.get("prize") or 0
+        for m in r.get("matches") or []:
+            t = _days(m.get("date"))
+            tm = m.get("teams") or []
+            if t is None or m.get("winner") is None or len(tm) != 2:
+                continue
+            last[tn] = max(last.get(tn, 0), t)
+            ew = VM.curve(min(pool, 1e6) / 1e6) if pool else 1.0
+            L.add_match(t, tm[0].get("name"), tm[1].get("name"), m["winner"] == 0, ew, True)
+            for x in tm:
+                played.setdefault(tn, set()).add(L.key(x.get("name")))
+    for hist in list(_bo3_hist.values()):
+        for m in hist:
+            t, w = _days(m.get("start_date")), m.get("winner_team_id")
+            a, b = (m.get("team1") or {}).get("name"), (m.get("team2") or {}).get("name")
+            if t is None or not w or not a or not b:
+                continue
+            s_ = ((m.get("tournament") or {}).get("tier") or m.get("tier") or "").lower() == "s"
+            L.add_match(t, a, b, w == m.get("team1_id"), 1.0 if s_ else 0.5, s_)
+    for f in (OUT / "team").glob("*.json"):
+        tj = load_json(f, {}) or {}
+        for x in tj.get("form") or []:
+            t = _days(x.get("date"))
+            if t is not None and x.get("won") is not None and tj.get("name"):
+                s_ = (x.get("tier") or "").lower() == "s"
+                L.add_match(t, tj["name"], x.get("opponent_name"), x["won"], 1.0 if s_ else 0.5, s_)
+    now = _days(NOW)
+    for tn, keys in played.items():
+        if last.get(tn, 0) <= ds["end"]:
+            continue  # турнир доигран до снимка — его призовые уже у Valve
+        places = ((hltv_cache.get("event3:" + tn) or {}).get("data") or {}).get("places")
+        if not places:
+            continue
+        done = set()
+        for p in places:
+            usd = float(p.get("prize") or 0) + float(p.get("club") or 0)
+            for n in p.get("teams") or ([p["team"]] if p.get("team") else []):
+                L.add_prize(n, usd, now)
+                done.add(L.key(n))
+        g = VM.worst_open(places)
+        for k in keys - done:
+            if not k.startswith("~"):
+                L.prizes.setdefault(k, []).append((now, g))
+    L.played = played
+    L.base = L.compute(now)["rating"]
+    _vrs_live.update(sig=sig, L=L)
+    return L
+
+
+PLAYOFF_RX = re.compile(r"(?i)quarter|semi|final|playoff|1/4|1/2|bracket")
+
+
+def vrs_outcomes_live(a: dict, b: dict, table: list[dict], brief: dict, lan: bool = True) -> dict | None:
+    """Прогноз «как на HLTV»: полный пересчёт модели Valve с добавленным матчем (сверено 06.11 с 6 образцами HLTV:
+    из 24 чисел 20 совпали, 4 — ±1). Меняются сид обеих (баунти, сеть, LAN, гарантированные призовые), личные
+    встречи всей истории и растяжка шкалы — поэтому проигравший бывает в плюсе, а победитель в минусе."""
+    L = vrs_live()
+    if not L:
+        return None
+    if L.key(a["name"]).startswith("~") or L.key(b["name"]).startswith("~"):
+        return None
+    tn = brief.get("tournament") or ""
+    ex = (hltv_cache.get("event3:" + tn) or {}).get("data") or {}
+    pool = ex.get("prize") or prize_usd((brief.get("serie") or {}).get("prize"))
+    ew = VM.curve(min(max(pool, 1.0), 1e6) / 1e6) if pool else 0.5
+    places = ex.get("places")
+    both, win = (0.0, 0.0), (0.0, 0.0)
+    if places:
+        g = VM.worst_open(places)
+        pl = L.played.get(tn) or set()
+        both = tuple(0.0 if L.key(x["name"]) in pl else g for x in (a, b))  # «минимум призовых — после первого матча»
+        if PLAYOFF_RX.search((brief.get("stage") or "") + " " + (brief.get("name") or "")):
+            wp = max(0.0, VM.playoff_win_prize(places) - g)
+            win = (wp, wp)
+    f = L.forecast(a["name"], b["name"], _days(NOW), ew=ew, lan=lan, win_prize=win, both_prize=both, base=L.base)
+    if not f:
+        return None
+    res = {}
+    for win_i, lab in ((0, "a_win"), (1, "b_win")):
+        dA, dB = round(f[lab][0]), round(f[lab][1])
+        pa, pb = a["points"] + dA, b["points"] + dB
+        others = [r["points"] for r in table if r["name"] not in (a["name"], b["name"])]
+        ra = 1 + sum(1 for p in others + [pb] if p > pa)
+        rb = 1 + sum(1 for p in others + [pa] if p > pb)
+        res["win" + str(win_i)] = [{"delta": dA, "points": pa, "rank": ra}, {"delta": dB, "points": pb, "rank": rb}]
+    res["model"] = "valve2"
     return res
 
 
@@ -4931,7 +5070,12 @@ def build_detail(m: dict, prev: dict | None) -> dict:
             warn(f"Призовые места {t.get('name')}: {e!r}")
     if len(rows) == 2 and all(rows):
         try:
-            detail["vrs_outcomes"] = vrs_outcomes_valve(rows[0], rows[1], table, hists=hists, bids=bids,
+            try:
+                o = vrs_outcomes_live(rows[0], rows[1], table, brief)
+            except Exception as e:
+                warn(f"VRS полный пересчёт: {e!r}")
+                o = None
+            detail["vrs_outcomes"] = o or vrs_outcomes_valve(rows[0], rows[1], table, hists=hists, bids=bids,
                                                         prize=(brief.get("serie") or {}).get("prize"), since=(brief.get("serie") or {}).get("begin") or "") or vrs_outcomes(rows[0], rows[1], table)
         except Exception as e:
             warn(f"VRS прогноз: {e!r}")

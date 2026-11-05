@@ -1,8 +1,16 @@
-"""Модель VRS Valve на Python: разбор снимка Valve (details/*.md) → набор данных → полный пересчёт.
+"""Модель VRS Valve на Python — как прогноз «VRS forecast» на HLTV.
 
-    python tools/vrs_model.py valve/live/2026 2026_11_02      # сверка пересчёта со снимком
+Разбор снимка Valve (live/<год>/details/<дата>/*.md) → набор данных (все матчи с победителем, LAN, весом турнира,
+призовые команд) → полный пересчёт: сид по 4 факторам (bounty offered/collected, opponent network, LAN) с растяжкой
+400..2000, потом Глико (RD=75) по всем матчам по времени. Перевод model/*.js из
+ValveSoftware/counter-strike_regional_standings. Живой слой (Live): матчи после снимка и гарантированные призовые
+идущих турниров — так HLTV считает «живой» рейтинг; прогноз — пересчёт с добавленным матчем.
 
-Код модели — перевод model/*.js из ValveSoftware/counter-strike_regional_standings.
+Проверено 06.11.2026: снимок 02.11 воспроизводится (топ-100 ±0.5 очка), живой рейтинг HLTV на 05.11 — ±1 очко
+(топ-40), 6 прогнозов HLTV (24 числа) — 20 точно, 4 с ошибкой 1.
+
+    python collector/vrs_model.py valve/live/2026 2026_11_02            # сверка со снимком
+    python collector/vrs_model.py valve/live/2026 2026_11_02 data/      # + живой рейтинг и образцы HLTV
 """
 import glob, math, os, re, sys
 from datetime import date, datetime, timezone
@@ -275,8 +283,8 @@ def compute(ds, now=None, matches=None, prizes=None):
             off[k], own[k] = d.get("off", 0.0), d.get("net", 0.0)
     avg, info = {}, {}
     for k in L:
-        bc = top10([off[m["l"]] * A(m["t"]) * m["ew"] for m in wins[k]]) / 10
-        net = top10([own[m["l"]] * A(m["t"]) * m["ew"] for m in wins[k]]) / 10
+        bc = top10([off.get(m["l"], 0.0) * A(m["t"]) * m["ew"] for m in wins[k]]) / 10
+        net = top10([own.get(m["l"], 0.0) * A(m["t"]) * m["ew"] for m in wins[k]]) / 10
         avg[k] = (curve(off[k]) + curve(bc) + net + lanp[k]) / 4
         info[k] = {"offered": curve(off[k]), "collected": curve(bc), "network": net, "lan": lanp[k]}
     mx = max(avg.values())
@@ -284,8 +292,8 @@ def compute(ds, now=None, matches=None, prizes=None):
     seed = dict(rating)
     for m in sorted(M, key=lambda m: (m["t"], -m["id"])):
         w, l, a = m["w"], m["l"], A(m["t"])
-        rw_ = rating.get(w, m.get("ghost_r")) if w in rating else m.get("ghost_r", 1000.0)
-        rl_ = rating.get(l) if l in rating else m.get("ghost_r", 1000.0)
+        rw_ = rating[w] if w in rating else m.get("ghost_r", 1000.0)
+        rl_ = rating[l] if l in rating else m.get("ghost_r", 1000.0)
         dw, dl = glicko(rw_, rl_, 1.0, a), glicko(rl_, rw_, 0.0, a)
         if w in rating:
             rating[w] += dw
@@ -340,21 +348,240 @@ def ghost_ratings(ds):
         rating[me] += h
 
 
-if __name__ == "__main__":
-    import statistics as st
-    root, day = sys.argv[1], sys.argv[2]
+VERSION = 1
+
+
+def prepare(root, day):
+    """Снимок Valve → набор данных для compute (только то, что нужно; сохраняется в JSON)."""
     S = load_snapshot(root, day)
     ds = build_dataset(S)
     ghost_ratings(ds)
     fit_hidden(ds, S)
-    print(len(S), "команд, матчей", len(ds["matches"]), "снимок", ds["end"])
+    keep = ("id", "t", "w", "l", "lan", "ew", "ghost_r")
+    ds["matches"] = [{k: m[k] for k in keep if k in m} for m in ds["matches"]]
+    for d in ds["teams"].values():
+        for k in ("rat", "lan_floor"):
+            d.pop(k, None)
+    ds["day"], ds["v"] = day, VERSION
+    return ds
+
+
+def norm(s):
+    return re.sub(r"[^a-z0-9]", "", (s or "").lower())
+
+
+def _strip(n):
+    return re.sub(r"^(team|the)|(team|esports|esport|gaming|clan|club|cs|gg)$", "", n)
+
+
+def place_rank(place):
+    """«5-6th» → (5, 6), «1st» → (1, 1)."""
+    m = re.match(r"\s*(\d+)(?:\s*-\s*(\d+))?", str(place or ""))
+    if not m:
+        return None
+    a = int(m.group(1))
+    return a, int(m.group(2) or a)
+
+
+def _places(places):
+    out = []
+    for p in places or []:
+        r = place_rank(p.get("place"))
+        if r:
+            out.append({"r": r, "usd": float(p.get("prize") or 0) + float(p.get("club") or 0),
+                        "teams": list(p.get("teams") or ([p["team"]] if p.get("team") else []))})
+    return sorted(out, key=lambda x: x["r"])
+
+
+def prize_for_ranks(places, lo, hi):
+    """Наименьшие призовые среди мест с lo по hi (гарантия: «если проиграет — займёт одно из этих мест»)."""
+    v = [p["usd"] for p in _places(places) if p["r"][1] >= lo and p["r"][0] <= hi]
+    return min(v) if v else 0.0
+
+
+def worst_open(places):
+    """Призовые худшего ещё не занятого места — минимум для живой команды, сыгравшей хотя бы матч (как у HLTV)."""
+    for p in reversed(_places(places)):
+        if len(p["teams"]) < p["r"][1] - p["r"][0] + 1:
+            return p["usd"]
+    return 0.0
+
+
+def alive_count(places):
+    P = _places(places)
+    total = max((p["r"][1] for p in P), default=0)
+    return total - sum(len(p["teams"]) for p in P)
+
+
+def _losers(a):
+    """Сколько команд вылетает в текущем раунде плей-офф из a живых (6 → 2 в 1/4, 4 → 2, 2 → 1)."""
+    return a - 2 ** int(math.floor(math.log2(a - 1))) if a >= 2 else 0
+
+
+def playoff_win_prize(places):
+    """Гарантия победителя матча плей-офф: место проигравшего в следующем раунде (1/4 IEM Beijing → 4-е)."""
+    a = alive_count(places)
+    if a < 2:
+        return 0.0
+    a2 = a - _losers(a)
+    if a2 <= 1:
+        return prize_for_ranks(places, 1, 1)
+    l2 = _losers(a2)
+    return prize_for_ranks(places, a2 - l2 + 1, a2)
+
+
+class Live:
+    """Набор данных снимка + матчи после него + призовые идущих турниров — «живой» рейтинг, как на HLTV."""
+
+    def __init__(self, ds):
+        self.ds = ds
+        T = ds["teams"]
+        self.idx, self.idx2 = {}, {}
+        for k, d in sorted(T.items(), key=lambda kv: kv[1].get("rank") or 9999):
+            if d.get("listed"):
+                self.idx.setdefault(norm(d["name"]), k)
+                self.idx2.setdefault(_strip(norm(d["name"])), k)
+        self.pairs = {}
+        self.ghost_last = {}
+        for m in ds["matches"]:
+            self.pairs.setdefault(frozenset((m["w"], m["l"])), []).append(m["t"])
+            for g in (m["w"], m["l"]):
+                if g.startswith("~") and m.get("ghost_r") is not None:
+                    self.ghost_last[g] = m["ghost_r"]
+        self.new = []
+        self.prizes = {}
+        self._seen = set()
+
+    def key(self, name):
+        n = norm(name)
+        return self.idx.get(n) or self.idx2.get(_strip(n)) or "~" + (name or "?")
+
+    def name(self, k):
+        return (self.ds["teams"].get(k) or {}).get("name") or k.lstrip("~")
+
+    def _match(self, t, kw, kl, ew, lan, mid=None):
+        m = {"id": mid if mid is not None else -1 - len(self.new) - len(self._seen), "t": t, "w": kw, "l": kl,
+             "ew": ew, "lan": lan}
+        for g in (kw, kl):
+            if g.startswith("~") or g not in self.ds["teams"]:
+                m["ghost_r"] = self.ghost_last.get(g, 1000.0)
+        return m
+
+    def add_match(self, t, a, b, a_won, ew=0.5, lan=False):
+        """Сыгранный матч после снимка (t — дни от 1970). Уже учтённые в снимке (та же пара ±1 день) пропускаются."""
+        ka, kb = self.key(a), self.key(b)
+        if ka == kb or t <= self.ds["end"] - 30:
+            return False
+        pid = (frozenset((ka, kb)), round(t, 2))
+        if pid in self._seen or any(abs(x - t) < 1.0 for x in self.pairs.get(frozenset((ka, kb)), ())):
+            return False
+        self._seen.add(pid)
+        self.new.append(self._match(t, ka if a_won else kb, kb if a_won else ka, ew, lan))
+        return True
+
+    def add_prize(self, name, usd, t):
+        k = self.key(name)
+        if usd > 0 and not k.startswith("~"):
+            self.prizes.setdefault(k, []).append((t, usd))
+
+    def compute(self, now, extra_matches=(), extra_prizes=None):
+        P = {k: list(v) for k, v in self.prizes.items()}
+        for k, v in (extra_prizes or {}).items():
+            P.setdefault(k, []).extend(v)
+        return compute(self.ds, now=now, matches=self.ds["matches"] + self.new + list(extra_matches), prizes=P)
+
+    def points(self, now):
+        R = self.compute(now)["rating"]
+        return {self.name(k): v for k, v in R.items()}
+
+    def forecast(self, a, b, now, ew=1.0, lan=True, win_prize=(0.0, 0.0), both_prize=(0.0, 0.0), base=None):
+        """Изменение очков A и B при победе каждой: {'a_win': (dA, dB), 'b_win': (dA, dB)}.
+        win_prize — прибавка гарантированных призовых победителю (A, B), both_prize — обеим командам после матча."""
+        ka, kb = self.key(a), self.key(b)
+        if ka.startswith("~") or kb.startswith("~"):
+            return None
+        base = base or self.compute(now)["rating"]
+        out = {}
+        for lab, (w, l, i) in (("a_win", (ka, kb, 0)), ("b_win", (kb, ka, 1))):
+            ex = {}
+            for k, v in ((ka, both_prize[0]), (kb, both_prize[1]), (w, win_prize[i])):
+                if v:
+                    ex.setdefault(k, []).append((now, v))
+            R = self.compute(now, [self._match(now, w, l, ew, lan, mid=-10 ** 9)], ex)["rating"]
+            out[lab] = (R[ka] - base[ka], R[kb] - base[kb])
+        return out
+
+
+def _check_live(ds, data):
+    """Сверка с живым рейтингом HLTV и образцами прогноза (data — выгрузка ветки data)."""
+    import json
+    from datetime import datetime
+    ts = lambda s: datetime.fromisoformat(s.replace("Z", "+00:00")).timestamp() / 86400
+    L = Live(ds)
+    tours = json.load(open(os.path.join(data, "matches.json")))["tournaments"]
+    tours = tours if isinstance(tours, list) else list(tours.values())
+    played = {}
+    for f in glob.glob(os.path.join(data, "results", "*.json")):
+        r = json.load(open(f))
+        for m in r["matches"]:
+            if m.get("winner") is not None and len(m["teams"]) == 2:
+                if L.add_match(ts(m["date"]), m["teams"][0]["name"], m["teams"][1]["name"], m["winner"] == 0, 1.0, True):
+                    for tm in m["teams"]:
+                        played.setdefault(r["tournament"], set()).add(tm["name"])
+    for f in glob.glob(os.path.join(data, "team", "*.json")):
+        t = json.load(open(f))
+        for x in t.get("form", []):
+            if x.get("won") is not None:
+                s_ = (x.get("tier") or "").lower() == "s"
+                L.add_match(ts(x["date"]), t["name"], x["opponent_name"], x["won"], 1.0 if s_ else 0.5, s_)
+    rk = json.load(open(os.path.join(data, "ranking.json")))["vrs"]
+    now = ts(rk.get("updated") or json.load(open(os.path.join(data, "ranking.json")))["updated"])
+    for tr in tours:
+        pl = (tr.get("hltv") or {}).get("places")
+        if not pl or tr["name"] not in played:
+            continue
+        done = {n for p in pl for n in (p.get("teams") or [])}
+        for p in _places(pl):
+            for n in p["teams"]:
+                L.add_prize(n, p["usd"], now)
+        for n in played[tr["name"]] - done:
+            L.add_prize(n, worst_open(pl), now)
+    R = L.points(now)
+    errs = [(r["rank"], r["name"], r["points"], round(R[L.name(L.key(r["name"]))] - r["points"], 1))
+            for r in rk["teams"][:40] if not L.key(r["name"]).startswith("~")]
+    print("живой рейтинг HLTV, топ-40: ср. ошибка %.2f" % (sum(abs(e[3]) for e in errs) / len(errs)))
+    smp = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "tools", "hltv_vrs_samples.json")
+    if os.path.exists(smp):
+        base = L.compute(now)["rating"]
+        tot = 0
+        for s_ in json.load(open(smp))["samples"]:
+            a, b = [x.strip() for x in s_["match"].split(" vs ")]
+            tr = next((t for t in tours if t["name"].split(" 20")[0] in s_["event"]), None)
+            pl = (tr or {}).get("hltv", {}).get("places")
+            if "QF" in s_["event"] or "SF" in s_["event"] or "Final" in s_["event"]:
+                wp = playoff_win_prize(pl) - worst_open(pl)
+                f = L.forecast(a, b, now, win_prize=(wp, wp), base=base)
+            else:
+                g = worst_open(pl)
+                f = L.forecast(a, b, now, both_prize=(g, g), base=base)
+            r = {"aw": f["a_win"][0], "bl": f["a_win"][1], "al": f["b_win"][0], "bw": f["b_win"][1]}
+            e = sum(abs(round(r[k]) - s_[k]) for k in r)
+            tot += e
+            print("%-28s HLTV %+d/%+d %+d/%+d | наш %+d/%+d %+d/%+d" % (s_["match"], s_["aw"], s_["bl"], s_["al"], s_["bw"],
+                  round(r["aw"]), round(r["bl"]), round(r["al"]), round(r["bw"])))
+        print("сумма ошибок прогноза:", tot)
+
+
+if __name__ == "__main__":
+    import statistics as st
+    root, day = sys.argv[1], sys.argv[2]
+    ds = prepare(root, day)
+    print(len([1 for d in ds["teams"].values() if d["listed"]]), "команд, матчей", len(ds["matches"]), "снимок", ds["end"])
     R = compute(ds)
     T = ds["teams"]
-    e = sorted(((abs(R["rating"][k] - T[k]["points"]), T[k]["rank"], T[k]["name"], round(R["rating"][k], 1), T[k]["points"],
-                 round(R["seed"][k], 1), T[k]["seed"]) for k in R["rating"]), key=lambda x: x[1])
+    e = sorted(((abs(R["rating"][k] - T[k]["points"]), T[k]["rank"]) for k in R["rating"]), key=lambda x: x[1])
     for lo, hi in ((1, 10), (11, 30), (31, 100), (101, 400)):
         x = [r[0] for r in e if lo <= r[1] <= hi]
-        print("места %d-%d: ср. ошибка %.2f, макс %.2f" % (lo, hi, st.mean(x), max(x)))
-    print("рефы", R["refs"], "макс", R["max"])
-    for r in e[:30]:
-        print(r)
+        print("снимок, места %d-%d: ср. ошибка %.2f, макс %.2f" % (lo, hi, st.mean(x), max(x)))
+    if len(sys.argv) > 3:
+        _check_live(ds, sys.argv[3])
