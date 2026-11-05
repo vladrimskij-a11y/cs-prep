@@ -15,14 +15,14 @@ jobs:
               except Exception as e:
                   return str(e), None, ""
           B = "https://proroles.gamesenselab.pro"
-          st, ct, rb = get(B + "/robots.txt"); print("PR| robots", st); [print("PR|  ", l) for l in rb.splitlines()[:30]]
-          st, ct, h = get(B + "/"); print("PR| main", st, ct, len(h))
-          for pat in (r'<script[^>]+src="([^"]+)"', r'fetch\(["\']([^"\']+)', r'["\'](/api/[^"\']+)', r'["\']([^"\']+\.json)["\']', r'(terms|privacy|tos)[^"\']*'):
-              print("PR| pat", pat[:20], list(dict.fromkeys(re.findall(pat, h, re.I)))[:15])
-          print("PR| snippet", re.sub(r"\s+", " ", h)[:1500])
-          for s in list(dict.fromkeys(re.findall(r'<script[^>]+src="([^"]+)"', h)))[:6]:
-              u = s if s.startswith("http") else B + ("" if s.startswith("/") else "/") + s
-              st, ct, js = get(u)
-              apis = list(dict.fromkeys(re.findall(r'["\'`](/api/[^"\'`]+|https?://[^"\'`]+/api[^"\'`]*|[^"\'`]*\.json)["\'`]', js)))[:20]
-              print("PR| js", u, st, len(js), apis)
+          st, ct, h = get(B + "/")
+          sc = re.findall(r"<script(?![^>]*src)[^>]*>(.*?)</script>", h, re.S)
+          print("PR| inline scripts", [len(x) for x in sc])
+          for x in sc:
+              for pat in (r"fetch\(([^)]{0,200})\)", r"['\"`](/[a-z0-9_/\-]*\??[^'\"`]{0,80})['\"`]", r"https?://[^'\"`\s]+"):
+                  print("PR| ", pat[:12], list(dict.fromkeys(re.findall(pat, x)))[:25])
+          k = h.find("ZywOo"); k = k if k >= 0 else h.lower().find("zywoo")
+          print("PR| zywoo at", k, re.sub(r"\s+", " ", h[max(0, k - 600):k + 900]) if k >= 0 else "")
+          for path in ("/data.json", "/api/players", "/api/data", "/players.json", "/player/zywoo", "/api/player/zywoo"):
+              st, ct, b = get(B + path); print("PR| try", path, st, ct, len(b), re.sub(r"\s+", " ", b[:200]))
           X
