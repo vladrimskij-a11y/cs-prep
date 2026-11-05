@@ -525,7 +525,7 @@ html { overflow-anchor: none; }
 .swn { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .swr.q b { color: var(--win); } .swr.out { opacity: .55; } .swr.out b { color: var(--loss); }
 /* швейцарка «по счёту»: столбцы раундов делят ширину экрана (без прокрутки вбок), в них группы по счёту;
-   сверху — кто прошёл, снизу — кто вылетел; стрелки: зелёная — куда идёт победитель, красная — проигравший */
+   сверху — кто прошёл, снизу — кто вылетел; стрелок нет (убраны по просьбе владельца 06.11) */
 .swg { position: relative; display: flex; gap: 14px; padding: 10px 8px; align-items: stretch; background: var(--sunk); border-radius: var(--r); }
 .swc { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 6px; position: relative; z-index: 1; }
 .swgr { display: flex; flex-direction: column; gap: 6px; }
@@ -536,7 +536,7 @@ html { overflow-anchor: none; }
 .sw-l .lg { position: absolute; inset: 15%; width: 70%; height: 70%; object-fit: contain; margin: 0; background: var(--sunk); }  /* нет логотипа — видны буквы под ним */
 .sw-l.w { box-shadow: 0 0 0 2px var(--win); background: var(--surface); }
 .sw-l.w .lg { background: var(--surface); }
-.sw-l.l { opacity: .35; filter: grayscale(1); }
+.sw-l.l { opacity: .7; filter: grayscale(.6); }
 .sw-box { border-radius: 8px; padding: 5px 4px; display: grid; gap: 4px; justify-items: center; }
 .sw-box .sw-l { width: 100%; max-width: 30px; }
 .sw-box.q { background: color-mix(in srgb, var(--win) 28%, var(--surface)); }
@@ -583,7 +583,7 @@ html { overflow-anchor: none; }
 .toast.out { opacity: 0; }
 .vr-ar { font-style: normal; font-size: .72em; margin-right: 3px; vertical-align: 1px; } .vr-ar.up { color: var(--win); } .vr-ar.dn { color: var(--loss); }
 .prz-g.vrs { display: flex; align-items: center; gap: 6px; color: var(--fg); font-weight: 700; }
-.vrs-b { font-size: 10px; font-weight: 800; letter-spacing: .04em; padding: 2px 6px; border-radius: 5px; background: var(--ct); color: #fff; }
+.vrs-b { font-size: 10px; font-weight: 700; letter-spacing: .04em; padding: 1px 5px; border-radius: 5px; background: var(--sunk); color: var(--muted); }
 .h2h .it.tap { display: block; width: 100%; text-align: left; } .h2h .it .go { color: var(--muted); font-weight: 700; margin-left: 4px; }
 .ptiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
 .ptile { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 4px 8px; border-radius: var(--r-s, 10px); background: var(--surface); border: 1px solid var(--line); text-align: center; min-width: 0; }
@@ -595,6 +595,7 @@ html { overflow-anchor: none; }
 .ptile small .vrs-b { font-size: 8.5px; padding: 1px 4px; }
 @media (max-width: 340px) { .ptiles { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 .rt.sub { background: color-mix(in srgb, var(--muted) 22%, transparent); color: var(--fg); } .rt.loan { background: color-mix(in srgb, var(--ct) 22%, transparent); color: var(--ct); }
+.rt.st { background: #111; color: #fff; white-space: normal; text-align: right; line-height: 1.25; }  /* замена/аренда — одной плашкой: статус и откуда/кого */
 /* главная: название над первой плиткой, вместе с плитками по центру экрана */
 .view.home .menu { min-height: calc(var(--tg-viewport-stable-height, 100dvh) - 40px); }
 .home-brand { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 0 4px 10px; }
@@ -1669,9 +1670,11 @@ a.ni { text-decoration: none; color: inherit; }
   }
   // ниточки между матчами соседних раундов
   // стрелки швейцарки: из группы (w:l) победители идут в (w+1:l) — зелёная, проигравшие в (w:l+1) — красная
+  var SWISS_ARROWS = false;
   function drawSwiss() {
     document.querySelectorAll(".swg").forEach(function (g) {
       var old = g.querySelector("svg.sw-arr"); if (old) old.remove();
+      if (!SWISS_ARROWS) return;  // стрелки убраны по просьбе владельца 06.11
       var cols = [].slice.call(g.querySelectorAll(".swc")), R0 = g.getBoundingClientRect(), paths = { w: "", l: "" };
       function arrow(kind, a, b) {
         var x1 = a.right - R0.left + 1, x2 = b.left - R0.left - 2, y1 = a.top + a.height / 2 - R0.top;
@@ -2321,10 +2324,10 @@ a.ni { text-decoration: none; color: inherit; }
         if (tg.some(function (x) { return x === "AWP" || /^Снайпер/.test(x); })) roles.push(["AWP", "awp"]);
         // статус в составе — заметной плашкой, одинаково во вкладке «Игроки» и на странице команды
         tg.forEach(function (x) {
-          if (/^Замена/.test(x)) { roles.push(["Замена", "sub"]); var fo = x.replace(/^Замена\s*(вместо\s*)?/, ""); if (fo) extra.push("заменяет " + esc(fo)); }
-          else if (/^trial$/i.test(x)) roles.push(["На просмотре", "sub"]);
-          else if (/^В аренде/.test(x)) { roles.push(["Аренда", "loan"]); var fr = x.replace(/^В аренде\s*(из\s*)?/, ""); if (fr) extra.push("в аренде из " + esc(fr.replace(/\b\w/g, function (c) { return c.toUpperCase(); }))); }
-          else if (x === "Неактивен") roles.push(["Неактивен", "sub"]);
+          if (/^Замена/.test(x)) { var fo = x.replace(/^Замена\s*(вместо\s*)?/, ""); roles.push([fo ? "Замена · вместо " + fo : "Замена", "st"]); }
+          else if (/^trial$/i.test(x)) roles.push(["На просмотре", "st"]);
+          else if (/^В аренде/.test(x)) { var fr = x.replace(/^В аренде\s*(из\s*)?/, "").replace(/\b\w/g, function (c) { return c.toUpperCase(); }); roles.push([fr ? "В аренде из " + fr : "В аренде", "st"]); }
+          else if (x === "Неактивен") roles.push(["Неактивен", "st"]);
         });
         var real = [p.first_name, p.last_name].filter(Boolean).join(" ");
         // во вкладке «Игроки» матча статистику не показываем (просьба владельца), на странице команды — оставляем
