@@ -2881,6 +2881,7 @@ def build_veto(teams: list[dict]) -> dict | None:
             res.append(None)
             continue
         picks, bans, first_bans, n, deciders = {}, {}, {}, 0, {}
+        wp, wb, wf, wn, vs = {}, {}, {}, 0.0, {}  # то же с весом свежести (полураспад 60 дней) и пики против конкретных соперников
         for mt in hltv_team_matches(ht)[:VETO_MATCHES]:
             v = hltv_veto(mt)
             if not v or not v.get("steps"):
@@ -2894,6 +2895,16 @@ def build_veto(teams: list[dict]) -> dict | None:
             if not mine:
                 continue
             n += 1
+            w = 0.5 ** (max(0, (NOW - vd).days) / 60) if vd else 0.5
+            wn += w
+            opp = next((norm(s["team"]) for s in v["steps"] if s["team"] and s not in mine), "")
+            for i, s in enumerate(mine):
+                tgt = wp if s["act"] == "pick" else wb
+                tgt[s["map"]] = tgt.get(s["map"], 0) + w
+                if s["act"] == "ban" and i == 0:
+                    wf[s["map"]] = wf.get(s["map"], 0) + w
+                if s["act"] == "pick" and opp:
+                    vs.setdefault(opp, {})[s["map"]] = vs.setdefault(opp, {}).get(s["map"], 0) + 1
             for s in v["steps"]:
                 if s["act"] == "decider":
                     deciders[s["map"]] = deciders.get(s["map"], 0) + 1
@@ -2903,8 +2914,9 @@ def build_veto(teams: list[dict]) -> dict | None:
                 if s["act"] == "ban" and i == 0:
                     first_bans[s["map"]] = first_bans.get(s["map"], 0) + 1
         top = lambda d: sorted(d.items(), key=lambda x: -x[1])
+        rate = lambda d: {k: round(v / wn, 3) for k, v in d.items()} if wn else {}
         res.append({"team": ht["name"], "matches": n, "picks": top(picks), "bans": top(bans), "first_bans": top(first_bans),
-                    "deciders": top(deciders)})
+                    "deciders": top(deciders), "pr": rate(wp), "br": rate(wb), "fr": rate(wf), "vs": vs})
     if not any(res):
         return None
     # вероятный маппул: что каждая пикает чаще всего и при этом соперник это не банит постоянно
@@ -4245,6 +4257,9 @@ def devig(coeffs: list) -> list:
     return [x / t for x in p]
 
 
+_bo3_starter: dict = {}
+
+
 def bo3_odds(bids: list) -> dict | None:
     """Коэффициенты букмекеров на ближайший матч двух команд (bo3.gg) → вероятности победы и точного счёта."""
     if len(bids) != 2 or not all(bids):
@@ -4256,6 +4271,8 @@ def bo3_odds(bids: list) -> dict | None:
         warn(f"bo3 коэффициенты: {e!r}")
         return None
     m = next((x for x in res if {x.get("team1_id"), x.get("team2_id")} == set(bids)), None)
+    if m:  # вето обычно начинает вторая команда в паре bo3.gg (так в ~72% из 357 серий BO3)
+        _bo3_starter[tuple(bids)] = bids.index(m.get("team2_id")) if m.get("team2_id") in bids else 0
     bu = (m or {}).get("bet_updates") or {}
     c1, c2 = (bu.get("team_1") or {}).get("coeff"), (bu.get("team_2") or {}).get("coeff")
     if not c1 or not c2 or min(c1, c2) < 1.02:
@@ -4295,27 +4312,50 @@ def build_prediction(d: dict, bids: list) -> dict | None:
     pool = [mp for mp, _ in sorted(seen.items(), key=lambda kv: -kv[1])][:7]
     if len(pool) < 7:
         pool += [mp for mp in table if mp not in pool][:7 - len(pool)]
-    def wr(i, mp):
+    def wr(i, mp):  # винрейт на карте со «сжатием» к 50%: при малом числе игр крайним значениям не верим
         r = table.get(mp)
         t = r["teams"][i] if r else {"won": 0, "played": 0}
-        return (t["won"] + 1) / (t["played"] + 2)
+        return (t["won"] + 1.5) / (t["played"] + 3)
     def pmap(mp):  # вероятность, что карту выиграет первая команда (log5)
         a, b = wr(0, mp), wr(1, mp)
         return a * (1 - b) / (a * (1 - b) + b * (1 - a))
+    # Выбор на каждом шаге вето (проверено на ~390 сериях с настоящим вето dust2: десайдер угадывается в ~34% против 24%
+    # у прежнего способа, пики — 43% против 41%; см. tools/veto_backtest.py):
+    #   бан  = как часто команда банит карту (свежие матчи весомее) + её первый бан + насколько соперник на карте сильнее;
+    #   пик  = как часто команда пикает карту + насколько она на карте сильнее соперника + что уже пикала именно против него.
+    bans_done = [0, 0]
+    opp_key = [norm(vt[1].get("team")), norm(vt[0].get("team"))]
     def choose(i, act, left):
         t = vt[i]
-        cnt = dict(t.get("bans" if act == "ban" else "picks") or [])
+        if not t.get("pr") and not t.get("br"):  # старые данные без весов — как раньше
+            cnt = dict(t.get("bans" if act == "ban" else "picks") or [])
+            if act == "ban":
+                for mp, c in t.get("first_bans") or []:
+                    cnt[mp] = cnt.get(mp, 0) + c
+            own = (lambda mp: wr(i, mp)) if act == "pick" else (lambda mp: -wr(i, mp))
+            return max(left, key=lambda mp: (cnt.get(mp, 0), own(mp)))
+        def sc(mp):
+            dx = wr(i, mp) - wr(1 - i, mp)
+            if act == "ban":
+                v = (t.get("br") or {}).get(mp, 0) - 2 * dx
+                if bans_done[i] == 0:
+                    v += (t.get("fr") or {}).get(mp, 0)
+                return v
+            return (t.get("pr") or {}).get(mp, 0) + 2 * dx + 0.1 * ((t.get("vs") or {}).get(opp_key[i]) or {}).get(mp, 0)
+        mp = max(left, key=sc)
         if act == "ban":
-            for mp, c in t.get("first_bans") or []:
-                cnt[mp] = cnt.get(mp, 0) + c
-        own = (lambda mp: wr(i, mp)) if act == "pick" else (lambda mp: -wr(i, mp))
-        return max(left, key=lambda mp: (cnt.get(mp, 0), own(mp)))
+            bans_done[i] += 1
+        return mp
+    odds = bo3_odds(bids) if len(bids) == 2 and all(bids) else None
+    st0 = _bo3_starter.get(tuple(bids), 0) if len(bids) == 2 else 0
     bo = int(d.get("bo") or 3)
     order = {1: [(0, "ban"), (1, "ban"), (0, "ban"), (1, "ban"), (0, "ban"), (1, "ban")],
              3: [(0, "ban"), (1, "ban"), (0, "pick"), (1, "pick"), (0, "ban"), (1, "ban")],
              5: [(0, "ban"), (1, "ban"), (0, "pick"), (1, "pick"), (0, "pick"), (1, "pick")]}.get(bo)
     if not order:
         return None
+    if st0 == 1:
+        order = [(1 - i, act) for i, act in order]
     left, steps, maps = list(pool), [], []
     for i, act in order:
         if not left:
@@ -4328,7 +4368,30 @@ def build_prediction(d: dict, bids: list) -> dict | None:
     if left:
         steps.append({"team": None, "act": "decider", "map": left[0]})
         maps.append({"map": left[0], "by": None})
-    probs = [pmap(x["map"]) for x in maps]
+    # Без коэффициентов: основа — разница очков VRS (проверка на 122 сериях последних 45 дней: угадан победитель в 74%,
+    # Брайер 0.18), а винрейты на картах лишь слегка сдвигают карту — сами по себе они почти не лучше монетки.
+    pv = None
+    try:
+        tbl = vrs_table()
+        ra, rb = (vrs_find(t, tbl) if tbl else None for t in (d.get("teams") or [{}, {}])[:2])
+        if ra and rb and ra.get("points") and rb.get("points"):
+            ps = 1 / (1 + 10 ** (-(ra["points"] - rb["points"]) / 400))
+            lo, hi = 0.0, 1.0  # вероятность выиграть карту, при которой серия BO3 выигрывается с вероятностью ps
+            for _ in range(40):
+                mid = (lo + hi) / 2
+                if mid * mid * (3 - 2 * mid) < ps:
+                    lo = mid
+                else:
+                    hi = mid
+            pv = (lo + hi) / 2
+    except Exception as e:
+        warn(f"Прогноз по VRS: {e!r}")
+    def pmap2(mp):
+        if pv is None:
+            return pmap(mp)
+        lg = math.log(pv / (1 - pv)) + 1.0 * (wr(0, mp) - wr(1, mp))
+        return 1 / (1 + math.exp(-lg))
+    probs = [pmap2(x["map"]) for x in maps]
     for x, p in zip(maps, probs):
         r = 0.5 + (p - 0.5) * 0.25  # вероятность раунда из вероятности карты — грубая оценка
         lose = max(3, min(11, round(13 * (1 - max(r, 1 - r)) / max(r, 1 - r))))
@@ -4345,7 +4408,6 @@ def build_prediction(d: dict, bids: list) -> dict | None:
     walk(0, 0, 0, 1.0)
     outcomes = [{"score": f"{a}:{b}", "p": round(100 * v)} for (a, b), v in sorted(dist.items(), key=lambda kv: -kv[1])]
     res = {"steps": steps, "maps": maps, "outcomes": outcomes, "source": "статистика"}
-    odds = bo3_odds(bids) if not STATS or True else None
     if odds:
         res["odds"] = odds
         if odds.get("scores"):
