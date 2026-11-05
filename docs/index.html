@@ -527,8 +527,10 @@ html { overflow-anchor: none; }
 .medal { cursor: pointer; }
 /* зона нажатия на награды больше самой плашки: палец попадает с первого раза */
 [data-pop] { position: relative; }
-.medal[data-pop]::after, .pmaj[data-pop]::after { content: ""; position: absolute; inset: -10px -8px; }
-.pmaj.tap { display: inline-block; padding: 4px 0; }
+/* зона нажатия — круг вокруг кнопки, а не длинная невидимая полоса */
+.medal[data-pop]::after { content: ""; position: absolute; left: 50%; top: 50%; width: max(48px, calc(100% + 16px)); aspect-ratio: 1; border-radius: 50%; transform: translate(-50%, -50%); }
+.pmaj[data-pop]::after { content: ""; position: absolute; inset: -8px; border-radius: 999px; }
+.pmaj.tap { display: inline-block; justify-self: start; padding: 3px 9px; border-radius: 999px; background: var(--sunk); margin-top: 4px; }
 
 .pop .pop-in.wide { box-sizing: border-box; width: min(calc(100vw - 24px), 440px); max-width: none; max-height: 70vh; }
 .pcols { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 8px; }
