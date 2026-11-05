@@ -177,7 +177,7 @@ ROSTER_CACHE_F = CACHE / "liquipedia_rosters_v3.json"  # тренер, роли,
 PRON_CACHE_F = CACHE / "pronunciation_v2.json"       # имена и ники по-русски с ударением
 games_cache: dict = load_json(GAMES_CACHE_F, {})
 details_cache: dict = load_json(DETAILS_CACHE_F, {})
-DETAILS_NEW_LIMIT = int(os.environ.get("DETAILS_NEW_LIMIT", "450"))  # новых карт с раундами за запуск
+DETAILS_NEW_LIMIT = int(os.environ.get("DETAILS_NEW_LIMIT", "1200"))  # bo3 — открытый API; 450 не хватало, мелкие команды оставались без статистики игроков  # новых карт с раундами за запуск
 _details_new = [0]
 teams_map: dict = load_json(TEAMS_CACHE_F, {})
 tr_cache: dict = load_json(TR_CACHE_F, {})
@@ -732,7 +732,8 @@ def bo3_team_id(t: dict) -> int | None:
         tries.append({"filter[teams.slug][eq]": t["slug"]})
     if t.get("name"):
         spaced = re.sub(r"(?<=[a-z])(?=[A-Z])", " ", t["name"])  # TheMongolz → The Mongolz
-        for nm in dict.fromkeys([t["name"], spaced]):
+        bare = re.sub(r"\s+(esports|e-sports|gaming|team|clan|club)$", "", t["name"], flags=re.IGNORECASE).strip()  # FUT Esports → FUT
+        for nm in dict.fromkeys([t["name"], spaced, bare]):
             tries.append({"filter[teams.name][eq]": nm})
             tries.append({"filter[teams.slug][eq]": re.sub(r"[^a-z0-9]+", "-", nm.lower()).strip("-")})
     if t.get("acronym"):
@@ -757,6 +758,23 @@ def bo3_team_id(t: dict) -> int | None:
 
 
 _bo3_hist: dict[int, list] = {}
+
+
+def bo3_upcoming(bid: int, limit: int = 10) -> list[dict]:
+    """Ближайшие матчи команды (bo3.gg): дата, соперник, турнир, формат — для страницы команды."""
+    try:
+        j = bo3("/matches", {"page[limit]": limit, "sort": "start_date", "filter[matches.status][in]": "upcoming,current",
+                             "filter[matches.team_ids][overlap]": bid, "with": "teams,tournament"})
+    except Exception as e:
+        warn(f"bo3 ближайшие {bid}: {e}")
+        return []
+    out = []
+    for m in j.get("results") or []:
+        me1 = m.get("team1_id") == bid
+        opp = (m.get("team2") if me1 else m.get("team1")) or {}
+        out.append({"sid": str(m.get("id")), "date": m.get("start_date"), "opponent_name": opp.get("name") or "TBD", "logo": opp.get("image_url"),
+                    "tournament": tour_name(m), "bo": m.get("bo_type"), "live": m.get("status") == "current"})
+    return out
 
 
 def bo3_history(bid: int, pages: int = 2) -> list[dict]:
@@ -990,6 +1008,9 @@ def bo3_h2h_matches(a: int, b: int) -> list[dict]:
     return sorted(res.values(), key=lambda m: m.get("start_date") or "", reverse=True)
 
 
+_h2h_matches: dict = {}
+
+
 def build_h2h(a: int, b: int, hist_a: list[dict]) -> list[dict]:
     since = datetime(NOW.year, 1, 1, tzinfo=timezone.utc)  # «за год» — текущий календарный год
     exact = bo3_h2h_matches(a, b)
@@ -1012,7 +1033,9 @@ def build_h2h(a: int, b: int, hist_a: list[dict]) -> list[dict]:
                 det = details_cache.get(str(games[i]["id"])) or game_detail(games[i]["id"])
                 sides = map_sides(det, win)
             maps.append({"map": r["map"], "winner": win, "score": r["score"], "sides": sides})
+        _h2h_matches[str(m.get("id"))] = m
         res.append({
+            "sid": str(m.get("id")),  # по нажатию открывается серия со статистикой и вето
             "date": m.get("start_date"),
             "tournament": tour_name(m),
             "bo": m.get("bo_type"),
@@ -3825,6 +3848,9 @@ def hltv_player_info(nick: str) -> dict | None:
                 mj.append(e)
     yr = lambda x: (re.findall(r"20\d\d", x) or ["0"])[-1]
     mj.sort(key=yr, reverse=True)
+    old = (c or {}).get("data") or {}
+    if not mj and old.get("major_events"):  # новый разбор ничего не нашёл — старый список мажоров не теряем
+        mj = list(old["major_events"])
     d = {"mvp": mvp, "mvp_events": ev, "majors": int(pm.group(1)) if pm else 0, "major_wins": int(wm.group(1)) if wm else 0,
          "major_events": mj, "trophies": tro[:40], "event_wins": wins[:40]}
     d["mvp_events"] = [str(x) for x in d["mvp_events"]] if isinstance(d["mvp_events"], list) else []
@@ -4020,7 +4046,7 @@ def build_detail(m: dict, prev: dict | None) -> dict:
         warn(f"Прогноз: {e!r}")
     for t, bid, hist in zip(teams, bids, hists):
         t["stats"] = build_player_stats(t, bid, hist)
-        for p in t.get("players") or []:
+        for p in (t.get("players") or []) + (t.get("coach") or []):  # у тренеров тоже мажоры и MVP (чаще всего — с игровой карьеры)
             try:
                 info = hltv_player_info(p.get("nick") or "")
             except Exception as e:
@@ -4028,8 +4054,18 @@ def build_detail(m: dict, prev: dict | None) -> dict:
                 info = None
             if info:
                 p.update({k: v for k, v in info.items() if v})
-    # подробности по каждой серии из «Формы» — открываются по нажатию
+    # подробности по каждой серии из «Формы» и личных встреч — открываются по нажатию
     series = {}
+    for x in detail.get("h2h") or []:
+        m0 = _h2h_matches.get(x.get("sid") or "")
+        if m0 and x["sid"] not in series:
+            try:
+                sd = series_detail(m0)
+            except Exception as e:
+                warn(f"Серия {x['sid']}: {e!r}")
+                sd = None
+            if sd:
+                series[x["sid"]] = sd
     for bid, hist in zip(bids, hists):
         for m0 in hist[:10] if bid else []:
             k = str(m0.get("id"))
@@ -4171,7 +4207,7 @@ def build_team_page(r: dict) -> dict | None:
         try:
             roster, coach = merge_roster([], lp_roster({"id": key, "name": r["name"]}))
             fix_names(roster)
-            for p in roster:
+            for p in roster + coach:
                 info = hltv_player_info(p.get("nick") or "")
                 if info:
                     p.update({k: v for k, v in info.items() if v})
@@ -4204,7 +4240,7 @@ def build_team_page(r: dict) -> dict | None:
     return {"updated": iso(NOW), "name": r["name"], "vrs": {k: r.get(k) for k in ("rank", "points", "region", "reg_rank", "hltv_rank")},
             "players": players or r.get("roster") or [], "roster": roster, "coach": coach, "logo": r.get("logo"),
             "stats": build_player_stats({"players": roster}, bid, hist) if roster else [],
-            "form": form, "series": series,
+            "form": form, "series": series, "upcoming": bo3_upcoming(bid),
             "maps": {"window_days": maps.get("window_days"), "table": maps.get("table") or []}, "prizes": ach}
 
 
