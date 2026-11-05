@@ -2765,15 +2765,20 @@ def d2_upcoming() -> list[dict]:
     if not h:
         return []
     b = re.sub(r"\s+", " ", h)
-    out = []
-    for blk in re.split(r'<div class="match-list-component', b)[1:]:
+    out, seen = [], set()
+    for blk in re.split(r'<div class="match-list-component|<div class="match text-ellipsis', b)[1:]:
         mm = re.search(r'href="/matches/(\d+)/([^"#?]+)"', blk)
         if not mm:
             continue
+        if mm.group(1) in seen:
+            continue
+        seen.add(mm.group(1))
         dd = re.search(r'data-date="(\d{12,})"', blk)
-        teams = list(dict.fromkeys(re.findall(r'class="team-logo[^"]*" title="([^"]+)"', blk)
+        teams = list(dict.fromkeys(re.findall(r'match-team-name[^"]*">([^<]+)<', blk)
+                                   or re.findall(r'class="team-logo[^"]*" title="([^"]+)"', blk)
                                    or re.findall(r'<img alt="([^"]+)"[^>]*class="team-logo', blk)))
-        out.append({"id": mm.group(1), "slug": mm.group(2), "teams": [strip_html(x) for x in teams][:2],
+        ph = re.findall(r'team-placeholder">([^<]+)<', blk)
+        out.append({"id": mm.group(1), "slug": mm.group(2), "teams": [strip_html(x) for x in teams][:2], "ph": [strip_html(x) for x in ph],
                     "begin": iso(datetime.fromtimestamp(int(dd.group(1)) / 1000, tz=timezone.utc)) if dd else None})
     return out
 
@@ -2786,10 +2791,45 @@ def d2_find(lst: list[dict], teams: list[dict], begin: str | None) -> dict | Non
     for x in lst:
         got = [norm(n) for n in x.get("teams") or []] + [norm(x.get("slug"))]
         ok = all(any(k == g or (len(k) >= 4 and k in g) or (len(g) >= 4 and g in k) for k in w for g in got) for w in want)
+        if ok and len(want) == 1 and not x.get("ph"):
+            ok = False  # у нас одна команда — ищем матч, где у dust2 тоже «победитель X/Y»
         xt = parse_iso(x.get("begin"))
         if ok and (not bt or not xt or abs((xt - bt).total_seconds()) < 14 * 3600):
             return x
     return None
+
+
+def team_names_index(listing: list | None) -> dict:
+    """norm(название/аббревиатура) → {name, acronym, image} по всем известным командам (список матчей и карточки)."""
+    idx: dict = {}
+    def put(t):
+        if not t or not t.get("name"):
+            return
+        v = {"name": t["name"], "acronym": t.get("acronym"), "image": t.get("image")}
+        for k in (t.get("name"), t.get("acronym"), re.sub(r"(?i)^(the|team)\s+", "", t.get("name") or "")):
+            if norm(k):
+                idx.setdefault(norm(k), v)
+    for m in listing or (load_json(OUT / "matches.json", {}) or {}).get("matches") or []:
+        for t in m.get("teams") or []:
+            put(t)
+    for f in (OUT / "match").glob("*.json"):
+        for t in (load_json(f, {}) or {}).get("teams") or []:
+            put(t)
+    idx.setdefault("navi", idx.get("natusvincere"))
+    return {k: v for k, v in idx.items() if v}
+
+
+def tbd_opp(ph: str, idx: dict) -> dict | None:
+    """«PARIVISION/NaVi winner» → кандидаты в соперники: {"kind": "winner"|"loser", "cands": [{name, acronym, image}]}."""
+    m = re.match(r"(?i)^(.+?)\s+(winner|loser)$", (ph or "").strip())
+    if not m or "/" not in m.group(1):
+        return None
+    cands = []
+    for raw in m.group(1).split("/")[:2]:
+        raw = raw.strip()
+        c = idx.get(norm(raw)) or next((v for k, v in idx.items() if norm(raw) and (norm(raw) in k or k in norm(raw)) and min(len(k), len(norm(raw))) >= 3), None)
+        cands.append(c or {"name": raw, "acronym": raw})
+    return {"kind": m.group(2).lower(), "cands": cands}
 
 
 def d2_sync(listing: list | None = None) -> None:
@@ -2799,15 +2839,22 @@ def d2_sync(listing: list | None = None) -> None:
     if not lst:
         return
     by_id = {str(x.get("id")): x for x in listing or []}
+    names_idx = team_names_index(listing)
     n_t = n_v = 0
     for f in (OUT / "match").glob("*.json"):
         d = load_json(f, None)
-        if not d or len(d.get("teams") or []) != 2:
+        if not d or not d.get("teams") or (len(d["teams"]) != 2 and not d.get("tbd")):
             continue
         x = d2_find(lst, d["teams"], d.get("begin_at"))
         if not x:
             continue
         ch = False
+        if d.get("tbd") and x.get("ph"):
+            opp = tbd_opp(x["ph"][0], names_idx)
+            if opp and opp != d.get("opp"):
+                d["opp"] = opp; ch = True
+                if str(d.get("id")) in by_id:
+                    by_id[str(d.get("id"))]["opp"] = opp
         if x.get("begin") and x["begin"] != d.get("begin_at") and not d.get("veto_now"):
             d["begin_at"] = x["begin"]; ch = True; n_t += 1
             if str(d.get("id")) in by_id:
@@ -4339,20 +4386,28 @@ def build_detail(m: dict, prev: dict | None) -> dict:
         hists.append(hist)
         teams.append({**t, "bo3_id": bid, "players": players, "coach": coach, "form": build_form(bid, hist) if bid else []})
     detail = {**brief, "teams": teams, "updated": iso(NOW)}
+    one = len(teams) < 2
+    if one:  # соперник ещё не известен: карточка с одной командой, статистику пары не считаем
+        nm = re.sub(r"^[^:]*:\s*", "", brief.get("name") or "")
+        detail["tbd"] = True
+        detail["tbd_side"] = 0 if re.match(r"(?i)^tbd\s+vs\b", nm) else 1
+        if prev and prev.get("opp"):
+            detail["opp"] = prev["opp"]
     if len(bids) == 2 and all(bids):
         detail["h2h"] = build_h2h(bids[0], bids[1], hists[0])
     else:
         detail["h2h"] = []
-    detail["maps"] = build_maps(bids, hists)
-    detail["sides"] = build_sides(bids, hists)
-    try:
-        detail["veto"] = build_veto(teams)
-    except Exception as e:
-        warn(f"Вето: {e!r}")
-    try:
-        detail["prediction"] = build_prediction(detail, bids)
-    except Exception as e:
-        warn(f"Прогноз: {e!r}")
+    if not one:
+        detail["maps"] = build_maps(bids, hists)
+        detail["sides"] = build_sides(bids, hists)
+        try:
+            detail["veto"] = build_veto(teams)
+        except Exception as e:
+            warn(f"Вето: {e!r}")
+        try:
+            detail["prediction"] = build_prediction(detail, bids)
+        except Exception as e:
+            warn(f"Прогноз: {e!r}")
     for t, bid, hist in zip(teams, bids, hists):
         t["stats"] = build_player_stats(t, bid, hist)
         for p in (t.get("players") or []) + (t.get("coach") or []):  # у тренеров тоже мажоры и MVP (чаще всего — с игровой карьеры)
@@ -4443,6 +4498,8 @@ def build_detail(m: dict, prev: dict | None) -> dict:
         for k in ("veto",):
             if prev.get(k) is not None:
                 detail[k] = prev[k]
+    if one:
+        return detail
     try:
         if (soon or not prev) and brief.get("tier") == "s" and not STATS:
             detail["facts"] = build_facts(detail, prev)
@@ -4806,7 +4863,7 @@ def main() -> int:
         begin = parse_iso(b["begin_at"])
         # карточка — для каждого матча недели, где известны обе команды. Дальше 3 дней она «лёгкая»
         # (без фактов от нейросети, новости один раз), за 3 дня до матча — полная (см. soon в build_detail)
-        detailed = len(b["teams"]) == 2 and begin is not None
+        detailed = len(b["teams"]) >= 1 and begin is not None  # с одной командой — тоже: соперник «победитель X/Y», статистика потом
         if detailed:
             path = OUT / "match" / f"{m['id']}.json"
             prev = load_json(path, None)
@@ -4820,6 +4877,12 @@ def main() -> int:
                 if detailed:
                     keep_ids.add(m["id"])
         b["has_detail"] = detailed
+        if len(b["teams"]) == 1:
+            nm0 = re.sub(r"^[^:]*:\s*", "", b.get("name") or "")
+            b["tbd"], b["tbd_side"] = True, 0 if re.match(r"(?i)^tbd\s+vs\b", nm0) else 1
+            c0 = load_json(OUT / "match" / f"{m['id']}.json", {}) or {}
+            if c0.get("opp"):
+                b["opp"] = c0["opp"]
         listing.append(b)
 
     for f in (OUT / "match").glob("*.json"):

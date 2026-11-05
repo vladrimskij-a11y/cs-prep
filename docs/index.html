@@ -176,6 +176,14 @@ a { color: inherit; }
 .pbad.awp { color: #c98a00; border-color: rgba(201,138,0,.45); }
 .psrc { font-size: 11px; color: var(--muted); text-align: center; margin: 4px 0 16px; line-height: 1.5; }
 .psrc a { color: var(--muted); text-decoration: underline; }
+.mixlg { position: relative; display: inline-block; width: 18px; height: 18px; flex: none; vertical-align: middle; }
+.mixlg.big { width: 44px; height: 44px; }
+.mixlg > img, .mixlg > i { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; font-style: normal; font-size: 9px; font-weight: 700; display: flex; align-items: center; justify-content: center; color: var(--muted); }
+.mixlg.big > i { font-size: 15px; }
+.mixlg > .h1 { clip-path: polygon(0 0, 100% 0, 0 100%); }
+.mixlg > .h2 { clip-path: polygon(100% 0, 100% 100%, 0 100%); }
+.mixlg::after { content: ""; position: absolute; left: 50%; top: -10%; height: 120%; width: 1.5px; background: var(--muted); opacity: .5; transform: rotate(45deg); }
+.tbdnote { font-size: 12px; color: var(--muted); }
 .mapsel { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }
 .recent { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .recent .col { display: flex; flex-direction: column; gap: 0; min-width: 0; }
@@ -863,6 +871,26 @@ a.ni { text-decoration: none; color: inherit; }
     return dm(s);
   }
   function abbr(t) { return t ? (t.acronym || t.name || "TBD") : "TBD"; }
+  // соперник ещё не известен: «победитель X / Y» — смешанный логотип из двух кандидатов
+  function oppTeam(m) {
+    var o = m.opp || {}, c = o.cands || [];
+    return { tbd: true, opp: o, players: [], coach: [], form: [],
+      name: c.length ? c.map(function (x) { return x.name; }).join(" / ") : "TBD",
+      acronym: c.length ? c.map(function (x) { return x.acronym || x.name; }).join("/") : "TBD" };
+  }
+  function withOpp(m) {
+    if (!m || !m.tbd || (m.teams || []).length >= 2) return m;
+    var t = (m.teams || []).slice(), side = m.tbd_side === 0 ? 0 : 1;
+    t.splice(side, 0, oppTeam(m));
+    var x = {}; for (var k in m) x[k] = m[k]; x.teams = t; return x;
+  }
+  function oppWord(t) { var k = (t.opp || {}).kind; return k === "loser" ? "Проигравший" : "Победитель"; }
+  function mixLogo(t, big) {
+    var c = ((t && t.opp) || {}).cands || [], a = c[0] || {}, b = c[1] || {};
+    function im(x, cls) { var k = nkey(x.name), u = PRIMARY[k] || x.image || LOGOS[k]; return u ? '<img class="' + cls + '" src="' + esc(u) + '" alt="" loading="lazy" onerror="this.remove()">' : '<i class="' + cls + '">' + esc(String(x.acronym || x.name || "?").slice(0, 2)) + '</i>'; }
+    return '<span class="mixlg' + (big ? ' big' : '') + '">' + (c.length ? im(a, "h1") + im(b, "h2") : '<i class="h0">?</i>') + '</span>';
+  }
+  function tnAttr(t) { return t && !t.tbd ? ' data-tname="' + esc(t.name) + '"' : ''; }
   var CC_FIX = { UK: "GB", EN: "GB", EL: "GR" };  // источники пишут UK — у флага Британии код GB
   var CC_SUB = { "GB-ENG": "\uD83C\uDFF4\uDB40\uDC67\uDB40\uDC62\uDB40\uDC65\uDB40\uDC6E\uDB40\uDC67\uDB40\uDC7F", "GB-SCT": "\uD83C\uDFF4\uDB40\uDC67\uDB40\uDC62\uDB40\uDC73\uDB40\uDC63\uDB40\uDC74\uDB40\uDC7F", "GB-WLS": "\uD83C\uDFF4\uDB40\uDC67\uDB40\uDC62\uDB40\uDC77\uDB40\uDC6C\uDB40\uDC73\uDB40\uDC7F" };
   function flag(cc) {
@@ -957,7 +985,7 @@ a.ni { text-decoration: none; color: inherit; }
   function getDetail(id) {
     if (state.details[id]) return Promise.resolve(state.details[id]);
     var p = DEMO ? Promise.resolve(DEMO.details[id]) : dfetch("data/match/" + id + ".json" + bust()).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); });
-    return p.then(function (x) { if (!x) throw new Error("нет данных"); state.details[id] = x; return x; });
+    return p.then(function (x) { if (!x) throw new Error("нет данных"); x = withOpp(x); state.details[id] = x; return x; });
   }
 
   // ---------- списки
@@ -980,13 +1008,14 @@ a.ni { text-decoration: none; color: inherit; }
   function rememberLogo(name, url) { if (name && url) LOGOS[nkey(name)] = LOGOS[nkey(name)] || url; }
   function logo(name, url) { var k = nkey(name), u = PRIMARY[k] || url || LOGOS[k]; return u ? '<img class="lg" src="' + esc(u) + '" alt="" loading="lazy" onerror="this.remove()">' : ''; }
   function matchRow(m, showTour) {
+    m = withOpp(m);
     var a = m.teams[0], b = m.teams[1], on = mine.has(String(m.id));
     var live = m.status === "running";
     var sub = showTour ? (m.stage ? m.tournament + " · " + m.stage : m.tournament) : (m.stage || m.tournament);
     return '<div class="match' + (m.has_detail ? "" : " nodetail") + '" data-open="' + m.id + '" role="button" tabindex="0" aria-label="' + esc(abbr(a) + " против " + abbr(b)) + '">' +
       '<div class="time">' + (live ? '<span class="live">LIVE</span>' : esc(hm(m.begin_at))) + '<small>BO' + esc(m.bo || "?") + '</small></div>' +
-      '<div class="vs"><div class="row"><span class="dot a"></span>' + logo(a && a.name, a && a.image) + '<span class="tname">' + esc(a ? a.name : "TBD") + '</span></div>' +
-      '<div class="row"><span class="dot b"></span>' + logo(b && b.name, b && b.image) + '<span class="tname">' + esc(b ? b.name : "TBD") + '</span></div>' +
+      '<div class="vs"><div class="row"><span class="dot a"></span>' + (a && a.tbd ? mixLogo(a) : logo(a && a.name, a && a.image)) + '<span class="tname">' + esc(a ? a.name : "TBD") + '</span></div>' +
+      '<div class="row"><span class="dot b"></span>' + (b && b.tbd ? mixLogo(b) : logo(b && b.name, b && b.image)) + '<span class="tname">' + esc(b ? b.name : "TBD") + '</span></div>' +
       '<div class="tour">' + esc(sub) + '</div></div>' +
       '<div class="side">' + (showTour ? '<span class="pill ' + esc(m.tier) + '">' + esc((m.tier || "?").toUpperCase()) + '</span>' : '') + '</div></div>';
   }
@@ -2139,6 +2168,12 @@ a.ni { text-decoration: none; color: inherit; }
   function playersTab(m) {
     var html = '<div id="livebox">' + (state.live && state.live.id === m.id ? state.live.html || "" : "") + '</div>';
     m.teams.forEach(function (t, i) {
+      if (t.tbd) {
+        var cs = (t.opp || {}).cands || [];
+        html += '<div class="sec"><div class="box roster ' + (i ? "b" : "a") + '"><div class="hd"><span class="tn">' + mixLogo(t) + ' ' + esc(t.name) + '</span></div><div class="note">' +
+          (cs.length ? oppWord(t) + ' матча ' + cs.map(function (c) { return '<span class="tlink" data-tname="' + esc(c.name) + '">' + esc(c.name) + '</span>'; }).join(" — ") + '. Состав появится, когда матч сыграют.' : 'Соперник ещё не определён.') + '</div></div></div>';
+        return;
+      }
       html += '<div class="sec"><div class="box roster ' + (i ? "b" : "a") + '"><div class="hd"><span class="tn tlink" data-tname="' + esc(t.name) + '">' + esc(t.name) + ' ›</span>' + trophyCount(t.prizes) + medalsHtml(t.prizes) + '</div>';
       if (!(t.players || []).length) html += '<div class="note">Состав не указан.</div>';
       html += rosterRows(t.players, t.coach, t, true) + '</div></div>';
@@ -2215,8 +2250,9 @@ a.ni { text-decoration: none; color: inherit; }
       Object.keys(D).forEach(function (n) { low[n.toLowerCase()] = n; });
       var players = (t.players || []).map(function (p) { return p.nick; });
       Object.keys(D).forEach(function (n) { if (players.map(function (x) { return String(x).toLowerCase(); }).indexOf(n.toLowerCase()) < 0 && players.length < 5) players.push(n); });
-      html += '<div class="sec"><div class="box"><div class="st-h ' + (i ? "b" : "a") + '">' + logo(t.name, t.logo) + esc(t.name) + '</div>';
-      if (!T[i]) html += '<div class="note">Команды нет в базе ProRoles (там только топ-50).</div>';
+      html += '<div class="sec"><div class="box"><div class="st-h ' + (i ? "b" : "a") + '">' + (t.tbd ? mixLogo(t) + ' ' : logo(t.name, t.logo)) + esc(t.name) + '</div>';
+      if (t.tbd) html += '<div class="note">Соперник ещё не определён.</div>';
+      else if (!T[i]) html += '<div class="note">Команды нет в базе ProRoles (там только топ-50).</div>';
       else if (!Object.keys(D).length) html += '<div class="note">На ' + esc(POS_MAPNAME[cur] || cur) + ' демо этой команды пока нет.</div>';
       else {
         html += '<table class="mtab ptab2"><thead><tr><th>Игрок</th><th class="ct">CT — держит</th><th class="tt">T — идёт первым</th></tr></thead><tbody>';
@@ -2361,7 +2397,7 @@ a.ni { text-decoration: none; color: inherit; }
   // ---------- карточка матча: вкладки (и фильтры новостей) — отдельные страницы в ряд, у каждой своя прокрутка.
   // Шапка лежит поверх страниц и сворачивается вслед за прокруткой (как профиль в Telegram).
   function newsSteps() {
-    var m = state.details[state.openId], L = ["all"].concat((m.teams || []).map(function (t) { return t.name; }));
+    var m = state.details[state.openId], L = ["all"].concat((m.teams || []).filter(function (t) { return !t.tbd; }).map(function (t) { return t.name; }));
     if (state.newsFilter && L.indexOf(state.newsFilter) < 0) L.push(state.newsFilter);  // личные новости игрока
     return L;
   }
@@ -2378,21 +2414,26 @@ a.ni { text-decoration: none; color: inherit; }
   function tabBodyHtml(m, key) {
     if (key === "team:players") return playersTab(m);
     if (key === "team:pos") return posBlock(m);
+    if (key === "stats" && m.tbd) return '<div class="sec"><div class="box note">Соперник ещё не определён — статистика пары появится, когда станет известна вторая команда.</div></div>';
     if (key === "stats") return stakeBlock(m) + vrsBlock(m) + pickBlock(m) + mapsTable(m) + mapZone(m) + h2hBlock(m) + formBlock(m);  // форма — после карт (по просьбе владельца)
     return (key === "news:all" ? factsBlock(m) : "") + newsList(m, key.slice(5));
   }
 
+  function heroSide(T) {
+    if (T.tbd) return '<span class="acr">' + mixLogo(T, true) + '</span><span class="full">' + esc(T.name) + '</span><span class="tbdnote">' + oppWord(T) + ' матча</span>';
+    return '<span class="acr">' + esc(abbr(T)) + '</span><span class="full">' + esc(T.name) + '</span>' + heroVrs(T);
+  }
   function headHtml(m) {
     var A = m.teams[0] || {}, B = m.teams[1] || {};
     var nCount = ((m.news && m.news.items) || []).length;
     function tabBtn(id, label, c) { return '<button class="tab" role="tab" data-tab="' + id + '" aria-selected="' + (state.tab === id) + '">' + label + (c ? '<span class="c">' + c + '</span>' : '') + '</button>'; }
     var opts = newsSteps().map(function (f) { return [f, f === "all" ? "Все" : f]; });
     return '<div class="hbar">' + backBtn(m.tournament || "Назад") + '</div>' +
-      '<div class="fold mini-wrap"><div class="fi"><div class="mini"><span class="ma" data-tname="' + esc(A.name) + '">' + esc(abbr(A)) + miniVrs(A) + '</span><span class="mm">BO' + esc(m.bo) + miniOutc(m) + '</span><span class="mb" data-tname="' + esc(B.name) + '">' + esc(abbr(B)) + miniVrs(B) + '</span></div></div></div>' +
+      '<div class="fold mini-wrap"><div class="fi"><div class="mini"><span class="ma"' + tnAttr(A) + '>' + esc(abbr(A)) + miniVrs(A) + '</span><span class="mm">BO' + esc(m.bo) + miniOutc(m) + '</span><span class="mb"' + tnAttr(B) + '>' + esc(abbr(B)) + miniVrs(B) + '</span></div></div></div>' +
       '<div class="fold hero-wrap"><div class="fi"><section class="hero"><div class="meta"><span class="pill ' + esc(m.tier) + '">' + esc((m.tier || "").toUpperCase()) + '</span><span>' + esc(withYear(m.tournament, (m.serie || {}).begin || m.begin_at)) + (m.stage ? " · " + esc(m.stage) : "") + '</span></div>' +
-      '<div class="face"><div class="tm a" data-tname="' + esc(A.name) + '"><span class="acr">' + esc(abbr(A)) + '</span><span class="full">' + esc(A.name) + '</span>' + heroVrs(A) + '</div>' +
+      '<div class="face"><div class="tm a"' + tnAttr(A) + '>' + heroSide(A) + '</div>' +
       '<div class="mid"><b>' + esc(hm(m.begin_at)) + '</b>' + esc(dm(m.begin_at)) + ' · BO' + esc(m.bo) + '</div>' +
-      '<div class="tm b" data-tname="' + esc(B.name) + '"><span class="acr">' + esc(abbr(B)) + '</span><span class="full">' + esc(B.name) + '</span>' + heroVrs(B) + '</div></div>' +
+      '<div class="tm b"' + tnAttr(B) + '>' + heroSide(B) + '</div></div>' +
       heroOutcomes(m) + '</section></div></div>' +
       '<nav class="tabs" role="tablist">' + tabBtn("players", "Команда") + tabBtn("stats", "Статистика") + tabBtn("news", "Новости", nCount) + '</nav>' +
       '<div class="fold nf-wrap"><div class="fi"><div class="filt tfilt" role="group" aria-label="Команда">' +
