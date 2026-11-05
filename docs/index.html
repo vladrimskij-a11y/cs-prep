@@ -1489,7 +1489,13 @@ a.ni { text-decoration: none; color: inherit; }
     }
     function openKey(x) {  // будущий/идущий матч → карточка матча из расписания
       var A = nkey(x.a), B = nkey(x.b);
-      if (!A || !B) return null;
+      if (A === "tbd") A = ""; if (B === "tbd") B = "";
+      if (!A && !B) return null;
+      if (!A || !B) {  // второй участник ещё не определён — ищем карточку с одной командой (лучше в тот же день)
+        var K = A || B, one = (state.list.matches || []).filter(function (mm) { var t = mm.teams || []; return t.length === 1 && nkey(t[0].name) === K; });
+        var hit = (x.date && one.find(function (mm) { return dayKey(mm.begin_at) === dayKey(x.date); })) || (one.length === 1 ? one[0] : null);
+        return hit ? hit.id : null;
+      }
       var m = (state.list.matches || []).find(function (mm) { var t = mm.teams || []; return t.length === 2 && ((nkey(t[0].name) === A && nkey(t[1].name) === B) || (nkey(t[0].name) === B && nkey(t[1].name) === A)); });
       return m ? m.id : null;
     }
