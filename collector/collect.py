@@ -2277,7 +2277,11 @@ def hltv_page_skip(path: str) -> bool:
 def hltv_get(path: str) -> str | None:
     if path in _hltv_pages:
         return _hltv_pages[path]
-    if _hltv_blocked[0] or hltv_page_skip(path):
+    if _hltv_blocked[0]:
+        return None
+    if hltv_page_skip(path):
+        print(f"HLTV пауза: {path} (недавно отказывала)")
+        _hltv_pages[path] = None
         return None
     html = None
     for attempt in (0, 1):
@@ -2342,6 +2346,7 @@ def hltv_events() -> dict:
     for slug, href in a.items():
         out.setdefault(slug, href)
     _events_cache.update(out)
+    print(f"События HLTV: текущих и будущих + архив = {len(out)}")
     return out
 
 
@@ -4642,6 +4647,7 @@ def main() -> int:
                 continue  # новых страниц событий — не больше 8 за сбор, остальные в следующий раз
             new_ev += 1
         ex = tournament_extras(tr["name"], final=fin)
+        print(f"Призовые/участники {tr['name']}: " + (f"мест {len((ex or {}).get('places') or [])}, команд {len((ex or {}).get('teams') or [])}" if ex else "нет (событие на HLTV не найдено или страница недоступна)"))
         if ex:
             tr["hltv"] = ex
             if ex.get("prize"):
