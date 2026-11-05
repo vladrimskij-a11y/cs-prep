@@ -4167,6 +4167,16 @@ def build_detail(m: dict, prev: dict | None) -> dict:
         bid = bo3_team_id({**t, "slug": full.get("slug") or t.get("slug")})
         add_alias(bid, t.get("name"), t.get("acronym"), t.get("slug"), full.get("name"), full.get("acronym"))
         hist = bo3_history(bid) if bid else []
+        if not coach and bid and len(players) > 5:  # состава с Liquipedia нет, а у PandaScore больше пятерых — оставляем тех, кто играл последние карты
+            recent = set()
+            for m0 in hist[:2]:
+                for g in bo3_games(m0)[:3]:
+                    det = details_cache.get(str(g.get("id"))) or {}
+                    recent |= {norm(x.get("nick")) for x in det.get("players") or [] if x.get("tid") == bid}
+            if len(recent) >= 5:
+                kept = [p for p in players if norm(p.get("nick")) in recent]
+                if len(kept) >= 5:
+                    players = kept
         bids.append(bid)
         hists.append(hist)
         teams.append({**t, "bo3_id": bid, "players": players, "coach": coach, "form": build_form(bid, hist) if bid else []})
@@ -4368,7 +4378,21 @@ def build_team_page(r: dict) -> dict | None:
                 add_pronunciation(need)
             except Exception as e:
                 warn(f"Имена по-русски {r['name']}: {e!r}")
+    roster_src = "lp" if roster else "bo3"
     if not roster and players:  # состава с Liquipedia нет — строим строки из игроков bo3, чтобы было как во вкладке «Игроки»
+        # только те, кто играл последний матч команды: запасные и ушедшие (они есть в истории карт) не попадают
+        last = []
+        for m0 in hist[:3]:
+            sd = series.get(str(m0.get("id")))
+            if not sd or not sd.get("players"):
+                continue
+            side = 0 if side_of(m0, bid) == 1 else 1
+            last = [r[0] for r in (sd["players"][side] or [])]
+            if len(last) >= 5:
+                break
+        if len(last) >= 5:
+            keep = {norm(x) for x in last}
+            players = [n for n in players if norm(n if isinstance(n, str) else n.get("nick")) in keep] or last
         roster = [{"nick": n if isinstance(n, str) else (n.get("nick") or "")} for n in players]
         roster = [p for p in roster if p["nick"]]
         for p in roster:
@@ -4379,7 +4403,7 @@ def build_team_page(r: dict) -> dict | None:
             if pc:
                 p["name_ru"] = pc["name_ru"]
     return {"updated": iso(NOW), "name": r["name"], "vrs": {k: r.get(k) for k in ("rank", "points", "region", "reg_rank", "hltv_rank")},
-            "players": players or r.get("roster") or [], "roster": roster, "coach": coach, "logo": r.get("logo"),
+            "players": players or r.get("roster") or [], "roster": roster, "coach": coach, "logo": r.get("logo"), "roster_src": roster_src,
             "stats": build_player_stats({"players": roster}, bid, hist) if roster else [],
             "form": form, "series": series, "upcoming": bo3_upcoming(bid),
             "maps": {"window_days": maps.get("window_days"), "table": maps.get("table") or []}, "prizes": ach}
@@ -4785,7 +4809,15 @@ def main() -> int:
     except Exception as e:
         warn(f"Логотипы: {e!r}")
     # «Будущие игры» на страницах команд — на каждом сборе (страницы целиком пересобираются раз в 3–12 ч, а расписание меняется чаще)
-    n_up = 0
+    # и сверка со свежими карточками матчей: состав, трофеи, MVP и мажоры у команды должны совпадать с тем, что в матче
+    PFIELDS = ("mvp", "mvp_events", "majors", "major_wins", "major_events", "trophies", "event_wins", "name_ru", "tags")
+    by_team: dict = {}
+    for mf in (OUT / "match").glob("*.json"):
+        md = load_json(mf, {}) or {}
+        for t in md.get("teams") or []:
+            if t.get("name"):
+                by_team[logo_key(t["name"])] = t
+    n_up = n_sync = 0
     for f in (OUT / "team").glob("*.json"):
         d = load_json(f, None)
         if not d or not d.get("name"):
@@ -4794,11 +4826,36 @@ def main() -> int:
             bid = team_by_name(d["name"])
             if bid:
                 d["upcoming"] = bo3_upcoming(bid)
-                save_json(f, d)
                 n_up += 1
         except Exception as e:
             warn(f"Будущие игры {d.get('name')}: {e!r}")
-    print(f"Будущие игры обновлены у {n_up} команд")
+        mt = by_team.get(logo_key(d["name"]))
+        if mt and mt.get("players"):
+            mp = {norm(p.get("nick")): p for p in mt["players"]}
+            if not d.get("roster_src") == "lp" and mt.get("players"):
+                # у матча состав точнее (Liquipedia + расписание): берём его, со всеми полями
+                d["roster"] = [dict(p) for p in mt["players"]]
+                d["coach"] = mt.get("coach") or d.get("coach") or []
+            else:
+                for p in d.get("roster") or []:
+                    q = mp.get(norm(p.get("nick")))
+                    if q:
+                        for k in PFIELDS:
+                            if q.get(k) and not p.get(k):
+                                p[k] = q[k]
+            if mt.get("prizes") and not d.get("prizes"):
+                d["prizes"] = mt["prizes"]
+            n_sync += 1
+        # MVP и мажоры из памяти HLTV — без новых запросов
+        for p in (d.get("roster") or []) + (d.get("coach") or []):
+            pl = hltv_player_ids.get(norm(p.get("nick")))
+            c = pl and (hltv_cache.get(f"pinfo5:{pl['id']}") or hltv_cache.get(f"pinfo4:{pl['id']}"))
+            if c and c.get("data"):
+                for k, v in c["data"].items():
+                    if v and not p.get(k):
+                        p[k] = v
+        save_json(f, d)
+    print(f"Будущие игры обновлены у {n_up} команд, сверено с матчами: {n_sync}")
     for f in list((OUT / "team").glob("*.json")) + list((OUT / "match").glob("*.json")):  # ручные имена — и в старых файлах
         d = load_json(f, None)
         if d is not None and NAME_RU:
