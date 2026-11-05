@@ -2136,6 +2136,17 @@ a.ni { text-decoration: none; color: inherit; }
     function fresh() { return state.pop && Date.now() - (state.popAt || 0) < 600; }
     document.addEventListener("touchstart", function (e) { y0 = state.pop && e.touches.length === 1 && !e.target.closest(".pop-in") ? e.touches[0].clientY : null; }, { passive: true, capture: true });
     document.addEventListener("touchmove", function (e) { if (y0 != null && !fresh() && Math.abs(e.touches[0].clientY - y0) > 14) { y0 = null; closePop(); } }, { passive: true, capture: true });
+    // тап по свободному месту — тоже закрывает (в Telegram на iPhone по пустому месту «клик» не приходит, ловим само касание)
+    var tx = null, ty = null, moved = false;
+    document.addEventListener("touchstart", function (e) { moved = false; if (state.pop && e.touches.length === 1 && !e.target.closest(".pop-in")) { tx = e.touches[0].clientX; ty = e.touches[0].clientY; } else tx = null; }, { passive: true, capture: true });
+    document.addEventListener("touchmove", function (e) { if (tx != null && (Math.abs(e.touches[0].clientX - tx) > 10 || Math.abs(e.touches[0].clientY - ty) > 10)) moved = true; }, { passive: true, capture: true });
+    document.addEventListener("touchend", function (e) {
+      if (tx == null || moved || !state.pop || Date.now() - (state.popAt || 0) < 250) return;
+      tx = null;
+      if (e.target.closest("[data-pop]")) return;  // тап по другой награде — откроется её окно
+      closePop();
+      if (!e.target.closest("button, a, [role=button], [data-open], [data-tname], input")) e.preventDefault();  // не кликаем «сквозь» окно по пустому месту
+    }, { passive: false, capture: true });
     // событие прокрутки не слушаем: инерция после касания закрывала окно само — закрываем только по движению пальца
     document.addEventListener("wheel", function (e) { if (state.pop && !e.target.closest(".pop-in")) closePop(); }, { passive: true, capture: true });
   })();
