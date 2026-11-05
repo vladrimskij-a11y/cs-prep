@@ -28,7 +28,7 @@ jobs:
           python-version: "3.12"
 
       - name: Установить библиотеку для чтения статей
-        run: pip install --quiet trafilatura
+        run: pip install --quiet trafilatura pillow
 
       - name: Взять текущие данные (ветка data)
         run: |

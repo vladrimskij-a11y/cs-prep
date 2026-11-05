@@ -28,6 +28,9 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Библиотека для сравнения картинок (склейка одной новости из разных каналов)
+        run: pip install --quiet pillow || true
+
       - name: Восстановить кэш сборщика (общий)
         uses: actions/cache/restore@v4
         with:
