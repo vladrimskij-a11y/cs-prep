@@ -1,0 +1,31 @@
+name: probe
+on: { workflow_dispatch: {} }
+jobs:
+  p:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          python3 - <<'X'
+          import re, urllib.request, time
+          UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
+          def get(p):
+              time.sleep(1.2)
+              try:
+                  r = urllib.request.urlopen(urllib.request.Request("https://www.dust2.us" + p, headers={"User-Agent": UA, "Accept": "text/html"}), timeout=40)
+                  return r.status, r.read().decode("utf-8", "replace")
+              except Exception as e:
+                  return str(e), ""
+          st, h = get("/matches"); print("PR| /matches", st, len(h))
+          links = list(dict.fromkeys(re.findall(r'href="(/matches/\d+/[^"#?]+)"', h)))
+          print("PR| links", len(links), links[:15])
+          i = h.find(links[0]) if links else -1
+          print("PR| around", re.sub(r"\s+", " ", h[max(0, i-1500):i+800]))
+          print("PR| unix attrs", re.findall(r'data-[a-z-]*="\d{12,}"', h)[:5])
+          tgt = next((l for l in links if "parivision" in l and "natus" in l), links[0] if links else None)
+          if tgt:
+              st, m = get(tgt); b = re.sub(r"\s+", " ", m); print("PR| match", tgt, st, len(m))
+              for k in ("maps-container", "veto", "lineup", "data-unix", "countdown", "map-container", "Best of", "head to head", "past-matches", "streams", "standard-box veto-box"):
+                  j = b.find(k); print("PR| key", k, j, b[max(0,j-150):j+400] if j >= 0 else "")
+          for p in ("/ranking", "/events", "/stats", "/team/12467/parivision", "/player/18053/jame", "/news"):
+              st, x = get(p); t = re.search(r"<title>(.*?)</title>", x, re.S); print("PR| page", p, st, len(x), t.group(1).strip()[:100] if t else "")
+          X
