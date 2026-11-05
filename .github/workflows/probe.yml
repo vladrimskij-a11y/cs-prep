@@ -1,0 +1,16 @@
+name: probe
+on: { workflow_dispatch: {} }
+jobs:
+  p:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          python3 - <<'X'
+          import json, urllib.request
+          u = "https://api.bo3.gg/api/v1/matches?page[limit]=5&sort=start_date&filter[matches.status][in]=upcoming&filter[matches.tier][in]=s"
+          d = json.loads(urllib.request.urlopen(urllib.request.Request(u, headers={"User-Agent": "cs-prep/1.0", "Accept": "application/json"}), timeout=30).read())
+          for m in d.get("results") or []:
+              bu = m.get("bet_updates")
+              print("PR|", m.get("slug"), json.dumps(bu)[:1500] if bu else None)
+              print("PR| keys", [k for k in m.keys() if "bet" in k or "odd" in k or "book" in k or "partner" in k])
+          X
