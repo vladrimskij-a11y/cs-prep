@@ -1,0 +1,29 @@
+name: probe
+on: { workflow_dispatch: {} }
+jobs:
+  p:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          python3 - <<'X'
+          import re, time, urllib.request
+          UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Safari/537.36"
+          def get(p):
+              time.sleep(1.5)
+              try:
+                  r = urllib.request.urlopen(urllib.request.Request("https://www.dust2.us" + p, headers={"User-Agent": UA, "Accept": "text/html", "Accept-Language": "en-US,en;q=0.9"}), timeout=40)
+                  return r.status, re.sub(r"\s+", " ", r.read().decode("utf-8", "replace"))
+              except Exception as e:
+                  return str(e), ""
+          for p in ("/player/7322/apex", "/player/11893/zywoo", "/team/9565/vitality"):
+              st, b = get(p)
+              marks = {m: b.find(m) for m in ("achievement-table", "majorAchievement", "Majors won", "Majors played", "MVP", "trophy-row-trophy", "Total MVPs", "lanAchievement")}
+              print("D2|", p, st, len(b), marks)
+              k = b.find("achievement-table")
+              if k > 0: print("D2|  ", b[k:k + 700])
+              k = b.find("MVP")
+              if k > 0: print("D2|  MVP:", b[max(0, k - 300):k + 300])
+          st, b = get("/matches/2400004/natus-vincere-vs-falcons")
+          pl = re.findall(r'href="/player/(\d+)/([^"]+)"', b)
+          print("D2| match players", st, len(set(pl)), list(dict.fromkeys(pl))[:12])
+          X
