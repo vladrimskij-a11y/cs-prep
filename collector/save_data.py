@@ -44,8 +44,14 @@ def merge(dst: Path) -> None:
                 rel = f.relative_to(OURS)
                 if rel.parts[0] == "match" and (dst / rel).exists():
                     a, b = load(f), load(dst / rel)
+                    ch = False
                     if a is not None and b is not None and not newer(a.get("news"), b.get("news")):
                         a["news"] = b["news"]  # в ветке новости свежее (их обновляет быстрый сбор)
+                        ch = True
+                    if a is not None and b is not None and b.get("veto_now") and newer(b.get("veto_now"), a.get("veto_now"), "t"):
+                        a["veto_now"] = b["veto_now"]  # вето перед матчем (его ловит быстрый сбор)
+                        ch = True
+                    if ch:
                         (dst / rel).write_text(json.dumps(a, ensure_ascii=False, separators=(",", ":")), "utf-8")
                         continue
                 (dst / rel).parent.mkdir(parents=True, exist_ok=True)
@@ -58,8 +64,13 @@ def merge(dst: Path) -> None:
         for f in (OURS / "match").glob("*.json"):
             g = dst / "match" / f.name
             a, b = load(f), load(g)
-            if a is not None and b is not None and newer(a.get("news"), b.get("news")):
-                b["news"] = a["news"]
+            if a is not None and b is not None and (newer(a.get("news"), b.get("news")) or a.get("veto_now") != b.get("veto_now") or a.get("begin_at") != b.get("begin_at")):
+                if newer(a.get("news"), b.get("news")):
+                    b["news"] = a["news"]
+                if a.get("veto_now") and newer(a.get("veto_now"), b.get("veto_now"), "t"):
+                    b["veto_now"] = a["veto_now"]
+                if a.get("begin_at") and a.get("veto_now") is None and b.get("veto_now") is None:
+                    b["begin_at"] = a["begin_at"]
                 g.write_text(json.dumps(b, ensure_ascii=False, separators=(",", ":")), "utf-8")
 
 

@@ -176,6 +176,10 @@ a { color: inherit; }
 .pbad.awp { color: #c98a00; border-color: rgba(201,138,0,.45); }
 .psrc { font-size: 11px; color: var(--muted); text-align: center; margin: 4px 0 16px; line-height: 1.5; }
 .psrc a { color: var(--muted); text-decoration: underline; }
+.vtag { display: block; font-size: 10.5px; font-weight: 700; margin-top: 2px; color: var(--muted); }
+.vtag.pick, .vtag.decider { color: #2fae5f; }
+.vtag.ban { color: #e5484d; }
+tr.vban td { opacity: .55; }
 .mapsel { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }
 .recent { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .recent .col { display: flex; flex-direction: column; gap: 0; min-width: 0; }
@@ -1775,13 +1779,37 @@ a.ni { text-decoration: none; color: inherit; }
   }
 
   // таблица карт: винрейт за 4 месяца
+  // вето перед матчем (dust2.us): порядок карт и кто что выбрал
+  function mkey(x) { return String(x || "").toLowerCase().replace(/[^a-z0-9]/g, "").replace("dustii", "dust2"); }
+  function vetoNow(m) {
+    var st = ((m.veto_now || {}).steps || []);
+    if (!st.length) return null;
+    var info = {}, order = [], no = 0;
+    function who(tn) {
+      var k = mkey(tn), t = (m.teams || []).find(function (x) { var a = mkey(x.name), b = mkey(x.acronym); return a && (a === k || a.indexOf(k) >= 0 || k.indexOf(a) >= 0) || (b && b === k); });
+      return t ? abbr(t) : (tn || "");
+    }
+    st.forEach(function (x) {
+      var k = mkey(x.map); if (!k) return;
+      info[k] = { act: x.act, who: who(x.team), map: x.map };
+      if (x.act !== "ban") { info[k].no = ++no; order.push(k); }
+    });
+    st.forEach(function (x) { var k = mkey(x.map); if (k && x.act === "ban") order.push(k); });
+    return { order: order, info: info };
+  }
   function mapsTable(m) {
     var M = m.maps, A = m.teams[0], B = m.teams[1];
     if (!M || !M.available || !M.table.length) return '<div class="sec"><h3>Карты</h3><div class="box note">Нет данных по картам за последние 4 месяца.</div></div>';
-    var html = '<div class="sec"><h3>Карты <span>за ' + Math.round(M.window_days / 30) + ' мес.</span></h3><div class="box" style="overflow-x:auto"><table class="mtab"><thead><tr><th>Карта</th><th>' + esc(abbr(A)) + '</th><th>' + esc(abbr(B)) + '</th></tr></thead><tbody>';
-    M.table.forEach(function (r) {
-      var ta = r.teams[0], tb = r.teams[1];
-      html += '<tr><td class="mn">' + esc(r.map) + '</td><td class="a">' + cell(ta, pct(ta.won, ta.played)) + '</td><td class="b">' + cell(tb, pct(tb.won, tb.played)) + '</td></tr>';
+    var V = vetoNow(m), rows = M.table.slice();
+    if (V) {  // вето уже провели: сначала карты в порядке игры, потом остальные; забаненные — с пометкой
+      V.order.forEach(function (k) { if (!rows.some(function (r) { return mkey(r.map) === k; })) rows.push({ map: V.info[k].map, teams: [{ played: 0 }, { played: 0 }] }); });
+      rows.sort(function (a, b) { var ia = V.order.indexOf(mkey(a.map)), ib = V.order.indexOf(mkey(b.map)); return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib); });
+    }
+    var html = '<div class="sec"><h3>Карты <span>' + (V ? 'в порядке игры · ' : '') + 'за ' + Math.round(M.window_days / 30) + ' мес.</span></h3><div class="box" style="overflow-x:auto"><table class="mtab"><thead><tr><th>Карта</th><th>' + esc(abbr(A)) + '</th><th>' + esc(abbr(B)) + '</th></tr></thead><tbody>';
+    rows.forEach(function (r) {
+      var ta = r.teams[0], tb = r.teams[1], vi = V && V.info[mkey(r.map)], tag = "";
+      if (vi) tag = '<span class="vtag ' + vi.act + '">' + (vi.act === "ban" ? "бан " + esc(vi.who) : (vi.no ? "Карта " + vi.no + " · " : "") + (vi.act === "decider" ? "десайдер" : "пик " + esc(vi.who))) + '</span>';
+      html += '<tr' + (vi && vi.act === "ban" ? ' class="vban"' : '') + '><td class="mn">' + esc(r.map) + tag + '</td><td class="a">' + cell(ta, pct(ta.won, ta.played)) + '</td><td class="b">' + cell(tb, pct(tb.won, tb.played)) + '</td></tr>';
     });
     return html + '</tbody></table></div></div>';
     function cell(t, p) {
@@ -1794,8 +1822,9 @@ a.ni { text-decoration: none; color: inherit; }
 
   // зона карты: липкая шапка с картами, ниже — стороны и пистолетки, потом последние игры; свайп по зоне листает карты
   function mapZone(m) {
-    var names = mapNames();
+    var names = mapNames(), Vz = vetoNow(m);
     if (!names.length) return "";
+    if (Vz) names = names.slice().sort(function (a, b) { var ia = Vz.order.indexOf(mkey(a)), ib = Vz.order.indexOf(mkey(b)); return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib); });
     if (!state.map || names.indexOf(state.map) < 0) state.map = names[0];
     return '<div class="sec mapzone"><div class="mapsel" role="group" aria-label="Карта">' +
       names.map(function (n) { return '<button class="chip" data-map="' + esc(n) + '" aria-pressed="' + (n === state.map) + '">' + esc(n) + '</button>'; }).join("") +
@@ -2154,7 +2183,7 @@ a.ni { text-decoration: none; color: inherit; }
     var maps = (P.maps || []).filter(function (mp) { return T.some(function (x) { return x && x[mp]; }); });
     if (!maps.length) return '<div class="sec"><div class="box note">По этим командам позиций пока нет: ProRoles разбирает демо только команд из топ-50.</div></div>' + posSrc(P);
     // порядок: сначала карты из статистики матча (пулы команд), потом остальные
-    var order = ((m.maps || {}).table || []).map(function (r) { return String(r.map || "").toLowerCase().replace(/[^a-z0-9]/g, "").replace("dustii", "dust2"); });
+    var Vn = vetoNow(m), order = (Vn ? Vn.order.filter(function (k) { return Vn.info[k].act !== "ban"; }) : []).concat(((m.maps || {}).table || []).map(function (r) { return mkey(r.map); }));
     maps.sort(function (a, b) { var ia = order.indexOf(a), ib = order.indexOf(b); return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib); });
     var cur = maps.indexOf(state.posMap) >= 0 ? state.posMap : maps[0];
     var html = '<div class="poswrap"><div class="mapsel" role="group" aria-label="Карта">' + maps.map(function (mp) {
@@ -3049,7 +3078,7 @@ a.ni { text-decoration: none; color: inherit; }
     if (t.hasAttribute("data-link")) { if (TG) { e.preventDefault(); openLink(t.getAttribute("data-link")); } return; }
     if (t.hasAttribute("data-open")) { go("#m-" + t.getAttribute("data-open")); return; }
     if (t.hasAttribute("data-tour")) { go("#t-" + t.getAttribute("data-tour")); window.scrollTo(0, 0); return; }
-    if (t.hasAttribute("data-tab")) { var nt = t.getAttribute("data-tab"); goKey(nt === "news" ? viewKey("news", state.newsFilter || "all") : viewKey(nt)); return; }
+    if (t.hasAttribute("data-tab")) { var nt = t.getAttribute("data-tab"); goKey(nt === "news" ? viewKey("news", state.newsFilter || "all") : nt === "players" ? "team:players" : nt); return; }
     if (t.hasAttribute("data-map")) { setMap(t.getAttribute("data-map")); return; }
     if (t.hasAttribute("data-nf")) { goKey(viewKey("news", t.getAttribute("data-nf"))); return; }
     if (t.hasAttribute("data-player")) {

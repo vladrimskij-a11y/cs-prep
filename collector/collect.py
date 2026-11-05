@@ -2728,20 +2728,7 @@ def hltv_veto(match: dict) -> dict | None:
     if not h:
         return None
     b = re.sub(r"\s+", " ", h)
-    steps = []
-    i = b.find('class="maps-container"')
-    sec = b[i:i + 40000] if i >= 0 else ""
-    for n, box in enumerate(re.split(r'<div class="standard-box map-container ', sec)[1:], 1):
-        nm = re.search(r'map-container-map-name">([^<]+)<', box)
-        tp = re.search(r'map-container-type">([^<]+)<', box)
-        team = (re.search(r'class="team-logo[^"]*" title="([^"]+)"', box)
-                or re.search(r'map-container-team-logo-container">\s*<span[^>]*>([^<]+)</span>', box))
-        if not nm:
-            continue
-        t = (tp.group(1).strip().upper() if tp else "")
-        act = "ban" if "BAN" in t else "pick" if "PICK" in t else "decider"
-        steps.append({"n": n, "team": strip_html(team.group(1)) if team and act != "decider" else None, "act": act,
-                      "map": strip_html(nm.group(1))})
+    steps = d2_parse_veto(b)
     dm = re.search(r'data-(?:unix|date)="(\d{12,})"', b)
     d = {"date": iso(datetime.fromtimestamp(int(dm.group(1)) / 1000, tz=timezone.utc)) if dm else None, "steps": steps}
     if not d["date"] and match.get("date"):
@@ -2751,6 +2738,91 @@ def hltv_veto(match: dict) -> dict | None:
     if steps:
         veto_cache[key] = d   # вето сыгранного матча не меняется
     return d
+
+
+def d2_parse_veto(b: str) -> list:
+    """Шаги вето со страницы матча dust2.us (b — html с одинарными пробелами)."""
+    steps = []
+    i = b.find('class="maps-container"')
+    sec = b[i:i + 40000] if i >= 0 else ""
+    for n, box in enumerate(re.split(r'<div class="standard-box map-container ', sec)[1:], 1):
+        nm = re.search(r'map-container-map-name">([^<]+)<', box)
+        tp = re.search(r'map-container-type">([^<]+)<', box)
+        team = (re.search(r'class="team-logo[^"]*" title="([^"]+)"', box)
+                or re.search(r'map-container-team-logo-container">\s*<span[^>]*>([^<]+)</span>', box))
+        if not nm or strip_html(nm.group(1)).strip().upper() in ("TBA", "TBD", "-", ""):
+            continue
+        t = (tp.group(1).strip().upper() if tp else "")
+        act = "ban" if "BAN" in t else "pick" if "PICK" in t else "decider"
+        steps.append({"n": n, "team": strip_html(team.group(1)) if team and act != "decider" else None, "act": act,
+                      "map": strip_html(nm.group(1))})
+    return steps
+
+
+def d2_upcoming() -> list[dict]:
+    """Ближайшие матчи с dust2.us /matches (одна страница): id, slug, время начала (как на HLTV), команды."""
+    h = d2_get("/matches")
+    if not h:
+        return []
+    b = re.sub(r"\s+", " ", h)
+    out = []
+    for blk in re.split(r'<div class="match-list-component', b)[1:]:
+        mm = re.search(r'href="/matches/(\d+)/([^"#?]+)"', blk)
+        if not mm:
+            continue
+        dd = re.search(r'data-date="(\d{12,})"', blk)
+        teams = list(dict.fromkeys(re.findall(r'class="team-logo[^"]*" title="([^"]+)"', blk)
+                                   or re.findall(r'<img alt="([^"]+)"[^>]*class="team-logo', blk)))
+        out.append({"id": mm.group(1), "slug": mm.group(2), "teams": [strip_html(x) for x in teams][:2],
+                    "begin": iso(datetime.fromtimestamp(int(dd.group(1)) / 1000, tz=timezone.utc)) if dd else None})
+    return out
+
+
+def d2_find(lst: list[dict], teams: list[dict], begin: str | None) -> dict | None:
+    def keys(t):
+        return {k for k in (norm(t.get("name")), norm(t.get("acronym")), norm(re.sub(r"(?i)^team |\s+(team|esports|gaming|club)$", "", t.get("name") or ""))) if k}
+    want = [keys(t) for t in teams]
+    bt = parse_iso(begin)
+    for x in lst:
+        got = [norm(n) for n in x.get("teams") or []] + [norm(x.get("slug"))]
+        ok = all(any(k == g or (len(k) >= 4 and k in g) or (len(g) >= 4 and g in k) for k in w for g in got) for w in want)
+        xt = parse_iso(x.get("begin"))
+        if ok and (not bt or not xt or abs((xt - bt).total_seconds()) < 14 * 3600):
+            return x
+    return None
+
+
+def d2_sync(listing: list | None = None) -> None:
+    """dust2.us: время начала матчей (как на HLTV) и вето перед матчем — как только команды его провели.
+    1 запрос на список + по запросу на матч, который начинается в ближайшие 2 часа или уже идёт, пока вето нет."""
+    lst = d2_upcoming()
+    if not lst:
+        return
+    by_id = {str(x.get("id")): x for x in listing or []}
+    n_t = n_v = 0
+    for f in (OUT / "match").glob("*.json"):
+        d = load_json(f, None)
+        if not d or len(d.get("teams") or []) != 2:
+            continue
+        x = d2_find(lst, d["teams"], d.get("begin_at"))
+        if not x:
+            continue
+        ch = False
+        if x.get("begin") and x["begin"] != d.get("begin_at") and not d.get("veto_now"):
+            d["begin_at"] = x["begin"]; ch = True; n_t += 1
+            if str(d.get("id")) in by_id:
+                by_id[str(d.get("id"))]["begin_at"] = x["begin"]
+        bt = parse_iso(d.get("begin_at"))
+        need = int(d.get("bo") or 3)
+        have = len([s0 for s0 in (d.get("veto_now") or {}).get("steps") or [] if s0.get("act") in ("pick", "decider")])
+        if bt and NOW - timedelta(hours=4) < bt < NOW + timedelta(hours=2) and have < need:
+            h = d2_get(f"/matches/{x['id']}/{x['slug']}")
+            steps = d2_parse_veto(re.sub(r"\s+", " ", h)) if h else []
+            if steps:
+                d["veto_now"] = {"steps": steps, "t": iso(NOW), "src": "dust2.us"}; ch = True; n_v += 1
+        if ch:
+            save_json(f, d)
+    print(f"dust2: матчей в списке {len(lst)}, время поправлено {n_t}, вето перед матчем {n_v}")
 
 
 def build_veto(teams: list[dict]) -> dict | None:
@@ -4842,6 +4914,10 @@ def main() -> int:
     for k in [k for k, v in dedup_cache.items() if (v.get("t") or "") < iso(NOW - timedelta(days=2))]:
         del dedup_cache[k]
     save_json(DEDUP_CACHE_F, dedup_cache)
+    try:
+        d2_sync(listing)
+    except Exception as e:
+        warn(f"dust2 матчи: {e!r}")
     save_json(OUT / "matches.json", {
         "updated": iso(NOW),
         "tiers": sorted(TIERS),
@@ -4935,6 +5011,10 @@ def news_main() -> int:
             save_json(f, d)
         except Exception as e:
             warn(f"Новости {f.stem}: {e!r}")
+    try:
+        d2_sync()  # каждые 5 минут: вето перед матчем и время начала
+    except Exception as e:
+        warn(f"dust2 матчи: {e!r}")
     save_json(TG_CACHE_F, tg_cache)
     save_json(GIGA_USAGE_F, giga_usage)
     save_json(DEDUP_CACHE_F, dedup_cache)
