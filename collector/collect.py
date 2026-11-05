@@ -2057,8 +2057,7 @@ CURRENT_TOURS: list[str] = []   # турниры из нашего распис�
 
 
 def tg_keep(info: dict, p: dict) -> bool:
-    if p.get("video") == "tg":
-        return False  # видео слишком большое для веб-версии Telegram — внутри приложения не запустится
+    # посты с большим видео оставляем (владелец 05.11): в приложении — обложка и кнопка «Смотреть видео в Telegram»
     text = (info.get("title") or "") + "\n" + (p["text"] or "") + "\n" + (info.get("ocr") or "")
     if AD.search(text[:600]) or SPAM.search(info.get("title") or "") or SPAM.search((p["text"] or "")[:200]):
         return False
