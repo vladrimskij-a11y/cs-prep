@@ -890,6 +890,10 @@ a.ni { text-decoration: none; color: inherit; }
     function im(x, cls) { var k = nkey(x.name), u = PRIMARY[k] || x.image || LOGOS[k]; return u ? '<img class="' + cls + '" src="' + esc(u) + '" alt="" loading="lazy" onerror="this.remove()">' : '<i class="' + cls + '">' + esc(String(x.acronym || x.name || "?").slice(0, 2)) + '</i>'; }
     return '<span class="mixlg' + (big ? ' big' : '') + '">' + (c.length ? im(a, "h1") + im(b, "h2") : '<i class="h0">?</i>') + '</span>';
   }
+  function sameTeam(z, name) {  // «TheMongolz» = «The MongolZ», «BetBoom Team» = «BetBoom»
+    var a = nkey(z.name).replace(/^the/, ""), b = nkey(name).replace(/^the/, ""), c = nkey(z.acronym);
+    return !!b && (a === b || c === b || (Math.min(a.length, b.length) >= 4 && (a.indexOf(b) === 0 || b.indexOf(a) === 0)));
+  }
   function tnAttr(t) { return t && !t.tbd ? ' data-tname="' + esc(t.name) + '"' : ''; }
   var CC_FIX = { UK: "GB", EN: "GB", EL: "GR" };  // источники пишут UK — у флага Британии код GB
   var CC_SUB = { "GB-ENG": "\uD83C\uDFF4\uDB40\uDC67\uDB40\uDC62\uDB40\uDC65\uDB40\uDC6E\uDB40\uDC67\uDB40\uDC7F", "GB-SCT": "\uD83C\uDFF4\uDB40\uDC67\uDB40\uDC62\uDB40\uDC73\uDB40\uDC63\uDB40\uDC74\uDB40\uDC7F", "GB-WLS": "\uD83C\uDFF4\uDB40\uDC67\uDB40\uDC62\uDB40\uDC77\uDB40\uDC6C\uDB40\uDC73\uDB40\uDC7F" };
@@ -1378,9 +1382,15 @@ a.ni { text-decoration: none; color: inherit; }
     if (U.length) {
       html += '<div class="sec"><h3>Будущие игры <span>' + U.length + ' ' + plural(U.length, "матч", "матча", "матчей") + '</span></h3><div class="box form">' +
         groupByTour(U, function (x) {
-          var inner = '<span>vs ' + logo(x.opponent_name, x.logo) + esc(x.opponent_name || "TBD") + ' <span class="d">' + esc(dm(x.date) + " " + hm(x.date)) + '</span></span>' +
+          var tbd = !x.opponent_name || x.opponent_name === "TBD";
+          var mm = (state.list.matches || []).find(function (q) {
+            var tt = q.teams || [], me = tt.some(function (z) { return sameTeam(z, T.name); });
+            if (!me || dayKey(q.begin_at) !== dayKey(x.date)) return false;
+            return tbd ? tt.length === 1 : tt.length === 2 && tt.some(function (z) { return sameTeam(z, x.opponent_name); });
+          });
+          var ot = tbd && mm && mm.tbd ? oppTeam(mm) : null;  // соперник ещё не известен — «PRV / NAVI» со смешанным логотипом
+          var inner = '<span>vs ' + (ot ? mixLogo(ot) + ' ' + esc(ot.name) : logo(x.opponent_name, x.logo) + esc(x.opponent_name || "TBD")) + ' <span class="d">' + esc(dm(x.date) + " " + hm(x.date)) + '</span></span>' +
             '<span class="wl num">' + (x.live ? '<span class="live">LIVE</span>' : 'BO' + esc(x.bo || "?")) + '</span>';
-          var mm = (state.list.matches || []).find(function (q) { var tt = q.teams || []; return tt.length === 2 && tt.some(function (z) { return nkey(z.name) === nkey(T.name); }) && tt.some(function (z) { return nkey(z.name) === nkey(x.opponent_name); }) && dayKey(q.begin_at) === dayKey(x.date); });
           return mm && mm.has_detail ? '<button class="gr gbtn" data-open="' + esc(mm.id) + '">' + inner + '</button>' : '<div class="gr">' + inner + '</div>';
         }) + '</div></div>';
     }
