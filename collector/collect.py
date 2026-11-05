@@ -2194,19 +2194,47 @@ def feed_dedupe(clusters: list[list[dict]]) -> list[list[dict]]:
     return out
 
 
+def _toks(t: str) -> set:
+    return set(re.findall(r"[a-zа-яё0-9]{3,}", (t or "").lower()))
+
+
+def dedupe_strict(items: list[dict]) -> list[list[dict]]:
+    """Склеиваем только повторы одной и той же новости (почти тот же текст, в пределах 2 суток).
+    Из повторов первой идёт самая подробная (длиннее текст). Фото и текст всегда от одного поста."""
+    clusters: list[list[dict]] = []
+    for it in sorted(items, key=lambda x: x["date"], reverse=True):
+        tk = _toks((it.get("text") or "") + " " + (it.get("title") or ""))
+        hit = None
+        for cl in clusters:
+            r = cl[0]
+            if abs((r["date"] - it["date"]).total_seconds()) > 48 * 3600:
+                continue
+            rk = _toks((r.get("text") or "") + " " + (r.get("title") or ""))
+            small = min(len(tk), len(rk)) or 1
+            if len(tk & rk) / small >= 0.75 and len(tk & rk) >= 6:  # одна новость, перепечатанная или чуть сокращённая
+                hit = cl
+                break
+        if hit is None:
+            clusters.append([it])
+        else:
+            hit.append(it)
+            hit.sort(key=lambda x: len(x.get("text") or ""), reverse=True)  # подробная — главная
+    clusters.sort(key=lambda cl: max(x["date"] for x in cl), reverse=True)
+    return clusters
+
+
 def build_feed() -> dict:
     """Лента на главном экране: посты каналов без повторов."""
     posts = [dict(p, about=["CS"]) for p in tg_posts()]
     for p in posts:
         p["key"] = "tg:" + p["url"].split("t.me/")[1]
         p["title_ru0"], p["lang0"] = None, "ru"
-    clusters = dedupe_news(posts, [], same_who_required=False)
-    clusters = feed_dedupe(clusters)
+    clusters = dedupe_strict(posts)  # не объединяем разные посты про одно и то же — только повторы (владелец 05.11)
     items = []
     for cl in clusters[:150]:
         it, others = cl[0], cl[1:]
         items.append({
-            "key": it["key"], "title": it["title"], "text": tg_text_preview(it["text"]), "full": tg_text_preview(it["text"], 3000),
+            "key": it["key"], "title": it["title"], "text": tg_text_preview(it["text"]), "full": tg_text_preview(it["text"], 100000),  # весь текст поста
             "photo": it.get("photo"), "photos": it.get("photos") or [], "video": it.get("video"),
             "channel": it["channel"], "channel_title": _tg_titles.get(it["channel"], it["channel"]),
             "url": it["url"], "date": iso(it["date"]),
@@ -3367,7 +3395,7 @@ def summarize_article(it: dict, url: str) -> dict:
 def article_info(it: dict) -> dict:
     """Ссылка на оригинал, пересказ, цитаты. Всё кэшируется по новости."""
     if it.get("tg"):
-        return {"url": it["url"], "summary_ru": tg_text_preview(it.get("text") or "", 3000), "image": it.get("photo"),
+        return {"url": it["url"], "summary_ru": tg_text_preview(it.get("text") or "", 100000), "image": it.get("photo"),
                 "photos": it.get("photos") or [], "video": it.get("video"), "lang": "ru"}
     k = it["key"]
     info = dict(art_cache.get(k) or {})
@@ -3474,7 +3502,7 @@ def gather_news(teams: list[dict]) -> list[dict]:
     for it in items:
         t_ru, t_lang = translate_keep(it["title"], keep)
         it["title_ru0"], it["lang0"] = (t_ru if t_lang != "ru" else None), t_lang
-    clusters = dedupe_news(items, teams)
+    clusters = dedupe_strict(items)  # только повторы одной новости, главная — самая подробная
 
     out = []
     for cl in clusters[:60]:
