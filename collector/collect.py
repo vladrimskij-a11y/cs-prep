@@ -1801,13 +1801,15 @@ def add_pronunciation(people: list[dict]) -> None:
             p.update(pron_cache[key])
         else:
             todo.append((p, full))
-    if todo and llm_ok():
+    if todo and (GIGA_KEY and not _giga["off"] or llm_ok()):
         def line(p, full):
             fn, ln = p.get("first_name"), p.get("last_name")
             who = f"имя: {fn}; фамилия: {ln}" if fn and ln else f"полное имя: {full or 'неизвестно'}"
             return f"- ник: {p.get('nick')}; {who}; страна: {p.get('nationality') or p.get('flag') or '?'}"
         lines = "\n".join(line(p, full) for p, full in todo)
-        res = parse_json_loose(giga_chat(PRON_SYSTEM, lines, 1200, model=os.environ.get("GIGACHAT_PRON_MODEL", "GigaChat-2-Max")))
+        # имена — работа GigaChat Max (Gemini остаётся новостям); если GigaChat недоступен — запасной путь через Gemini
+        pm = os.environ.get("GIGACHAT_PRON_MODEL", "GigaChat-2-Max")
+        res = parse_json_loose(gigachat_call(PRON_SYSTEM, lines, 1200, model=pm)) or parse_json_loose(giga_chat(PRON_SYSTEM, lines, 1200, model=pm))
         got = {norm(x.get("nick")): x for x in (res or {}).get("people") or [] if isinstance(x, dict)}
         for p, full in todo:
             x = got.get(norm(p.get("nick")))
@@ -3092,7 +3094,7 @@ _giga = {"token": None, "exp": 0.0, "ctx": None, "off": False}
 
 # Дневные лимиты токенов, чтобы бесплатного пакета хватило на год:
 # базовая модель 250 млн/год → 500 тыс./день, Max (картинки) 25 млн/год → 50 тыс./день.
-GIGA_DAY_LIMIT = {"lite": int(os.environ.get("GIGA_DAY_LITE", "500000")), "max": int(os.environ.get("GIGA_DAY_MAX", "50000")),
+GIGA_DAY_LIMIT = {"lite": int(os.environ.get("GIGA_DAY_LITE", "500000")), "max": int(os.environ.get("GIGA_DAY_MAX", "10000000")),  # Max — только имена; без дневной планки (05.11, решение владельца), ограничивает лишь пакет Сбера
                   "pro": int(os.environ.get("GIGA_DAY_PRO", "100000"))}
 GIGA_USAGE_F = CACHE / "giga_usage.json"
 giga_usage: dict = load_json(GIGA_USAGE_F, {})
@@ -4246,7 +4248,7 @@ def build_detail(m: dict, prev: dict | None) -> dict:
 
 
 TEAM_GAMES_NEW = [0]
-_team_pron_new = [0]  # команд за сбор, для которых просим у нейросети русские имена
+_team_pron_new = [0]  # команд за сбор, для которых просим у нейросети русские имена (лимит ниже — до 100)
 _team_lp_new = [0]
 
 
@@ -4318,7 +4320,7 @@ def build_team_page(r: dict) -> dict | None:
         except Exception as e:
             warn(f"Состав {r['name']}: {e!r}")
     # имена по-русски для всех, у кого есть настоящее имя (нейросеть один раз на человека, дальше — кэш навсегда)
-    if roster and not STATS and _team_pron_new[0] < 30:
+    if roster and not STATS and _team_pron_new[0] < 100:
         need = [p for p in roster + coach if (p.get("first_name") or p.get("last_name") or p.get("name")) and not p.get("name_ru")]
         if need:
             _team_pron_new[0] += 1
