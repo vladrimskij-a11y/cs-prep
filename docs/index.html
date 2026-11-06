@@ -636,6 +636,7 @@ body.nav #app > .sshell .shead, body.nav #app > .mshell .mhead { animation: fade
 .sres .pp-maps { padding: 0; }
 .pp-m.left { background: transparent; border: 1px dashed var(--line); }
 /* квадраты карт: картинка карты под затемнением, текст белый с тенью */
+button.pp-m.ppbtn { font: inherit; text-align: left; border-left: 0; border-right: 0; border-bottom: 0; cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .pp-m.mimg { position: relative; isolation: isolate; overflow: hidden; color: #fff; background: #1b1f27; }
 .pp-m.mimg::before { content: ""; position: absolute; inset: 0; z-index: -1; background: linear-gradient(180deg, rgba(8,10,14,.55), rgba(8,10,14,.82)), var(--mi) center / cover no-repeat; }
 .pp-m.mimg b, .pp-m.mimg .pp-n, .pp-m.mimg small { color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,.85); }
@@ -2131,26 +2132,33 @@ a.ni { text-decoration: none; color: inherit; }
     var side = function (who) { return who === abbr(A) ? 0 : who === abbr(B) ? 1 : null; };
     var play = Vn.order.filter(function (k) { return Vn.info[k].act !== "ban"; });
     var top = ((P.outcomes || [])[0] || {}).score, bo = +m.bo || 3;
+    var sid = m.cur_sid, S = sid && (m.series || {})[sid], SM = (S && S.maps) || [];
+    var sflip = S && S.teams && S.teams[0] && mkey(S.teams[0].name) === mkey(B.name);  // порядок команд у bo3 бывает обратным
+    var anyPlayed = false;
     var cards = play.map(function (k, i) {
       var x = Vn.info[k], by = x.act === "decider" ? null : side(x.who), sc = mapScoreFor(m, x.map);
-      var z = bo === 3 && i === 2 && (top === "2:0" || top === "0:2");
-      if (z) sc = [0, 0];
-      return '<div class="pp-m ' + (by === 0 ? "a" : by === 1 ? "b" : "n") + mapBg(x.map) + '"><span class="pp-n">Карта ' + (i + 1) + ' · ' + (x.act === "decider" ? "десайдер" : esc(x.who)) + '</span><b>' + esc(x.map) + '</b>' +
-        '<span class="num pp-s"><span class="a">' + sc[0] + '</span>:<span class="b">' + sc[1] + '</span></span>' + (z ? '<small>скорее всего не понадобится</small>' : '') + '</div>';
+      var mi = SM.findIndex(function (g) { return mkey(g.map) === mkey(x.map) && g.score; }), g = mi >= 0 ? SM[mi] : null;
+      var z = !g && bo === 3 && i === 2 && (top === "2:0" || top === "0:2") && !SM.some(function (q) { return q.score; });
+      if (g) { sc = sflip ? [g.score[1], g.score[0]] : g.score; anyPlayed = true; }
+      else if (z) sc = [0, 0];
+      var inner = '<span class="pp-n">Карта ' + (i + 1) + ' · ' + (x.act === "decider" ? "десайдер" : esc(x.who)) + '</span><b>' + esc(x.map) + '</b>' +
+        '<span class="num pp-s"><span class="a">' + sc[0] + '</span>:<span class="b">' + sc[1] + '</span></span>' +
+        (g ? '<small>сыграна · статистика ›</small>' : z ? '<small>скорее всего не понадобится</small>' : '<small>вероятный счёт</small>');
+      var cls = 'pp-m ' + (by === 0 ? "a" : by === 1 ? "b" : "n") + (g ? " ppbtn" : "") + mapBg(x.map);  // mapBg дописывает style — он последним
+      return g ? '<button class="' + cls + '" data-vser="' + esc(sid) + '" data-vmap="' + mi + '">' + inner + '</button>' : '<div class="' + cls + '">' + inner + '</div>';
     }).join("");
     var bans = [A, B].map(function (t) {
       var list = Vn.order.filter(function (k) { return Vn.info[k].act === "ban" && Vn.info[k].who === abbr(t); }).map(function (k) { return Vn.info[k].map; });
       return list.length ? '<b>' + esc(abbr(t)) + '</b> — ' + esc(list.join(", ")) : '';
     }).filter(Boolean).join(' · ');
-    return '<div class="sec" data-nav><h3>Вето <span>счёт — вероятный</span></h3><div class="box ppick"><div class="pp-maps">' + cards + '</div>' +
+    return '<div class="sec" data-nav><h3>Вето <span>' + (anyPlayed ? 'нажми на сыгранную карту' : 'dust2 · счёт вероятный') + '</span></h3><div class="box ppick"><div class="pp-maps">' + cards + '</div>' +
       (bans ? '<div class="note" style="padding:10px 4px 2px">Баны: ' + bans + '</div>' : '') + '</div></div>';
   }
   function pickBlock(m) {
     var P = m.prediction, A = m.teams[0] || {}, B = m.teams[1] || {};
     if (m.tbd) return '<div class="sec"><h3>Вероятный пик</h3><div class="box note">Ждём соперника.</div></div>';
-    var Vn = vetoNow(m);
-    if (Vn && Vn.order.some(function (k) { return Vn.info[k].act !== "ban"; })) return vetoActualBlock(m, Vn);  // вето проведено — показываем настоящее
-    if (!P || !(P.maps || []).length) return "";
+    var Vn = vetoNow(m), act = Vn && Vn.order.some(function (k) { return Vn.info[k].act !== "ban"; }) ? vetoActualBlock(m, Vn) : "";  // вето проведено — блок «Вето» под вероятным
+    if (!P || !(P.maps || []).length) return act;
     var html = '<div class="sec" data-nav><h3>Вероятный пик <span>по вето за 3 мес.</span></h3><div class="box ppick"><div class="pp-maps">' + P.maps.map(function (x, i) {
       var who = x.by === 0 ? abbr(A) : x.by === 1 ? abbr(B) : "";  // кто пикает карту
       var z = x.score && x.score[0] === 0 && x.score[1] === 0;
@@ -2158,7 +2166,7 @@ a.ni { text-decoration: none; color: inherit; }
         '<span class="num pp-s"><span class="a">' + esc(x.score ? x.score[0] : "–") + '</span>:<span class="b">' + esc(x.score ? x.score[1] : "–") + '</span></span>' +
         (z ? '<small>скорее всего не понадобится</small>' : '') + '</div>';  // строки с процентами нет — по просьбе владельца
     }).join("") + '</div></div></div>';
-    return html;
+    return html + act;
   }
   function vrsBlock(m) {
     var O = m.vrs_outcomes, A = m.teams[0] || {}, B = m.teams[1] || {};
@@ -3250,7 +3258,7 @@ a.ni { text-decoration: none; color: inherit; }
   // ---------- клики
   document.addEventListener("click", function (e) {
     if (state.pop && !e.target.closest(".pop-in")) { closePop(); if (!e.target.closest("[data-pop]")) { e.preventDefault(); e.stopPropagation(); return; } }
-    var t = e.target.closest("[data-pop],[data-vplay],[data-snav],[data-goto],[data-sk],[data-team],[data-tname],[data-tseries],[data-fread],[data-close],#facts-more,[data-home],[data-feedch],[data-tg],[data-reader],[data-fact],[data-formall],[data-tsub],[data-pmap],[data-tpmap],[data-open],[data-tour],[data-tab],[data-map],[data-nf],[data-player],[data-link],[data-read],[data-series],[data-rseries],[data-smap],[data-ttab],#back");
+    var t = e.target.closest("[data-pop],[data-vplay],[data-snav],[data-goto],[data-sk],[data-team],[data-tname],[data-tseries],[data-fread],[data-close],#facts-more,[data-home],[data-feedch],[data-tg],[data-reader],[data-fact],[data-formall],[data-tsub],[data-pmap],[data-tpmap],[data-open],[data-tour],[data-tab],[data-map],[data-nf],[data-player],[data-link],[data-read],[data-series],[data-vser],[data-rseries],[data-smap],[data-ttab],#back");
     if (!t) return;
     if (t.hasAttribute("data-pop")) { e.stopPropagation(); e.preventDefault(); openPop(t.getAttribute("data-pop"), t); return; }
     if (t.hasAttribute("data-vplay")) { var vv = t.parentNode.querySelector("video"); if (vv) { t.remove(); vv.play().catch(function () {}); } return; }
@@ -3299,6 +3307,15 @@ a.ni { text-decoration: none; color: inherit; }
     if (t.hasAttribute("data-reader")) {
       var m0 = state.details[state.openId], n = m0 && ((m0.news && m0.news.items) || []).find(function (x) { return x.key === t.getAttribute("data-reader"); });
       if (n) openOverlay("news", n.key, readerView(n));
+      return;
+    }
+    if (t.hasAttribute("data-vser")) {  // сыгранная карта в «Вето»: статистика игроков на этой карте
+      var md0 = state.details[state.openId] || {}, sv = t.getAttribute("data-vser"), SV = (md0.series || {})[sv], mi0 = Number(t.getAttribute("data-vmap")), mid1 = state.openId;
+      if (SV) {
+        openSeries(SV, "Статистика", function () { delete state.details[mid1]; return getDetail(mid1).then(function (d) { return (d.series || {})[sv]; }); });
+        var ks = SV.players ? [-1].concat((SV.maps || []).map(function (g, i) { return g.players ? i : null; }).filter(function (x) { return x != null; })) : [];
+        var at = ks.indexOf(mi0); if (at > 0) ovTrackTo(at, false);
+      }
       return;
     }
     if (t.hasAttribute("data-series")) {

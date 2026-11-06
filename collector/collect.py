@@ -4851,6 +4851,9 @@ _bo3_starter: dict = {}
 _bo3_slug: dict = {}
 
 
+_bo3_cur: dict = {}
+
+
 def bo3_odds(bids: list) -> dict | None:
     """Коэффициенты букмекеров на ближайший матч двух команд (bo3.gg) → вероятности победы и точного счёта."""
     if len(bids) != 2 or not all(bids):
@@ -4865,6 +4868,7 @@ def bo3_odds(bids: list) -> dict | None:
     if m:  # вето обычно начинает вторая команда в паре bo3.gg (так в ~72% из 357 серий BO3)
         _bo3_starter[tuple(bids)] = bids.index(m.get("team2_id")) if m.get("team2_id") in bids else 0
         _bo3_slug[tuple(bids)] = m.get("slug")  # для журнала VRS: по нему потом узнаём победителя
+        _bo3_cur[tuple(bids)] = m  # сам матч bo3: когда идёт — по нему сыгранные карты для блока «Вето»
     bu = (m or {}).get("bet_updates") or {}
     c1, c2 = (bu.get("team_1") or {}).get("coeff"), (bu.get("team_2") or {}).get("coeff")
     if not c1 or not c2 or min(c1, c2) < 1.02:
@@ -5156,6 +5160,25 @@ def build_detail(m: dict, prev: dict | None) -> dict:
             attach_veto(sd)
         except Exception as e:
             warn(f"Вето серии: {e!r}")
+    # идущий матч: сыгранные карты со статистикой игроков — открываются из блока «Вето» (владелец 06.11)
+    bg0 = parse_iso(detail.get("begin_at") or "")
+    if len(bids) == 2 and all(bids) and ((detail.get("status") in ("running", "finished")) or (bg0 is not None and bg0 <= NOW)):
+        mc = _bo3_cur.get(tuple(bids))
+        if mc and mc.get("status") in ("current", "finished"):
+            try:
+                sd = series_detail(mc)
+                if sd and sd.get("maps"):
+                    try:
+                        attach_veto(sd)
+                    except Exception as e:
+                        warn(f"Вето идущей серии: {e!r}")
+                    series[str(mc["id"])] = sd
+                    detail["cur_sid"] = str(mc["id"])
+            except Exception as e:
+                warn(f"Идущая серия: {e!r}")
+    if "cur_sid" not in detail and prev and prev.get("cur_sid") and (prev.get("series") or {}).get(prev["cur_sid"]):
+        detail["cur_sid"] = prev["cur_sid"]
+        series.setdefault(prev["cur_sid"], prev["series"][prev["cur_sid"]])
     detail["series"] = series
     # место и очки VRS, оценка при разных исходах, призовые места за 3 месяца
     try:
