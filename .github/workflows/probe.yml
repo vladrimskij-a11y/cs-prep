@@ -30,7 +30,7 @@ jobs:
               ms = C.team_veto_matches(t, C.hltv_team_for(t))
               print("  матчей в архиве:", len(ms), [m.get("slug") for m in ms[:4]])
               v = C.build_veto([t])
-              print("  вето:", bool(v and v.get("teams") and v["teams"][0]), (v or {}).get("teams", [None])[0] and {k: v["teams"][0].get(k) for k in ("n", "picks")})
+              print("  вето:", json.dumps(v, ensure_ascii=False)[:300])
           d = json.load(open([f for f in __import__("glob").glob("docs/data/match/*.json") if "FUT" in open(f).read()][0]))
           print("карточка TS vs FUT updated:", d.get("updated"), [bool(x) for x in (d.get("veto") or {}).get("teams", [])])
           EOF
