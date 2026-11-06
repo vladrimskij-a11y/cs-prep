@@ -5,4 +5,4 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: python3 tools/probe_d2map.py parivision-vs-natus-vincere mouz-vs-parivision
+      - run: python3 tools/probe_d2map.py

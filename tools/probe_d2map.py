@@ -4,26 +4,13 @@ def get(p):
     time.sleep(1.2)
     r = urllib.request.Request("https://www.dust2.us" + p, headers={"User-Agent": UA, "Accept": "text/html"})
     return re.sub(r"\s+", " ", urllib.request.urlopen(r, timeout=40).read().decode("utf-8", "replace"))
-def show(path):
-    b = get(path)
-    i = b.find('class="maps-container"')
-    sec = b[i:i + 30000] if i >= 0 else ""
-    print("==", path, "len", len(b), "maps-container", i)
-    for n, box in enumerate(re.split(r'<div class="standard-box map-container ', sec)[1:], 1):
-        t = re.sub(r"<[^>]+>", "|", box[:3000]); t = re.sub(r"(\|\s*)+", "|", t)
-        print(n, t[:500])
-    for k in ("results-team-score", "mapholder", "score", "won", "lost", "live"):
-        print(k, b.count(k))
-    j = b.find("results-team-score"); print(b[j-300:j+600] if j >= 0 else "")
-lst = get("/results")
-links = list(dict.fromkeys(re.findall(r'href="(/matches/\d+/[^"#?]+)"', lst)))
-want = sys.argv[1:] or ["parivision-vs-natus-vincere"]
-for w in want:
-    for l in links:
-        if w in l:
-            show(l); break
-up = get("/matches")
-live = list(dict.fromkeys(re.findall(r'href="(/matches/\d+/[^"#?]+)"', up)))
-for l in live:
-    if "furia" in l and "betboom" in l:
-        show(l); break
+b = get("/matches/2400006/parivision-vs-natus-vincere")
+cls = re.findall(r'class="([^"]+)"', b)
+from collections import Counter
+print(Counter(cls).most_common(150))
+for k in ("zweih", "ADR", "K-D", "Rating", "stats"):
+    for m in list(re.finditer(k, b))[:4]:
+        print("##", k, re.sub(r"<[^>]+>", "|", b[m.start()-400:m.start()+400]))
+print(re.findall(r'href="(/[^"]*stats[^"]*)"', b)[:20])
+print(re.findall(r'href="(/matches/[^"]*)"', b)[:20])
+m = re.search(r'map-container-map-name">Mirage<', b); print(b[m.start()-1500:m.start()+3000] if m else "")
