@@ -2007,15 +2007,15 @@ a.ni { text-decoration: none; color: inherit; }
   // свайп по картам: в «Статистике» — зона карты, в «Позициях» — таблицы позиций
   function zctx() {
     var m = state.details[state.openId];
-    if (curKey() === "team:pos") return { names: function () { return posMapNames(m); }, cur: function () { return state.posMap; }, set: function (x) { state.posMap = x; }, body: posBody, attr: "data-pmap" };
-    return { names: mapNames, cur: function () { return state.map; }, set: function (x) { state.map = x; }, body: mapBody, attr: "data-map" };
+    if (curKey() === "team:pos") return { names: function () { return posMapNames(m); }, cur: function () { return state.posMap; }, set: function (x) { state.posMap = x; state.posMapUser = true; }, body: posBody, attr: "data-pmap" };
+    return { names: mapNames, cur: function () { return state.map; }, set: function (x) { state.map = x; state.mapUser = true; }, body: mapBody, attr: "data-map" };
   }
 
   // зона карты: липкая шапка с картами, ниже — стороны и пистолетки, потом последние игры; свайп по зоне листает карты
   function mapZone(m) {
     var names = mapNames();
     if (!names.length) return "";
-    if (!state.map || names.indexOf(state.map) < 0) state.map = names[0];
+    if (!state.map || names.indexOf(state.map) < 0 || (vetoNow(m) && !state.mapUser)) state.map = names[0];  // после вето — первая играемая, пока не выбрали сами
     return '<div class="sec mapzone"><div class="mapsel" role="group" aria-label="Карта">' +
       names.map(function (n) { return '<button class="chip" data-map="' + esc(n) + '" aria-pressed="' + (n === state.map) + '">' + esc(n) + '</button>'; }).join("") +
       '</div><div class="mzbody">' + mapBody(m, state.map) + '</div></div>';
@@ -2404,7 +2404,7 @@ a.ni { text-decoration: none; color: inherit; }
     }
     var P = state.pos, maps = posMapNames(m);
     if (!maps.length) return '<div class="sec"><div class="box note">По этим командам позиций пока нет: ProRoles разбирает демо только команд из топ-50.</div></div>' + posSrc(P);
-    if (maps.indexOf(state.posMap) < 0) state.posMap = maps[0];
+    if (maps.indexOf(state.posMap) < 0 || (vetoNow(m) && !state.posMapUser)) state.posMap = maps[0];
     var cur = state.posMap;
     return '<div class="poswrap"><div class="mapsel" role="group" aria-label="Карта">' + maps.map(function (mp) {
       return '<button class="chip" data-pmap="' + esc(mp) + '" aria-pressed="' + (mp === cur) + '">' + esc(POS_MAPNAME[mp] || mp) + '</button>';
@@ -2862,8 +2862,13 @@ a.ni { text-decoration: none; color: inherit; }
     var clan = {};  // название клана в игре → наша команда 0/1
     (PS || []).forEach(function (p) { var tid = (p.team_clan || {}).team_id; if (tid) clan[p.clan_name] = tid === A.bo3_id ? 0 : 1; });
     function side(name, tid) { if (tid) return tid === A.bo3_id ? 0 : 1; return clan[name]; }
-    var mapsHtml = games.map(function (g) {
+    var Vn = vetoNow(m), play = Vn ? Vn.order.filter(function (k) { return Vn.info[k].act !== "ban"; }).map(function (k) { return Vn.info[k].map; }) : [];
+    var anyCur = games.some(function (g) { return g.status === "current"; });
+    var guessCur = !anyCur && M.status === "current" ? (games.find(function (g) { return g.status !== "finished"; }) || {}).number : null;
+    var mapsHtml = games.map(function (g, gi) {
       var nm = String(g.map_name || "").replace(/^de_/, ""); nm = nm.charAt(0).toUpperCase() + nm.slice(1);
+      if (!nm) nm = play[(g.number || gi + 1) - 1] || "";  // bo3 ещё не прислал карту — берём из вето dust2
+      var isCur = g.status === "current" || (guessCur != null && g.number === guessCur);
       var sc = ["–", "–"];
       if (g.status === "finished") {
         var w = side(g.winner_clan_name, (g.winner_team_clan || {}).team_id);
@@ -2873,7 +2878,7 @@ a.ni { text-decoration: none; color: inherit; }
         sc = [0, 0];
         (G.game_rounds || []).forEach(function (rd) { var s2 = side(rd.winner_clan_name); if (s2 != null) sc[s2]++; });
       }
-      return '<div class="lv-m' + (g.status === "current" ? " cur" : "") + mapBg(nm) + '"><span>' + esc(nm) + '</span><b class="num">' + esc(sc[0]) + ':' + esc(sc[1]) + '</b><small>' + (g.status === "current" ? "идёт" : g.status === "finished" ? "сыграна" : "") + '</small></div>';
+      return '<div class="lv-m' + (isCur ? " cur" : "") + mapBg(nm) + '"><span>' + esc(nm || ("Карта " + (g.number || gi + 1))) + '</span><b class="num">' + esc(sc[0]) + ':' + esc(sc[1]) + '</b><small>' + (isCur ? "идёт" : g.status === "finished" ? "сыграна" : "") + '</small></div>';
     }).join("");
     var rows = [[], []];
     (PS || []).forEach(function (p) {
@@ -3096,7 +3101,7 @@ a.ni { text-decoration: none; color: inherit; }
     try { TG && TG.HapticFeedback && TG.HapticFeedback.selectionChanged(); } catch (err) {}
   }
   function setMap(mp) {
-    state.map = mp;
+    state.map = mp; state.mapUser = true;
     var pane = activePane(), b = pane && pane.querySelector(".mzbody");
     if (b) b.innerHTML = mapBody(state.details[state.openId], mp);
     markMap(mp); revealSel(pane && pane.querySelector(".mapsel"));
@@ -3205,7 +3210,7 @@ a.ni { text-decoration: none; color: inherit; }
     if (mt) {
       SH = null;
       var id = mt[1];
-      if (state.openId !== id) { state.openId = id; state.tab = "players"; state.teamSub = "players"; state.newsFilter = "all"; state.map = null; state.scrolls = {}; state.factsAll = false; window.scrollTo(0, 0); }
+      if (state.openId !== id) { state.openId = id; state.tab = "players"; state.teamSub = "players"; state.newsFilter = "all"; state.map = null; state.mapUser = false; state.posMapUser = false; state.scrolls = {}; state.factsAll = false; window.scrollTo(0, 0); }
       $app.innerHTML = '<div class="empty">Загружаю матч…</div>';
       getDetail(id).then(renderMatch).catch(function () {
         $app.innerHTML = '<div class="empty"><strong>Подробностей пока нет</strong>Карточка появится после ближайшего сбора — как только станут известны обе команды. <button class="chip" id="back" style="margin-top:8px">Назад</button></div>';
@@ -3336,7 +3341,7 @@ a.ni { text-decoration: none; color: inherit; }
       return;
     }
     if (t.hasAttribute("data-pmap")) {  // карта в «Позициях»: перерисовываем только эту страницу, прокрутка остаётся
-      state.posMap = t.getAttribute("data-pmap");
+      state.posMap = t.getAttribute("data-pmap"); state.posMapUser = true;
       var mt = state.details[state.openId], pp = paneOf("team:pos"), pb = pp && pp.querySelector(".mzbody");
       if (mt && pb) { pb.innerHTML = posBody(mt, state.posMap); markMap(state.posMap); revealSel(pp.querySelector(".mapsel")); }
       return;
