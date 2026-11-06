@@ -53,6 +53,7 @@ jobs:
           NEWS_ONLY: "1"
           GIGACHAT_KEY: ${{ secrets.GIGACHAT_KEY }}
           GEMINI_KEY: ${{ secrets.GEMINI_KEY }}
+          ODDSPAPI_KEY: ${{ secrets.ODDSPAPI_KEY }}
           REMOTE: "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
         run: |
           end=$((SECONDS + 55 * 60))

@@ -5159,12 +5159,30 @@ OP_MONTH_BUDGET = int(os.environ.get("OP_MONTH_BUDGET", "225"))  # в кабин
 
 
 def op_used() -> dict:
+    """Счётчик запросов за месяц — отдельный для каждого вида сбора (кэши новостей и сборщика сливаются по максимуму,
+    так что общий счётчик терял бы запросы); всего потрачено — сумма. Возвращает запись своего вида сбора."""
+    m = NOW.strftime("%Y-%m")
     u = op_cache.get("used") or {}
-    if u.get("m") != NOW.strftime("%Y-%m"):
+    if u.get("m") != m:
         # в ноябре 2026 до подключения уже ушло 33 запроса на проверки (кабинет OddsPapi, 06.11) — учитываем с запасом
-        u = {"m": NOW.strftime("%Y-%m"), "n": 40 if NOW.strftime("%Y-%m") == "2026-11" else 0}
+        u = {"m": m, "base": 40 if m == "2026-11" else 0}
         op_cache["used"] = u
+    kind = "news" if os.environ.get("NEWS_ONLY") == "1" else "stats" if STATS else "full"
+    u.setdefault(kind, 0)
+    u["_k"] = kind
     return u
+
+
+def op_spent() -> int:
+    u = op_used()
+    return int(u.get("base") or 0) + sum(int(u.get(k) or 0) for k in ("news", "stats", "full"))
+
+
+def op_on_pace() -> bool:
+    """Тратим не быстрее графика: к этому дню месяца — не больше доли лимита (запас на запросы после вето)."""
+    import calendar
+    days = calendar.monthrange(NOW.year, NOW.month)[1]
+    return op_spent() <= OP_MONTH_BUDGET * NOW.day / days
 
 
 def op_get(path: str, **q):
@@ -5177,10 +5195,10 @@ def op_get(path: str, **q):
     if off and off > NOW:
         return None
     u = op_used()
-    if u["n"] >= OP_MONTH_BUDGET:
+    if op_spent() >= OP_MONTH_BUDGET:
         return None
     for k in range(2):
-        u["n"] += 1
+        u[u["_k"]] = int(u.get(u["_k"]) or 0) + 1
         wait = 2.6 - (time.time() - _op["last"])
         if wait > 0:
             time.sleep(wait)
@@ -5280,11 +5298,16 @@ def _op_scan(lst, ka, kb, bt, same):
     return None
 
 
+def op_veto_ready(d: dict) -> bool:
+    return any(x.get("act") in ("pick", "decider") for x in (d.get("veto_now") or {}).get("steps") or [])
+
+
 def op_lines(d: dict) -> dict | None:
     """Линии на матч: шанс первой команды карточки на серию, на каждую карту (1–3/5) и точный счёт серии.
-    Pinnacle, если у него есть рынок, иначе медиана по всем букмекерам. Бесплатный тариф — 250 запросов в месяц,
-    поэтому линию берём ОДИН раз на матч: только тир-1 и только за 2 ч до начала (Pinnacle к этому времени
-    выставляет карты), дальше — из кэша (после начала прогноз всё равно заморожен)."""
+    Pinnacle, если у него есть рынок, иначе медиана по всем букмекерам. Лимит — 240 запросов в месяц, поэтому
+    только тир-1 и не больше двух запросов на матч: «до вето» — за 2 ч до начала, если тратим не быстрее графика
+    (`op_on_pace`), и «после вето» — как только на dust2 появилось вето (линии уже под настоящие карты); вето нет,
+    а до начала меньше 10 мин — «последний» запрос. После начала не перечитываем (прогноз заморожен)."""
     if not ODDSPAPI_KEY or str(d.get("tier") or "").lower() != "s" or len(d.get("teams") or []) != 2:
         return None
     st0 = parse_iso(d.get("begin_at"))
@@ -5301,10 +5324,18 @@ def op_lines(d: dict) -> dict | None:
             return None
         f, flip = hit
         op_cache[ck] = {"fid": f["id"], "flip": flip, "t0": f.get("t"), "t": iso(NOW)}
-    key = f"od:{f['id']}"
-    c = op_cache.get(key) or {}
-    fresh = c.get("lines") is not None
-    if not fresh and soon and f.get("odds") is not False:
+    base = f"od:{f['id']}"
+    have = {k: op_cache.get(f"{base}:{k}") for k in ("veto", "last", "pre")}
+    stage = None
+    if soon and f.get("odds") is not False:
+        if op_veto_ready(d) and not have["veto"]:
+            stage = "veto"
+        elif not any(have.values()) and st0 - NOW <= timedelta(minutes=10):
+            stage = "last"
+        elif not any(have.values()) and op_on_pace():
+            stage = "pre"
+    c = next((v for v in have.values() if v), None) or {}
+    if stage:
         mk = op_markets()
         od = op_get("/odds", fixtureId=f["id"])
         bo = (od or {}).get("bookmakerOdds") if isinstance(od, dict) else None
@@ -5347,8 +5378,8 @@ def op_lines(d: dict) -> dict | None:
                 med = {k: sorted(v.get(k, 0.0) for v in cs.values())[len(cs) // 2] for k in ks}
                 t = sum(med.values()) or 1
                 csp = {k: v / t for k, v in med.items()}
-            c = {"t": iso(NOW), "lines": {"win": [round(win, 4), src] if win is not None else None, "maps": maps, "cs": csp, "books": len(bo)}}
-            op_cache[key] = c
+            c = {"t": iso(NOW), "stage": stage, "lines": {"win": [round(win, 4), src] if win is not None else None, "maps": maps, "cs": csp, "books": len(bo)}}
+            op_cache[f"{base}:{stage}"] = c
     L = c.get("lines")
     if not L:
         return None
@@ -5365,6 +5396,41 @@ def op_lines(d: dict) -> dict | None:
                 sc[(b2, a) if flip else (a, b2)] = v
         out["scores"] = [{"score": f"{a}:{b2}", "p": round(100 * v)} for (a, b2), v in sorted(sc.items(), key=lambda kv: -kv[1])]
     return out
+
+
+def op_veto_sync() -> None:
+    """Каждые 5 минут (вместе с вето dust2): у матча тир-1, где только что появилось вето (или вето нет, а до начала
+    меньше 10 мин), пересчитываем прогноз — op_lines возьмёт линию под настоящие карты. Один запрос на матч."""
+    if not ODDSPAPI_KEY:
+        return
+    n = 0
+    for f in (OUT / "match").glob("*.json"):
+        d = load_json(f, None)
+        if not d or str(d.get("tier") or "").lower() != "s" or len(d.get("teams") or []) != 2:
+            continue
+        st0 = parse_iso(d.get("begin_at"))
+        if not st0 or not (NOW < st0 <= NOW + timedelta(hours=2)):
+            continue
+        m = op_cache.get(f"m:{d.get('id')}") or {}
+        base = f"od:{m.get('fid')}"
+        have = m.get("fid") and any(op_cache.get(f"{base}:{k}") for k in ("veto", "last", "pre"))
+        need = (op_veto_ready(d) and not (m.get("fid") and op_cache.get(f"{base}:veto"))) or (not have and st0 - NOW <= timedelta(minutes=10))
+        if not need:
+            continue
+        hb = _hltv_blocked[0]
+        _hltv_blocked[0] = True  # к HLTV — только в полном сборе: рейтинг VRS здесь берётся из кэша
+        try:
+            P = build_prediction(d, [t.get("bo3_id") for t in d["teams"]])
+        except Exception as e:
+            warn(f"Прогноз после вето {f.stem}: {e!r}")
+            continue
+        finally:
+            _hltv_blocked[0] = hb
+        if P:
+            d["prediction"] = P
+            save_json(f, d)
+            n += 1
+    print(f"OddsPapi: прогнозов по линии после вето — {n}, запросов в этом месяце {op_spent()} из {OP_MONTH_BUDGET}")
 
 
 def build_prediction(d: dict, bids: list) -> dict | None:
@@ -6326,6 +6392,10 @@ def main() -> int:
     except Exception as e:
         warn(f"dust2 матчи: {e!r}")
     try:
+        op_veto_sync()
+    except Exception as e:
+        warn(f"OddsPapi после вето: {e!r}")
+    try:
         live_series_sync()
     except Exception as e:
         warn(f"Идущие матчи: {e!r}")
@@ -6427,6 +6497,12 @@ def news_main() -> int:
         d2_sync()  # каждые 5 минут: вето перед матчем и время начала
     except Exception as e:
         warn(f"dust2 матчи: {e!r}")
+    try:
+        op_veto_sync()  # вето появилось — линия Pinnacle под настоящие карты
+    except Exception as e:
+        warn(f"OddsPapi после вето: {e!r}")
+    if op_cache:
+        save_json(OP_CACHE_F, op_cache)
     try:
         live_series_sync()  # и сыгранные карты идущих матчей со статистикой
     except Exception as e:
