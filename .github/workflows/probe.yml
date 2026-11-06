@@ -1,0 +1,22 @@
+name: probe (временная проверка, только чтение)
+on:
+  workflow_dispatch:
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/cache/restore@v4
+        with:
+          path: cache_news
+          key: news-cache-probe-${{ github.run_id }}
+          restore-keys: news-cache-
+      - name: запись поста в кэше
+        run: |
+          python3 - <<'PY'
+          import json, glob
+          for f in glob.glob("cache_news/telegram_posts*.json"):
+              d = json.load(open(f))
+              for k in ("cs3news/19545", "retakenews/32744"):
+                  print(f, k, json.dumps(d.get(k), ensure_ascii=False)[:600])
+          PY
