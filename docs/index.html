@@ -2146,7 +2146,8 @@ a.ni { text-decoration: none; color: inherit; }
       var cls = 'pp-m ' + (by === 0 ? "a" : by === 1 ? "b" : "n") + (g ? " ppbtn" : "") + mapBg(x.map);  // mapBg дописывает style — он последним
       return g ? '<button class="' + cls + '" data-vser="' + esc(sid) + '" data-vmap="' + mi + '">' + inner + '</button>' : '<div class="' + cls + '">' + inner + '</div>';
     }).join("");
-    var bans = [A, B].map(function (t) {
+    var firstBan = Vn.order.find(function (k) { return Vn.info[k].act === "ban"; }), fb = firstBan ? Vn.info[firstBan].who : null;
+    var bans = (fb === abbr(B) ? [B, A] : [A, B]).map(function (t) {  // первой — команда, которая банила первой
       var list = Vn.order.filter(function (k) { return Vn.info[k].act === "ban" && Vn.info[k].who === abbr(t); }).map(function (k) { return Vn.info[k].map; });
       return list.length ? '<b>' + esc(abbr(t)) + '</b> — ' + esc(list.join(", ")) : '';
     }).filter(Boolean).join(' · ');
