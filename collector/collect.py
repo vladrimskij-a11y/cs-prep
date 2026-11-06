@@ -3319,6 +3319,8 @@ def d2_fill_series(d: dict) -> bool:
             g["winner"] = 0 if sc[0] > sc[1] else 1
         if not g.get("players"):
             g["players"] = rows_for(R["stats"].get(x["map"]) or next((v for k2, v in R["stats"].items() if norm(k2) == norm(x["map"])), None))
+            if g["players"]:
+                g["src"] = "dust2"
     if not S.get("players"):
         S["players"] = rows_for(R["stats"].get("*"))
     if S.get("src") == "dust2":

@@ -2641,7 +2641,7 @@ a.ni { text-decoration: none; color: inherit; }
             return '<tr><td class="mn">' + esc(r[0]) + '</td><td class="r num">' + r[1] + '–' + r[2] + ' <small class="' + (diff > 0 ? "up" : diff < 0 ? "dn" : "") + '">' + (diff > 0 ? "+" : "") + diff + '</small></td>' +
               '<td class="r num">' + Number(r[3]).toFixed(1) + '</td><td class="r num">' + r[4] + '%</td><td class="r num rt2 ' + (r[5] >= (r[5] > 3 ? 7 : 1.1) ? "up" : r[5] <= (r[5] > 3 ? 5.5 : 0.9) ? "dn" : "") + '">' + Number(r[5]).toFixed(2) + '</td></tr>';
           }).join("") + '</tbody></table></div></div>';
-      }).join("") + '<div class="upd" style="text-align:center;margin-top:12px">Статистика bo3.gg · рейтинг bo3</div>';
+      }).join("") + '<div class="upd" style="text-align:center;margin-top:12px">' + (S.src === "dust2" ? "Статистика dust2.us · рейтинг HLTV 3.0" : (S.maps || []).some(function (g) { return g.src === "dust2"; }) ? "Статистика bo3.gg и dust2.us (HLTV)" : "Статистика bo3.gg · рейтинг bo3") + '</div>';
     }
     var panes = keys.length ? keys.map(function (k) { return '<div class="opane"><div class="pin">' + (k < 0 ? vetoHtml : '') + tables(k < 0 ? S.players : maps[k].players) + '</div></div>'; }).join("")
       : '<div class="opane"><div class="pin">' + vetoHtml + '<div class="box note" style="margin-top:12px">Статистики игроков по этому матчу пока нет.</div></div></div>';
