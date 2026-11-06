@@ -3216,6 +3216,121 @@ def d2_parse_veto(b: str) -> list:
     return steps
 
 
+def d2_parse_result(b: str) -> dict:
+    """Со страницы матча dust2.us: счёт доигранных карт (появляется сразу после карты) и статистика игроков
+    по каждой карте и по всей серии (вкладки «All maps», «Mirage»…): строки [ник, K, D, ADR, KAST %, рейтинг]."""
+    out = {"maps": [], "stats": {}}
+    i = b.find('class="maps-container"')
+    sec = b[i:i + 40000] if i >= 0 else ""
+    for box in re.split(r'<div class="standard-box map-container ', sec)[1:]:
+        nm = re.search(r'map-container-map-name">([^<]+)<', box)
+        if not nm or "map-banned" in box[:20]:
+            continue
+        tn = [strip_html(x) for x in re.findall(r'map-container-logo-score-team-logo-container">.*?hidden="hidden">([^<]+)</span>', box)]
+        sl = re.search(r'map-container-score-left">\s*(\d+)\s*<', box)
+        sr = re.search(r'map-container-score-right">\s*(\d+)\s*<', box)
+        done = "map-won" in box or "map-lost" in box
+        out["maps"].append({"map": strip_html(nm.group(1)), "teams": tn[:2],
+                            "score": [int(sl.group(1)), int(sr.group(1))] if sl and sr and done else None})
+    j = b.find("match-result-wrapper-tabs")
+    if j >= 0:
+        tabs = dict(re.findall(r'class="tabs-tab[^"]*" data-tab-id="(\d+)"[^>]*>([^<]+)<', b[j:j + 3000]))
+        for part in re.split(r'data-tab-content-id="', b[j:])[1:]:
+            tid = re.match(r"(\d+)", part)
+            name = strip_html(tabs.get(tid.group(1), "")) if tid else ""
+            if not name:
+                continue
+            teams = {}
+            for tb in re.split(r'standard-box match-result-table', part)[1:3]:
+                tnm = re.search(r'match-stat-team-name[^"]*">([^<]+)<', tb)
+                rows = []
+                for tr in re.findall(r"<tr>(.*?)</tr>", tb):
+                    nk = re.search(r"<b>([^<]+)</b>", tr)
+                    kd = re.search(r'match-stat-kd">\s*(\d+)\s*-\s*(\d+)', tr)
+                    adr = re.search(r'match-stat-adr">\s*([\d.]+)', tr)
+                    ka = re.search(r'match-stat-kast">\s*([\d.]+)%', tr)
+                    rt = re.search(r'match-stat-rating">\s*([\d.]+)', tr)
+                    if nk and kd:
+                        rows.append([strip_html(nk.group(1)).strip(), int(kd.group(1)), int(kd.group(2)),
+                                     float(adr.group(1)) if adr else 0.0, round(float(ka.group(1))) if ka else 0,
+                                     float(rt.group(1)) if rt else 0.0])
+                if tnm and rows:
+                    teams[strip_html(tnm.group(1))] = sorted(rows, key=lambda r: -r[5])
+            if teams:
+                out["stats"]["*" if name.lower().startswith("all") else name] = teams
+    return out
+
+
+def _d2_side(name: str, teams: list) -> int | None:
+    """Индекс нашей команды (по названию/аббревиатуре) для названия команды с dust2."""
+    k = norm(name)
+    if not k:
+        return None
+    for i, t in enumerate(teams[:2]):
+        for x in (t.get("name"), t.get("acronym"), re.sub(r"(?i)^(the|team)\s*|\s+(team|esports|gaming|club)$", "", t.get("name") or "")):
+            g = norm(x)
+            if g and (g == k or (min(len(g), len(k)) >= 4 and (g in k or k in g))):
+                return i
+    return None
+
+
+def d2_fill_series(d: dict) -> bool:
+    """Счёт и статистику игроков с dust2 (d["d2_res"]) — в серию идущего матча, где у bo3 их ещё нет.
+    Если bo3 серию ещё не отдал — серия «d2-<id>» по нашей карточке. Возвращает True, если карточка изменилась."""
+    R = d.get("d2_res") or {}
+    if not R.get("maps") or len(d.get("teams") or []) != 2:
+        return False
+    sid = d.get("cur_sid")
+    S = (d.get("series") or {}).get(sid) if sid else None
+    if not S:
+        if not any(x.get("score") for x in R["maps"]):
+            return False
+        sid = f"d2-{R.get('id')}"
+        S = (d.get("series") or {}).get(sid) or {
+            "id": sid, "date": d.get("begin_at"), "bo": d.get("bo"), "tournament": (d.get("tournament") or {}).get("name") if isinstance(d.get("tournament"), dict) else d.get("tournament"),
+            "teams": [{"name": t.get("name"), "acronym": t.get("acronym"), "score": None, "logo": t.get("image")} for t in d["teams"]],
+            "winner": None, "maps": [], "players": None, "src": "dust2"}
+    before = json.dumps(S, sort_keys=True)
+    st = S.get("teams") or []
+    def rows_for(tabl):
+        if not tabl:
+            return None
+        got = [None, None]
+        for tn, rows in tabl.items():
+            j = _d2_side(tn, st)
+            if j is not None:
+                got[j] = rows
+        return got if all(got) else None
+    for x in R["maps"]:
+        if not x.get("score"):
+            continue
+        a, b2 = (_d2_side(n, st) for n in (x.get("teams") or ["", ""])[:2]) if len(x.get("teams") or []) == 2 else (None, None)
+        if a is None and b2 is not None:
+            a = 1 - b2
+        if a is None:
+            continue
+        sc = list(x["score"]) if a == 0 else [x["score"][1], x["score"][0]]
+        g = next((q for q in S["maps"] if norm(q.get("map")) == norm(x["map"])), None)
+        if not g:
+            g = {"map": x["map"], "score": None, "winner": None, "sides": None, "players": None}
+            S["maps"].append(g)
+        if not g.get("score"):
+            g["score"] = sc
+            g["winner"] = 0 if sc[0] > sc[1] else 1
+        if not g.get("players"):
+            g["players"] = rows_for(R["stats"].get(x["map"]) or next((v for k2, v in R["stats"].items() if norm(k2) == norm(x["map"])), None))
+    if not S.get("players"):
+        S["players"] = rows_for(R["stats"].get("*"))
+    if S.get("src") == "dust2":
+        w = [sum(1 for g in S["maps"] if g.get("winner") == j) for j in (0, 1)]
+        S["teams"][0]["score"], S["teams"][1]["score"] = w
+    if json.dumps(S, sort_keys=True) == before and d.get("cur_sid") == sid:
+        return False
+    d.setdefault("series", {})[sid] = S
+    d["cur_sid"] = sid
+    return True
+
+
 def d2_upcoming() -> list[dict]:
     """Ближайшие матчи с dust2.us /matches (одна страница): id, slug, время начала (как на HLTV), команды."""
     h = d2_get("/matches")
@@ -3297,15 +3412,19 @@ def d2_sync(listing: list | None = None) -> None:
         return
     by_id = {str(x.get("id")): x for x in listing or []}
     names_idx = team_names_index(listing)
-    n_t = n_v = 0
+    n_t = n_v = n_m = 0
     for f in (OUT / "match").glob("*.json"):
         d = load_json(f, None)
         if not d or not d.get("teams") or (len(d["teams"]) != 2 and not d.get("tbd")):
             continue
         x = d2_find(lst, d["teams"], d.get("begin_at"))
+        if not x and d.get("d2") and len(d["teams"]) == 2:
+            x = {"id": d["d2"]["id"], "slug": d["d2"]["slug"]}  # матч уже ушёл из списка dust2 — страница та же
         if not x:
             continue
         ch = False
+        if len(d["teams"]) == 2 and (d.get("d2") or {}).get("id") != x["id"]:
+            d["d2"] = {"id": x["id"], "slug": x["slug"]}; ch = True
         if d.get("tbd") and x.get("ph"):
             opp = tbd_opp(x["ph"][0], names_idx)
             if opp and opp != d.get("opp"):
@@ -3319,14 +3438,27 @@ def d2_sync(listing: list | None = None) -> None:
         bt = parse_iso(d.get("begin_at"))
         need = int(d.get("bo") or 3)
         have = len([s0 for s0 in (d.get("veto_now") or {}).get("steps") or [] if s0.get("act") in ("pick", "decider")])
-        if bt and NOW - timedelta(hours=4) < bt < NOW + timedelta(hours=2) and have < need:
+        R0 = d.get("d2_res") or {}
+        # пока матч идёт — каждый проход: счёт доигранных карт и статистика игроков по ним (dust2 даёт сразу после карты)
+        live = (bt and NOW - timedelta(hours=8) < bt <= NOW and len(d["teams"]) == 2
+                and not (R0.get("maps") and all(m0.get("score") for m0 in R0["maps"][:need])
+                         and all(R0.get("stats", {}).get(m0["map"]) for m0 in R0["maps"] if m0.get("score"))))
+        if bt and ((NOW - timedelta(hours=4) < bt < NOW + timedelta(hours=2) and have < need) or live):
             h = d2_get(f"/matches/{x['id']}/{x['slug']}")
-            steps = d2_parse_veto(re.sub(r"\s+", " ", h)) if h else []
-            if steps:
+            b0 = re.sub(r"\s+", " ", h) if h else ""
+            steps = d2_parse_veto(b0) if b0 else []
+            if steps and have < need:
                 d["veto_now"] = {"steps": steps, "t": iso(NOW), "src": "dust2.us"}; ch = True; n_v += 1
+            if b0 and live:
+                R = d2_parse_result(b0)
+                R["id"] = x["id"]
+                if any(m0.get("score") for m0 in R["maps"]) and json.dumps(R, sort_keys=True) != json.dumps(R0, sort_keys=True):
+                    d["d2_res"] = R; ch = True; n_m += 1
+                if d2_fill_series(d):
+                    ch = True
         if ch:
             save_json(f, d)
-    print(f"dust2: матчей в списке {len(lst)}, время поправлено {n_t}, вето перед матчем {n_v}")
+    print(f"dust2: матчей в списке {len(lst)}, время поправлено {n_t}, вето перед матчем {n_v}, счёт/статистика карт {n_m}")
 
 
 def live_series_sync() -> None:
@@ -3364,10 +3496,16 @@ def live_series_sync() -> None:
             sd["veto"] = [{"team": x.get("team"), "act": x.get("act"), "map": x.get("map")} for x in d["veto_now"]["steps"]]
         elif old.get("veto"):
             sd["veto"] = old["veto"]
-        if json.dumps(old.get("maps"), sort_keys=True) == json.dumps(sd.get("maps"), sort_keys=True) and d.get("cur_sid") == str(m["id"]):
-            continue
+        d2s = d.get("cur_sid") if str(d.get("cur_sid") or "").startswith("d2-") else None
+        prev_cur = d.get("cur_sid")
         d.setdefault("series", {})[str(m["id"])] = sd
         d["cur_sid"] = str(m["id"])
+        d2_fill_series(d)  # карты, по которым у bo3 ещё нет счёта/статистики, — с dust2
+        sd = d["series"][str(m["id"])]
+        if json.dumps(old.get("maps"), sort_keys=True) == json.dumps(sd.get("maps"), sort_keys=True) and prev_cur == str(m["id"]):
+            continue
+        if d2s:
+            d["series"].pop(d2s, None)  # серия bo3 появилась — временная dust2-серия больше не нужна
         save_json(f, d)
         n += 1
     print(f"Идущие матчи: обновлено сыгранных карт в карточках — {n}")
