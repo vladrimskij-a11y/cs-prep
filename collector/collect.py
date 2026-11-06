@@ -2119,9 +2119,18 @@ def bo3_prize_places(bid: int | None, hist: list[dict]) -> list[dict]:
         except Exception as e:
             warn(f"bo3 места {slug}: {e!r}")
             continue
-        if pl and name:
+        if pl and name and not QUAL_RX.search(name):  # отборочные (Closed Qualifier) — не трофей
             out.append({"place": pl, "event": name, "date": date})
     return out
+
+
+QUAL_RX = re.compile(r"(?i)qualif|квалиф|\bqual\b")
+
+
+def tour_brand(ev: str) -> str:
+    """«BLAST Rivals Spring 2026» и «BLAST Rivals 2026 Season 1» → «blastrivals»: серия турнира без года/сезона."""
+    t = re.sub(r"(?i)\b(20\d\d|season|s\d+|spring|summer|fall|autumn|winter|finals?|\d+)\b", " ", ev or "")
+    return norm(t)
 
 
 def prize_places(hltv_team: dict | None, hist: list[dict], days: int = 92, bid: int | None = None) -> list[dict]:
@@ -2136,9 +2145,20 @@ def prize_places(hltv_team: dict | None, hist: list[dict], days: int = 92, bid: 
     except Exception as e:
         warn(f"HLTV призовые: {e!r}")
         extra = []
+    same = lambda a, x: tour_same(a["event"], tour_norm(x["event"])) or tour_same(x["event"], tour_norm(a["event"]))
+    used = {i for i, x in enumerate(out) for a in extra if same(a, x)}
     for a in extra:
-        if not any(tour_same(a["event"], tour_norm(x["event"])) or tour_same(x["event"], tour_norm(a["event"])) for x in out):
-            out.append(a)
+        if QUAL_RX.search(a["event"]) or any(same(a, x) for x in out):
+            continue
+        # тот же турнир под другим названием (у HLTV «2026 Season 1», у bo3 «Spring 2026»): та же серия, год и место —
+        # каждое место bo3 «закрывает» не больше одного такого (06.11: задвоенные BLAST Rivals и BLAST Bounty)
+        ya = (re.findall(r"20\d\d", a["event"]) or [""])[-1]
+        j = next((i for i, x in enumerate(out) if i not in used and x["place"] == a["place"] and tour_brand(x["event"]) == tour_brand(a["event"])
+                  and ya in x["event"] + (x.get("date") or "")[:4]), None)
+        if j is not None:
+            used.add(j)
+            continue
+        out.append(a)
     out.sort(key=lambda x: x.get("date") or "", reverse=True)
     return out
 
