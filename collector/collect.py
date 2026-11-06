@@ -5155,13 +5155,14 @@ _op = {"last": 0.0, "off": False}
 OP_PER = {"First": 1, "Second": 2, "Third": 3, "Fourth": 4, "Fifth": 5}
 
 
-OP_MONTH_BUDGET = int(os.environ.get("OP_MONTH_BUDGET", "230"))  # бесплатный тариф — 250 запросов в месяц, 20 — запас
+OP_MONTH_BUDGET = int(os.environ.get("OP_MONTH_BUDGET", "225"))  # в кабинете OddsPapi лимит 240 в месяц, 15 — запас
 
 
 def op_used() -> dict:
     u = op_cache.get("used") or {}
     if u.get("m") != NOW.strftime("%Y-%m"):
-        u = {"m": NOW.strftime("%Y-%m"), "n": 0}
+        # в ноябре 2026 до подключения уже ушло 33 запроса на проверки (кабинет OddsPapi, 06.11) — учитываем с запасом
+        u = {"m": NOW.strftime("%Y-%m"), "n": 40 if NOW.strftime("%Y-%m") == "2026-11" else 0}
         op_cache["used"] = u
     return u
 
