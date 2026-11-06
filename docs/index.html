@@ -2142,9 +2142,10 @@ a.ni { text-decoration: none; color: inherit; }
       if (g) { sc = sflip ? [g.score[1], g.score[0]] : g.score; anyPlayed = true; }
       var inner = '<span class="pp-n">Карта ' + (i + 1) + ' · ' + (x.act === "decider" ? "десайдер" : esc(x.who)) + '</span><b>' + esc(x.map) + '</b>' +
         '<span class="num pp-s"><span class="a">' + sc[0] + '</span>:<span class="b">' + sc[1] + '</span></span>' +
-        (g ? '<small>сыграна · статистика ›</small>' : z ? '<small>вероятный, если понадобится</small>' : '<small>вероятный счёт</small>');
-      var cls = 'pp-m ' + (by === 0 ? "a" : by === 1 ? "b" : "n") + (g ? " ppbtn" : "") + mapBg(x.map);  // mapBg дописывает style — он последним
-      return g ? '<button class="' + cls + '" data-vser="' + esc(sid) + '" data-vmap="' + mi + '">' + inner + '</button>' : '<div class="' + cls + '">' + inner + '</div>';
+        (g ? (g.players ? '<small>сыграна · статистика ›</small>' : '<small>сыграна · статистика скоро</small>') : z ? '<small>вероятный, если понадобится</small>' : '<small>вероятный счёт</small>');
+      var btn = g && g.players;  // нажимается, когда bo3 отдал статистику игроков
+      var cls = 'pp-m ' + (by === 0 ? "a" : by === 1 ? "b" : "n") + (btn ? " ppbtn" : "") + mapBg(x.map);  // mapBg дописывает style — он последним
+      return btn ? '<button class="' + cls + '" data-vser="' + esc(sid) + '" data-vmap="' + mi + '">' + inner + '</button>' : '<div class="' + cls + '">' + inner + '</div>';
     }).join("");
     var firstBan = Vn.order.find(function (k) { return Vn.info[k].act === "ban"; }), fb = firstBan ? Vn.info[firstBan].who : null;
     var bans = (fb === abbr(B) ? [B, A] : [A, B]).map(function (t) {  // первой — команда, которая банила первой
