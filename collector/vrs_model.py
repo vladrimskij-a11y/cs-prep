@@ -509,6 +509,7 @@ class Live:
                     ex.setdefault(k, []).append((now, v))
             R = self.compute(now, [self._match(now, w, l, ew, lan, mid=-10 ** 9)], ex)["rating"]
             out[lab] = (R[ka] - base[ka], R[kb] - base[kb])
+            out[lab + "_all"] = {k: R[k] - base[k] for k in R}  # сдвиг очков всех команд — для мест, как у HLTV
         return out
 
 

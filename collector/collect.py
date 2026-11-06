@@ -1993,11 +1993,15 @@ def vrs_outcomes_live(a: dict, b: dict, table: list[dict], brief: dict, lan: boo
     f = L.forecast(a["name"], b["name"], _days(NOW), ew=ew, lan=lan, win_prize=win, both_prize=both, base=L.base)
     if not f:
         return None
+    # Места — по всей пересчитанной таблице, как у HLTV: матч сдвигает очки и других команд (Vitality при победе FURIA
+    # над BetBoom теряет очки, FURIA выходит на №2). Разница очков ±1 к HLTV неустранима: дробной части их очков нет.
+    keys = [L.key(r["name"]) for r in table]
     res = {}
     for win_i, lab in ((0, "a_win"), (1, "b_win")):
+        sh = f[lab + "_all"]
         dA, dB = round(f[lab][0]), round(f[lab][1])
         pa, pb = a["points"] + dA, b["points"] + dB
-        others = [r["points"] for r in table if r["name"] not in (a["name"], b["name"])]
+        others = [r["points"] + round(sh.get(k, 0.0)) for k, r in zip(keys, table) if r["name"] not in (a["name"], b["name"])]
         ra = 1 + sum(1 for p in others + [pb] if p > pa)
         rb = 1 + sum(1 for p in others + [pa] if p > pb)
         res["win" + str(win_i)] = [{"delta": dA, "points": pa, "rank": ra}, {"delta": dB, "points": pb, "rank": rb}]
