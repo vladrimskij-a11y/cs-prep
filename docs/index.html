@@ -564,20 +564,6 @@ html { overflow-anchor: none; }
 .pop-in .pci { font-size: 16px; padding-bottom: 4px; border-bottom: 1px solid var(--line); margin-bottom: 2px; } .pop-in .pci b { display: inline; font-size: 14px; margin: 0; }
 .pce { font-size: 12px; line-height: 1.3; color: var(--fg); overflow-wrap: anywhere; }
 .pce.none { color: var(--muted); }
-.lv-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--onair); margin-right: 6px; animation: lvb 1.4s infinite; vertical-align: middle; }
-@keyframes lvb { 50% { opacity: .3; } }
-.lv-upd { font-weight: 500; color: var(--muted); margin-left: 6px; text-transform: none; letter-spacing: 0; }
-.box.live { padding: 10px 12px; }
-.lv-s { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 10px; font-weight: 800; }
-.lv-s .a { color: var(--ct); } .lv-s .b { color: var(--t); text-align: right; } .lv-s b { font-size: 22px; }
-.lv-maps { display: flex; gap: 6px; margin-top: 10px; }
-.lv-m { flex: 1; min-width: 0; background: var(--sunk); border-radius: 8px; padding: 6px 8px; display: flex; flex-direction: column; font-size: 12px; }
-.lv-m b { font-size: 16px; } .lv-m small { color: var(--muted); font-size: 10.5px; } .lv-m.cur { outline: 1.5px solid var(--onair); }
-.lv-ts { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
-.lv-tn { font-weight: 800; font-size: 12px; margin-bottom: 4px; } .lv-t.a .lv-tn { color: var(--ct); } .lv-t.b .lv-tn { color: var(--t); }
-.lv-p { display: grid; grid-template-columns: 1fr auto 30px; gap: 6px; font-size: 12.5px; padding: 2px 0; }
-.lv-p span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .lv-p i { font-style: normal; color: var(--muted); text-align: right; }
-.lv-h { margin-top: 8px; font-size: 11px; color: var(--muted); }
 [data-tname] { cursor: pointer; } .tlink { text-decoration: none; }
 .toast { position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--fg); color: var(--bg); padding: 10px 16px; border-radius: 12px; font-size: 13px; z-index: 99; max-width: calc(100vw - 32px); transition: opacity .3s; }
 .toast.out { opacity: 0; }
@@ -650,10 +636,10 @@ body.nav #app > .sshell .shead, body.nav #app > .mshell .mhead { animation: fade
 .sres .pp-maps { padding: 0; }
 .pp-m.left { background: transparent; border: 1px dashed var(--line); }
 /* квадраты карт: картинка карты под затемнением, текст белый с тенью */
-.pp-m.mimg, .lv-m.mimg { position: relative; isolation: isolate; overflow: hidden; color: #fff; background: #1b1f27; }
-.pp-m.mimg::before, .lv-m.mimg::before { content: ""; position: absolute; inset: 0; z-index: -1; background: linear-gradient(180deg, rgba(8,10,14,.55), rgba(8,10,14,.82)), var(--mi) center / cover no-repeat; }
-.pp-m.mimg b, .pp-m.mimg .pp-n, .pp-m.mimg small, .lv-m.mimg span, .lv-m.mimg b, .lv-m.mimg small { color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,.85); }
-.pp-m.mimg .pp-n, .pp-m.mimg small, .lv-m.mimg small { color: rgba(255,255,255,.82); }
+.pp-m.mimg { position: relative; isolation: isolate; overflow: hidden; color: #fff; background: #1b1f27; }
+.pp-m.mimg::before { content: ""; position: absolute; inset: 0; z-index: -1; background: linear-gradient(180deg, rgba(8,10,14,.55), rgba(8,10,14,.82)), var(--mi) center / cover no-repeat; }
+.pp-m.mimg b, .pp-m.mimg .pp-n, .pp-m.mimg small { color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,.85); }
+.pp-m.mimg .pp-n, .pp-m.mimg small { color: rgba(255,255,255,.82); }
 .pp-m.mimg .pp-s .a { color: #8db8ff; } .pp-m.mimg .pp-s .b { color: #ffc27a; }
 .pp-m.left.mimg { border: 1px dashed rgba(255,255,255,.35); }
 /* раунды по сторонам: CT голубой, T золотой — отдельно от цветов команд */
@@ -833,7 +819,7 @@ a.ni { text-decoration: none; color: inherit; }
 .chip { transition: background .15s, color .15s, border-color .15s; }
 .match, .tour-card, .bm, .fact.link, .ni, .rk, .gbtn, .pp-m, [data-tname] { transition: transform .12s ease, opacity .12s ease; }
 .match:active, .tour-card:active, .bm:active, .fact.link:active, .ni:active, button.rk:active, .gbtn:active { transform: scale(.985); opacity: .9; }
-.pp-m, .th-t, .lv-m { border-radius: var(--r-s); }
+.pp-m, .th-t { border-radius: var(--r-s); }
 .pill { border-radius: 6px; }
 .th-logo { background: var(--sunk); }
 .fact.link .fsrc { opacity: .8; }
@@ -2125,9 +2111,45 @@ a.ni { text-decoration: none; color: inherit; }
     }).join("") + (P.source === "букмекеры" ? "" : '<span class="oc-src">оценка по рейтингу VRS</span>') + '</div>';
   }
   // вероятный пик: вето по привычкам команд за 3 месяца, счёт — по винрейту карт
+  // вероятный счёт карты: шанс на серию до матча → шанс на карту, поправка на винрейты команд на этой карте
+  // (так же, как в сборщике build_prediction: одна шкала и для прогноза, и для настоящего вето)
+  function mapScoreFor(m, mp) {
+    var w0 = winPct(m, 0), ps = w0 != null ? Math.min(0.97, Math.max(0.03, w0 / 100)) : 0.5, bo = +m.bo || 3, lo = 0, hi = 1;
+    for (var k = 0; k < 40; k++) {
+      var mid = (lo + hi) / 2, ser = bo === 1 ? mid : bo === 5 ? mid * mid * mid * (10 - 15 * mid + 6 * mid * mid) : mid * mid * (3 - 2 * mid);
+      if (ser < ps) lo = mid; else hi = mid;
+    }
+    var pv = (lo + hi) / 2, row = (((m.maps || {}).table) || []).find(function (r) { return mkey(r.map) === mkey(mp); });
+    var wr = function (i) { var t = row ? row.teams[i] : { won: 0, played: 0 }; return (t.won + 1.5) / (t.played + 3); };
+    var p = 1 / (1 + Math.exp(-(Math.log(pv / (1 - pv)) + (wr(0) - wr(1)))));
+    var r = 0.5 + (p - 0.5) * 0.25, mx = Math.max(r, 1 - r), lose = Math.max(3, Math.min(11, Math.round(13 * (1 - mx) / mx)));
+    return p >= 0.5 ? [13, lose] : [lose, 13];
+  }
+  // настоящее вето (dust2): карты в порядке игры, кто пикнул, вероятный счёт; ниже — кто что забанил
+  function vetoActualBlock(m, Vn) {
+    var A = m.teams[0] || {}, B = m.teams[1] || {}, P = m.prediction || {};
+    var side = function (who) { return who === abbr(A) ? 0 : who === abbr(B) ? 1 : null; };
+    var play = Vn.order.filter(function (k) { return Vn.info[k].act !== "ban"; });
+    var top = ((P.outcomes || [])[0] || {}).score, bo = +m.bo || 3;
+    var cards = play.map(function (k, i) {
+      var x = Vn.info[k], by = x.act === "decider" ? null : side(x.who), sc = mapScoreFor(m, x.map);
+      var z = bo === 3 && i === 2 && (top === "2:0" || top === "0:2");
+      if (z) sc = [0, 0];
+      return '<div class="pp-m ' + (by === 0 ? "a" : by === 1 ? "b" : "n") + mapBg(x.map) + '"><span class="pp-n">Карта ' + (i + 1) + ' · ' + (x.act === "decider" ? "десайдер" : esc(x.who)) + '</span><b>' + esc(x.map) + '</b>' +
+        '<span class="num pp-s"><span class="a">' + sc[0] + '</span>:<span class="b">' + sc[1] + '</span></span>' + (z ? '<small>скорее всего не понадобится</small>' : '') + '</div>';
+    }).join("");
+    var bans = [A, B].map(function (t) {
+      var list = Vn.order.filter(function (k) { return Vn.info[k].act === "ban" && Vn.info[k].who === abbr(t); }).map(function (k) { return Vn.info[k].map; });
+      return list.length ? '<b>' + esc(abbr(t)) + '</b> — ' + esc(list.join(", ")) : '';
+    }).filter(Boolean).join(' · ');
+    return '<div class="sec" data-nav><h3>Вето <span>счёт — вероятный</span></h3><div class="box ppick"><div class="pp-maps">' + cards + '</div>' +
+      (bans ? '<div class="note" style="padding:10px 4px 2px">Баны: ' + bans + '</div>' : '') + '</div></div>';
+  }
   function pickBlock(m) {
     var P = m.prediction, A = m.teams[0] || {}, B = m.teams[1] || {};
     if (m.tbd) return '<div class="sec"><h3>Вероятный пик</h3><div class="box note">Ждём соперника.</div></div>';
+    var Vn = vetoNow(m);
+    if (Vn && Vn.order.some(function (k) { return Vn.info[k].act !== "ban"; })) return vetoActualBlock(m, Vn);  // вето проведено — показываем настоящее
     if (!P || !(P.maps || []).length) return "";
     var html = '<div class="sec" data-nav><h3>Вероятный пик <span>по вето за 3 мес.</span></h3><div class="box ppick"><div class="pp-maps">' + P.maps.map(function (x, i) {
       var who = x.by === 0 ? abbr(A) : x.by === 1 ? abbr(B) : "";  // кто пикает карту
@@ -2634,8 +2656,7 @@ a.ni { text-decoration: none; color: inherit; }
   function tabBodyHtml(m, key) {
     if (key === "team:players") return playersTab(m);
     if (key === "team:pos") return posBlock(m);
-    if (key === "stats") return '<div id="livebox">' + (state.live && state.live.id === m.id ? state.live.html || "" : "") + '</div>' +  // LIVE — первым в «Статистике» (владелец 06.11)
-      stakeBlock(m) + vrsBlock(m) + pickBlock(m) + mapsTable(m) + mapZone(m) + h2hBlock(m) + formBlock(m);  // форма — после карт (по просьбе владельца)
+    if (key === "stats") return stakeBlock(m) + vrsBlock(m) + pickBlock(m) + mapsTable(m) + mapZone(m) + h2hBlock(m) + formBlock(m);  // форма — после карт (по просьбе владельца)
     return (key === "news:all" ? factsBlock(m) : "") + newsList(m, key.slice(5));
   }
 
@@ -2817,93 +2838,7 @@ a.ni { text-decoration: none; color: inherit; }
     return out;
   }
   // ---- живой режим: счёт карт, раунды и статистика игроков с bo3.gg через наш посредник (обновление раз в 15 с)
-  var LIVE = "https://rimcs-live.vladrimskij.workers.dev";
-  function liveWanted(m) {
-    if (!m || !m.teams || m.teams.length < 2 || !m.teams[0].bo3_id || !m.teams[1].bo3_id) return false;
-    if (m.status === "finished" || m.status === "canceled") return false;
-    if (m.status === "running") return true;
-    var t = Date.parse(m.begin_at || "");
-    return t && Date.now() > t - 15 * 60000 && Date.now() < t + 8 * 3600000;
-  }
-  function liveJ(path) {
-    return fetch(LIVE + path, { cache: "no-store" }).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); });
-  }
-  function liveStop() { if (state.live && state.live.timer) clearTimeout(state.live.timer); state.live = null; }
-  function liveStart(m) {
-    if (state.live && state.live.id === m.id) return;
-    liveStop();
-    if (!liveWanted(m)) return;
-    state.live = { id: m.id, html: "" };
-    liveTick(m);
-  }
-  function liveTick(m) {
-    var L = state.live; if (!L || L.id !== m.id) return;
-    var A = m.teams[0], B = m.teams[1];
-    liveJ("/matches?page%5Blimit%5D=10&filter%5Bmatches.status%5D%5Bin%5D=current&filter%5Bmatches.team_ids%5D%5Boverlap%5D=" + A.bo3_id).then(function (j) {
-      var M = (j.results || []).find(function (x) { return [x.team1_id, x.team2_id].indexOf(B.bo3_id) >= 0; });
-      if (!M) { L.html = ""; return null; }
-      return liveJ("/games?filter%5Bgames.match_id%5D%5Beq%5D=" + M.id).then(function (g) {
-        var games = (g.results || []).sort(function (a, b) { return (a.number || 0) - (b.number || 0); });
-        var cur = games.find(function (x) { return x.status === "current"; });
-        if (!cur) return [M, games, null, null];
-        return Promise.all([liveJ("/games/" + cur.id).catch(function () { return null; }), liveJ("/games/" + cur.id + "/players_stats").catch(function () { return []; })])
-          .then(function (r) { return [M, games, r[0], r[1]]; });
-      });
-    }).then(function (r) {
-      if (!state.live || state.live.id !== m.id) return;
-      if (r) state.live.html = liveHtml(m, r[0], r[1], r[2], r[3]);
-      var box = document.getElementById("livebox"); if (box) box.innerHTML = state.live.html;
-    }).catch(function () {}).then(function () {
-      if (state.live && state.live.id === m.id) state.live.timer = setTimeout(function () { liveTick(m); }, 15000);
-    });
-  }
-  function liveHtml(m, M, games, G, PS) {
-    var A = m.teams[0], B = m.teams[1], flip = M.team1_id === B.bo3_id;
-    var sa = flip ? M.team2_score : M.team1_score, sb = flip ? M.team1_score : M.team2_score;
-    var clan = {};  // название клана в игре → наша команда 0/1
-    (PS || []).forEach(function (p) { var tid = (p.team_clan || {}).team_id; if (tid) clan[p.clan_name] = tid === A.bo3_id ? 0 : 1; });
-    function side(name, tid) { if (tid) return tid === A.bo3_id ? 0 : 1; return clan[name]; }
-    var Vn = vetoNow(m), play = Vn ? Vn.order.filter(function (k) { return Vn.info[k].act !== "ban"; }).map(function (k) { return Vn.info[k].map; }) : [];
-    var anyCur = games.some(function (g) { return g.status === "current"; });
-    var guessCur = !anyCur && M.status === "current" ? (games.find(function (g) { return g.status !== "finished"; }) || {}).number : null;
-    var mapsHtml = games.map(function (g, gi) {
-      var nm = String(g.map_name || "").replace(/^de_/, ""); nm = nm.charAt(0).toUpperCase() + nm.slice(1);
-      if (!nm) nm = play[(g.number || gi + 1) - 1] || "";  // bo3 ещё не прислал карту — берём из вето dust2
-      var isCur = g.status === "current" || (guessCur != null && g.number === guessCur);
-      var sc = ["–", "–"];
-      if (g.status === "finished") {
-        var w = side(g.winner_clan_name, (g.winner_team_clan || {}).team_id);
-        if (w == null) w = 0;
-        sc[w] = g.winner_clan_score; sc[1 - w] = g.loser_clan_score;
-      } else if (g.status === "current" && G && (G.game_rounds || []).length) {
-        sc = [0, 0];
-        (G.game_rounds || []).forEach(function (rd) { var s2 = side(rd.winner_clan_name); if (s2 != null) sc[s2]++; });
-      }
-      return '<div class="lv-m' + (isCur ? " cur" : "") + mapBg(nm) + '"><span>' + esc(nm || ("Карта " + (g.number || gi + 1))) + '</span><b class="num">' + esc(sc[0]) + ':' + esc(sc[1]) + '</b><small>' + (isCur ? "идёт" : g.status === "finished" ? "сыграна" : "") + '</small></div>';
-    }).join("");
-    var rows = [[], []];
-    (PS || []).forEach(function (p) {
-      var s2 = side(p.clan_name, (p.team_clan || {}).team_id); if (s2 == null) return;
-      rows[s2].push(p);
-    });
-    var tables = (rows[0].length || rows[1].length) ? [0, 1].map(function (i) {
-      var t = m.teams[i];
-      return '<div class="lv-t ' + (i ? "b" : "a") + '"><div class="lv-tn">' + esc(t.acronym || t.name) + '</div>' + rows[i].sort(function (x, y) { return (y.kills || 0) - (x.kills || 0); }).map(function (p) {
-        return '<div class="lv-p"><span>' + esc((p.steam_profile || {}).nickname || p.nickname || "?") + '</span><b class="num">' + esc(p.kills || 0) + '–' + esc(p.death || 0) + '</b><i class="num">' + (p.adr != null ? Math.round(p.adr) : "–") + '</i></div>';
-      }).join("") + '</div>';
-    }).join("") : '';
-    var nr = G ? (G.game_rounds || []).length : 0, curNm = (games.find(function (g) { return g.status === "current"; }) || {}).map_name;
-    curNm = String(curNm || "").replace(/^de_/, ""); curNm = curNm.charAt(0).toUpperCase() + curNm.slice(1);
-    var hint = nr ? '<div class="lv-h">K–D и ADR' + (curNm ? ' на ' + esc(curNm) : '') + ' после ' + nr + '-го раунда · bo3.gg</div>'
-      : '<div class="lv-h">bo3.gg пока не передаёт раунды' + (M.parsed_status === "waiting" ? ' этого матча (ждёт данные)' : '') + ' — счёт карты и статистика игроков появятся, как только начнёт.</div>';
-    var now = new Date();
-    return '<div class="sec"><h3><span><span class="lv-dot"></span>LIVE</span><small class="lv-upd">обновлено ' + String(now.getHours()).padStart(2, "0") + ':' + String(now.getMinutes()).padStart(2, "0") + ':' + String(now.getSeconds()).padStart(2, "0") + '</small></h3>' +
-      '<div class="box live"><div class="lv-s"><span class="a">' + esc(A.acronym || A.name) + '</span><b class="num">' + esc(sa) + ' : ' + esc(sb) + '</b><span class="b">' + esc(B.acronym || B.name) + '</span></div>' +
-      (mapsHtml ? '<div class="lv-maps">' + mapsHtml + '</div>' : '') +
-      (tables ? '<div class="lv-ts">' + tables + '</div>' : '') + hint + '</div></div>';
-  }
   function renderMatch(m) {
-    liveStart(m);
     state.scrolls = state.scrolls || {};
     panes().forEach(function (p) { state.scrolls[p.getAttribute("data-key")] = p.scrollTop; });
     var keys = paneKeys();
@@ -3222,7 +3157,6 @@ a.ni { text-decoration: none; color: inherit; }
       });
       return;
     }
-    liveStop();
     state.openId = null;
     if (!(tt || /^(tours|rating|feed|major|r-)/.test(h))) SH = null;
     if (tt) { state.view = "tour:" + tt[1]; showTour(tt[1]); }

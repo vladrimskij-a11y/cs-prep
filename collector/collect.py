@@ -4660,7 +4660,7 @@ ODDS_LOG_F = OUT / "odds_log.json"
 odds_log: dict = {}
 
 
-def odds_log_put(m: dict, bids: list, win: list, provider) -> None:
+def odds_log_put(m: dict, bids: list, win: list, provider, scores=None) -> None:
     """Журнал прогнозов: последняя линия до начала матча — чтобы потом сравнить с итогом."""
     if not odds_log:
         odds_log.update((load_json(ODDS_LOG_F, {}) or {}).get("entries") or {})
@@ -4669,6 +4669,47 @@ def odds_log_put(m: dict, bids: list, win: list, provider) -> None:
         return  # после начала линия уже лайвовая — в журнал не пишем
     e = odds_log.setdefault(str(m.get("id")), {})
     e.update({"slug": m.get("slug"), "begin": m.get("start_date"), "ids": bids, "p": win, "prov": provider, "t": iso(NOW)})
+    if scores:
+        e["sc"] = scores  # исходы серии до начала — на них замораживается прогноз матча
+
+
+def odds_prematch(bids: list, begin: str | None) -> dict | None:
+    """Последняя линия до начала матча из журнала (шанс на победу и, если есть, исходы) — в порядке команд bids."""
+    if not odds_log:
+        odds_log.update((load_json(ODDS_LOG_F, {}) or {}).get("entries") or {})
+    bg = parse_iso(begin or "")
+    for e in odds_log.values():
+        ids = e.get("ids") or []
+        if sorted(ids) != sorted(bids) or not e.get("p"):
+            continue
+        eb = parse_iso(e.get("begin") or "")
+        if bg and eb and abs((eb - bg).total_seconds()) > 36 * 3600:
+            continue
+        flip = ids != list(bids)
+        win = list(reversed(e["p"])) if flip else list(e["p"])
+        sc = [{"score": ":".join(reversed(x["score"].split(":"))) if flip else x["score"], "p": x["p"]} for x in e.get("sc") or []]
+        return {"win": win, "scores": sc, "provider": e.get("prov")}
+    return None
+
+
+def series_outcomes(pw: float, bo: int) -> list:
+    """Исходы серии из шанса на серию (без линии на счёт): шанс карты подбирается под шанс серии."""
+    lo, hi = 0.0, 1.0
+    for _ in range(40):
+        mid = (lo + hi) / 2
+        ser = mid if bo == 1 else mid ** 3 * (10 - 15 * mid + 6 * mid * mid) if bo == 5 else mid * mid * (3 - 2 * mid)
+        lo, hi = (mid, hi) if ser < pw else (lo, mid)
+    p = (lo + hi) / 2
+    need = bo // 2 + 1
+    dist: dict = {}
+    def walk(a, b, pr):
+        if a == need or b == need:
+            dist[(a, b)] = dist.get((a, b), 0) + pr
+            return
+        walk(a + 1, b, pr * p)
+        walk(a, b + 1, pr * (1 - p))
+    walk(0, 0, 1.0)
+    return [{"score": f"{a}:{b}", "p": round(100 * v)} for (a, b), v in sorted(dist.items(), key=lambda kv: -kv[1])]
 
 
 VRS_LOG_F = OUT / "vrs_log.json"
@@ -4831,10 +4872,6 @@ def bo3_odds(bids: list) -> dict | None:
     flip = m.get("team1_id") == bids[1]
     p1 = devig([c1, c2])[0]
     out = {"win": [round(100 * (1 - p1 if flip else p1)), round(100 * (p1 if flip else 1 - p1))], "provider": bu.get("provider")}
-    try:
-        odds_log_put(m, bids, out["win"], bu.get("provider"))
-    except Exception as e:
-        warn(f"Журнал прогнозов: {e!r}")
     sc = {}
     for mk in bu.get("additional_markets") or []:
         mt = re.match(r"score_(\d)_(\d)$", mk.get("bet_type") or "")
@@ -4845,6 +4882,10 @@ def bo3_odds(bids: list) -> dict | None:
         ks = list(sc.keys()); pv = devig([1 / sc[k] for k in ks])
         sc = dict(zip(ks, pv))
         out["scores"] = [{"score": f"{a}:{b}", "p": round(100 * v)} for (a, b), v in sorted(sc.items(), key=lambda kv: -kv[1])]
+    try:
+        odds_log_put(m, bids, out["win"], bu.get("provider"), out.get("scores"))
+    except Exception as e:
+        warn(f"Журнал прогнозов: {e!r}")
     return out
 
 
@@ -5047,6 +5088,20 @@ def build_detail(m: dict, prev: dict | None) -> dict:
             detail["prediction"] = build_prediction(detail, bids)
         except Exception as e:
             warn(f"Прогноз: {e!r}")
+        # после начала матча прогноз не меняем: шанс на победу и исходы (2:0, 2:1…) — как перед матчем
+        # (линия букмекера по ходу игры прыгает — владелец 06.11)
+        bg = parse_iso(detail.get("begin_at") or "")
+        started = (detail.get("status") in ("running", "finished")) or (bg is not None and bg <= NOW)
+        if started and prev and prev.get("prediction"):
+            P0 = dict(prev["prediction"])
+            if not P0.get("frozen"):  # первая заморозка: линия из журнала до начала (карточка могла успеть поймать лайв)
+                pm = odds_prematch(bids, detail.get("begin_at")) if len(bids) == 2 and all(bids) else None
+                if pm:
+                    sc = pm["scores"] or series_outcomes(pm["win"][0] / 100, int(detail.get("bo") or 3))
+                    P0["odds"] = {**(P0.get("odds") or {}), "win": pm["win"], "scores": sc, "provider": pm["provider"] or (P0.get("odds") or {}).get("provider")}
+                    P0["outcomes"], P0["source"] = sc, "букмекеры"
+                P0["frozen"] = iso(NOW)
+            detail["prediction"] = P0
     for t, bid, hist in zip(teams, bids, hists):
         t["stats"] = build_player_stats(t, bid, hist)
         for p in (t.get("players") or []) + (t.get("coach") or []):  # у тренеров тоже мажоры и MVP (чаще всего — с игровой карьеры)
