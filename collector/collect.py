@@ -5128,6 +5128,188 @@ def bo3_odds(bids: list) -> dict | None:
     return out
 
 
+# ---------------------------------------------------------------- OddsPapi: линии Pinnacle (и рынка) на серию и на каждую карту
+# Ключ — секрет ODDSPAPI_KEY (бесплатный тариф). Проверка 06.11 на ~130 картах тир-1: победитель карты по линии угадан в 62%
+# (по винрейтам карт — ~53%); счёт карты линия почти не сдвигает — только при фаворите карты ≥80% проигравший берёт ~5 раундов.
+ODDSPAPI_KEY = os.environ.get("ODDSPAPI_KEY", "").strip()
+OP_API = "https://api.oddspapi.io/v4"
+OP_CACHE_F = CACHE / "oddspapi.json"
+op_cache: dict = load_json(OP_CACHE_F, {})
+_op = {"last": 0.0, "off": False}
+OP_PER = {"First": 1, "Second": 2, "Third": 3, "Fourth": 4, "Fifth": 5}
+
+
+def op_get(path: str, **q):
+    """Запрос к OddsPapi: не чаще раза в 2.6 с; 429 — пауза и один повтор; отказ по ключу/лимиту — пауза 6 ч.
+    В журнал — только путь и код ошибки (в адресе ключ)."""
+    if not ODDSPAPI_KEY or _op["off"]:
+        return None
+    off = parse_iso(op_cache.get("off_until"))
+    if off and off > NOW:
+        return None
+    for k in range(2):
+        wait = 2.6 - (time.time() - _op["last"])
+        if wait > 0:
+            time.sleep(wait)
+        _op["last"] = time.time()
+        stats["oddspapi_requests"] = stats.get("oddspapi_requests", 0) + 1
+        try:
+            return json.loads(http_get(OP_API + path + "?" + urllib.parse.urlencode({**q, "apiKey": ODDSPAPI_KEY}),
+                                       {"Accept": "application/json"}, timeout=60, retry429=False))
+        except urllib.error.HTTPError as e:
+            if e.code == 429 and k == 0:
+                time.sleep(8)
+                continue
+            if e.code in (401, 402, 403, 429):
+                op_cache["off_until"] = iso(NOW + timedelta(hours=6))
+                _op["off"] = True
+            warn(f"OddsPapi {path}: HTTP {e.code}")
+            return None
+        except Exception as e:
+            warn(f"OddsPapi {path}: {type(e).__name__}")
+            return None
+    return None
+
+
+def op_markets() -> dict:
+    """Нужные рынки CS2: id → [вид, номер карты, линия] и названия исходов. Каталог перечитываем раз в неделю."""
+    c = op_cache.get("mk") or {}
+    if c.get("m") and (parse_iso(c.get("t")) or NOW) > NOW - timedelta(days=7):
+        return c
+    rows = op_get("/markets")
+    if not isinstance(rows, list):
+        return c
+    out, names = {}, {}
+    for m in rows:
+        if m.get("sportId") != 17:
+            continue
+        nm = m.get("marketName") or ""
+        mm = re.match(r"(First|Second|Third|Fourth|Fifth) Map Winner", nm)
+        kind = ("win", 0) if nm == "Winner" else ("map", OP_PER[mm.group(1)]) if mm else ("cs", 0) if nm == "Correct Map Score" else None
+        if kind:
+            out[str(m["marketId"])] = [kind[0], kind[1], m.get("handicap")]
+            names[str(m["marketId"])] = {str(o["outcomeId"]): o.get("outcomeName") for o in m.get("outcomes") or []}
+    c = {"t": iso(NOW), "m": out, "o": names}
+    op_cache["mk"] = c
+    return c
+
+
+def op_fixtures() -> list:
+    """Матчи CS2 на 8 дней вперёд (и вчера) — раз в час."""
+    c = op_cache.get("fx") or {}
+    if c.get("list") is not None and (parse_iso(c.get("t")) or NOW) > NOW - timedelta(hours=1):
+        return c["list"]
+    rows = op_get("/fixtures", sportId=17, **{"from": (NOW - timedelta(days=1)).strftime("%Y-%m-%d"), "to": (NOW + timedelta(days=8)).strftime("%Y-%m-%d")})
+    if not isinstance(rows, list):
+        return c.get("list") or []
+    lst = [{"id": f.get("fixtureId"), "a": f.get("participant1Name"), "b": f.get("participant2Name"), "t": f.get("startTime"), "odds": f.get("hasOdds")}
+           for f in rows if f.get("fixtureId")]
+    op_cache["fx"] = {"t": iso(NOW), "list": lst}
+    return lst
+
+
+def op_find(teams: list, begin: str | None) -> tuple | None:
+    """Матч OddsPapi для наших двух команд: (fixture, flip) — flip, если у них команды в обратном порядке."""
+    def keys(t):
+        n = t.get("name") or ""
+        return {k for k in (norm(n), norm(t.get("acronym")), norm(re.sub(r"(?i)^(the|team)\s+|\s+(team|esports|gaming|club|cs2?)$", "", n))) if k}
+    def same(ks, x):
+        g = norm(x)
+        g2 = norm(re.sub(r"(?i)^(the|team)\s+|\s+(team|esports|gaming|club|cs2?)$", "", x or ""))
+        return any(k == g or k == g2 or (len(k) >= 4 and (k in g or g2 in k)) for k in ks if g)
+    if len(teams) != 2:
+        return None
+    ka, kb = keys(teams[0]), keys(teams[1])
+    bt = parse_iso(begin)
+    for f in op_fixtures():
+        ft = parse_iso(f.get("t"))
+        if bt and ft and abs((ft - bt).total_seconds()) > 14 * 3600:
+            continue
+        if same(ka, f["a"]) and same(kb, f["b"]):
+            return f, False
+        if same(ka, f["b"]) and same(kb, f["a"]):
+            return f, True
+    return None
+
+
+def op_lines(d: dict) -> dict | None:
+    """Линии на матч: шанс первой команды карточки на серию, на каждую карту (1–3/5) и точный счёт серии.
+    Pinnacle, если у него есть рынок, иначе медиана по всем букмекерам. Кэш: за 3 ч до начала — 15 мин, раньше — час;
+    после начала не перечитываем (линия до матча)."""
+    if not ODDSPAPI_KEY:
+        return None
+    hit = op_find(d.get("teams") or [], d.get("begin_at"))
+    if not hit:
+        return None
+    f, flip = hit
+    key = f"od:{f['id']}"
+    c = op_cache.get(key) or {}
+    st = parse_iso(f.get("t")) or parse_iso(d.get("begin_at"))
+    ttl = timedelta(minutes=15) if st and st - NOW < timedelta(hours=3) else timedelta(hours=1)
+    fresh = c.get("lines") is not None and ((st and st <= NOW) or (parse_iso(c.get("t")) or NOW) > NOW - ttl)
+    if not fresh and f.get("odds") is not False:
+        mk = op_markets()
+        od = op_get("/odds", fixtureId=f["id"])
+        bo = (od or {}).get("bookmakerOdds") if isinstance(od, dict) else None
+        if bo is not None and mk.get("m"):
+            per: dict = {}  # (вид, номер) → {книга: p первой команды OddsPapi}; для счёта — {книга: {счёт: p}}
+            for slug, b in bo.items():
+                if b.get("suspended"):
+                    continue
+                for mid, m in (b.get("markets") or {}).items():
+                    info = mk["m"].get(str(mid))
+                    if not info:
+                        continue
+                    pr = {}
+                    for oid, o in (m.get("outcomes") or {}).items():
+                        x = ((o.get("players") or {}).get("0") or {})
+                        if x.get("price") and x["price"] > 1 and x.get("active", True):
+                            pr[mk["o"].get(str(mid), {}).get(str(oid), oid)] = 1 / x["price"]
+                    if info[0] == "cs":
+                        if len(pr) >= 3:
+                            t = sum(pr.values())
+                            per.setdefault(("cs", 0), {})[slug] = {k: v / t for k, v in pr.items()}
+                    elif "1" in pr and "2" in pr:
+                        per.setdefault((info[0], info[1]), {})[slug] = pr["1"] / (pr["1"] + pr["2"])
+            def pick(k):
+                v = per.get(k) or {}
+                if "pinnacle" in v:
+                    return v["pinnacle"], "pinnacle"
+                xs = sorted(x for x in v.values() if isinstance(x, float))
+                return (xs[len(xs) // 2], f"рынок ({len(xs)})") if xs else (None, None)
+            win, src = pick(("win", 0))
+            maps = {}
+            for n in range(1, 6):
+                pm, s2 = pick(("map", n))
+                if pm is not None:
+                    maps[str(n)] = [round(pm, 4), s2]
+            cs = (per.get(("cs", 0)) or {})
+            csp = cs.get("pinnacle") or (next(iter(cs.values())) if len(cs) == 1 else None)
+            if csp is None and cs:  # медиана по книгам для каждого счёта, потом нормировка
+                ks = {k for v in cs.values() for k in v}
+                med = {k: sorted(v.get(k, 0.0) for v in cs.values())[len(cs) // 2] for k in ks}
+                t = sum(med.values()) or 1
+                csp = {k: v / t for k, v in med.items()}
+            c = {"t": iso(NOW), "lines": {"win": [round(win, 4), src] if win is not None else None, "maps": maps, "cs": csp, "books": len(bo)}}
+            op_cache[key] = c
+    L = c.get("lines")
+    if not L:
+        return None
+    fl = lambda p: (1 - p) if flip else p
+    out = {"win": fl(L["win"][0]) if L.get("win") else None, "win_src": (L.get("win") or [None, None])[1],
+           "maps": {int(n): fl(v[0]) for n, v in (L.get("maps") or {}).items()},
+           "map_src": next((v[1] for v in (L.get("maps") or {}).values()), None), "books": L.get("books")}
+    if L.get("cs"):
+        sc = {}
+        for k, v in L["cs"].items():
+            mt = re.match(r"(\d):(\d)$", str(k))
+            if mt:
+                a, b2 = int(mt.group(1)), int(mt.group(2))
+                sc[(b2, a) if flip else (a, b2)] = v
+        out["scores"] = [{"score": f"{a}:{b2}", "p": round(100 * v)} for (a, b2), v in sorted(sc.items(), key=lambda kv: -kv[1])]
+    return out
+
+
 def build_prediction(d: dict, bids: list) -> dict | None:
     """Вероятное вето (по вето команд за 3 месяца), счёт на картах (по винрейту карт) и исходы серии."""
     V = d.get("veto") or {}
@@ -5215,7 +5397,14 @@ def build_prediction(d: dict, bids: list) -> dict | None:
     pv = None
     ps = None
     try:
-        if odds and odds.get("win"):
+        opl = op_lines(d)
+    except Exception as e:
+        warn(f"OddsPapi линии: {e!r}")
+        opl = None
+    try:
+        if opl and opl.get("win") is not None:
+            ps = min(0.97, max(0.03, opl["win"]))  # Pinnacle (или рынок) точнее одной линии Thunderpick
+        elif odds and odds.get("win"):
             ps = min(0.97, max(0.03, odds["win"][0] / 100))
         else:
             tbl = vrs_table()
@@ -5240,12 +5429,18 @@ def build_prediction(d: dict, bids: list) -> dict | None:
         lg = math.log(pv / (1 - pv)) + 1.0 * (wr(0, mp) - wr(1, mp))
         return 1 / (1 + math.exp(-lg))
     probs = [pmap2(x["map"]) for x in maps]
+    mline = (opl or {}).get("maps") or {}
+    for i in range(len(probs)):  # линия на карту N (в порядке игры) — точнее винрейтов
+        if mline.get(i + 1) is not None:
+            probs[i] = min(0.97, max(0.03, mline[i + 1]))
     # Счёт карты — по реальным картам (2482 карты, 06.11): проигравший берёт 7–8 раундов почти независимо от разницы
     # в силе (медиана 8; при шансе фаворита на серию ≥85% — 7), овертайм ~15% при близких командах и ~11% при явном
     # фаворите. Прежняя формула через «шанс раунда» почти всегда давала 13:11 и была хуже даже постоянного 13:8.
     fav = max(ps, 1 - ps) if ps is not None else 0.6
-    for x, p in zip(maps, probs):
+    for i, (x, p) in enumerate(zip(maps, probs)):
         lose = 7 if fav >= 0.85 else 8
+        if mline.get(i + 1) is not None and max(p, 1 - p) >= 0.8:
+            lose = 5  # явный фаворит карты по линии: проигравший в среднем ~5 раундов (проверка 06.11)
         x["p"] = round(100 * p)
         x["score"] = [13, lose] if p >= 0.5 else [lose, 13]
         x["ot"] = 15 if fav < 0.8 else 11  # шанс допов на карте, %
@@ -5265,6 +5460,17 @@ def build_prediction(d: dict, bids: list) -> dict | None:
         if odds.get("scores"):
             res["outcomes"], res["source"] = odds["scores"], "букмекеры"
             res["provider"] = odds.get("provider")
+    if opl:
+        if opl.get("scores") and len(opl["scores"]) >= 3:
+            res["outcomes"], res["source"], res["provider"] = opl["scores"], "букмекеры", opl.get("win_src")
+        elif mline or opl.get("win") is not None:
+            res["source"] = "букмекеры"  # исходы посчитаны из линий на карты и на серию
+        if mline:
+            res["map_lines"] = [round(100 * mline[n]) if mline.get(n) is not None else None for n in range(1, len(maps) + 1)]
+        res["lines_src"] = opl.get("map_src") or opl.get("win_src")
+        if opl.get("win") is not None:
+            w = round(100 * min(0.97, max(0.03, opl["win"])))
+            res["win"] = [w, 100 - w]  # шанс на серию в шапке матча — по Pinnacle/рынку
     top = res["outcomes"][0]["score"] if res["outcomes"] else ""
     if bo == 3 and top in ("2:0", "0:2") and len(maps) == 3:
         maps[2]["score"] = [0, 0]  # самый вероятный исход — 2:0, до десайдера дело не дойдёт
@@ -5339,7 +5545,7 @@ def build_detail(m: dict, prev: dict | None) -> dict:
             P0 = dict(prev["prediction"])
             if not P0.get("frozen"):  # первая заморозка: линия из журнала до начала (карточка могла успеть поймать лайв)
                 pm = odds_prematch(bids, detail.get("begin_at")) if len(bids) == 2 and all(bids) else None
-                if pm:
+                if pm and not P0.get("lines_src"):  # линия OddsPapi в прошлой карточке уже была до начала — её и оставляем
                     sc = pm["scores"] or series_outcomes(pm["win"][0] / 100, int(detail.get("bo") or 3))
                     P0["odds"] = {**(P0.get("odds") or {}), "win": pm["win"], "scores": sc, "provider": pm["provider"] or (P0.get("odds") or {}).get("provider")}
                     P0["outcomes"], P0["source"] = sc, "букмекеры"
@@ -6045,6 +6251,10 @@ def main() -> int:
     save_json(DETAILS_CACHE_F, details_cache)
     save_json(BO3_PLAYERS_F, bo3_players)
     save_json(BO3_PLACES_F, bo3_places_cache)
+    for k in [k for k, v in op_cache.items() if k.startswith("od:") and (v.get("t") or "") < iso(NOW - timedelta(days=3))]:
+        del op_cache[k]
+    if op_cache:
+        save_json(OP_CACHE_F, op_cache)
     save_json(TEAMS_CACHE_F, teams_map)
     save_json(TR_CACHE_F, tr_cache)
     save_json(ROSTER_CACHE_F, roster_cache)

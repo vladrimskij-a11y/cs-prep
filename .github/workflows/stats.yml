@@ -49,6 +49,7 @@ jobs:
       - name: Сбор
         env:
           PANDASCORE_TOKEN: ${{ secrets.PANDASCORE_TOKEN }}
+          ODDSPAPI_KEY: ${{ secrets.ODDSPAPI_KEY }}
           STATS_ONLY: "1"
         run: python collector/collect.py
 

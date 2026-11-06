@@ -55,6 +55,7 @@ jobs:
       - name: Сбор
         env:
           PANDASCORE_TOKEN: ${{ secrets.PANDASCORE_TOKEN }}
+          ODDSPAPI_KEY: ${{ secrets.ODDSPAPI_KEY }}
           GIGACHAT_KEY: ${{ secrets.GIGACHAT_KEY }}
           GEMINI_KEY: ${{ secrets.GEMINI_KEY }}
         run: python collector/collect.py

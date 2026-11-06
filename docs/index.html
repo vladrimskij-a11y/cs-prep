@@ -2142,7 +2142,7 @@ a.ni { text-decoration: none; color: inherit; }
   // вероятный пик: вето по привычкам команд за 3 месяца, счёт — по винрейту карт
   // вероятный счёт карты: шанс на серию до матча → шанс на карту, поправка на винрейты команд на этой карте
   // (так же, как в сборщике build_prediction: одна шкала и для прогноза, и для настоящего вето)
-  function mapScoreFor(m, mp) {
+  function mapScoreFor(m, mp, idx) {
     var w0 = winPct(m, 0), ps = w0 != null ? Math.min(0.97, Math.max(0.03, w0 / 100)) : 0.5, bo = +m.bo || 3, lo = 0, hi = 1;
     for (var k = 0; k < 40; k++) {
       var mid = (lo + hi) / 2, ser = bo === 1 ? mid : bo === 5 ? mid * mid * mid * (10 - 15 * mid + 6 * mid * mid) : mid * mid * (3 - 2 * mid);
@@ -2151,8 +2151,11 @@ a.ni { text-decoration: none; color: inherit; }
     var pv = (lo + hi) / 2, row = (((m.maps || {}).table) || []).find(function (r) { return mkey(r.map) === mkey(mp); });
     var wr = function (i) { var t = row ? row.teams[i] : { won: 0, played: 0 }; return (t.won + 1.5) / (t.played + 3); };
     var p = 1 / (1 + Math.exp(-(Math.log(pv / (1 - pv)) + (wr(0) - wr(1)))));
-    // как в сборщике: по 2482 реальным картам проигравший берёт 7–8 раундов почти всегда (медиана 8, при явном фаворите 7)
-    var fav = Math.max(ps, 1 - ps), lose = fav >= 0.85 ? 7 : 8;
+    var ML = ((m.prediction || {}).map_lines || []), ln = idx != null ? ML[idx] : null;
+    if (ln != null) p = ln / 100;  // линия букмекеров на карту N (в порядке игры) — точнее винрейтов
+    // как в сборщике: по 2482 реальным картам проигравший берёт 7–8 раундов почти всегда (медиана 8, при явном фаворите 7);
+    // при фаворите карты по линии ≥80% — около 5
+    var fav = Math.max(ps, 1 - ps), lose = (ln != null && Math.max(p, 1 - p) >= 0.8) ? 5 : fav >= 0.85 ? 7 : 8;
     var sc = p >= 0.5 ? [13, lose] : [lose, 13]; sc.ot = fav < 0.8 ? 15 : 11;
     return sc;
   }
@@ -2166,7 +2169,7 @@ a.ni { text-decoration: none; color: inherit; }
     var sflip = S && S.teams && S.teams[0] && mkey(S.teams[0].name) === mkey(B.name);  // порядок команд у bo3 бывает обратным
     var anyPlayed = false;
     var cards = play.map(function (k, i) {
-      var x = Vn.info[k], by = x.act === "decider" ? null : side(x.who), sc = mapScoreFor(m, x.map);
+      var x = Vn.info[k], by = x.act === "decider" ? null : side(x.who), sc = mapScoreFor(m, x.map, i);
       var mi = SM.findIndex(function (g) { return mkey(g.map) === mkey(x.map) && g.score; }), g = mi >= 0 ? SM[mi] : null;
       var z = !g && bo === 3 && i === 2 && (top === "2:0" || top === "0:2") && !SM.some(function (q) { return q.score; });
       if (g) { sc = sflip ? [g.score[1], g.score[0]] : g.score; anyPlayed = true; }
@@ -2192,8 +2195,8 @@ a.ni { text-decoration: none; color: inherit; }
     if (!P || !(P.maps || []).length) return act;
     var html = '<div class="sec" data-nav><h3>Вероятный пик <span>по вето за 3 мес.</span></h3><div class="box ppick"><div class="pp-maps">' + P.maps.map(function (x, i) {
       var who = x.by === 0 ? abbr(A) : x.by === 1 ? abbr(B) : "";  // кто пикает карту
-      var z = x.score && x.score[0] === 0 && x.score[1] === 0, sc = z ? mapScoreFor(m, x.map) : x.score;  // вероятный счёт — даже если карта может не понадобиться
-      var otp = x.ot != null ? x.ot : (mapScoreFor(m, x.map).ot);
+      var z = x.score && x.score[0] === 0 && x.score[1] === 0, sc = z ? mapScoreFor(m, x.map, i) : x.score;  // вероятный счёт — даже если карта может не понадобиться
+      var otp = x.ot != null ? x.ot : (mapScoreFor(m, x.map, i).ot);
       return '<div class="pp-m ' + (x.by === 0 ? "a" : x.by === 1 ? "b" : "n") + mapBg(x.map) + '"><span class="pp-n">Карта ' + (i + 1) + (who ? ' · ' + esc(who) : '') + '</span><b>' + esc(x.map) + '</b>' +
         '<span class="num pp-s"><span class="a">' + esc(sc ? sc[0] : "–") + '</span>:<span class="b">' + esc(sc ? sc[1] : "–") + '</span></span>' +
         '<small>' + (z ? 'если понадобится · ' : '') + 'допы ~' + otp + '%</small></div>';  // строки с процентами нет — по просьбе владельца
@@ -2703,6 +2706,7 @@ a.ni { text-decoration: none; color: inherit; }
   // шанс команды выиграть серию: по коэффициентам, а без них — сумма исходов прогноза
   function winPct(m, i) {
     var P = m.prediction; if (!P || m.tbd) return null;
+    if (P.win) return P.win[i];  // линия Pinnacle/рынка (OddsPapi)
     if (P.odds && P.odds.win) return P.odds.win[i];
     var s0 = 0, any = false;
     (P.outcomes || []).forEach(function (o) { var x = o.score.split(":"); any = true; if ((+x[0] > +x[1]) === (i === 0)) s0 += +o.p || 0; });
