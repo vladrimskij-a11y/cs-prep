@@ -1999,7 +1999,7 @@ def vrs_outcomes_live(a: dict, b: dict, table: list[dict], brief: dict, lan: boo
         pl = L.played.get(tn) or set()
         both = tuple(0.0 if L.key(x["name"]) in pl else g for x in (a, b))  # «минимум призовых — после первого матча»
         if PLAYOFF_RX.search((brief.get("stage") or "") + " " + (brief.get("name") or "")):
-            wp = max(0.0, VM.playoff_win_prize(places) - g)
+            wp = max(0.0, VM.playoff_win_prize(places, (brief.get("stage") or "") + " " + (brief.get("name") or "")) - g)
             win = (wp, wp)
     f = L.forecast(a["name"], b["name"], _days(NOW), ew=ew, lan=lan, win_prize=win, both_prize=both, base=L.base)
     if not f:

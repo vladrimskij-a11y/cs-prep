@@ -418,8 +418,17 @@ def _losers(a):
     return a - 2 ** int(math.floor(math.log2(a - 1))) if a >= 2 else 0
 
 
-def playoff_win_prize(places):
-    """Гарантия победителя матча плей-офф: место проигравшего в следующем раунде (1/4 IEM Beijing → 4-е)."""
+def playoff_win_prize(places, stage=""):
+    """Гарантия победителя матча плей-офф: место проигравшего в следующем раунде (1/4 IEM Beijing → 4-е).
+    По названию стадии: финал → 1-е, полуфинал → 2-е, четвертьфинал → 3–4-е; иначе — по числу живых команд
+    (при недоигранном соседнем матче счёт живых путает раунд: полуфинал считался четвертьфиналом — 06.11)."""
+    st = (stage or "").lower()
+    if re.search(r"grand final|(?<!semi)(?<!semi-)(?<!quarter)(?<!quarter-)\bfinal\b|гранд|^финал", st) and not re.search(r"semi|quarter|lower|upper|полу|четверт", st):
+        return prize_for_ranks(places, 1, 1)
+    if re.search(r"semi|полуфинал|1/2", st) and not re.search(r"lower|нижн", st):
+        return prize_for_ranks(places, 2, 2)
+    if re.search(r"quarter|четвертьфинал|1/4", st) and not re.search(r"lower|нижн", st):
+        return prize_for_ranks(places, 3, 4)
     a = alive_count(places)
     if a < 2:
         return 0.0
