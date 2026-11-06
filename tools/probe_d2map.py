@@ -1,6 +1,6 @@
 import json, re, sys, time, urllib.request
-sys.path.insert(0, "collector")
-import collect as C
+sys.path.insert(0, "tools"); sys.path.insert(0, "collector")
+import collect_probe as C
 UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
 def get(p):
     time.sleep(1.2)
