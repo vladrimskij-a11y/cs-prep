@@ -4454,14 +4454,20 @@ _mvp_new = [0]
 MVP_PER_RUN = int(os.environ.get("MVP_PER_RUN", "30"))  # страниц игроков HLTV за сбор; сбор раз в час (было 80 раз в 3 ч)
 
 
+def hltv_ids_from_cache() -> None:
+    """id игроков HLTV со страниц команд и рейтинга из прошлых сборов — без запросов. Нужно в ЛЮБОМ режиме:
+    быстрый сбор (stats.yml) тоже пересобирает карточки, и без этих id затирал у игроков MVP и мажоры (06.11)."""
+    for k, v in list(hltv_cache.items()):
+        if k.startswith("tpl:") or k == "rkpl":
+            for n, x in ((v or {}).get("data") or {}).items():
+                hltv_player_ids.setdefault(n, x)
+
+
 def hltv_players_warm() -> None:
     """Очередь страниц игроков HLTV: сначала те, о ком ничего нет, потом давно не обновлённые; ближайшие матчи — вперёд.
     Отказавшие недавно страницы ждут своей паузы и не стоят в начале. Всё полученное до остановки остаётся в кэше,
     следующий сбор продолжает с того же места очереди."""
-    for k, v in list(hltv_cache.items()):  # id игроков со страниц команд и рейтинга из прошлых сборов
-        if k.startswith("tpl:") or k == "rkpl":
-            for n, x in ((v or {}).get("data") or {}).items():
-                hltv_player_ids.setdefault(n, x)
+    hltv_ids_from_cache()
     nicks: list = []
     forms: dict = {}  # ник → форма его команды (турнир, дата серии)
     files = sorted((load_json(f, {}) or {} for f in (OUT / "match").glob("*.json")), key=lambda d: d.get("begin_at") or "9999")
@@ -5477,6 +5483,7 @@ def main() -> int:
         print(f"Тир-2 без команд уровня тир-1 — скрыто матчей: {n0 - len(matches)}")
     CURRENT_TOURS[:] = list(dict.fromkeys(tournament_label(m) for m in matches))
     # id игроков HLTV из составов на страницах ближайших турниров (нужны для Rating 3.0)
+    hltv_ids_from_cache()
     seen_tours = set()
     for m in matches:
         tname = tournament_label(m)
