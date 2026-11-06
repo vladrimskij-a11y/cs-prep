@@ -2140,10 +2140,9 @@ a.ni { text-decoration: none; color: inherit; }
       var mi = SM.findIndex(function (g) { return mkey(g.map) === mkey(x.map) && g.score; }), g = mi >= 0 ? SM[mi] : null;
       var z = !g && bo === 3 && i === 2 && (top === "2:0" || top === "0:2") && !SM.some(function (q) { return q.score; });
       if (g) { sc = sflip ? [g.score[1], g.score[0]] : g.score; anyPlayed = true; }
-      else if (z) sc = [0, 0];
       var inner = '<span class="pp-n">Карта ' + (i + 1) + ' · ' + (x.act === "decider" ? "десайдер" : esc(x.who)) + '</span><b>' + esc(x.map) + '</b>' +
         '<span class="num pp-s"><span class="a">' + sc[0] + '</span>:<span class="b">' + sc[1] + '</span></span>' +
-        (g ? '<small>сыграна · статистика ›</small>' : z ? '<small>скорее всего не понадобится</small>' : '<small>вероятный счёт</small>');
+        (g ? '<small>сыграна · статистика ›</small>' : z ? '<small>вероятный, если понадобится</small>' : '<small>вероятный счёт</small>');
       var cls = 'pp-m ' + (by === 0 ? "a" : by === 1 ? "b" : "n") + (g ? " ppbtn" : "") + mapBg(x.map);  // mapBg дописывает style — он последним
       return g ? '<button class="' + cls + '" data-vser="' + esc(sid) + '" data-vmap="' + mi + '">' + inner + '</button>' : '<div class="' + cls + '">' + inner + '</div>';
     }).join("");
@@ -2161,10 +2160,10 @@ a.ni { text-decoration: none; color: inherit; }
     if (!P || !(P.maps || []).length) return act;
     var html = '<div class="sec" data-nav><h3>Вероятный пик <span>по вето за 3 мес.</span></h3><div class="box ppick"><div class="pp-maps">' + P.maps.map(function (x, i) {
       var who = x.by === 0 ? abbr(A) : x.by === 1 ? abbr(B) : "";  // кто пикает карту
-      var z = x.score && x.score[0] === 0 && x.score[1] === 0;
+      var z = x.score && x.score[0] === 0 && x.score[1] === 0, sc = z ? mapScoreFor(m, x.map) : x.score;  // вероятный счёт — даже если карта может не понадобиться
       return '<div class="pp-m ' + (x.by === 0 ? "a" : x.by === 1 ? "b" : "n") + mapBg(x.map) + '"><span class="pp-n">Карта ' + (i + 1) + (who ? ' · ' + esc(who) : '') + '</span><b>' + esc(x.map) + '</b>' +
-        '<span class="num pp-s"><span class="a">' + esc(x.score ? x.score[0] : "–") + '</span>:<span class="b">' + esc(x.score ? x.score[1] : "–") + '</span></span>' +
-        (z ? '<small>скорее всего не понадобится</small>' : '') + '</div>';  // строки с процентами нет — по просьбе владельца
+        '<span class="num pp-s"><span class="a">' + esc(sc ? sc[0] : "–") + '</span>:<span class="b">' + esc(sc ? sc[1] : "–") + '</span></span>' +
+        (z ? '<small>если понадобится</small>' : '') + '</div>';  // строки с процентами нет — по просьбе владельца
     }).join("") + '</div></div></div>';
     return html + act;
   }

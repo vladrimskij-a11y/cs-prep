@@ -974,8 +974,11 @@ def game_detail(gid: int | None) -> dict | None:
     if not gid:
         return None
     key = str(gid)
-    if key in details_cache:
-        return details_cache[key]
+    c = details_cache.get(key)
+    if c is not None and (c.get("players") or c.get("final")):
+        return c
+    if c is not None and (c.get("chk") or "") > iso(NOW - timedelta(minutes=20)):
+        return c  # без статистики — перепроверяем не чаще раза в 20 минут
     if _details_new[0] >= DETAILS_NEW_LIMIT:
         return None
     _details_new[0] += 1
@@ -1003,6 +1006,13 @@ def game_detail(gid: int | None) -> dict | None:
         })
     d = {"wt": wtc.get("team_id"), "lt": ltc.get("team_id"), "rounds": rounds, "players": players}
     if g.get("status") == "finished":
+        # статистика игроков у bo3 появляется позже итога карты: без неё — перепроверяем; через 3 дня считаем, что её не будет
+        bg = parse_iso(g.get("begin_at") or "")
+        if not players:
+            d["chk"] = iso(NOW)
+            d["n"] = ((c or {}).get("n") or 0) + 1
+            if (bg and bg < NOW - timedelta(days=3)) or d["n"] >= 30:
+                d["final"] = True
         details_cache[key] = d
     return d
 
@@ -3315,6 +3325,50 @@ def d2_sync(listing: list | None = None) -> None:
         if ch:
             save_json(f, d)
     print(f"dust2: матчей в списке {len(lst)}, время поправлено {n_t}, вето перед матчем {n_v}")
+
+
+def live_series_sync() -> None:
+    """Идущие матчи: сыгранные карты со статистикой игроков (bo3.gg) — в карточку, для блока «Вето».
+    Каждые 5 минут вместе с вето dust2 — кнопка «статистика» на карте появляется вскоре после её конца."""
+    n = 0
+    for f in (OUT / "match").glob("*.json"):
+        d = load_json(f, None)
+        if not d or d.get("tbd") or len(d.get("teams") or []) != 2:
+            continue
+        bt = parse_iso(d.get("begin_at"))
+        if not bt or not (NOW - timedelta(hours=8) < bt < NOW + timedelta(minutes=10)) or d.get("status") == "finished":
+            continue
+        bids = [t.get("bo3_id") for t in d["teams"]]
+        if not all(bids):
+            continue
+        res = []
+        for stt in ("current", "finished"):  # по одному статусу: перечисление через запятую bo3 отдаёт пусто
+            try:
+                res += bo3("/matches", {"page[limit]": 10, "filter[matches.status][in]": stt, "sort": "-start_date",
+                                        "filter[matches.team_ids][overlap]": bids[0]}).get("results") or []
+            except Exception as e:
+                warn(f"bo3 идущий матч {f.stem}: {e!r}")
+            if any({x.get("team1_id"), x.get("team2_id")} == set(bids) for x in res):
+                break
+        m = next((x for x in res if {x.get("team1_id"), x.get("team2_id")} == set(bids)
+                  and abs(((parse_iso(x.get("start_date")) or bt) - bt).total_seconds()) < 12 * 3600), None)
+        if not m:
+            continue
+        sd = series_detail(m)
+        if not sd or not sd.get("maps"):
+            continue
+        old = (d.get("series") or {}).get(str(m["id"])) or {}
+        if (d.get("veto_now") or {}).get("steps"):
+            sd["veto"] = [{"team": x.get("team"), "act": x.get("act"), "map": x.get("map")} for x in d["veto_now"]["steps"]]
+        elif old.get("veto"):
+            sd["veto"] = old["veto"]
+        if json.dumps(old.get("maps"), sort_keys=True) == json.dumps(sd.get("maps"), sort_keys=True) and d.get("cur_sid") == str(m["id"]):
+            continue
+        d.setdefault("series", {})[str(m["id"])] = sd
+        d["cur_sid"] = str(m["id"])
+        save_json(f, d)
+        n += 1
+    print(f"Идущие матчи: обновлено сыгранных карт в карточках — {n}")
 
 
 def build_veto(teams: list[dict]) -> dict | None:
@@ -5819,6 +5873,10 @@ def main() -> int:
         d2_sync(listing)
     except Exception as e:
         warn(f"dust2 матчи: {e!r}")
+    try:
+        live_series_sync()
+    except Exception as e:
+        warn(f"Идущие матчи: {e!r}")
     save_json(OUT / "matches.json", {
         "updated": iso(NOW),
         "tiers": sorted(TIERS),
@@ -5917,6 +5975,10 @@ def news_main() -> int:
         d2_sync()  # каждые 5 минут: вето перед матчем и время начала
     except Exception as e:
         warn(f"dust2 матчи: {e!r}")
+    try:
+        live_series_sync()  # и сыгранные карты идущих матчей со статистикой
+    except Exception as e:
+        warn(f"Идущие матчи: {e!r}")
     save_json(TG_CACHE_F, tg_cache)
     save_json(GIGA_USAGE_F, giga_usage)
     save_json(DEDUP_CACHE_F, dedup_cache)
