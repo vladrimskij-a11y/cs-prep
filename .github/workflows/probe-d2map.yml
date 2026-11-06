@@ -1,0 +1,8 @@
+name: probe-d2map
+on: { workflow_dispatch: {}, push: { paths: [".github/workflows/probe-d2map.yml"] } }
+jobs:
+  p:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 tools/probe_d2map.py parivision-vs-natus-vincere mouz-vs-parivision
