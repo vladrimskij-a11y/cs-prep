@@ -5155,15 +5155,31 @@ _op = {"last": 0.0, "off": False}
 OP_PER = {"First": 1, "Second": 2, "Third": 3, "Fourth": 4, "Fifth": 5}
 
 
+OP_MONTH_BUDGET = int(os.environ.get("OP_MONTH_BUDGET", "230"))  # бесплатный тариф — 250 запросов в месяц, 20 — запас
+
+
+def op_used() -> dict:
+    u = op_cache.get("used") or {}
+    if u.get("m") != NOW.strftime("%Y-%m"):
+        u = {"m": NOW.strftime("%Y-%m"), "n": 0}
+        op_cache["used"] = u
+    return u
+
+
 def op_get(path: str, **q):
-    """Запрос к OddsPapi: не чаще раза в 2.6 с; 429 — пауза и один повтор; отказ по ключу/лимиту — пауза 6 ч.
+    """Запрос к OddsPapi: не чаще раза в 2.6 с; счётчик запросов за месяц (не больше OP_MONTH_BUDGET);
+    429 — пауза и один повтор; отказ по ключу/лимиту — пауза (кончился месячный лимит — до 1-го числа).
     В журнал — только путь и код ошибки (в адресе ключ)."""
     if not ODDSPAPI_KEY or _op["off"]:
         return None
     off = parse_iso(op_cache.get("off_until"))
     if off and off > NOW:
         return None
+    u = op_used()
+    if u["n"] >= OP_MONTH_BUDGET:
+        return None
     for k in range(2):
+        u["n"] += 1
         wait = 2.6 - (time.time() - _op["last"])
         if wait > 0:
             time.sleep(wait)
@@ -5173,13 +5189,20 @@ def op_get(path: str, **q):
             return json.loads(http_get(OP_API + path + "?" + urllib.parse.urlencode({**q, "apiKey": ODDSPAPI_KEY}),
                                        {"Accept": "application/json"}, timeout=60, retry429=False))
         except urllib.error.HTTPError as e:
-            if e.code == 429 and k == 0:
+            try:
+                body = e.read()[:400].decode("utf-8", "replace")
+            except Exception:
+                body = ""
+            monthly = bool(re.search(r"(?i)quota|monthly|month|plan|limit exceeded|upgrade", body))
+            if e.code == 429 and k == 0 and not monthly:
                 time.sleep(8)
                 continue
             if e.code in (401, 402, 403, 429):
-                op_cache["off_until"] = iso(NOW + timedelta(hours=6))
+                nxt = (NOW.replace(day=1) + timedelta(days=32)).replace(day=1, hour=0, minute=5, second=0, microsecond=0)
+                op_cache["off_until"] = iso(nxt if monthly else NOW + timedelta(hours=6))
                 _op["off"] = True
-            warn(f"OddsPapi {path}: HTTP {e.code}")
+            clean = re.sub(r"apiKey=[^&\s]+", "apiKey=…", body)[:160]
+            warn(f"OddsPapi {path}: HTTP {e.code} {clean}")
             return None
         except Exception as e:
             warn(f"OddsPapi {path}: {type(e).__name__}")
@@ -5190,7 +5213,7 @@ def op_get(path: str, **q):
 def op_markets() -> dict:
     """Нужные рынки CS2: id → [вид, номер карты, линия] и названия исходов. Каталог перечитываем раз в неделю."""
     c = op_cache.get("mk") or {}
-    if c.get("m") and (parse_iso(c.get("t")) or NOW) > NOW - timedelta(days=7):
+    if c.get("m") and (parse_iso(c.get("t")) or NOW) > NOW - timedelta(days=60):
         return c
     rows = op_get("/markets")
     if not isinstance(rows, list):
@@ -5210,12 +5233,12 @@ def op_markets() -> dict:
     return c
 
 
-def op_fixtures() -> list:
-    """Матчи CS2 на 8 дней вперёд (и вчера) — раз в час."""
+def op_fixtures(need: bool = False) -> list:
+    """Матчи CS2 на 3 дня вперёд — из кэша; новый запрос, только если нужного матча в нём нет и список старше 12 ч."""
     c = op_cache.get("fx") or {}
-    if c.get("list") is not None and (parse_iso(c.get("t")) or NOW) > NOW - timedelta(hours=1):
+    if c.get("list") is not None and (not need or (parse_iso(c.get("t")) or NOW) > NOW - timedelta(hours=12)):
         return c["list"]
-    rows = op_get("/fixtures", sportId=17, **{"from": (NOW - timedelta(days=1)).strftime("%Y-%m-%d"), "to": (NOW + timedelta(days=8)).strftime("%Y-%m-%d")})
+    rows = op_get("/fixtures", sportId=17, **{"from": (NOW - timedelta(days=1)).strftime("%Y-%m-%d"), "to": (NOW + timedelta(days=3)).strftime("%Y-%m-%d")})
     if not isinstance(rows, list):
         return c.get("list") or []
     lst = [{"id": f.get("fixtureId"), "a": f.get("participant1Name"), "b": f.get("participant2Name"), "t": f.get("startTime"), "odds": f.get("hasOdds")}
@@ -5237,7 +5260,15 @@ def op_find(teams: list, begin: str | None) -> tuple | None:
         return None
     ka, kb = keys(teams[0]), keys(teams[1])
     bt = parse_iso(begin)
-    for f in op_fixtures():
+    for attempt in (False, True):
+        hit = _op_scan(op_fixtures(attempt), ka, kb, bt, same)
+        if hit:
+            return hit
+    return None
+
+
+def _op_scan(lst, ka, kb, bt, same):
+    for f in lst:
         ft = parse_iso(f.get("t"))
         if bt and ft and abs((ft - bt).total_seconds()) > 14 * 3600:
             continue
@@ -5250,20 +5281,29 @@ def op_find(teams: list, begin: str | None) -> tuple | None:
 
 def op_lines(d: dict) -> dict | None:
     """Линии на матч: шанс первой команды карточки на серию, на каждую карту (1–3/5) и точный счёт серии.
-    Pinnacle, если у него есть рынок, иначе медиана по всем букмекерам. Кэш: за 3 ч до начала — 15 мин, раньше — час;
-    после начала не перечитываем (линия до матча)."""
-    if not ODDSPAPI_KEY:
+    Pinnacle, если у него есть рынок, иначе медиана по всем букмекерам. Бесплатный тариф — 250 запросов в месяц,
+    поэтому линию берём ОДИН раз на матч: только тир-1 и только за 2 ч до начала (Pinnacle к этому времени
+    выставляет карты), дальше — из кэша (после начала прогноз всё равно заморожен)."""
+    if not ODDSPAPI_KEY or str(d.get("tier") or "").lower() != "s" or len(d.get("teams") or []) != 2:
         return None
-    hit = op_find(d.get("teams") or [], d.get("begin_at"))
-    if not hit:
-        return None
-    f, flip = hit
+    st0 = parse_iso(d.get("begin_at"))
+    soon = st0 is not None and NOW < st0 <= NOW + timedelta(hours=2)  # только до начала: после — линия уже «живая»
+    ck = f"m:{d.get('id')}"
+    if ck in op_cache and op_cache[ck].get("fid"):
+        f = {"id": op_cache[ck]["fid"], "t": op_cache[ck].get("t0")}
+        flip = op_cache[ck].get("flip", False)
+    else:
+        if not soon:
+            return None
+        hit = op_find(d.get("teams") or [], d.get("begin_at"))
+        if not hit:
+            return None
+        f, flip = hit
+        op_cache[ck] = {"fid": f["id"], "flip": flip, "t0": f.get("t"), "t": iso(NOW)}
     key = f"od:{f['id']}"
     c = op_cache.get(key) or {}
-    st = parse_iso(f.get("t")) or parse_iso(d.get("begin_at"))
-    ttl = timedelta(minutes=15) if st and st - NOW < timedelta(hours=3) else timedelta(hours=1)
-    fresh = c.get("lines") is not None and ((st and st <= NOW) or (parse_iso(c.get("t")) or NOW) > NOW - ttl)
-    if not fresh and f.get("odds") is not False:
+    fresh = c.get("lines") is not None
+    if not fresh and soon and f.get("odds") is not False:
         mk = op_markets()
         od = op_get("/odds", fixtureId=f["id"])
         bo = (od or {}).get("bookmakerOdds") if isinstance(od, dict) else None
@@ -6267,7 +6307,7 @@ def main() -> int:
     save_json(DETAILS_CACHE_F, details_cache)
     save_json(BO3_PLAYERS_F, bo3_players)
     save_json(BO3_PLACES_F, bo3_places_cache)
-    for k in [k for k, v in op_cache.items() if k.startswith("od:") and (v.get("t") or "") < iso(NOW - timedelta(days=3))]:
+    for k in [k for k, v in op_cache.items() if (k.startswith("od:") or k.startswith("m:")) and (v.get("t") or "") < iso(NOW - timedelta(days=3))]:
         del op_cache[k]
     if op_cache:
         save_json(OP_CACHE_F, op_cache)
