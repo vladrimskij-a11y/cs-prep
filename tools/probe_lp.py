@@ -1,7 +1,6 @@
 import re, sys
 sys.path.insert(0, "collector")
 import collect as C
-P = C.lp_pages(["FalleN", "Zweih", "B1ad3", "Sidde", "Molodoy", "HObbit"])
+P = C.lp_pages(["FalleN", "Zweih", "Sidde"])
 for k, v in P.items():
-    ib = C.infobox(v)
-    print(k, [l.strip() for l in ib.split("\n") if re.search(r"(?i)hltv|\|\s*id\s*=", l)][:6])
+    print(k, len(v), [v[max(0, m.start()-80):m.start()+80].replace("\n", " ") for m in re.finditer(r"(?i)hltv", v)][:5])
