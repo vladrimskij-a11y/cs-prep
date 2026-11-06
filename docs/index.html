@@ -466,6 +466,7 @@ html { overflow-anchor: none; }
 /* статистика игрока: таблица из двух строк, числа ровно под числами */
 .ps { grid-column: 1 / -1; display: grid; gap: 4px; margin-top: 8px; padding: 8px 10px; border-radius: var(--r-s, 10px); background: var(--sunk); }
 .ps-r { display: grid; grid-template-columns: minmax(84px, 1.25fr) repeat(3, minmax(0, 1fr)); align-items: center; gap: 6px; }
+.ps-r.r4 { grid-template-columns: minmax(78px, 1.15fr) repeat(4, minmax(0, 1fr)); gap: 4px; }  /* с рейтингом HLTV 3.0 */
 .ps-l { font-size: 12px; font-weight: 600; display: flex; flex-direction: column; line-height: 1.2; }
 .ps-l small { font-weight: 400; font-size: 10.5px; color: var(--muted); }
 .ps-c { display: flex; flex-direction: column; align-items: flex-end; line-height: 1.15; }
@@ -2253,10 +2254,12 @@ a.ni { text-decoration: none; color: inherit; }
       [vsBase(f.kd, bkd, 0.15), vsBase(f.adr, badr, 0.12), vsBase(f.kast, bkast, 6, true)]);
   }
   // строка статистики игрока: подпись слева, затем K/D, ADR, KAST — столбцы ровно под столбцами
-  function statRow(icon, label, sub, kd, adr, kast, cls) {
+  function statRow(icon, label, sub, kd, adr, kast, cls, rating) {
     cls = cls || [];
     function c(l, v, suf, k) { return '<span class="ps-c"><small>' + l + '</small><b' + (k ? ' class="' + k + '"' : '') + '>' + (v == null || v === "" || isNaN(Number(v)) ? "–" : esc(v) + (suf || "")) + '</b></span>'; }
-    return '<span class="ps-r"><span class="ps-l">' + icon + ' ' + esc(label) + (sub ? '<small>' + esc(sub) + '</small>' : '') + '</span>' + c("K/D", kd, "", cls[0]) + c("ADR", adr, "", cls[1]) + c("KAST", kast, "%", cls[2]) + '</span>';
+    var r4 = rating !== undefined;  // строка с рейтингом HLTV 3.0 (статистика с dust2)
+    return '<span class="ps-r' + (r4 ? ' r4' : '') + '"><span class="ps-l">' + icon + ' ' + esc(label) + (sub ? '<small>' + esc(sub) + '</small>' : '') + '</span>' +
+      (r4 ? c("Rating", rating, "", rating >= 1.1 ? "hi" : rating <= 0.9 && rating != null ? "lo" : "") : '') + c("K/D", kd, "", cls[0]) + c("ADR", adr, "", cls[1]) + c("KAST", kast, "%", cls[2]) + '</span>';
   }
   // на турнире сильно лучше своего уровня за 3 месяца — зелёным, сильно хуже — красным
   function vsBase(v, base, rel, abs) {
@@ -2270,7 +2273,12 @@ a.ni { text-decoration: none; color: inherit; }
     if (!st) return "";
     var h = st.hltv || {}, fx = function (v, d) { return v == null ? null : Number(v).toFixed(d); };
     var kast = h.kast != null ? h.kast : st.kast;
-    return statRow("📊", st.src === "dust2" ? "HLTV" : "3 мес.", st.maps ? st.maps + " " + plural(st.maps, "карта", "карты", "карт") : "", fx(h.kd != null ? h.kd : st.kd, 2), fx(h.adr != null ? h.adr : st.adr, 1), kast == null ? null : Math.round(kast));
+    var mapsTxt = st.maps ? st.maps + " " + plural(st.maps, "карта", "карты", "карт") : "";
+    if (st.src === "dust2") {  // HLTV 3.0 по матчам dust2: период — сколько уже накопили (1, 2, потом 3 месяца)
+      var mo = Math.min(3, Math.max(1, Math.round((st.days || 30) / 30)));
+      return statRow("📊", mo + " мес.", mapsTxt, fx(st.kd, 2), fx(st.adr, 1), st.kast == null ? null : Math.round(st.kast), null, fx(st.rating, 2));
+    }
+    return statRow("📊", "3 мес.", mapsTxt, fx(h.kd != null ? h.kd : st.kd, 2), fx(h.adr != null ? h.adr : st.adr, 1), kast == null ? null : Math.round(kast));
   }
 
   // без знаков ударения (комбинируемые акценты), й и ё не трогаем
