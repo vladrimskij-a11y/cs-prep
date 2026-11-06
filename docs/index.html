@@ -558,8 +558,8 @@ html { overflow-anchor: none; }
 .pmaj[data-pop]::after { content: ""; position: absolute; inset: -8px; border-radius: 999px; }
 .pmaj.tap { display: inline-block; justify-self: start; padding: 3px 9px; border-radius: 999px; background: var(--sunk); margin-top: 4px; }
 
-.pop .pop-in.wide { box-sizing: border-box; width: min(calc(100vw - 24px), 440px); max-width: none; max-height: min(70vh, 460px); }
-.pop-in > b { position: sticky; top: -10px; margin: -10px -12px 6px; padding: 10px 12px 6px; background: var(--surface); z-index: 1; }  /* заголовок окна стоит, список под ним листается */
+.pop .pop-in.wide { box-sizing: border-box; width: min(calc(100vw - 24px), 440px); max-width: none; max-height: 70vh; }
+.pop-in.long > b { position: sticky; top: -10px; margin: -10px -12px 6px; padding: 10px 12px 6px; background: var(--surface); z-index: 1; }  /* длинный список: заголовок стоит, список листается */
 .pcols { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 8px; }
 .pcol { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
 .pop-in .pci { font-size: 16px; padding-bottom: 4px; border-bottom: 1px solid var(--line); margin-bottom: 2px; } .pop-in .pci b { display: inline; font-size: 14px; margin: 0; }
@@ -615,7 +615,7 @@ body.nav #app > .sshell .shead, body.nav #app > .mshell .mhead { animation: fade
 .pstat.tf { margin-top: 2px; color: var(--muted); } .pstat.tf small { color: var(--muted); }
 .pop { position: fixed; inset: 0; z-index: 50; pointer-events: none; }  /* страница под окном листается */
 .pop .pop-in { pointer-events: auto; }
-.pop-in { position: fixed; max-width: min(320px, calc(100vw - 24px)); max-height: min(50vh, 330px); overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; touch-action: pan-y; background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
+.pop-in { position: fixed; max-width: min(320px, calc(100vw - 24px)); max-height: 50vh; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; touch-action: pan-y; background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
   box-shadow: 0 10px 30px rgba(0,0,0,.35); padding: 10px 12px; font-size: 13px; }
 .pop-in b { display: block; margin-bottom: 6px; }
 .pop-in ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 3px; color: var(--muted); }
@@ -2343,6 +2343,11 @@ a.ni { text-decoration: none; color: inherit; }
     el.innerHTML = '<div class="pop-in' + (d.c ? ' wide' : '') + '"><b>' + esc(d.t) + '</b>' + (d.c ? '<div class="pcols">' + d.c.map(function (c) { return '<div class="pcol"><div class="pci">' + c.i + ' <b>' + c.l.length + '</b></div>' + (c.l.length ? c.l.map(function (x) { return '<div class="pce">' + esc(x) + '</div>'; }).join("") : '<div class="pce none">—</div>') + '</div>'; }).join("") + '</div>' : (d.l || []).length ? '<ul>' + d.l.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join("") + '</ul>' : '<p>Список турниров появится после обновления данных.</p>') + '</div>';
     document.body.appendChild(el);
     var r = anchor.getBoundingClientRect(), box = el.firstChild, W = window.innerWidth;
+    var li = box.querySelectorAll("li");
+    if (li.length > 10) {  // больше 10 строк (мейджоры ветеранов): окно — по первым десяти, остальное листается внутри
+      box.classList.add("long");
+      box.style.maxHeight = Math.round(li[10].offsetTop + li[10].offsetHeight * 0.5) + "px";
+    }
     var top = r.bottom + 6, left = d.c ? Math.max(12, (W - box.offsetWidth) / 2) : Math.min(Math.max(12, r.left), W - box.offsetWidth - 12);
     if (top + box.offsetHeight > window.innerHeight - 12) top = Math.max(12, r.top - box.offsetHeight - 6);
     box.style.top = top + "px"; box.style.left = left + "px";
