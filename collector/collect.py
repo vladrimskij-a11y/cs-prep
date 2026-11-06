@@ -4731,9 +4731,14 @@ def hltv_players_warm() -> None:
         c = hltv_cache.get(f"pinfo5:{pl['id']}")
         old = any(hltv_cache.get(f"{v}:{pl['id']}") for v in ("pinfo4", "pinfo3", "pinfo2", "pinfo"))
         rank = 0 if not c and not old else 1 if not c else 2  # ничего нет → старая версия → давно не обновлялось
+        cd = (c or {}).get("data") or {}
+        short = bool(cd.get("majors")) and len(cd.get("major_events") or []) < cd["majors"]  # список мейджоров неполный
+        if short and (c.get("fix") or 0) < 1:
+            rank = 1
         # MVP и мейджоры меняются только по итогам турниров: страницу перечитываем, когда команда доиграла турнир
         # после прошлой проверки, а без этого — раз в 3 недели (раньше — каждую неделю всех подряд)
-        if c and (parse_iso(c.get("t")) or NOW) > NOW - timedelta(days=PINFO_TTL_DAYS) and not event_ended_since(n, c.get("t") or ""):
+        if (c and (parse_iso(c.get("t")) or NOW) > NOW - timedelta(days=PINFO_TTL_DAYS) and not event_ended_since(n, c.get("t") or "")
+                and rank != 1):
             continue
         queue.append((rank, (c or {}).get("t") or "", i, n))
     queue.sort()
@@ -4750,6 +4755,10 @@ def hltv_players_warm() -> None:
 
 
 PINFO_TTL_DAYS = 21
+# мейджоры, в названии которых нет слова Major (как их пишет HLTV): без этого у ветеранов в списке меньше, чем в счётчике
+# (06.11: у FalleN 19 мейджоров, в окне 13 — не было ESL One Cologne 2015/2016, MLG Columbus 2016, IEM Katowice 2019…)
+MAJOR_RX = re.compile(r"(?i)major|dreamhack winter 201[34]|ems one katowice 2014|esl one (?:katowice 2015|cologne 201[456])"
+                      r"|cluj-napoca 2015|columbus 2016|iem katowice 2019")
 
 
 def hltv_player_info(nick: str, force: bool = False) -> dict | None:
@@ -4805,7 +4814,7 @@ def hltv_player_info(nick: str, force: bool = False) -> dict | None:
             if not m_ev:
                 continue
             name, place = _html.unescape(m_ev.group(1)).strip(), (m_pl.group(1).strip() if m_pl else "")
-            if "major" in name.lower():
+            if MAJOR_RX.search(name):
                 lab = name + (f" — {place}" if place else "")
                 if lab not in mj:
                     mj.append(lab)
@@ -4831,7 +4840,7 @@ def hltv_player_info(nick: str, force: bool = False) -> dict | None:
     d = {"mvp": mvp, "mvp_events": ev, "majors": int(pm.group(1)) if pm else 0, "major_wins": int(wm.group(1)) if wm else 0,
          "major_events": mj, "trophies": tro[:40], "event_wins": wins[:40]}
     d["mvp_events"] = [str(x) for x in d["mvp_events"]] if isinstance(d["mvp_events"], list) else []
-    hltv_cache[key] = {"t": iso(NOW), "data": d}
+    hltv_cache[key] = {"t": iso(NOW), "data": d, "fix": 1}  # fix=1 — разобрано с полным списком мейджоров (MAJOR_RX)
     return d
 
 
