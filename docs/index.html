@@ -558,7 +558,8 @@ html { overflow-anchor: none; }
 .pmaj[data-pop]::after { content: ""; position: absolute; inset: -8px; border-radius: 999px; }
 .pmaj.tap { display: inline-block; justify-self: start; padding: 3px 9px; border-radius: 999px; background: var(--sunk); margin-top: 4px; }
 
-.pop .pop-in.wide { box-sizing: border-box; width: min(calc(100vw - 24px), 440px); max-width: none; max-height: 70vh; }
+.pop .pop-in.wide { box-sizing: border-box; width: min(calc(100vw - 24px), 440px); max-width: none; max-height: min(70vh, 460px); }
+.pop-in > b { position: sticky; top: -10px; margin: -10px -12px 6px; padding: 10px 12px 6px; background: var(--surface); z-index: 1; }  /* заголовок окна стоит, список под ним листается */
 .pcols { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 8px; }
 .pcol { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
 .pop-in .pci { font-size: 16px; padding-bottom: 4px; border-bottom: 1px solid var(--line); margin-bottom: 2px; } .pop-in .pci b { display: inline; font-size: 14px; margin: 0; }
@@ -614,7 +615,7 @@ body.nav #app > .sshell .shead, body.nav #app > .mshell .mhead { animation: fade
 .pstat.tf { margin-top: 2px; color: var(--muted); } .pstat.tf small { color: var(--muted); }
 .pop { position: fixed; inset: 0; z-index: 50; pointer-events: none; }  /* страница под окном листается */
 .pop .pop-in { pointer-events: auto; }
-.pop-in { position: fixed; max-width: min(320px, calc(100vw - 24px)); max-height: 50vh; overflow: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
+.pop-in { position: fixed; max-width: min(320px, calc(100vw - 24px)); max-height: min(50vh, 330px); overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; touch-action: pan-y; background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
   box-shadow: 0 10px 30px rgba(0,0,0,.35); padding: 10px 12px; font-size: 13px; }
 .pop-in b { display: block; margin-bottom: 6px; }
 .pop-in ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 3px; color: var(--muted); }
