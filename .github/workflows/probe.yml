@@ -29,8 +29,8 @@ jobs:
               print("алиасы", t["name"], C.team_aliases(t, C.hltv_team_for(t)))
               ms = C.team_veto_matches(t, C.hltv_team_for(t))
               print("  матчей в архиве:", len(ms), [m.get("slug") for m in ms[:4]])
-              v = C.build_veto([t])
-              print("  вето:", json.dumps(v, ensure_ascii=False)[:300])
+              v = C.build_veto([t, {"name": "Vitality", "acronym": "VIT"}])
+              print("  вето:", [(x or {}).get("matches") for x in (v or {}).get("teams", [])], json.dumps((v or {}).get("teams", [None])[0], ensure_ascii=False)[:200])
           d = json.load(open([f for f in __import__("glob").glob("docs/data/match/*.json") if "FUT" in open(f).read()][0]))
           print("карточка TS vs FUT updated:", d.get("updated"), [bool(x) for x in (d.get("veto") or {}).get("teams", [])])
           EOF
