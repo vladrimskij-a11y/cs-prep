@@ -1443,6 +1443,7 @@ a.ni { text-decoration: none; color: inherit; }
         M.table.map(function (r) { var t = r.teams[0], p = pct(t.won, t.played); return '<tr><td class="mn">' + esc(r.map) + '</td><td class="a"><span class="wr"><span class="pct">' + p + '%</span><span class="track"><i style="width:' + p + '%"></i></span><span class="gp">' + t.won + '/' + t.played + '</span></span></td></tr>'; }).join("") +
         '</tbody></table></div></div>';
     }
+    html += teamPosBlock(T);
     return html;
   }
   var SIDES_LEGEND = '<div class="sd-leg">Раунды на карте: за <i class="sct">CT</i> и за <i class="st">T</i></div>';
@@ -1483,6 +1484,7 @@ a.ni { text-decoration: none; color: inherit; }
   }
   function showTeam(slug) {
     var T = (state.teams || {})[slug];
+    state.teamSlug = slug;
     renderShell({ id: "team:" + slug, back: "Рейтинг", title: esc(T ? T.name : "Команда"), tabs: [{ key: "main", label: "" }], pane: function () { return teamPane(T); } });
   }
 
@@ -2427,7 +2429,15 @@ a.ni { text-decoration: none; color: inherit; }
       if (t.tbd) html += '<div class="note">Соперник ещё не определён.</div>';
       else if (!T[i]) html += '<div class="note">Команды нет в базе ProRoles (там только топ-50).</div>';
       else if (!Object.keys(D).length) html += '<div class="note">На ' + esc(POS_MAPNAME[cur] || cur) + ' демо этой команды пока нет.</div>';
-      else {
+      else html += posTable(players, D, low);
+      html += '</div></div>';
+    });
+    return html;
+  }
+  // таблица позиций одной команды на карте: игрок, где держит за CT, куда идёт за T (матч и страница команды)
+  function posTable(players, D, low) {
+    var html = '';
+    {
         html += '<table class="mtab ptab2"><thead><tr><th>Игрок</th><th class="ct">CT — держит</th><th class="tt">T — идёт первым</th></tr></thead><tbody>';
         players.forEach(function (nk) {
           var r = D[low[String(nk).toLowerCase()]];
@@ -2439,10 +2449,47 @@ a.ni { text-decoration: none; color: inherit; }
             '<td><span class="rl">' + esc(roleRu(r.t)) + '</span>' + (r.ts ? '<span class="ar">' + esc(callRu(r.ts[0])) + ' · ' + r.ts[1] + '%</span>' : '') + '</td></tr>';
         });
         html += '</tbody></table>';
-      }
-      html += '</div></div>';
-    });
+    }
     return html;
+  }
+  // «Позиции» на странице команды: те же данные ProRoles, своя строка карт (data-tpmap)
+  function teamPosT(T) {
+    var ps = (T.roster || []).length ? T.roster : (T.players || []).map(function (p) { return typeof p === "string" ? { nick: p } : p; });
+    return { name: T.name, players: ps.filter(function (p) { return p && p.nick; }) };
+  }
+  function teamPosMaps(T) {
+    var P = state.pos, X = P && posTeam(P, teamPosT(T)); if (!X) return [];
+    var order = ((T.maps || {}).table || []).map(function (r) { return mkey(r.map); });
+    return (P.maps || []).filter(function (mp) { return X[mp] && Object.keys(X[mp]).length; })
+      .sort(function (a, b) { var ia = order.indexOf(a), ib = order.indexOf(b); return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib); });
+  }
+  function teamPosBody(T, cur) {
+    var t = teamPosT(T), D = (posTeam(state.pos, t) || {})[cur] || {}, low = {};
+    Object.keys(D).forEach(function (n) { low[n.toLowerCase()] = n; });
+    var players = t.players.map(function (p) { return p.nick; });
+    Object.keys(D).forEach(function (n) { if (players.map(function (x) { return String(x).toLowerCase(); }).indexOf(n.toLowerCase()) < 0 && players.length < 5) players.push(n); });
+    return '<div class="box">' + (Object.keys(D).length ? posTable(players, D, low) : '<div class="note">На ' + esc(POS_MAPNAME[cur] || cur) + ' демо этой команды пока нет.</div>') + '</div>';
+  }
+  function teamPosBlock(T) {
+    if (!state.pos) {
+      if (!state.posLoading) {
+        state.posLoading = true;
+        dfetch("data/positions.json" + bust()).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; })
+          .then(function (j) {
+            state.pos = j || { teams: {} }; state.posLoading = false;
+            var el = document.getElementById("tpos"), TT = state.teams[state.teamSlug];
+            if (el && TT) el.outerHTML = teamPosBlock(TT);
+          });
+      }
+      return '<div class="sec" id="tpos"><h3>Позиции</h3><div class="box note">Загружаю позиции…</div></div>';
+    }
+    var maps = teamPosMaps(T);
+    if (!maps.length) return '<div class="sec" id="tpos"><h3>Позиции</h3><div class="box note">Позиций этой команды пока нет: ProRoles разбирает демо только команд из топ-50.</div></div>';
+    if (maps.indexOf(state.tposMap) < 0) state.tposMap = maps[0];
+    var cur = state.tposMap;
+    return '<div class="sec" id="tpos"><h3>Позиции <span>CT — где держит, T — куда идёт</span></h3><div class="mapsel" role="group" aria-label="Карта" style="margin-bottom:8px">' + maps.map(function (mp) {
+      return '<button class="chip" data-tpmap="' + esc(mp) + '" aria-pressed="' + (mp === cur) + '">' + esc(POS_MAPNAME[mp] || mp) + '</button>';
+    }).join("") + '</div><div class="tposbody">' + teamPosBody(T, cur) + '</div>' + posSrc(state.pos) + '</div>';
   }
   function posSrc(P) {
     return '<div class="psrc">CT — где игрок стоит с 15-й по 30-ю секунду раунда, T — куда идёт в первые 18 секунд. Посчитано по демо турниров последних месяцев.<br>' +
@@ -3259,7 +3306,7 @@ a.ni { text-decoration: none; color: inherit; }
   // ---------- клики
   document.addEventListener("click", function (e) {
     if (state.pop && !e.target.closest(".pop-in")) { closePop(); if (!e.target.closest("[data-pop]")) { e.preventDefault(); e.stopPropagation(); return; } }
-    var t = e.target.closest("[data-pop],[data-vplay],[data-snav],[data-goto],[data-sk],[data-team],[data-tname],[data-tseries],[data-fread],[data-close],#facts-more,[data-home],[data-feedch],[data-tg],[data-reader],[data-fact],[data-formall],[data-tsub],[data-pmap],[data-open],[data-tour],[data-tab],[data-map],[data-nf],[data-player],[data-link],[data-read],[data-series],[data-rseries],[data-smap],[data-ttab],#back");
+    var t = e.target.closest("[data-pop],[data-vplay],[data-snav],[data-goto],[data-sk],[data-team],[data-tname],[data-tseries],[data-fread],[data-close],#facts-more,[data-home],[data-feedch],[data-tg],[data-reader],[data-fact],[data-formall],[data-tsub],[data-pmap],[data-tpmap],[data-open],[data-tour],[data-tab],[data-map],[data-nf],[data-player],[data-link],[data-read],[data-series],[data-rseries],[data-smap],[data-ttab],#back");
     if (!t) return;
     if (t.hasAttribute("data-pop")) { e.stopPropagation(); e.preventDefault(); openPop(t.getAttribute("data-pop"), t); return; }
     if (t.hasAttribute("data-vplay")) { var vv = t.parentNode.querySelector("video"); if (vv) { t.remove(); vv.play().catch(function () {}); } return; }
@@ -3282,6 +3329,12 @@ a.ni { text-decoration: none; color: inherit; }
     if (t.id === "facts-more") { state.factsAll = !state.factsAll; renderMatch(state.details[state.openId]); return; }
     if (t.hasAttribute("data-tg")) { if (TG) { e.preventDefault(); try { TG.openTelegramLink(t.getAttribute("data-tg")); } catch (x) { openLink(t.getAttribute("data-tg")); } } return; }
     if (t.hasAttribute("data-tsub")) { goKey("team:" + t.getAttribute("data-tsub")); return; }  // «Команда»: Игроки / Позиции — как фильтры новостей
+    if (t.hasAttribute("data-tpmap")) {  // карта в «Позициях» на странице команды
+      state.tposMap = t.getAttribute("data-tpmap");
+      var tb = document.querySelector("#tpos .tposbody"), TT = state.teams[state.teamSlug];
+      if (tb && TT) { tb.innerHTML = teamPosBody(TT, state.tposMap); document.querySelectorAll("#tpos [data-tpmap]").forEach(function (b) { b.setAttribute("aria-pressed", String(b.getAttribute("data-tpmap") === state.tposMap)); }); }
+      return;
+    }
     if (t.hasAttribute("data-pmap")) {  // карта в «Позициях»: перерисовываем только эту страницу, прокрутка остаётся
       state.posMap = t.getAttribute("data-pmap");
       var mt = state.details[state.openId], pp = paneOf("team:pos"), pb = pp && pp.querySelector(".mzbody");
