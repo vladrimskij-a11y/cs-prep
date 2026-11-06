@@ -2875,7 +2875,7 @@ a.ni { text-decoration: none; color: inherit; }
         var w = side(g.winner_clan_name, (g.winner_team_clan || {}).team_id);
         if (w == null) w = 0;
         sc[w] = g.winner_clan_score; sc[1 - w] = g.loser_clan_score;
-      } else if (g.status === "current" && G) {
+      } else if (g.status === "current" && G && (G.game_rounds || []).length) {
         sc = [0, 0];
         (G.game_rounds || []).forEach(function (rd) { var s2 = side(rd.winner_clan_name); if (s2 != null) sc[s2]++; });
       }
@@ -2892,11 +2892,15 @@ a.ni { text-decoration: none; color: inherit; }
         return '<div class="lv-p"><span>' + esc((p.steam_profile || {}).nickname || p.nickname || "?") + '</span><b class="num">' + esc(p.kills || 0) + '–' + esc(p.death || 0) + '</b><i class="num">' + (p.adr != null ? Math.round(p.adr) : "–") + '</i></div>';
       }).join("") + '</div>';
     }).join("") : '';
+    var nr = G ? (G.game_rounds || []).length : 0, curNm = (games.find(function (g) { return g.status === "current"; }) || {}).map_name;
+    curNm = String(curNm || "").replace(/^de_/, ""); curNm = curNm.charAt(0).toUpperCase() + curNm.slice(1);
+    var hint = nr ? '<div class="lv-h">K–D и ADR' + (curNm ? ' на ' + esc(curNm) : '') + ' после ' + nr + '-го раунда · bo3.gg</div>'
+      : '<div class="lv-h">bo3.gg пока не передаёт раунды' + (M.parsed_status === "waiting" ? ' этого матча (ждёт данные)' : '') + ' — счёт карты и статистика игроков появятся, как только начнёт.</div>';
     var now = new Date();
     return '<div class="sec"><h3><span><span class="lv-dot"></span>LIVE</span><small class="lv-upd">обновлено ' + String(now.getHours()).padStart(2, "0") + ':' + String(now.getMinutes()).padStart(2, "0") + ':' + String(now.getSeconds()).padStart(2, "0") + '</small></h3>' +
       '<div class="box live"><div class="lv-s"><span class="a">' + esc(A.acronym || A.name) + '</span><b class="num">' + esc(sa) + ' : ' + esc(sb) + '</b><span class="b">' + esc(B.acronym || B.name) + '</span></div>' +
       (mapsHtml ? '<div class="lv-maps">' + mapsHtml + '</div>' : '') +
-      (tables ? '<div class="lv-ts">' + tables + '</div><div class="lv-h">K–D и ADR за текущую карту · bo3.gg</div>' : '') + '</div></div>';
+      (tables ? '<div class="lv-ts">' + tables + '</div>' : '') + hint + '</div></div>';
   }
   function renderMatch(m) {
     liveStart(m);

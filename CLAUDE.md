@@ -24,7 +24,7 @@
 - `collector/save_data.py` — слияние и запись в ветку `data` (orphan, один коммит, force-with-lease).
 - Workflow: `collect.yml` (полный, каждый час с 06.11 — владелец, лимит 90 мин, публикует Pages; к HLTV тяжёлое — по своим срокам: события 6 ч, список событий 3 ч, игроки по очереди), `stats.yml` (~40 мин), `news.yml` (5 мин), `pages.yml` (при изменении docs/).
   GitHub запускает расписание с опозданием → в воркере есть `scheduled()`: по крону Cloudflare раз в 5 мин запускает news.yml, раз в 30 — stats.yml (нужны секрет GH_TOKEN и Cron Trigger в Cloudflare — делает владелец).
-- LIVE-блок — первым во вкладке «Статистика» (`#livebox`, владелец 06.11; раньше был в «Игроках»).
+- LIVE-блок — первым во вкладке «Статистика» (`#livebox`, владелец 06.11; раньше был в «Игроках»). Подпись «K–D и ADR на <карта> после N-го раунда»; пока у bo3 `parsed_status: waiting` (раундов нет) — подпись, что bo3 ещё не передаёт раунды. 06.11 на PRV–NAVI bo3 полчаса после начала отдавал только «current» без раундов и статистики — это их задержка, не наша.
 - Live: Cloudflare Worker `https://rimcs-live.vladrimskij.workers.dev` → api.bo3.gg (/matches, /games, /games/ID/players_stats), код в `tools/cloudflare-worker.js`; владелец вставляет его сам в редакторе Cloudflare.
 - Нейросеть: Gemini `gemini-flash-latest` (основная; при 503 ждёт и переходит на `gemini-flash-lite-latest`,
   она не принимает thinkingConfig; 2.5-flash-lite снята), GigaChat (запасная). Ключ GEMINI_KEY добавлен 04.11.
