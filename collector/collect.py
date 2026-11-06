@@ -2765,9 +2765,10 @@ def hltv_events() -> dict:
     """slug → путь страницы события: текущие и будущие (/events) + сыгранные в этом году (архив, раз в сутки)."""
     if _events_cache:
         return _events_cache
-    out = {}
-    for href, slug in re.findall(r'href="(/events/\d+/([^"#?]+))"', hltv_get("/events") or ""):
-        out.setdefault(slug, href)
+    # список событий — раз в 3 ч (сбор теперь каждый час, лишний запрос к HLTV не нужен)
+    out = dict(hltv_cached("evlist", lambda: dict((slug, href) for href, slug in
+                                                  re.findall(r'href="(/events/\d+/([^"#?]+))"', hltv_get("/events") or "")) or None,
+                           ttl_h=3) or {})
 
     def arch():  # архив листается страницами по 50 — берём до 6 страниц (весь год), раз в сутки
         res: dict = {}
@@ -4450,7 +4451,7 @@ def build_facts(d: dict, prev: dict | None) -> list | None:
 # ---------------------------------------------------------------- main
 
 _mvp_new = [0]
-MVP_PER_RUN = int(os.environ.get("MVP_PER_RUN", "80"))  # страниц игроков HLTV за полный сбор (темп тот же — раз в 2,5 с)
+MVP_PER_RUN = int(os.environ.get("MVP_PER_RUN", "30"))  # страниц игроков HLTV за сбор; сбор раз в час (было 80 раз в 3 ч)
 
 
 def hltv_players_warm() -> None:
