@@ -1,8 +1,10 @@
 name: probe-d2map
-on: { workflow_dispatch: {}, push: { paths: [".github/workflows/probe-d2map.yml"] } }
+on: { workflow_dispatch: {} }
 jobs:
   p:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
       - run: python3 tools/probe_d2map.py
