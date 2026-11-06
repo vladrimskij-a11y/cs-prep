@@ -2270,7 +2270,7 @@ a.ni { text-decoration: none; color: inherit; }
     if (!st) return "";
     var h = st.hltv || {}, fx = function (v, d) { return v == null ? null : Number(v).toFixed(d); };
     var kast = h.kast != null ? h.kast : st.kast;
-    return statRow("📊", "3 мес.", st.maps ? st.maps + " " + plural(st.maps, "карта", "карты", "карт") : "", fx(h.kd != null ? h.kd : st.kd, 2), fx(h.adr != null ? h.adr : st.adr, 1), kast == null ? null : Math.round(kast));
+    return statRow("📊", st.src === "dust2" ? "HLTV" : "3 мес.", st.maps ? st.maps + " " + plural(st.maps, "карта", "карты", "карт") : "", fx(h.kd != null ? h.kd : st.kd, 2), fx(h.adr != null ? h.adr : st.adr, 1), kast == null ? null : Math.round(kast));
   }
 
   // без знаков ударения (комбинируемые акценты), й и ё не трогаем
@@ -2384,7 +2384,7 @@ a.ni { text-decoration: none; color: inherit; }
       if (tg.some(function (x) { return /AWP/.test(x); })) return 2;
       return 3;
     }
-    function prate(p) {  // от лучшего к худшему: рейтинг bo3 за 3 месяца, если нет — K/D
+    function prate(p) {  // от лучшего к худшему: Rating 3.0 HLTV (dust2) или рейтинг bo3 за период, если нет — K/D
       var key = String(p.nick || "").toLowerCase().replace(/[^a-z0-9а-я]/g, "");
       var st = ((statsTeam || {}).stats || []).find(function (x) { return String(x.nick).toLowerCase().replace(/[^a-z0-9а-я]/g, "") === key; });
       return st ? (st.rating != null ? st.rating : (st.kd || 0) * 6) : -1;

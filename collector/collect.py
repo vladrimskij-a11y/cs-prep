@@ -1332,7 +1332,15 @@ def match_roster(x: dict, roster: dict, team_ids: dict | None = None) -> str | N
 
 
 def build_player_stats(team: dict, bid: int | None, hist: list[dict]) -> list[dict]:
-    """Статистика игроков состава за STATS_WINDOW_DAYS по картам bo3.gg."""
+    """Статистика игроков состава за STATS_WINDOW_DAYS: сначала по архиву dust2 (Rating 3.0 HLTV, владелец 06.11),
+    если там у команды мало карт — по картам bo3.gg, как раньше."""
+    try:
+        d2 = d2_player_stats(team, STATS_WINDOW_DAYS) if (team.get("name") or team.get("acronym")) else []
+    except Exception as e:
+        warn(f"dust2 статистика игроков {team.get('name')}: {e!r}")
+        d2 = []
+    if len([x for x in d2 if x["maps"] >= 3]) >= 3:
+        return d2
     if not bid:
         return []
     roster = {norm(p.get("nick")): p.get("nick") for p in team.get("players") or []}
@@ -1448,7 +1456,7 @@ def series_detail(m: dict) -> dict | None:
         maps.append({"map": g.get("map"), "score": score, "winner": win, "sides": map_sides(det, win),
                      "players": [series_players(rows, t1, names), series_players(rows, t2, names)] if rows else None})
     tm1, tm2 = m.get("team1") or {}, m.get("team2") or {}
-    return {
+    out = {
         "id": m["id"], "date": m.get("start_date"), "bo": m.get("bo_type"),
         "tournament": tour_name(m) or None,
         "teams": [{"name": tm1.get("name"), "acronym": tm1.get("acronym"), "score": m.get("team1_score"), "logo": tm1.get("image_url")},
@@ -1457,6 +1465,11 @@ def series_detail(m: dict) -> dict | None:
         "maps": maps,
         "players": [series_players(every, t1, names), series_players(every, t2, names)] if every else None,
     }
+    try:
+        d2_enrich(out)  # статистика игроков — HLTV Rating 3.0 с dust2, где матч есть в архиве
+    except Exception as e:
+        warn(f"dust2 в серии {m.get('id')}: {e!r}")
+    return out
 
 
 ROUND_RU = [(r"grand final", "гранд-финал"), (r"upper bracket", "верхняя сетка"), (r"lower bracket", "нижняя сетка"),
@@ -3235,6 +3248,11 @@ def hltv_veto(match: dict) -> dict | None:
     b = re.sub(r"\s+", " ", h)
     steps = d2_parse_veto(b)
     dm = re.search(r'data-(?:unix|date)="(\d{12,})"', b)
+    try:  # тем же запросом — статистика игроков матча (Rating 3.0 HLTV) в архив
+        dd = iso(datetime.fromtimestamp(int(dm.group(1)) / 1000, tz=timezone.utc)) if dm else match.get("date")
+        d2_store(match["id"], match.get("slug"), dd, b)
+    except Exception as ex:
+        warn(f"dust2 статистика {match.get('id')}: {ex!r}")
     d = {"date": iso(datetime.fromtimestamp(int(dm.group(1)) / 1000, tz=timezone.utc)) if dm else None, "steps": steps}
     if not d["date"] and match.get("date"):
         d["date"] = match["date"]  # дата из ленты dust2
@@ -3306,6 +3324,168 @@ def d2_parse_result(b: str) -> dict:
                     teams[strip_html(tnm.group(1))] = sorted(rows, key=lambda r: -r[5])
             if teams:
                 out["stats"]["*" if name.lower().startswith("all") else name] = teams
+    return out
+
+
+D2_STATS_F = CACHE / "d2_stats.json"
+d2_stats: dict = load_json(D2_STATS_F, {})  # id матча dust2 → {date, slug, teams, maps, stats, done, t}: статистика HLTV (Rating 3.0)
+D2_STATS_NEW = int(os.environ.get("D2_STATS_NEW", "400"))  # новых страниц матчей за сбор (dust2 — раз в секунду, отказов не было)
+_d2s_new = [0]
+
+
+def d2_store(mid, slug: str | None, date: str | None, b: str) -> dict | None:
+    """Разбор страницы матча dust2 (b — html с одинарными пробелами) в архив статистики: счёт карт и таблицы игроков
+    (Rating 3.0, K-D, ADR, KAST) по каждой карте и по серии. Доигранный матч хранится навсегда."""
+    R = d2_parse_result(b)
+    if not R["stats"]:
+        return None
+    tn = next((m["teams"] for m in R["maps"] if len(m.get("teams") or []) == 2), None) or list((R["stats"].get("*") or {}).keys())[:2]
+    need = len(R["maps"]) // 2 + 1 if R["maps"] else 1
+    wins = {}
+    for m in R["maps"]:
+        if m.get("score") and len(m.get("teams") or []) == 2:
+            w = m["teams"][0] if m["score"][0] > m["score"][1] else m["teams"][1]
+            wins[w] = wins.get(w, 0) + 1
+    e = {"date": date, "slug": slug, "teams": tn, "maps": R["maps"], "stats": R["stats"], "t": iso(NOW),
+         "done": bool(wins) and max(wins.values()) >= need and all(R["stats"].get(m["map"]) for m in R["maps"] if m.get("score"))}
+    d2_stats[str(mid)] = e
+    return e
+
+
+def d2_stats_sync() -> None:
+    """Страницы прошедших матчей из ленты dust2 (последний месяц), которых нет в архиве: статистика игроков HLTV.
+    Один раз на матч (недоигранный/без таблиц — повтор через 6 ч)."""
+    n = 0
+    for mt in d2_recent_matches():
+        e = d2_stats.get(str(mt["id"]))
+        if e and (e.get("done") or (parse_iso(e.get("t")) or NOW) > NOW - timedelta(hours=6)):
+            continue
+        if _d2s_new[0] >= D2_STATS_NEW or _d2_blocked[0]:
+            break
+        _d2s_new[0] += 1
+        h = d2_get(f"/matches/{mt['id']}/{mt['slug']}")
+        if not h:
+            continue
+        b = re.sub(r"\s+", " ", h)
+        try:
+            if d2_store(mt["id"], mt["slug"], mt.get("date"), b):
+                n += 1
+            if f"match:{mt['id']}" not in veto_cache:  # заодно вето — тем же запросом
+                steps = d2_parse_veto(b)
+                if steps:
+                    veto_cache[f"match:{mt['id']}"] = {"date": mt.get("date"), "steps": steps}
+        except Exception as ex:
+            warn(f"dust2 статистика {mt['id']}: {ex!r}")
+    print(f"dust2: статистика матчей — новых {n}, всего в архиве {len(d2_stats)}")
+
+
+def _d2_teamkeys(name: str) -> set:
+    n = name or ""
+    return {k for k in (norm(n), norm(re.sub(r"(?i)^(the|team)\s+|\s+(team|esports|gaming|club|cs2?)$", "", n))) if len(k) >= 2}
+
+
+def _d2_same(keys: set, x: str) -> bool:
+    g = norm(x)
+    return bool(g) and any(k == g or (min(len(k), len(g)) >= 3 and (k in g or g in k)) for k in keys)
+
+
+def d2_find_stats(names: list, date: str | None):
+    """Матч из архива dust2 для двух команд и даты (±36 ч): (запись, порядок) — порядок[i] = название команды i у dust2."""
+    d0 = parse_iso(date)
+    if len(names) != 2 or not all(names) or not d0:
+        return None, None
+    ka, kb = _d2_teamkeys(names[0]), _d2_teamkeys(names[1])
+    best = None
+    for e in d2_stats.values():
+        ed = parse_iso(e.get("date"))
+        if not ed or abs((ed - d0).total_seconds()) > 36 * 3600 or len(e.get("teams") or []) != 2:
+            continue
+        t0, t1 = e["teams"]
+        if _d2_same(ka, t0) and _d2_same(kb, t1):
+            o = [t0, t1]
+        elif _d2_same(ka, t1) and _d2_same(kb, t0):
+            o = [t1, t0]
+        else:
+            continue
+        dt = abs((ed - d0).total_seconds())
+        if not best or dt < best[0]:
+            best = (dt, e, o)
+    return (best[1], best[2]) if best else (None, None)
+
+
+def d2_enrich(sd: dict) -> None:
+    """Статистика игроков серии — с dust2 (Rating 3.0 HLTV) вместо bo3, где матч есть в архиве; счёт — где у bo3 пусто."""
+    names = [(t or {}).get("name") for t in sd.get("teams") or []]
+    e, o = d2_find_stats(names, sd.get("date"))
+    if not e:
+        return
+    st = e.get("stats") or {}
+    def pair(tab):
+        if not tab:
+            return None
+        rows = [tab.get(o[0]), tab.get(o[1])]
+        return rows if all(rows) else None
+    any_map = False
+    for g in sd.get("maps") or []:
+        tab = st.get(g.get("map")) or next((v for k, v in st.items() if norm(k) == norm(g.get("map"))), None)
+        pr = pair(tab)
+        if pr:
+            g["players"], g["src"] = pr, "dust2"
+            any_map = True
+        if not g.get("score"):
+            mm = next((m for m in e.get("maps") or [] if norm(m.get("map")) == norm(g.get("map")) and m.get("score")), None)
+            if mm and len(mm.get("teams") or []) == 2:
+                sc = mm["score"] if mm["teams"][0] == o[0] else [mm["score"][1], mm["score"][0]]
+                g["score"], g["winner"] = sc, 0 if sc[0] > sc[1] else 1
+    allp = pair(st.get("*"))
+    if allp:
+        sd["players"] = allp
+    if any_map and all(g.get("src") == "dust2" for g in sd.get("maps") or [] if g.get("players")):
+        sd["src"] = "dust2"
+
+
+def d2_player_stats(team: dict, days: int = 90) -> list[dict]:
+    """Статистика игроков команды за период по архиву dust2 (Rating 3.0 HLTV): по каждой сыгранной карте."""
+    keys = set()
+    for x in (team.get("name"), team.get("acronym")):
+        keys |= _d2_teamkeys(x or "")
+    if not keys:
+        return []
+    roster = {norm(p.get("nick")): p.get("nick") for p in team.get("players") or []}
+    roster.update({leet(k): v for k, v in list(roster.items())})
+    agg: dict = {}
+    first = None
+    for e in d2_stats.values():
+        ed = parse_iso(e.get("date"))
+        if not ed or ed < NOW - timedelta(days=days):
+            continue
+        tn = next((t for t in e.get("teams") or [] if _d2_same(keys, t)), None)
+        if not tn:
+            continue
+        for mp, tab in (e.get("stats") or {}).items():
+            if mp == "*" or not tab.get(tn):
+                continue
+            first = min(first or ed, ed)
+            for r in tab[tn]:
+                k = norm(r[0])
+                k = k if k in roster else leet(k) if leet(k) in roster else k
+                if roster and k not in roster:
+                    continue
+                a = agg.setdefault(k, {"nick": roster.get(k, r[0]), "maps": 0, "k": 0, "d": 0, "adr": 0.0, "kast": 0.0, "r": 0.0, "per_map": {}})
+                a["maps"] += 1
+                a["k"] += r[1]; a["d"] += r[2]; a["adr"] += r[3]; a["kast"] += r[4]; a["r"] += r[5]
+                pm = a["per_map"].setdefault(mp, [0, 0.0])
+                pm[0] += 1
+                pm[1] += r[5]
+    out = []
+    for a in agg.values():
+        n = a["maps"] or 1
+        best = sorted(((mp, v[1] / v[0], v[0]) for mp, v in a["per_map"].items() if v[0] >= 3), key=lambda t: -t[1])
+        out.append({"nick": a["nick"], "maps": a["maps"], "rating": round(a["r"] / n, 2), "kd": round(a["k"] / a["d"], 2) if a["d"] else None,
+                    "adr": round(a["adr"] / n, 1), "kast": round(a["kast"] / n), "best_map": best[0][0] if best else None,
+                    "worst_map": best[-1][0] if len(best) > 1 else None, "src": "dust2",
+                    "days": max(1, (NOW - first).days) if first else None})
+    out.sort(key=lambda x: -x["rating"])
     return out
 
 
@@ -5961,7 +6141,7 @@ def build_team_page(r: dict) -> dict | None:
                 p["name_ru"] = pc["name_ru"]
     return {"updated": iso(NOW), "name": r["name"], "vrs": {k: r.get(k) for k in ("rank", "points", "region", "reg_rank", "hltv_rank")},
             "players": players or r.get("roster") or [], "roster": roster, "coach": coach, "logo": r.get("logo"), "roster_src": roster_src,
-            "stats": build_player_stats({"players": roster}, bid, hist) if roster else [],
+            "stats": build_player_stats({"players": roster, "name": r["name"]}, bid, hist) if roster else [],
             "form": form, "series": series, "upcoming": bo3_upcoming(bid),
             "maps": {"window_days": maps.get("window_days"), "table": maps.get("table") or []}, "prizes": ach}
 
@@ -6181,6 +6361,10 @@ def main() -> int:
     if n0 != len(matches):
         print(f"Тир-2 без команд уровня тир-1 — скрыто матчей: {n0 - len(matches)}")
     CURRENT_TOURS[:] = list(dict.fromkeys(tournament_label(m) for m in matches))
+    try:  # статистика игроков HLTV (Rating 3.0) с dust2 — до карточек: по ней серии и игроки за период
+        d2_stats_sync()
+    except Exception as e:
+        warn(f"dust2 статистика: {e!r}")
     # id игроков HLTV из составов на страницах ближайших турниров (нужны для Rating 3.0)
     hltv_ids_from_cache()
     seen_tours = set()
@@ -6359,6 +6543,17 @@ def main() -> int:
                             save_json(path, rj)
                     except Exception as ex:
                         warn(f"Сетка {tr['name']}: {ex!r}")
+            n_d2 = 0
+            for sd in rj.get("matches") or []:  # статистика игроков — HLTV Rating 3.0 из архива dust2, без запросов
+                if sd.get("src") != "dust2":
+                    before = json.dumps(sd.get("maps"), sort_keys=True)
+                    try:
+                        d2_enrich(sd)
+                    except Exception as ex:
+                        warn(f"dust2 в итогах: {ex!r}")
+                    n_d2 += json.dumps(sd.get("maps"), sort_keys=True) != before
+            if n_d2:
+                save_json(path, rj)
             # матчи без счёта/статистики карт (итоги собрали раньше, чем bo3 выложил карты) — дособираем:
             # до 3 турниров за сбор, у каждого не больше 6 попыток (06.11: 114 из 398 матчей были пустыми, весь Cologne Major)
             holes = [x for x in rj.get("matches") or [] if not x.get("maps") or any(g.get("score") is None or not g.get("players") for g in x["maps"])]
@@ -6434,6 +6629,7 @@ def main() -> int:
     save_json(FACTS_CACHE_F, facts_cache)
     save_json(HLTV_CACHE_F, hltv_cache)
     save_json(VETO_CACHE_F, veto_cache)
+    save_json(D2_STATS_F, d2_stats)
     for k in [k for k in giga_usage if k < (NOW - timedelta(days=40)).strftime("%Y-%m-%d")]:
         del giga_usage[k]
     save_json(GIGA_USAGE_F, giga_usage)
@@ -6589,6 +6785,7 @@ def news_main() -> int:
     save_json(GIGA_USAGE_F, giga_usage)
     save_json(DEDUP_CACHE_F, dedup_cache)
     save_json(TR_CACHE_F, tr_cache)
+    save_json(D2_STATS_F, d2_stats)
     print(f"Новости обновлены, предупреждений: {len(stats['warnings'])}")
     return 0
 
