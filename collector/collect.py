@@ -4047,13 +4047,19 @@ def gather_news(teams: list[dict]) -> list[dict]:
         src = (it["source"] or "").lower()
         cs_src = any(s in src for s in CS_SOURCES) or bool(it.get("tg"))
         about = []
+        body = it.get("text") or it.get("snippet") or ""
         for label, rx, amb, ti in entities:
-            if not rx.search(title):
+            # команда — по заголовку; игрок состава — и по всему тексту поста (новость про игрока, где его ник
+            # не в первой строке: «худшая карта zweih» в подборке PARIVISION — владелец 06.11)
+            in_title = bool(rx.search(title))
+            if not in_title and not (label not in team_names and rx.search(body)):
                 continue
             if amb:
-                # неоднозначный ник/название: нужно, чтобы рядом была его команда или явный контекст CS
+                # неоднозначный ник/название: нужно, чтобы рядом была его команда или явный контекст CS;
+                # в CS-каналах Telegram ник от 4 букв, не обычное слово, — достаточно
                 own_team = teams[ti]["name"]
-                if not (entity_re(own_team, False).search(text) and label != own_team) and not CS_CONTEXT.search(title):
+                tg_ok = bool(it.get("tg")) and label != own_team and len(label) >= 4 and label.lower() not in COMMON_WORDS
+                if not tg_ok and not (entity_re(own_team, False).search(text + " " + body) and label != own_team) and not CS_CONTEXT.search(title):
                     continue
             if label not in about:
                 about.append(label)

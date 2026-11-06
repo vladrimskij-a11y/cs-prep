@@ -2341,7 +2341,7 @@ a.ni { text-decoration: none; color: inherit; }
     return html;
   }
   function playersTab(m) {
-    var html = '<div id="livebox">' + (state.live && state.live.id === m.id ? state.live.html || "" : "") + '</div>';
+    var html = '';
     m.teams.forEach(function (t, i) {
       if (t.tbd) {
         var cs = (t.opp || {}).cands || [];
@@ -2634,7 +2634,8 @@ a.ni { text-decoration: none; color: inherit; }
   function tabBodyHtml(m, key) {
     if (key === "team:players") return playersTab(m);
     if (key === "team:pos") return posBlock(m);
-    if (key === "stats") return stakeBlock(m) + vrsBlock(m) + pickBlock(m) + mapsTable(m) + mapZone(m) + h2hBlock(m) + formBlock(m);  // форма — после карт (по просьбе владельца)
+    if (key === "stats") return '<div id="livebox">' + (state.live && state.live.id === m.id ? state.live.html || "" : "") + '</div>' +  // LIVE — первым в «Статистике» (владелец 06.11)
+      stakeBlock(m) + vrsBlock(m) + pickBlock(m) + mapsTable(m) + mapZone(m) + h2hBlock(m) + formBlock(m);  // форма — после карт (по просьбе владельца)
     return (key === "news:all" ? factsBlock(m) : "") + newsList(m, key.slice(5));
   }
 
