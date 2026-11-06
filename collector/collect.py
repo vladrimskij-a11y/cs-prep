@@ -2876,6 +2876,9 @@ def parse_hltv_event(html: str) -> dict:
         pl = re.findall(r'<a href="/player/(\d+)/([^"]+)">([^<]+)</a>', lu[1] if len(lu) > 1 else "")
         lineups[strip_html(tn.group(1))] = [{"id": int(i), "slug": sl, "nick": strip_html(nk)} for i, sl, nk in pl]
     res["lineups"] = lineups
+    # тренеры участников: у HLTV у тренера своя страница /coach/<id>/<ник> (мейджоры и трофеи — как тренера)
+    res["coach_ids"] = [{"id": int(i), "slug": sl, "nick": strip_html(tx) or sl}
+                        for i, sl, tx in dict.fromkeys(re.findall(r'href="/coach/(\d+)/([^"/?#]+)"[^>]*>(?:<[^>]+>)*\s*([^<]*)', b))]
     res["team_ids"] = {strip_html(n): {"id": int(i), "slug": sl} for i, sl, n in
                        re.findall(r'<div class="team-name"><a href="/team/(\d+)/([^"]+)"><div class="text-container"><div class="text">([^<]+)</div>', b)}
     return res
@@ -2963,6 +2966,18 @@ hltv_stats_cache: dict = load_json(HLTV_STATS_CACHE_F, {})
 HLTV_STATS_LIMIT = int(os.environ.get("HLTV_STATS_LIMIT", "0"))  # страницы статистики HLTV закрыты для ботов (403)
 _hltv_stats_new = [0]
 hltv_player_ids: dict = {}   # norm(ник) → {"id","slug"}
+hltv_coach_ids: dict = {}    # norm(ник тренера) → {"id","slug"} — страницы /coach/ (со страниц турниров), кэш «cpl»
+
+
+def hltv_ref(nick: str, coach: bool = False):
+    """Страница HLTV человека: тренер — его страница тренера (если id известен), иначе страница игрока.
+    → (запись id/slug, префикс кэша, путь)."""
+    if coach:
+        c = hltv_coach_ids.get(norm(nick))
+        if c:
+            return c, "cinfo1", "/coach"
+    pl = hltv_player_ids.get(norm(nick))
+    return (pl, "pinfo5", "/player") if pl else (None, None, None)
 
 
 def _num_after(b: str, label: str) -> float | None:
@@ -4712,6 +4727,9 @@ def hltv_ids_from_cache() -> None:
         if k.startswith("tpl:") or k == "rkpl":
             for n, x in ((v or {}).get("data") or {}).items():
                 hltv_player_ids.setdefault(n, x)
+        elif k == "cpl":
+            for n, x in ((v or {}).get("data") or {}).items():
+                hltv_coach_ids.setdefault(n, x)
 
 
 def hltv_players_warm() -> None:
@@ -4722,15 +4740,18 @@ def hltv_players_warm() -> None:
     nicks: list = []
     forms: dict = {}  # ник → форма его команды (турнир, дата серии)
     files = sorted((load_json(f, {}) or {} for f in (OUT / "match").glob("*.json")), key=lambda d: d.get("begin_at") or "9999")
+    coaches: set = set()
     for d in files:
         for t in d.get("teams") or []:
             ps = [p.get("nick") for p in (t.get("players") or []) + (t.get("coach") or [])]
+            coaches |= {norm(p.get("nick")) for p in t.get("coach") or []}
             nicks += ps
             for n in ps:
                 forms.setdefault(n, t.get("form") or [])
     for f in sorted((OUT / "team").glob("*.json")):
         d = load_json(f, {}) or {}
         ps = [p.get("nick") for p in (d.get("roster") or []) + (d.get("coach") or [])]
+        coaches |= {norm(p.get("nick")) for p in d.get("coach") or []}
         nicks += ps
         for n in ps:
             forms.setdefault(n, d.get("form") or [])
@@ -4744,11 +4765,12 @@ def hltv_players_warm() -> None:
         return False
     queue = []
     for i, n in enumerate(dict.fromkeys(x for x in nicks if x)):
-        pl = hltv_player_ids.get(norm(n))
+        isc = norm(n) in coaches
+        pl, kp, _ = hltv_ref(n, isc)
         if not pl:
             continue
-        c = hltv_cache.get(f"pinfo5:{pl['id']}")
-        old = any(hltv_cache.get(f"{v}:{pl['id']}") for v in ("pinfo4", "pinfo3", "pinfo2", "pinfo"))
+        c = hltv_cache.get(f"{kp}:{pl['id']}")
+        old = kp == "pinfo5" and any(hltv_cache.get(f"{v}:{pl['id']}") for v in ("pinfo4", "pinfo3", "pinfo2", "pinfo"))
         rank = 0 if not c and not old else 1 if not c else 2  # ничего нет → старая версия → давно не обновлялось
         cd = (c or {}).get("data") or {}
         short = bool(cd.get("majors")) and len(cd.get("major_events") or []) < cd["majors"]  # список мейджоров неполный
@@ -4759,14 +4781,14 @@ def hltv_players_warm() -> None:
         if (c and (parse_iso(c.get("t")) or NOW) > NOW - timedelta(days=PINFO_TTL_DAYS) and not event_ended_since(n, c.get("t") or "")
                 and rank != 1):
             continue
-        queue.append((rank, (c or {}).get("t") or "", i, n))
+        queue.append((rank, (c or {}).get("t") or "", i, n, isc))
     queue.sort()
     done = 0
-    for _, _, _, n in queue:
+    for _, _, _, n, isc in queue:
         if _mvp_new[0] >= MVP_PER_RUN or _hltv_blocked[0]:
             break
         try:
-            if hltv_player_info(n, force=True):
+            if hltv_player_info(n, force=True, coach=isc):
                 done += 1
         except Exception as e:
             warn(f"Игрок HLTV {n}: {e!r}")
@@ -4780,17 +4802,20 @@ MAJOR_RX = re.compile(r"(?i)major|dreamhack winter 201[34]|ems one katowice 2014
                       r"|cluj-napoca 2015|columbus 2016|iem katowice 2019")
 
 
-def hltv_player_info(nick: str, force: bool = False) -> dict | None:
-    """Со страницы игрока HLTV: медали MVP, сколько мейджоров сыграл и выиграл. Кэш на неделю, до 12 новых страниц за запуск."""
-    pl = hltv_player_ids.get(norm(nick))
+def hltv_player_info(nick: str, force: bool = False, coach: bool = False) -> dict | None:
+    """Со страницы игрока HLTV: медали MVP, сколько мейджоров сыграл и выиграл. Кэш на 3 недели, до MVP_PER_RUN новых
+    страниц за запуск. Тренер (coach=True) — со страницы тренера: мейджоры, места и трофеи его команд как тренера
+    (разметка та же: «Majors played/won», achievement-table, trophy-row-trophy — сверено 06.11 на /coach/1084/fierce)."""
+    pl, kp, pp = hltv_ref(nick, coach)
     if not pl:
         return None
-    key = f"pinfo5:{pl['id']}"
+    key = f"{kp}:{pl['id']}"
     c = hltv_cache.get(key)
     if c and (not force or _mvp_new[0] >= MVP_PER_RUN) and (parse_iso(c.get("t")) or NOW) > NOW - timedelta(days=PINFO_TTL_DAYS):
         return c["data"]  # свежее — из кэша; очередь (force) перечитывает тех, чья команда доиграла турнир
-    c = c or hltv_cache.get(f"pinfo4:{pl['id']}") or hltv_cache.get(f"pinfo3:{pl['id']}") or hltv_cache.get(f"pinfo2:{pl['id']}") or hltv_cache.get(f"pinfo:{pl['id']}")  # старая запись (без названий мейджоров) — пока не перечитали
-    path = f"/player/{pl['id']}/{pl['slug']}"
+    if kp == "pinfo5":
+        c = c or hltv_cache.get(f"pinfo4:{pl['id']}") or hltv_cache.get(f"pinfo3:{pl['id']}") or hltv_cache.get(f"pinfo2:{pl['id']}") or hltv_cache.get(f"pinfo:{pl['id']}")  # старая запись (без названий мейджоров) — пока не перечитали
+    path = f"{pp}/{pl['id']}/{pl['slug']}"
     if _mvp_new[0] >= MVP_PER_RUN or _hltv_blocked[0] or STATS or hltv_page_skip(path):
         return c["data"] if c else None  # лимит, стоп или страница недавно отказывала — берём что есть
     _mvp_new[0] += 1
@@ -5679,9 +5704,9 @@ def build_detail(m: dict, prev: dict | None) -> dict:
             detail["prediction"] = P0
     for t, bid, hist in zip(teams, bids, hists):
         t["stats"] = build_player_stats(t, bid, hist)
-        for p in (t.get("players") or []) + (t.get("coach") or []):  # у тренеров тоже мажоры и MVP (чаще всего — с игровой карьеры)
+        for p, isc in [(x, False) for x in t.get("players") or []] + [(x, True) for x in t.get("coach") or []]:  # тренеры — со страницы тренера HLTV
             try:
-                info = hltv_player_info(p.get("nick") or "")
+                info = hltv_player_info(p.get("nick") or "", coach=isc)
             except Exception as e:
                 warn(f"Игрок HLTV {p.get('nick')}: {e!r}")
                 info = None
@@ -5871,8 +5896,8 @@ def build_team_page(r: dict) -> dict | None:
         try:
             roster, coach = merge_roster([], lp_roster({"id": key, "name": r["name"]}))
             fix_names(roster)
-            for p in roster + coach:
-                info = hltv_player_info(p.get("nick") or "")
+            for p, isc in [(x, False) for x in roster] + [(x, True) for x in coach]:
+                info = hltv_player_info(p.get("nick") or "", coach=isc)
                 if info:
                     p.update({k: v for k, v in info.items() if v})
             for p in roster:
@@ -6153,6 +6178,12 @@ def main() -> int:
             for lineup in (ex.get("lineups") or {}).values():
                 for p in lineup:
                     hltv_player_ids[norm(p["nick"])] = {"id": p["id"], "slug": p["slug"]}
+            cpl = (hltv_cache.get("cpl") or {}).get("data") or {}
+            for c in ex.get("coach_ids") or []:
+                for k in {norm(c["nick"]), norm(c["slug"])} - {""}:
+                    hltv_coach_ids[k] = cpl[k] = {"id": c["id"], "slug": c["slug"]}
+            if cpl:
+                hltv_cache["cpl"] = {"t": iso(NOW), "data": cpl}
             for tn, ti in (ex.get("team_ids") or {}).items():
                 hltv_team_ids[norm(tn)] = {**ti, "name": tn}
     if not STATS:  # команды из рейтинга Valve (заодно id игроков составов) — до очереди игроков
@@ -6457,9 +6488,9 @@ def main() -> int:
                 d["prizes"] = mt["prizes"]
             n_sync += 1
         # MVP и мажоры из памяти HLTV — без новых запросов
-        for p in (d.get("roster") or []) + (d.get("coach") or []):
-            pl = hltv_player_ids.get(norm(p.get("nick")))
-            c = pl and (hltv_cache.get(f"pinfo5:{pl['id']}") or hltv_cache.get(f"pinfo4:{pl['id']}"))
+        for p, isc in [(x, False) for x in d.get("roster") or []] + [(x, True) for x in d.get("coach") or []]:
+            pl, kp, _ = hltv_ref(p.get("nick") or "", isc)
+            c = pl and (hltv_cache.get(f"{kp}:{pl['id']}") or (kp == "pinfo5" and hltv_cache.get(f"pinfo4:{pl['id']}")))
             if c and c.get("data"):
                 for k, v in c["data"].items():
                     if v and not p.get(k):
