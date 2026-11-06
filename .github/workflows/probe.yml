@@ -1,0 +1,29 @@
+name: probe (временная проверка, только чтение)
+on:
+  workflow_dispatch:
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: live PRV–NAVI
+        run: |
+          python3 - <<'PY'
+          import json, urllib.request
+          W = "https://rimcs-live.vladrimskij.workers.dev"
+          def j(p):
+              r = urllib.request.Request(W + p, headers={"Origin": "https://vladrimskij-a11y.github.io", "User-Agent": "rimcs-probe"})
+              return json.load(urllib.request.urlopen(r, timeout=20))
+          m = j("/matches?page%5Blimit%5D=10&filter%5Bmatches.status%5D%5Bin%5D=current&filter%5Bmatches.team_ids%5D%5Boverlap%5D=8171")
+          for x in m.get("results") or []:
+              print("match", x["id"], x.get("team1_id"), x.get("team2_id"), x.get("team1_score"), x.get("team2_score"), x.get("status"))
+              g = j(f"/games?filter%5Bgames.match_id%5D%5Beq%5D={x['id']}")
+              for y in g.get("results") or []:
+                  print("  game", y.get("number"), y.get("map_name"), y.get("status"), y.get("winner_clan_name"), y.get("winner_clan_score"), y.get("loser_clan_score"))
+                  if y.get("status") == "current":
+                      G = j(f"/games/{y['id']}")
+                      print("    rounds:", len(G.get("game_rounds") or []), "map:", G.get("map_name"))
+                      ps = j(f"/games/{y['id']}/players_stats")
+                      print("    players:", len(ps), [(p.get("nickname") or (p.get("steam_profile") or {}).get("nickname"), p.get("kills"), p.get("death")) for p in ps][:10])
+          if not (m.get("results")): print("нет текущих матчей", json.dumps(m)[:300])
+          PY
