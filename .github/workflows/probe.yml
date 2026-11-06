@@ -25,31 +25,12 @@ jobs:
           import sys, re, json
           sys.path.insert(0, "collector"); sys.argv = ["probe"]
           import collect as C
-          import glob
-          for k, v in C.hltv_cache.items():
-              if k.startswith("tpl:") or k == "rkpl":
-                  for n, x in ((v or {}).get("data") or {}).items(): C.hltv_player_ids.setdefault(n, x)
-          for nm in ("PGL Major Singapore 2026 Stage 1", "PGL Major Singapore 2026 Stage 2"):
-              ex = (C.hltv_cache.get("event3:" + nm) or {}).get("data") or {}
-              print(nm, ex.get("hltv"), "lineups:", list((ex.get("lineups") or {}).keys()))
-              for lu in (ex.get("lineups") or {}).values():
-                  for p in lu: C.hltv_player_ids.setdefault(C.norm(p["nick"]), {"id": p["id"], "slug": p["slug"]})
-          miss = []
-          for f in glob.glob("docs/data/match/*.json"):
-              d = json.load(open(f))
-              for t in d.get("teams") or []:
-                  for p in t.get("players") or []:
-                      if "majors" not in p and "mvp" not in p:
-                          miss.append((t["name"], p.get("nick")))
-          print("без данных:", len(miss))
-          import collections
-          st = collections.Counter()
-          for tn, n in sorted(set(miss)):
-              pl = C.hltv_player_ids.get(C.norm(n or ""))
-              c = C.hltv_cache.get(f"pinfo5:{pl['id']}") if pl else None
-              fail = [k for k in C.hltv_cache if pl and k.startswith("hfail:") and f"/player/{pl['id']}/" in k]
-              why = "нет id" if not pl else ("кэш " + json.dumps({k: v for k, v in (c.get("data") or {}).items() if k in ("mvp", "majors")}) + " t=" + str(c.get("t"))[:16]) if c else ("пауза" if fail else "нет кэша")
-              st[why.split(" ")[0]] += 1
-              print("  ", tn, n, pl and pl["id"], why)
-          print(dict(st))
+          for t in ({"name": "FUT Esports", "acronym": "FUT"}, {"name": "NIP", "acronym": "NIP"}, {"name": "Spirit", "acronym": "TS"}):
+              print("алиасы", t["name"], C.team_aliases(t, C.hltv_team_for(t)))
+              ms = C.team_veto_matches(t, C.hltv_team_for(t))
+              print("  матчей в архиве:", len(ms), [m.get("slug") for m in ms[:4]])
+              v = C.build_veto([t])
+              print("  вето:", bool(v and v.get("teams") and v["teams"][0]), (v or {}).get("teams", [None])[0] and {k: v["teams"][0].get(k) for k in ("n", "picks")})
+          d = json.load(open([f for f in __import__("glob").glob("docs/data/match/*.json") if "FUT" in open(f).read()][0]))
+          print("карточка TS vs FUT updated:", d.get("updated"), [bool(x) for x in (d.get("veto") or {}).get("teams", [])])
           EOF
