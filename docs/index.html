@@ -2145,8 +2145,10 @@ a.ni { text-decoration: none; color: inherit; }
     var pv = (lo + hi) / 2, row = (((m.maps || {}).table) || []).find(function (r) { return mkey(r.map) === mkey(mp); });
     var wr = function (i) { var t = row ? row.teams[i] : { won: 0, played: 0 }; return (t.won + 1.5) / (t.played + 3); };
     var p = 1 / (1 + Math.exp(-(Math.log(pv / (1 - pv)) + (wr(0) - wr(1)))));
-    var r = 0.5 + (p - 0.5) * 0.25, mx = Math.max(r, 1 - r), lose = Math.max(3, Math.min(11, Math.round(13 * (1 - mx) / mx)));
-    return p >= 0.5 ? [13, lose] : [lose, 13];
+    // как в сборщике: по 2482 реальным картам проигравший берёт 7–8 раундов почти всегда (медиана 8, при явном фаворите 7)
+    var fav = Math.max(ps, 1 - ps), lose = fav >= 0.85 ? 7 : 8;
+    var sc = p >= 0.5 ? [13, lose] : [lose, 13]; sc.ot = fav < 0.8 ? 15 : 11;
+    return sc;
   }
   // настоящее вето (dust2): карты в порядке игры, кто пикнул, вероятный счёт; ниже — кто что забанил
   function vetoActualBlock(m, Vn) {
@@ -2164,7 +2166,7 @@ a.ni { text-decoration: none; color: inherit; }
       if (g) { sc = sflip ? [g.score[1], g.score[0]] : g.score; anyPlayed = true; }
       var inner = '<span class="pp-n">Карта ' + (i + 1) + ' · ' + (x.act === "decider" ? "десайдер" : esc(x.who)) + '</span><b>' + esc(x.map) + '</b>' +
         '<span class="num pp-s"><span class="a">' + sc[0] + '</span>:<span class="b">' + sc[1] + '</span></span>' +
-        (g ? (g.players ? '<small>сыграна · статистика ›</small>' : '<small>сыграна · статистика скоро</small>') : z ? '<small>вероятный, если понадобится</small>' : '<small>вероятный счёт</small>');
+        (g ? (g.players ? '<small>сыграна · статистика ›</small>' : '<small>сыграна · статистика скоро</small>') : '<small>' + (z ? 'если понадобится · ' : 'вероятный · ') + 'допы ~' + sc.ot + '%</small>');
       var btn = g && g.players;  // нажимается, когда bo3 отдал статистику игроков
       var cls = 'pp-m ' + (by === 0 ? "a" : by === 1 ? "b" : "n") + (btn ? " ppbtn" : "") + mapBg(x.map);  // mapBg дописывает style — он последним
       return btn ? '<button class="' + cls + '" data-vser="' + esc(sid) + '" data-vmap="' + mi + '">' + inner + '</button>' : '<div class="' + cls + '">' + inner + '</div>';
@@ -2185,9 +2187,10 @@ a.ni { text-decoration: none; color: inherit; }
     var html = '<div class="sec" data-nav><h3>Вероятный пик <span>по вето за 3 мес.</span></h3><div class="box ppick"><div class="pp-maps">' + P.maps.map(function (x, i) {
       var who = x.by === 0 ? abbr(A) : x.by === 1 ? abbr(B) : "";  // кто пикает карту
       var z = x.score && x.score[0] === 0 && x.score[1] === 0, sc = z ? mapScoreFor(m, x.map) : x.score;  // вероятный счёт — даже если карта может не понадобиться
+      var otp = x.ot != null ? x.ot : (mapScoreFor(m, x.map).ot);
       return '<div class="pp-m ' + (x.by === 0 ? "a" : x.by === 1 ? "b" : "n") + mapBg(x.map) + '"><span class="pp-n">Карта ' + (i + 1) + (who ? ' · ' + esc(who) : '') + '</span><b>' + esc(x.map) + '</b>' +
         '<span class="num pp-s"><span class="a">' + esc(sc ? sc[0] : "–") + '</span>:<span class="b">' + esc(sc ? sc[1] : "–") + '</span></span>' +
-        (z ? '<small>если понадобится</small>' : '') + '</div>';  // строки с процентами нет — по просьбе владельца
+        '<small>' + (z ? 'если понадобится · ' : '') + 'допы ~' + otp + '%</small></div>';  // строки с процентами нет — по просьбе владельца
     }).join("") + '</div></div></div>';
     return html + act;
   }

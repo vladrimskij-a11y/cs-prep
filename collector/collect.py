@@ -5042,8 +5042,8 @@ def build_prediction(d: dict, bids: list) -> dict | None:
     # Брайер 0.18), а винрейты на картах лишь слегка сдвигают карту — сами по себе они почти не лучше монетки.
     # С коэффициентами — карты считаются от шанса букмекера на серию (так проценты карт с ним согласованы).
     pv = None
+    ps = None
     try:
-        ps = None
         if odds and odds.get("win"):
             ps = min(0.97, max(0.03, odds["win"][0] / 100))
         else:
@@ -5069,11 +5069,15 @@ def build_prediction(d: dict, bids: list) -> dict | None:
         lg = math.log(pv / (1 - pv)) + 1.0 * (wr(0, mp) - wr(1, mp))
         return 1 / (1 + math.exp(-lg))
     probs = [pmap2(x["map"]) for x in maps]
+    # Счёт карты — по реальным картам (2482 карты, 06.11): проигравший берёт 7–8 раундов почти независимо от разницы
+    # в силе (медиана 8; при шансе фаворита на серию ≥85% — 7), овертайм ~15% при близких командах и ~11% при явном
+    # фаворите. Прежняя формула через «шанс раунда» почти всегда давала 13:11 и была хуже даже постоянного 13:8.
+    fav = max(ps, 1 - ps) if ps is not None else 0.6
     for x, p in zip(maps, probs):
-        r = 0.5 + (p - 0.5) * 0.25  # вероятность раунда из вероятности карты — грубая оценка
-        lose = max(3, min(11, round(13 * (1 - max(r, 1 - r)) / max(r, 1 - r))))
+        lose = 7 if fav >= 0.85 else 8
         x["p"] = round(100 * p)
         x["score"] = [13, lose] if p >= 0.5 else [lose, 13]
+        x["ot"] = 15 if fav < 0.8 else 11  # шанс допов на карте, %
     need = bo // 2 + 1
     dist: dict = {}
     def walk(k, a, b, pr):
