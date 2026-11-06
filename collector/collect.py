@@ -2461,7 +2461,8 @@ def tg_keep(info: dict, p: dict) -> bool:
     if is_stale_preview(info.get("title"), p["date"]) or is_stale_preview((p["text"] or "").split("\n", 1)[0], p["date"]):
         return False  # превью уже сыгранного матча
     cat = info.get("cat") if info.get("v") == 3 else None
-    if cat:
+    if cat == "ad":
+        cat = "feature"  # «реклама» по мнению нейросети без рекламных слов — не реклама (06.11: тренер BetBoom и кола zorte)
         if cat in ("highlight", "unique_play"):
             return bool(UNIQUE_PLAY.search(text[:400]))  # клатчи, эйсы, квадро — нет; нож, граната, зевс — да
         if cat not in TG_KEEP:
@@ -4069,7 +4070,7 @@ def gather_news(teams: list[dict]) -> list[dict]:
         for label in {t.get("name"), t.get("acronym")} - {None, ""}:
             amb = label.lower() in COMMON_WORDS or len(label) <= 3
             entities.append((t["name"], entity_re(label, case=amb), amb, ti))
-        for p in t.get("players") or []:
+        for p in (t.get("players") or []) + (t.get("coach") or []):  # и тренеры: новости про них — тоже про команду
             nick = p.get("nick") or ""
             if len(nick) < 2:
                 continue
