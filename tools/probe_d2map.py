@@ -1,31 +1,40 @@
-import json, urllib.request, urllib.parse, time
-B = "https://api.bo3.gg/api/v1"
-def get(p, q=None):
-    time.sleep(0.4)
-    u = B + p + ("?" + urllib.parse.urlencode(q) if q else "")
+import json, os, time, urllib.request, urllib.parse
+from datetime import datetime, timedelta, timezone
+K = os.environ.get("ODDSPAPI_KEY", "")
+print("key set:", bool(K), "len", len(K))
+B = "https://api.oddspapi.io/v4"
+def get(p, **q):
+    time.sleep(2.2)
+    q["apiKey"] = K
+    u = B + p + "?" + urllib.parse.urlencode(q)
     try:
-        return json.loads(urllib.request.urlopen(urllib.request.Request(u, headers={"Accept": "application/json", "User-Agent": "Mozilla/5.0"}), timeout=30).read())
-    except Exception as e:
-        return {"err": repr(e)}
-res = get("/matches", {"page[limit]": 15, "sort": "start_date", "filter[matches.status][in]": "upcoming", "filter[matches.tier][in]": "s,a"}).get("results") or []
-types = {}
-for m in res:
-    bu = m.get("bet_updates") or {}
-    print(m.get("slug"), "provider", bu.get("provider"), "keys", list(bu.keys()))
-    for mk in bu.get("additional_markets") or []:
-        types[mk.get("bet_type")] = mk
-print("BET TYPES", sorted(types))
-for k, v in list(types.items())[:40]:
-    print(json.dumps(v)[:300])
-if res:
-    m = res[0]
-    print("MATCH KEYS", list(m.keys()))
-    for p in (f"/matches/{m['slug']}", f"/matches/{m['id']}/bet_updates", f"/bet_updates?filter[bet_updates.match_id][eq]={m['id']}", f"/games?filter[games.match_id][eq]={m['id']}"):
-        r = get(p)
-        s = json.dumps(r)
-        print("==", p, len(s), s[:200])
-        i = s.find("bet"); print("   bet@", s[i-100:i+600] if i >= 0 else "-")
-cur = get("/matches", {"page[limit]": 5, "filter[matches.status][in]": "current"}).get("results") or []
-for m in cur:
-    bu = m.get("bet_updates") or {}
-    print("LIVE", m.get("slug"), sorted({x.get("bet_type") for x in bu.get("additional_markets") or []}))
+        r = urllib.request.urlopen(urllib.request.Request(u, headers={"Accept": "application/json", "User-Agent": "rimcs/1.0"}), timeout=40)
+        h = {k: v for k, v in r.headers.items() if "limit" in k.lower() or "remain" in k.lower() or "quota" in k.lower()}
+        print("  ", p, "headers", h)
+        return json.loads(r.read())
+    except urllib.error.HTTPError as e:
+        print("  ", p, "HTTP", e.code, e.read()[:300])
+        return None
+now = datetime.now(timezone.utc)
+fx = get("/fixtures", sportId=17, **{"from": now.strftime("%Y-%m-%d"), "to": (now + timedelta(days=6)).strftime("%Y-%m-%d")})
+fl = fx if isinstance(fx, list) else (fx or {}).get("data") or []
+print("fixtures", len(fl))
+for f in fl[:60]:
+    print("  ", json.dumps({k: f.get(k) for k in ("fixtureId", "participant1Name", "participant2Name", "tournamentName", "startTime", "statusId", "hasOdds")}, ensure_ascii=False))
+if fl: print("FX KEYS", list(fl[0].keys()))
+mk = get("/markets")
+ml = mk if isinstance(mk, list) else (mk or {}).get("data") or []
+cs = [m for m in ml if m.get("sportId") == 17]
+print("CS2 markets", len(cs))
+for m in cs:
+    print("   ", m.get("marketId"), m.get("marketName"), m.get("handicap"), m.get("period"), [o.get("outcomeName") for o in m.get("outcomes") or []])
+want = [f for f in fl if any(x in json.dumps(f).lower() for x in ("mongol", "natus", "mouz", "vitality", "furia"))][:3]
+for f in want:
+    od = get("/odds", fixtureId=f["fixtureId"])
+    bo = (od or {}).get("bookmakerOdds") or {}
+    print("ODDS", f.get("participant1Name"), f.get("participant2Name"), "books", len(bo))
+    for slug in sorted(bo):
+        mm = bo[slug].get("markets") or {}
+        print("    ", slug, sorted(mm.keys())[:40])
+    pin = bo.get("pinnacle") or {}
+    print("  PINNACLE", json.dumps(pin)[:2500])
