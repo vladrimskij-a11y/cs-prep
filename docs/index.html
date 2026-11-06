@@ -1010,9 +1010,31 @@ a.ni { text-decoration: none; color: inherit; }
   }
   function getDetail(id) {
     if (state.details[id]) return Promise.resolve(state.details[id]);
-    var p = DEMO ? Promise.resolve(DEMO.details[id]) : dfetch("data/match/" + id + ".json" + bust()).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); });
-    return p.then(function (x) { if (!x) throw new Error("нет данных"); x = withOpp(x); state.details[id] = x; return x; });
+    var p = DEMO ? Promise.resolve(DEMO.details[id]) : dfetch("data/match/" + id + ".json" + bust()).then(function (r) { if (!r.ok) throw new Error(r.status); return r.text(); })
+      .then(function (txt) { state.detailRaw = state.detailRaw || {}; state.detailRaw[id] = txt; return JSON.parse(txt); });
+    return p.then(function (x) { if (!x) throw new Error("нет данных"); x = withOpp(x); state.details[id] = x; state.detailAt = state.detailAt || {}; state.detailAt[id] = Date.now(); return x; });
   }
+  // открытый матч обновляется сам: раз в минуту (и при возврате в приложение) берём свежую карточку из сети,
+  // если она изменилась — перерисовываем с той же прокруткой (новости, вето, сыгранные карты появляются без переоткрытия)
+  function refreshOpen(force) {
+    var id = state.openId; if (!id || DEMO || state.refreshingOpen) return;
+    if (!force && state.detailAt && Date.now() - (state.detailAt[id] || 0) < 55000) return;
+    var u = "data/match/" + id + ".json" + bust();
+    state.refreshingOpen = true;
+    fromNet(u, dkey(u)).then(function (r) { return r.ok ? r.text() : null; }).then(function (txt) {
+      state.refreshingOpen = false;
+      state.detailAt = state.detailAt || {}; state.detailAt[id] = Date.now();
+      if (!txt || state.openId !== id) return;
+      state.detailRaw = state.detailRaw || {};
+      if (state.detailRaw[id] === txt) return;
+      var x; try { x = withOpp(JSON.parse(txt)); } catch (e) { return; }
+      state.detailRaw[id] = txt; state.details[id] = x;
+      if (state.ovl) { state.pendingRender = id; return; }  // открыто окно серии — перерисуем, когда закроют
+      keepFilterScroll(function () { renderMatch(x); });
+    }).catch(function () { state.refreshingOpen = false; });
+  }
+  setInterval(function () { if (!document.hidden) refreshOpen(); }, 60000);
+  document.addEventListener("visibilitychange", function () { if (!document.hidden) refreshOpen(); });
 
   // ---------- списки
   function usd(n) { return n == null ? "" : "$" + Number(n).toLocaleString("ru-RU"); }
@@ -3068,6 +3090,10 @@ a.ni { text-decoration: none; color: inherit; }
     try { TG && TG.BackButton.show(); } catch (e) {}
   }
   function closeOverlay(instant) {
+    if (state.pendingRender && state.pendingRender === state.openId && state.details[state.openId]) {
+      var pr = state.details[state.openId]; state.pendingRender = null;
+      setTimeout(function () { if (!state.ovl && String(state.openId) === String(pr.id)) keepFilterScroll(function () { renderMatch(pr); }); }, 400);
+    }
     var O = state.ovl;
     if (!O) return;
     state.ovl = null;
@@ -3161,7 +3187,7 @@ a.ni { text-decoration: none; color: inherit; }
       var id = mt[1];
       if (state.openId !== id) { state.openId = id; state.tab = "players"; state.teamSub = "players"; state.newsFilter = "all"; state.map = null; state.mapUser = false; state.posMapUser = false; state.scrolls = {}; state.factsAll = false; window.scrollTo(0, 0); }
       $app.innerHTML = '<div class="empty">Загружаю матч…</div>';
-      getDetail(id).then(renderMatch).catch(function () {
+      getDetail(id).then(function (d) { renderMatch(d); setTimeout(function () { refreshOpen(true); }, 300); }).catch(function () {
         $app.innerHTML = '<div class="empty"><strong>Подробностей пока нет</strong>Карточка появится после ближайшего сбора — как только станут известны обе команды. <button class="chip" id="back" style="margin-top:8px">Назад</button></div>';
       });
       return;
