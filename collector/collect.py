@@ -3123,7 +3123,7 @@ def veto_names(t: dict, ht: dict | None = None) -> set:
             names.append(r["name"])
     except Exception:
         pass
-    return {k for k in (norm(x) for x in names) if len(k) >= 3}
+    return {k for k in (norm(x) for x in names) if len(k) >= 2}  # «9z», «G2» — двухбуквенные, ищутся только целым словом
 
 
 def _slug_has(slug: str, v: str) -> bool:
