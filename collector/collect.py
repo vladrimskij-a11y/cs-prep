@@ -3112,7 +3112,7 @@ def hltv_team_for(t: dict) -> dict | None:
     return None
 
 
-def team_aliases(t: dict, ht: dict | None = None) -> set:
+def veto_names(t: dict, ht: dict | None = None) -> set:
     """Все написания команды (norm): название, HLTV, без «Team/Esports…», сокращение и полное имя из рейтинга VRS
     (FUT Esports → fut, NIP → ninjasinpyjamas) — dust2 пишет команды по-своему."""
     names = [t.get("name"), t.get("acronym"), (ht or {}).get("name"),
@@ -3137,7 +3137,7 @@ def _slug_has(slug: str, v: str) -> bool:
 def team_veto_matches(t: dict, ht: dict | None) -> list[dict]:
     """Матчи команды для сводки «что пикает / банит» — из своего архива вето (dust2): лента dust2 за месяц
     и уже сохранённые вето за 3 месяца. HLTV (/results?team=) — только если своих матчей меньше 5."""
-    vs = team_aliases(t, ht)
+    vs = veto_names(t, ht)
     if not vs:
         return []
     def mine(tn):
@@ -3336,7 +3336,7 @@ def build_veto(teams: list[dict]) -> dict | None:
             vd = parse_iso(v.get("date"))
             if vd and vd < NOW - timedelta(days=STATS_WINDOW_DAYS):
                 continue  # только последние 3 месяца
-            names = team_aliases(t, hreal) | ({norm(ht["name"]), norm(t.get("name")), norm(t.get("acronym"))} - {""})
+            names = veto_names(t, hreal) | ({norm(ht["name"]), norm(t.get("name")), norm(t.get("acronym"))} - {""})
             mine = [s for s in v["steps"] if s["team"] and (norm(s["team"]) in names
                                                              or any(len(x) >= 3 and (x in norm(s["team"]) or norm(s["team"]) in x) for x in names))]
             if not mine:
