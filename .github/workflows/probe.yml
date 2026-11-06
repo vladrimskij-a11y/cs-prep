@@ -1,0 +1,26 @@
+name: probe (временная проверка, только чтение)
+on:
+  workflow_dispatch:
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: поиск поста
+        run: |
+          python3 - <<'PY'
+          import re, time, urllib.request, html
+          for ch in ["cs3news", "retakenews", "raiznews", "newcsgo", "m0NESYGG"]:
+              for q in ["эко", "по времени", "PARIVISION раунд"]:
+                  u = f"https://t.me/s/{ch}?q=" + urllib.parse.quote(q) if False else f"https://t.me/s/{ch}?q=" + __import__("urllib.parse").parse.quote(q)
+                  try:
+                      h = urllib.request.urlopen(urllib.request.Request(u, headers={"User-Agent": "Mozilla/5.0"}), timeout=20).read().decode("utf-8", "replace")
+                  except Exception as e:
+                      print(ch, q, "ERR", e); continue
+                  for post, body in re.findall(r'data-post="([^"]+)".*?<div class="tgme_widget_message_text[^>]*>(.*?)</div>', h, re.S):
+                      t = re.sub(r"\s+", " ", html.unescape(re.sub(r"<[^>]+>", " ", body))).strip()
+                      if re.search(r"(?i)pari|прв|париви", t):
+                          dt = re.search(r'data-post="%s".*?datetime="([^"]+)"' % re.escape(post), h, re.S)
+                          print("POST", post, dt.group(1) if dt else "", "|", t[:300])
+                  time.sleep(1)
+          PY
