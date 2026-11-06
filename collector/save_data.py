@@ -32,6 +32,25 @@ def newer(a, b, key="updated"):
     return ((a or {}).get(key) or "") >= ((b or {}).get(key) or "")
 
 
+LIVE = ("d2", "d2_res", "series", "cur_sid")  # идущий матч: счёт и статистика сыгранных карт (быстрый проход каждые 5 мин)
+
+
+def take_newer(a: dict, b: dict) -> bool:
+    """Перенести в b из a то, что у a свежее: данные идущего матча (live_t) и прогноз (prediction.t). True — b изменён."""
+    ch = False
+    if a.get("live_t") and (a.get("live_t") or "") > (b.get("live_t") or ""):
+        for k in LIVE:
+            if k in a:
+                b[k] = a[k]
+        b["live_t"] = a["live_t"]
+        ch = True
+    pa, pb = a.get("prediction") or {}, b.get("prediction") or {}
+    if pa.get("t") and (pa.get("t") or "") > (pb.get("t") or "") and not pb.get("frozen"):
+        b["prediction"] = pa
+        ch = True
+    return ch
+
+
 def merge(dst: Path) -> None:
     if MODE in ("stats", "full"):  # своё — поверх; набор карточек матчей и итогов — как у нас
         for sub in ("match", "results", "team"):
@@ -54,6 +73,8 @@ def merge(dst: Path) -> None:
                     if a is not None and b is not None and b.get("veto_now") and newer(b.get("veto_now"), a.get("veto_now"), "t"):
                         a["veto_now"] = b["veto_now"]  # вето перед матчем (его ловит быстрый сбор)
                         ch = True
+                    if a is not None and b is not None and take_newer(b, a):
+                        ch = True  # сыгранные карты идущего матча и прогноз после вето — их обновляет быстрый сбор
                     if ch:
                         (dst / rel).write_text(json.dumps(a, ensure_ascii=False, separators=(",", ":")), "utf-8")
                         continue
@@ -67,6 +88,8 @@ def merge(dst: Path) -> None:
         for f in (OURS / "match").glob("*.json"):
             g = dst / "match" / f.name
             a, b = load(f), load(g)
+            if a is not None and b is not None and take_newer(a, b):
+                g.write_text(json.dumps(b, ensure_ascii=False, separators=(",", ":")), "utf-8")
             if a is not None and b is not None and (newer(a.get("news"), b.get("news")) or a.get("veto_now") != b.get("veto_now") or a.get("begin_at") != b.get("begin_at") or a.get("opp") != b.get("opp")):
                 if newer(a.get("news"), b.get("news")):
                     b["news"] = a["news"]

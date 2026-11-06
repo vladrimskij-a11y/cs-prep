@@ -3490,8 +3490,10 @@ def d2_sync(listing: list | None = None) -> None:
                 R["id"] = x["id"]
                 if any(m0.get("score") for m0 in R["maps"]) and json.dumps(R, sort_keys=True) != json.dumps(R0, sort_keys=True):
                     d["d2_res"] = R; ch = True; n_m += 1
+                    d["live_t"] = iso(NOW)
                 if d2_fill_series(d):
                     ch = True
+                    d["live_t"] = iso(NOW)
         if ch:
             save_json(f, d)
     print(f"dust2: матчей в списке {len(lst)}, время поправлено {n_t}, вето перед матчем {n_v}, счёт/статистика карт {n_m}")
@@ -3546,6 +3548,7 @@ def live_series_sync() -> None:
             continue
         if d2s:
             d["series"].pop(d2s, None)  # серия bo3 появилась — временная dust2-серия больше не нужна
+        d["live_t"] = iso(NOW)  # по этой метке сохранение не затрёт свежие карты старой карточкой
         save_json(f, d)
         n += 1
     print(f"Идущие матчи: обновлено сыгранных карт в карточках — {n}")
@@ -5155,7 +5158,7 @@ _op = {"last": 0.0, "off": False}
 OP_PER = {"First": 1, "Second": 2, "Third": 3, "Fourth": 4, "Fifth": 5}
 
 
-OP_MONTH_BUDGET = int(os.environ.get("OP_MONTH_BUDGET", "225"))  # в кабинете OddsPapi лимит 240 в месяц, 15 — запас
+OP_MONTH_BUDGET = int(os.environ.get("OP_MONTH_BUDGET", "236"))  # в кабинете OddsPapi лимит 240 в месяц; 4 — на случай, если параллельные сборы чуть недосчитали
 
 
 def op_used() -> dict:
@@ -5577,7 +5580,7 @@ def build_prediction(d: dict, bids: list) -> dict | None:
         walk(k + 1, a, b + 1, pr * (1 - probs[k]))
     walk(0, 0, 0, 1.0)
     outcomes = [{"score": f"{a}:{b}", "p": round(100 * v)} for (a, b), v in sorted(dist.items(), key=lambda kv: -kv[1])]
-    res = {"steps": steps, "maps": maps, "outcomes": outcomes, "source": "статистика"}
+    res = {"steps": steps, "maps": maps, "outcomes": outcomes, "source": "статистика", "t": iso(NOW)}
     if odds:
         res["odds"] = odds
         if odds.get("scores"):
