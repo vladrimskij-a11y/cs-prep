@@ -3,14 +3,17 @@ from datetime import datetime, timedelta, timezone
 K = os.environ.get("ODDSPAPI_KEY", "")
 B = "https://api.oddspapi.io/v4"
 calls = [0]
-def get(p, **q):
-    time.sleep(2.3); calls[0] += 1
+def get(p, _try=0, **q):
+    time.sleep(5.5 if "historical" in p else 2.5); calls[0] += 1
     q["apiKey"] = K
     try:
         r = urllib.request.urlopen(urllib.request.Request(B + p + "?" + urllib.parse.urlencode(q), headers={"Accept": "application/json", "User-Agent": "rimcs/1.0"}), timeout=90)
         return json.loads(r.read())
     except urllib.error.HTTPError as e:
-        print("HTTP", p, e.code, e.read()[:300]); return None
+        body = e.read()[:300]
+        if e.code == 429 and _try < 2:
+            time.sleep(6); return get(p, _try + 1, **{k: v for k, v in q.items() if k != "apiKey"})
+        print("HTTP", p, e.code, body); return None
 cat = [m for m in (get("/markets") or []) if m.get("sportId") == 17]
 keep = {m["marketId"]: m for m in cat if re.search(r"Map Winner|Rounds Handicap (First|Second|Third) Map|^Total Rounds (First|Second|Third) Map|^Winner$|Correct Map Score", m.get("marketName") or "")}
 TIER1 = re.compile(r"(?i)intel extreme|iem|blast|pgl|esl pro|starladder|thunderpick|fissure|major|esports world cup|cct global|perfect world")
@@ -27,8 +30,8 @@ fx = [f for f in fx if (f.get("startTime") or "") < (now - timedelta(hours=6)).i
 fx.sort(key=lambda f: f["startTime"], reverse=True)
 print("tier1 fixtures", len(fx))
 out = {"markets": keep, "fixtures": []}
-for f in fx[:110]:
-    h = get("/historical-odds", fixtureId=f["fixtureId"], bookmakers="pinnacle,polymarket,1xbet")
+for f in fx[:90]:
+    h = get("/historical-odds", fixtureId=f["fixtureId"], bookmakers="pinnacle,1xbet")
     if not h:
         continue
     bk = h.get("bookmakers") or {}
