@@ -3111,14 +3111,32 @@ def hltv_team_for(t: dict) -> dict | None:
     return None
 
 
+def team_aliases(t: dict, ht: dict | None = None) -> set:
+    """Все написания команды (norm): название, HLTV, без «Team/Esports…», сокращение и полное имя из рейтинга VRS
+    (FUT Esports → fut, NIP → ninjasinpyjamas) — dust2 пишет команды по-своему."""
+    names = [t.get("name"), t.get("acronym"), (ht or {}).get("name"),
+             re.sub(r"^(the|team)\s+|\s+(team|esports|esport|gaming|club|cs)$", "", t.get("name") or "", flags=re.IGNORECASE)]
+    try:
+        r = vrs_find(t, vrs_table())
+        if r:
+            names.append(r["name"])
+    except Exception:
+        pass
+    return {k for k in (norm(x) for x in names) if len(k) >= 3}
+
+
+def _slug_has(slug: str, v: str) -> bool:
+    """Есть ли команда v в адресе матча dust2 («fut-vs-spirit-…»): короткие — только целыми словами."""
+    if len(v) >= 4 and v in norm(slug):
+        return True
+    tk = [norm(x) for x in (slug or "").split("-")]
+    return any("".join(tk[i:j]) == v for i in range(len(tk)) for j in range(i + 1, min(len(tk), i + 5) + 1))
+
+
 def team_veto_matches(t: dict, ht: dict | None) -> list[dict]:
     """Матчи команды для сводки «что пикает / банит» — из своего архива вето (dust2): лента dust2 за месяц
     и уже сохранённые вето за 3 месяца. HLTV (/results?team=) — только если своих матчей меньше 5."""
-    vs = set()
-    for x in (t.get("name"), (ht or {}).get("name"), re.sub(r"^(the|team)\s+|\s+(team|esports|gaming|club)$", "", t.get("name") or "", flags=re.IGNORECASE)):
-        k = norm(x)
-        if len(k) >= 4 or (k and k == norm(t.get("name"))):
-            vs.add(k)
+    vs = team_aliases(t, ht)
     if not vs:
         return []
     def mine(tn):
@@ -3127,8 +3145,7 @@ def team_veto_matches(t: dict, ht: dict | None) -> list[dict]:
     out = {}
     try:
         for mt in d2_recent_matches():
-            sl = norm(mt.get("slug"))
-            if any(v in sl for v in vs):
+            if any(_slug_has(mt.get("slug") or "", v) for v in vs):
                 out[str(mt["id"])] = {"id": mt["id"], "slug": mt["slug"], "date": mt.get("date")}
     except Exception as e:
         warn(f"Лента dust2 для вето {t.get('name')}: {e!r}")
@@ -3318,7 +3335,7 @@ def build_veto(teams: list[dict]) -> dict | None:
             vd = parse_iso(v.get("date"))
             if vd and vd < NOW - timedelta(days=STATS_WINDOW_DAYS):
                 continue  # только последние 3 месяца
-            names = {norm(ht["name"]), norm(t.get("name")), norm(t.get("acronym"))} - {""}
+            names = team_aliases(t, hreal) | ({norm(ht["name"]), norm(t.get("name")), norm(t.get("acronym"))} - {""})
             mine = [s for s in v["steps"] if s["team"] and (norm(s["team"]) in names
                                                              or any(len(x) >= 3 and (x in norm(s["team"]) or norm(s["team"]) in x) for x in names))]
             if not mine:
@@ -5465,12 +5482,16 @@ def main() -> int:
         if tname in seen_tours or ((m.get("tournament") or {}).get("tier") or "").lower() != "s":
             continue
         seen_tours.add(tname)
-        ex = tournament_extras(tname) or {}
-        for lineup in (ex.get("lineups") or {}).values():
-            for p in lineup:
-                hltv_player_ids[norm(p["nick"])] = {"id": p["id"], "slug": p["slug"]}
-        for tn, ti in (ex.get("team_ids") or {}).items():
-            hltv_team_ids[norm(tn)] = {**ti, "name": tn}
+        # у мейджора на основной странице HLTV — составы только приглашённых в Stage 3; команды Stage 1/2 — на страницах
+        # стадий («… Stage 1»): без них игроки Stage 1 не попадали в очередь MVP/мажоров (06.11: NIP, M80, Lynn Vision…)
+        names = [tname] + ([f"{tname} Stage 1", f"{tname} Stage 2"] if "major" in tname.lower() else [])
+        for nm in names:
+            ex = tournament_extras(nm) or {}
+            for lineup in (ex.get("lineups") or {}).values():
+                for p in lineup:
+                    hltv_player_ids[norm(p["nick"])] = {"id": p["id"], "slug": p["slug"]}
+            for tn, ti in (ex.get("team_ids") or {}).items():
+                hltv_team_ids[norm(tn)] = {**ti, "name": tn}
     if not STATS:  # команды из рейтинга Valve (заодно id игроков составов) — до очереди игроков
         try:
             for r in vrs_table():
