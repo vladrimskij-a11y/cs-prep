@@ -1,0 +1,48 @@
+name: probe (временная проверка, только чтение)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install --quiet pillow
+      - uses: actions/cache/restore@v4
+        with:
+          path: cache
+          key: collector-cache-probe-${{ github.run_id }}
+          restore-keys: collector-cache-
+      - name: Проверка
+        run: |
+          mkdir -p docs/data && (git fetch -q --depth 1 origin data && git archive FETCH_HEAD | tar -x -C docs/data) || true
+          python - <<'EOF'
+          import sys, re, json
+          sys.path.insert(0, "collector"); sys.argv = ["probe"]
+          import collect as C
+          ev = (C.hltv_cache.get("evlist") or {}).get("data") or {}
+          print("evlist:", len(ev), [s for s in ev if "major" in s or "singapore" in s])
+          print("event3 keys:", [k for k in C.hltv_cache if k.startswith("event3:") and "Major" in k],
+                {k: bool((v or {}).get("data")) for k, v in C.hltv_cache.items() if k.startswith("event3:") and "Major" in k})
+          ids = C.hltv_player_ids
+          for k, v in C.hltv_cache.items():
+              if k.startswith("tpl:") or k == "rkpl":
+                  for n, x in ((v or {}).get("data") or {}).items(): ids.setdefault(n, x)
+          for n in ("s1mple", "stavn", "swisher", "westmelon", "nettik", "rain", "chelo"):
+              print("id", n, ids.get(C.norm(n)))
+          vs = [x for x in C.d2_recent_matches()]
+          print("dust2 лента:", len(vs))
+          for key in ("fut", "ninjas", "nip", "flyquest", "chinggis"):
+              print("  ", key, [m["slug"] for m in vs if key in m["slug"]][:6])
+          names = {}
+          for k, v in C.veto_cache.items():
+              if k.startswith("match:"):
+                  for s in v.get("steps") or []:
+                      if s.get("team"): names[s["team"]] = names.get(s["team"], 0) + 1
+          print("вето: команды, похожие:", {n: c for n, c in names.items() if re.search(r"(?i)fut|nin|nip|fly|ching", n)})
+          EOF
