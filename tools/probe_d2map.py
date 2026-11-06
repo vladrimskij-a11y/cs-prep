@@ -1,17 +1,31 @@
-import json, re, sys, time, urllib.request
-sys.path.insert(0, "tools"); sys.path.insert(0, "collector")
-import collect_probe as C
-UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
-def get(p):
-    time.sleep(1.2)
-    r = urllib.request.Request("https://www.dust2.us" + p, headers={"User-Agent": UA, "Accept": "text/html"})
-    return re.sub(r"\s+", " ", urllib.request.urlopen(r, timeout=40).read().decode("utf-8", "replace"))
-for p, teams in (("/matches/2400006/parivision-vs-natus-vincere", [{"name": "Natus Vincere", "acronym": "NAVI"}, {"name": "PARIVISION", "acronym": "PRV"}]),
-                 ("/matches/2400007/furia-vs-betboom", [{"name": "FURIA", "acronym": "FURIA"}, {"name": "BetBoom Team", "acronym": "BB"}])):
-    R = C.d2_parse_result(get(p)); R["id"] = p.split("/")[2]
-    print(p, json.dumps(R["maps"]), {k: {t: len(v) for t, v in x.items()} for k, x in R["stats"].items()})
-    print(" first rows", {k: list(x.values())[0][:2] for k, x in R["stats"].items()})
-    d = {"teams": teams, "d2_res": R, "begin_at": "2026-11-05T10:00:00Z", "bo": 3, "tournament": "IEM"}
-    print(" fill", C.d2_fill_series(d), d.get("cur_sid"))
-    S = (d.get("series") or {}).get(d.get("cur_sid")) or {}
-    print(" series", json.dumps({"teams": S.get("teams"), "maps": [{k: g[k] for k in ("map", "score", "winner")} | {"pl": [len(x) for x in g["players"]] if g.get("players") else None} for g in S.get("maps", [])], "players": bool(S.get("players"))}))
+import json, urllib.request, urllib.parse, time
+B = "https://api.bo3.gg/api/v1"
+def get(p, q=None):
+    time.sleep(0.4)
+    u = B + p + ("?" + urllib.parse.urlencode(q) if q else "")
+    try:
+        return json.loads(urllib.request.urlopen(urllib.request.Request(u, headers={"Accept": "application/json", "User-Agent": "Mozilla/5.0"}), timeout=30).read())
+    except Exception as e:
+        return {"err": repr(e)}
+res = get("/matches", {"page[limit]": 15, "sort": "start_date", "filter[matches.status][in]": "upcoming", "filter[matches.tier][in]": "s,a"}).get("results") or []
+types = {}
+for m in res:
+    bu = m.get("bet_updates") or {}
+    print(m.get("slug"), "provider", bu.get("provider"), "keys", list(bu.keys()))
+    for mk in bu.get("additional_markets") or []:
+        types[mk.get("bet_type")] = mk
+print("BET TYPES", sorted(types))
+for k, v in list(types.items())[:40]:
+    print(json.dumps(v)[:300])
+if res:
+    m = res[0]
+    print("MATCH KEYS", list(m.keys()))
+    for p in (f"/matches/{m['slug']}", f"/matches/{m['id']}/bet_updates", f"/bet_updates?filter[bet_updates.match_id][eq]={m['id']}", f"/games?filter[games.match_id][eq]={m['id']}"):
+        r = get(p)
+        s = json.dumps(r)
+        print("==", p, len(s), s[:200])
+        i = s.find("bet"); print("   bet@", s[i-100:i+600] if i >= 0 else "-")
+cur = get("/matches", {"page[limit]": 5, "filter[matches.status][in]": "current"}).get("results") or []
+for m in cur:
+    bu = m.get("bet_updates") or {}
+    print("LIVE", m.get("slug"), sorted({x.get("bet_type") for x in bu.get("additional_markets") or []}))
