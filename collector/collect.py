@@ -55,6 +55,7 @@ STATS = os.environ.get("STATS_ONLY") == "1"   # быстрый сбор стат
 DAYS_AHEAD = int(os.environ.get("DAYS_AHEAD", "21"))  # расписание: BLAST и др. публикуют заранее
 DETAIL_HOURS = int(os.environ.get("DETAIL_HOURS", "72"))
 NEWS_DAYS = int(os.environ.get("NEWS_DAYS", "7"))
+NEWS_PER_TEAM = 60  # новостей на команду в подборке матча (за NEWS_DAYS дней)
 MAPS_WINDOW_DAYS = 90  # статистика карт — за 3 месяца, как и остальная
 
 # Ленты профильных сайтов. Любую можно убрать или добавить свою.
@@ -4146,7 +4147,15 @@ def gather_news(teams: list[dict]) -> list[dict]:
             continue
         found[k] = {**it, "about": about, "key": k}
 
-    items = sorted(found.values(), key=lambda i: i["date"], reverse=True)[:90]
+    # лимит — на каждую команду отдельно (с игроками): поток новостей про одну не вытесняет другую
+    # (06.11: «PARIVISION проиграли раунд временем против эко» 03.11 выпал из-за новостей про NAVI и w0nderful)
+    team_of_label = {e[0]: e[3] for e in entities}
+    allv = sorted(found.values(), key=lambda i: i["date"], reverse=True)
+    pick: dict = {}
+    for ti in range(len(teams)):
+        for it in [x for x in allv if any(team_of_label.get(a) == ti for a in x["about"])][:NEWS_PER_TEAM]:
+            pick[it["key"]] = it
+    items = sorted(pick.values(), key=lambda i: i["date"], reverse=True)
     keep = [x for t in teams for x in [t.get("name"), t.get("acronym")] + [p.get("nick") for p in t.get("players") or []]]
     keep += ["IEM", "BLAST", "PGL", "ESL", "HLTV", "Major", "VRS", "CS2", "Counter-Strike", "Vitality", "Spirit", "MOUZ",
              "Falcons", "Liquid", "Heroic", "Legacy", "Aurora", "Monte", "Astralis", "Complexity", "Nemiga", "Virtus.pro"]
@@ -4156,7 +4165,7 @@ def gather_news(teams: list[dict]) -> list[dict]:
     clusters = dedupe_strict(items)  # только повторы одной новости, главная — самая подробная
 
     out = []
-    for cl in clusters[:60]:
+    for cl in clusters[:NEWS_PER_TEAM * 2]:
         it, others = cl[0], cl[1:]
         art = article_info(it)
         lang = art.get("lang") or it["lang0"]
