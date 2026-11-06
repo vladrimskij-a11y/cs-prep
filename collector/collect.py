@@ -1514,6 +1514,9 @@ def bo3_tournament_for(name: str) -> dict | None:
         return None
 
 
+_refill_n = [0]
+
+
 def build_results(tr: dict) -> dict | None:
     """Сыгранные матчи турнира со статистикой — для вкладки «Завершённые»."""
     T = bo3_tournament_for(tr["name"])
@@ -2972,12 +2975,20 @@ hltv_coach_ids: dict = {}    # norm(ник тренера) → {"id","slug"} —
 def hltv_ref(nick: str, coach: bool = False):
     """Страница HLTV человека: тренер — его страница тренера (если id известен), иначе страница игрока.
     → (запись id/slug, префикс кэша, путь)."""
+    k1, k2 = norm(nick), leet(norm(nick))  # у HLTV ник в адресе бывает «без цифр»: dev1ce → device
     if coach:
-        c = hltv_coach_ids.get(norm(nick))
+        c = hltv_coach_ids.get(k1) or hltv_coach_ids.get(k2)
         if c:
             return c, "cinfo1", "/coach"
-    pl = hltv_player_ids.get(norm(nick))
+    pl = hltv_player_ids.get(k1) or hltv_player_ids.get(k2)
     return (pl, "pinfo5", "/player") if pl else (None, None, None)
+
+
+_LEET = str.maketrans("0134578", "oieastb")
+
+
+def leet(s: str) -> str:
+    return (s or "").translate(_LEET)
 
 
 def _num_after(b: str, label: str) -> float | None:
@@ -6340,6 +6351,31 @@ def main() -> int:
                             save_json(path, rj)
                     except Exception as ex:
                         warn(f"Сетка {tr['name']}: {ex!r}")
+            # матчи без счёта/статистики карт (итоги собрали раньше, чем bo3 выложил карты) — дособираем:
+            # до 3 турниров за сбор, у каждого не больше 6 попыток (06.11: 114 из 398 матчей были пустыми, весь Cologne Major)
+            holes = [x for x in rj.get("matches") or [] if not x.get("maps") or any(g.get("score") is None or not g.get("players") for g in x["maps"])]
+            if holes and _refill_n[0] < 3 and (rj.get("refill") or 0) < 6:
+                _refill_n[0] += 1
+                try:
+                    res = build_results(tr)
+                except Exception as ex:
+                    warn(f"Дозаполнение итогов {tr['name']}: {ex!r}")
+                    res = None
+                if res and res.get("matches"):
+                    fresh = {str(x.get("id")): x for x in res["matches"]}
+                    fixed = 0
+                    for i, x in enumerate(rj.get("matches") or []):
+                        y = fresh.get(str(x.get("id")))
+                        if x in holes and y and sum(bool(g.get("players")) for g in y.get("maps") or []) > sum(bool(g.get("players")) for g in x.get("maps") or []):
+                            if x.get("veto") and not y.get("veto"):
+                                y["veto"] = x["veto"]
+                            rj["matches"][i] = y
+                            fixed += 1
+                    known = {str(x.get("id")) for x in rj.get("matches") or []}
+                    rj["matches"] += [y for k, y in fresh.items() if k not in known]  # матчи, которых раньше не было
+                    rj["refill"] = (rj.get("refill") or 0) + 1
+                    save_json(path, rj)
+                    print(f"Итоги {tr['name']}: дособрано карт в {fixed} из {len(holes)} матчей")
             tr["results"] = len(rj.get("matches") or [])
             tr["bracket"] = bool(rj.get("stages"))  # вкладка «Обзор» у сыгранного турнира: сетка, призовые, участники
             continue
