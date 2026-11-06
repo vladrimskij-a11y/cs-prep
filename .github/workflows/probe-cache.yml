@@ -1,0 +1,24 @@
+name: probe-cache
+on: { workflow_dispatch: {} }
+jobs:
+  p:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache/restore@v4
+        with: { path: cache, key: collector-cache-none, restore-keys: collector-cache- }
+      - run: |
+          python3 - <<'PY'
+          import json, datetime
+          h = json.load(open("cache/hltv.json"))
+          now = datetime.datetime.now(datetime.timezone.utc)
+          rows = []
+          for k, v in h.items():
+              if k.startswith("hfail:"):
+                  t = datetime.datetime.fromisoformat(v["t"].replace("Z", "+00:00"))
+                  rows.append((k[6:], v.get("n"), v["t"][:16]))
+          rows.sort(key=lambda r: r[2])
+          print("pauses", len(rows))
+          for r in rows: print(r)
+          print("pinfo5", sum(1 for k in h if k.startswith("pinfo5:")), "cinfo1", sum(1 for k in h if k.startswith("cinfo1:")), "cpl", len((h.get("cpl") or {}).get("data") or {}), "rkpl", len((h.get("rkpl") or {}).get("data") or {}))
+          PY
