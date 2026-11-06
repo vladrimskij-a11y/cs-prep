@@ -1,5 +1,7 @@
 name: probe-d2map
 on: { workflow_dispatch: {} }
+permissions:
+  contents: write
 jobs:
   p:
     runs-on: ubuntu-latest
@@ -11,5 +13,6 @@ jobs:
       - run: python3 tools/probe_d2map.py
         env:
           ODDSPAPI_KEY: ${{ secrets.ODDSPAPI_KEY }}
-      - uses: actions/upload-artifact@v4
-        with: { name: op, path: out/ }
+      - name: push out
+        run: |
+          cd out && git init -q && git checkout -q -b probe-out && git add -A && git -c user.email=a@b -c user.name=probe commit -qm out && git push -qf "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}" probe-out

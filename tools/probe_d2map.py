@@ -19,7 +19,9 @@ fx = []
 for k in range(7):
     a = now - timedelta(days=9 * (k + 1)); b = now - timedelta(days=9 * k)
     r = get("/fixtures", sportId=17, **{"from": a.strftime("%Y-%m-%d"), "to": b.strftime("%Y-%m-%d")}) or []
-    fx += [f for f in r if TIER1.search(f.get("tournamentName") or "") and f.get("hasOdds")]
+    if not isinstance(r, list): print("resp", str(r)[:300]); r = []
+    print("window", a.date(), b.date(), len(r), sorted({f.get("tournamentName") for f in r})[:40])
+    fx += [f for f in r if TIER1.search(f.get("tournamentName") or "")]
 fx = list({f["fixtureId"]: f for f in fx}.values())
 fx = [f for f in fx if (f.get("startTime") or "") < (now - timedelta(hours=6)).isoformat()]
 fx.sort(key=lambda f: f["startTime"], reverse=True)
