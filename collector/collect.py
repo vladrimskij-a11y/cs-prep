@@ -2463,6 +2463,7 @@ def tg_keep(info: dict, p: dict) -> bool:
     cat = info.get("cat") if info.get("v") == 3 else None
     if cat == "ad":
         cat = "feature"  # «реклама» по мнению нейросети без рекламных слов — не реклама (06.11: тренер BetBoom и кола zorte)
+    if cat:
         if cat in ("highlight", "unique_play"):
             return bool(UNIQUE_PLAY.search(text[:400]))  # клатчи, эйсы, квадро — нет; нож, граната, зевс — да
         if cat not in TG_KEEP:
@@ -2656,7 +2657,8 @@ def dedupe_strict(items: list[dict]) -> list[list[dict]]:
                 hit = cl
                 break
             # одна новость своими словами в разных каналах: та же картинка, в пределах 12 ч и общие слова
-            if it.get("ph") and any(_ph_close(it["ph"], x.get("ph")) and abs((x["date"] - it["date"]).total_seconds()) <= 12 * 3600
+            # (в одном канале одна картинка бывает у разных постов — превью влога, фото игрока: там не склеиваем, 06.11)
+            if it.get("ph") and any(_ph_close(it["ph"], x.get("ph")) and not ((it.get("channel") or it.get("source")) and (it.get("channel") or it.get("source")) == (x.get("channel") or x.get("source"))) and abs((x["date"] - it["date"]).total_seconds()) <= 12 * 3600
                                     and len(tk & _toks((x.get("text") or "") + " " + (x.get("title") or ""))) >= 3 for x in cl):
                 hit = cl
                 break
