@@ -1052,6 +1052,7 @@ a.ni { text-decoration: none; color: inherit; }
 
   // логотипы команд: что знаем из расписания, рейтинга и итогов
   var LOGOS = {};
+  function nkeyG(n) { return nkey(n); }
   function nkey(n) { return String(n || "").toLowerCase().replace(/^(the|team)\s+|\s+(team|esports|gaming)$/g, "").replace(/[^a-z0-9а-я]/g, ""); }
   function rememberLogo(name, url) { if (name && url) LOGOS[nkey(name)] = LOGOS[nkey(name)] || url; }
   function logo(name, url) { var k = nkey(name), u = PRIMARY[k] || url || LOGOS[k]; return u ? '<img class="lg" src="' + esc(u) + '" alt="" loading="lazy" onerror="this.remove()">' : ''; }
@@ -1537,6 +1538,8 @@ a.ni { text-decoration: none; color: inherit; }
         '<span><i class="nf">' + esc(name || "TBD") + '</i><i class="ns">' + esc(shortName(name)) + '</i></span><b class="num">' + esc(fin || sc ? (sc == null ? "" : sc) : "") + '</b></span>';
     }
     function openKey(x) {  // будущий/идущий матч → карточка матча из расписания
+      // «TheMongolz» в расписании и «The MongolZ» в сетке — одно и то же: начальное the не учитываем
+      var nkey = function (n) { return nkeyG(n).replace(/^the(?=.{3})/, ""); };
       var A = nkey(x.a), B = nkey(x.b);
       if (A === "tbd") A = ""; if (B === "tbd") B = "";
       if (!A && !B) return null;
@@ -1546,7 +1549,10 @@ a.ni { text-decoration: none; color: inherit; }
         return hit ? hit.id : null;
       }
       var m = (state.list.matches || []).find(function (mm) { var t = mm.teams || []; return t.length === 2 && ((nkey(t[0].name) === A && nkey(t[1].name) === B) || (nkey(t[0].name) === B && nkey(t[1].name) === A)); });
-      return m ? m.id : null;
+      if (m) return m.id;
+      // в расписании соперник ещё не вписан (карточка с одной командой) — открываем её, если она в тот же день
+      var one2 = (state.list.matches || []).find(function (mm) { var t = mm.teams || []; return t.length === 1 && (nkey(t[0].name) === A || nkey(t[0].name) === B) && x.date && dayKey(mm.begin_at) === dayKey(x.date); });
+      return one2 ? one2.id : null;
     }
     function box(x, label) {
       var fin = x.st === "finished", btn = fin && have[String(x.id)], op = !btn && openKey(x);
