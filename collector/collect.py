@@ -4752,9 +4752,16 @@ def hltv_players_warm() -> None:
     forms: dict = {}  # ник → форма его команды (турнир, дата серии)
     files = sorted((load_json(f, {}) or {} for f in (OUT / "match").glob("*.json")), key=lambda d: d.get("begin_at") or "9999")
     coaches: set = set()
+    soon: dict = {}  # ник → начало ближайшего матча в ближайшие 3 дня (или идущего)
     for d in files:
+        bt = parse_iso(d.get("begin_at"))
+        near = bt is not None and NOW - timedelta(hours=8) < bt < NOW + timedelta(days=3)
         for t in d.get("teams") or []:
             ps = [p.get("nick") for p in (t.get("players") or []) + (t.get("coach") or [])]
+            if near:
+                for n in ps:
+                    if n and (n not in soon or d["begin_at"] < soon[n]):
+                        soon[n] = d["begin_at"]
             coaches |= {norm(p.get("nick")) for p in t.get("coach") or []}
             nicks += ps
             for n in ps:
@@ -4792,10 +4799,11 @@ def hltv_players_warm() -> None:
         if (c and (parse_iso(c.get("t")) or NOW) > NOW - timedelta(days=PINFO_TTL_DAYS) and not event_ended_since(n, c.get("t") or "")
                 and rank != 1):
             continue
-        queue.append((rank, (c or {}).get("t") or "", i, n, isc))
+        # сначала — все, кто играет в ближайшие 3 дня (по времени матча), в любой ступени; потом остальные по ступеням
+        queue.append((0 if n in soon else 1, soon.get(n) or "", rank, (c or {}).get("t") or "", i, n, isc))
     queue.sort()
     done = 0
-    for _, _, _, n, isc in queue:
+    for *_, n, isc in queue:
         if _mvp_new[0] >= MVP_PER_RUN or _hltv_blocked[0]:
             break
         try:
