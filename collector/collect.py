@@ -3345,6 +3345,18 @@ def d2_fill_series(d: dict) -> bool:
                 g["src"] = "dust2"
     if not S.get("players"):
         S["players"] = rows_for(R["stats"].get("*"))
+    if not S.get("players"):  # во время матча вкладки «All maps» у dust2 ещё нет — сводка по сыгранным картам
+        pm = [g["players"] for g in S["maps"] if g.get("players")]
+        if pm:
+            agg = []
+            for j in (0, 1):
+                acc: dict = {}
+                for pl in pm:
+                    for r in pl[j]:
+                        a = acc.setdefault(r[0], [r[0], 0, 0, 0.0, 0.0, 0.0, 0])
+                        a[1] += r[1]; a[2] += r[2]; a[3] += r[3]; a[4] += r[4]; a[5] += r[5]; a[6] += 1
+                agg.append(sorted(([a[0], a[1], a[2], round(a[3] / a[6], 1), round(a[4] / a[6]), round(a[5] / a[6], 2)] for a in acc.values()), key=lambda r: -r[5]))
+            S["players"] = agg
     if S.get("src") == "dust2":
         w = [sum(1 for g in S["maps"] if g.get("winner") == j) for j in (0, 1)]
         S["teams"][0]["score"], S["teams"][1]["score"] = w
@@ -3515,6 +3527,10 @@ def live_series_sync() -> None:
         sd = series_detail(m)
         if not sd or not sd.get("maps"):
             continue
+        for j, tid in enumerate((m.get("team1_id"), m.get("team2_id"))):  # в списке матчей bo3 нет названий команд — берём из карточки
+            ct = next((t for t in d["teams"] if t.get("bo3_id") == tid), None)
+            if ct and j < len(sd.get("teams") or []) and not sd["teams"][j].get("name"):
+                sd["teams"][j].update({"name": ct.get("name"), "acronym": ct.get("acronym"), "logo": sd["teams"][j].get("logo") or ct.get("image")})
         old = (d.get("series") or {}).get(str(m["id"])) or {}
         if (d.get("veto_now") or {}).get("steps"):
             sd["veto"] = [{"team": x.get("team"), "act": x.get("act"), "map": x.get("map")} for x in d["veto_now"]["steps"]]
