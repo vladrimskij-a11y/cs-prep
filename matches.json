@@ -1,0 +1,2412 @@
+{
+ "updated": "2026-11-07T19:30:26Z",
+ "tiers": [
+  "a",
+  "s"
+ ],
+ "tournaments": [
+  {
+   "id": "bo3-5107",
+   "name": "IEM Rio 2026",
+   "tier": "s",
+   "begin": "2026-04-13T14:00:00Z",
+   "end": "2026-04-18T22:00:00Z",
+   "prize": null,
+   "prize_usd": 1000000,
+   "matches": 0,
+   "next": null,
+   "live": 0,
+   "finished": true,
+   "bg": null,
+   "results": 30,
+   "bracket": false
+  },
+  {
+   "id": "bo3-4207",
+   "name": "PGL Astana 2026",
+   "tier": "s",
+   "begin": "2026-05-09T05:00:00Z",
+   "end": "2026-05-17T17:00:00Z",
+   "prize": null,
+   "prize_usd": 1600000,
+   "matches": 0,
+   "next": null,
+   "live": 0,
+   "finished": true,
+   "bg": "https://files.bo3.gg/uploads/tournament/4207/banner_image/webp-5ad59518ecc66ad81659d08695ff3c1b.webp",
+   "results": 41,
+   "bracket": true
+  },
+  {
+   "id": "bo3-5108",
+   "name": "IEM Atlanta 2026",
+   "tier": "s",
+   "begin": "2026-05-11T15:30:00Z",
+   "end": "2026-05-16T22:00:00Z",
+   "prize": null,
+   "prize_usd": 1000000,
+   "matches": 0,
+   "next": null,
+   "live": 0,
+   "finished": true,
+   "bg": "https://files.bo3.gg/uploads/tournament/5108/image/webp-4f3776228ee3b00888b0cf14dff10fa4.webp",
+   "results": 30,
+   "bracket": true
+  },
+  {
+   "id": "bo3-4208",
+   "name": "CS Asia Championships 2026",
+   "tier": "s",
+   "begin": "2026-05-20T03:00:00Z",
+   "end": "2026-05-24T11:00:00Z",
+   "prize": null,
+   "prize_usd": 1000000,
+   "matches": 0,
+   "next": null,
+   "live": 0,
+   "finished": true,
+   "bg": "https://files.bo3.gg/uploads/tournament/4208/banner_image/webp-597b3dc1917b1e0c7542d810bcbcad49.webp",
+   "results": 30,
+   "bracket": true
+  },
+  {
+   "id": "bo3-4209",
+   "name": "IEM Cologne Major 2026",
+   "tier": "s",
+   "begin": "2026-06-11T06:00:00Z",
+   "end": "2026-06-21T20:00:00Z",
+   "prize": null,
+   "prize_usd": 1170000,
+   "matches": 0,
+   "next": null,
+   "live": 0,
+   "finished": true,
+   "bg": "https://files.bo3.gg/uploads/tournament/4209/banner_image/webp-8d2831ec2679c3d3fc628c2cc8025337.webp",
+   "results": 40,
+   "bracket": true
+  },
+  {
+   "id": "bo3-4211",
+   "name": "BLAST Bounty Summer 2026",
+   "tier": "s",
+   "begin": "2026-07-30T13:00:00Z",
+   "end": "2026-08-02T15:00:00Z",
+   "prize": null,
+   "prize_usd": 740000,
+   "matches": 0,
+   "next": null,
+   "live": 0,
+   "finished": true,
+   "bg": "https://files.bo3.gg/uploads/tournament/4211/banner_image/webp-8db9a9086a933ea251c6491acc4d7c6b.webp",
+   "results": 7,
+   "bracket": true
+  },
+  {
+   "id": "bo3-4214",
+   "name": "Esports World Cup 2026",
+   "tier": "s",
+   "begin": "2026-08-12T06:00:00Z",
+   "end": "2026-08-23T17:00:00Z",
+   "prize": null,
+   "prize_usd": 2000000,
+   "matches": 0,
+   "next": null,
+   "live": 0,
+   "finished": true,
+   "bg": "https://files.bo3.gg/uploads/tournament/4214/banner_image/webp-e8d57a665eedc373785f4f60917163b7.webp",
+   "results": 56,
+   "bracket": true
+  },
+  {
+   "id": "bo3-4204",
+   "name": "FISSURE Playground 3",
+   "tier": "s",
+   "begin": "2026-09-07T23:00:00Z",
+   "end": "2026-09-13T20:55:00Z",
+   "prize": null,
+   "prize_usd": 1000000,
+   "matches": 0,
+   "next": null,
+   "live": 0,
+   "finished": true,
+   "bg": "https://files.bo3.gg/uploads/tournament/4204/image/webp-2399febd0e75b023f693b627ddfa3a57.webp",
+   "results": 29,
+   "bracket": true
+  },
+  {
+   "id": "bo3-5109",
+   "name": "StarLadder StarSeries Fall 2026",
+   "tier": "s",
+   "begin": "2026-09-17T06:00:00Z",
+   "end": "2026-09-20T20:00:00Z",
+   "prize": null,
+   "prize_usd": 500000,
+   "matches": 0,
+   "next": null,
+   "live": 0,
+   "finished": true,
+   "bg": "https://files.bo3.gg/uploads/tournament/5109/image/webp-a1bc100f80fc0d812ef34887e88811fc.webp",
+   "results": 14,
+   "bracket": true
+  },
+  {
+   "id": "bo3-5110",
+   "name": "ESL Pro League Season 24",
+   "tier": "s",
+   "begin": "2026-10-03T06:00:00Z",
+   "end": "2026-10-11T20:00:00Z",
+   "prize": null,
+   "prize_usd": 1000000,
+   "matches": 0,
+   "next": null,
+   "live": 0,
+   "finished": true,
+   "bg": "https://files.bo3.gg/uploads/tournament/5110/image/webp-8e019c35557e43a47a0f2b1f6695d5cb.webp",
+   "results": 41,
+   "bracket": true
+  },
+  {
+   "id": "bo3-5111",
+   "name": "Thunderpick World Championship 2026",
+   "tier": "s",
+   "begin": "2026-10-13T22:00:00Z",
+   "end": "2026-10-18T20:00:00Z",
+   "prize": null,
+   "prize_usd": 1000000,
+   "matches": 0,
+   "next": null,
+   "live": 0,
+   "finished": true,
+   "bg": "https://files.bo3.gg/uploads/tournament/5111/banner_image/webp-310c07c0fa831856fa66fa7d7c8d3ef3.webp",
+   "results": 14,
+   "bracket": true
+  },
+  {
+   "id": "bo3-6130",
+   "name": "1win Private Club 2",
+   "tier": "a",
+   "begin": "2026-10-19T09:00:00Z",
+   "end": "2026-10-22T20:00:00Z",
+   "prize": null,
+   "prize_usd": 100000,
+   "matches": 0,
+   "next": null,
+   "live": 0,
+   "finished": true,
+   "bg": "https://files.bo3.gg/uploads/tournament/6130/image/webp-77f88df3b667446a4f840bf1a5e9107a.webp",
+   "results": 14,
+   "bracket": true
+  },
+  {
+   "id": "bo3-5338",
+   "name": "PGL Masters Bucharest 2026",
+   "tier": "s",
+   "begin": "2026-10-24T07:00:00Z",
+   "end": "2026-10-31T16:00:00Z",
+   "prize": null,
+   "prize_usd": 1250000,
+   "matches": 0,
+   "next": null,
+   "live": 0,
+   "finished": true,
+   "bg": "https://files.bo3.gg/uploads/tournament/5338/image/webp-a225678ba2b4659c752fb72a598f3830.webp",
+   "results": 41,
+   "bracket": true
+  },
+  {
+   "id": "bo3-6103",
+   "name": "Stake Ranked Episode 5",
+   "tier": "a",
+   "begin": "2026-10-27T11:00:00Z",
+   "end": "2026-10-30T21:30:00Z",
+   "prize": null,
+   "prize_usd": 100000,
+   "matches": 0,
+   "next": null,
+   "live": 0,
+   "finished": true,
+   "bg": "https://files.bo3.gg/uploads/tournament/6132/image/webp-0c8f381d4c001f0905ff7428cf0c371a.webp",
+   "results": 0,
+   "bracket": true
+  },
+  {
+   "id": "11136",
+   "name": "IEM Beijing 2026",
+   "tier": "s",
+   "image": null,
+   "begin": "2026-11-02T02:00:00Z",
+   "end": "2026-11-08T12:30:00Z",
+   "prize": "1,250,000 United States Dollar",
+   "matches": 2,
+   "next": "2026-11-08T04:00:00Z",
+   "live": 0,
+   "bg": "https://files.bo3.gg/uploads/tournament/5113/image/webp-b3b28942f623394df07e3e47006ca419.webp",
+   "hltv": {
+    "prize": 1250000,
+    "player_share": 300000,
+    "club_share": 950000,
+    "places": [
+     {
+      "place": "1st",
+      "prize": 125000,
+      "club": 235000,
+      "spots": [],
+      "other": [],
+      "team": null,
+      "count": 1,
+      "teams": []
+     },
+     {
+      "place": "2nd",
+      "prize": 50000,
+      "club": 160000,
+      "spots": [],
+      "other": [],
+      "team": null,
+      "count": 1,
+      "teams": []
+     },
+     {
+      "place": "3rd",
+      "prize": 30000,
+      "club": 130000,
+      "spots": [],
+      "other": [],
+      "team": null,
+      "count": 1,
+      "teams": []
+     },
+     {
+      "place": "4th",
+      "prize": 20000,
+      "club": 100000,
+      "spots": [],
+      "other": [],
+      "team": null,
+      "count": 1,
+      "teams": []
+     },
+     {
+      "place": "5-6th",
+      "prize": 12500,
+      "club": 75000,
+      "spots": [],
+      "other": [],
+      "team": "FURIA",
+      "count": 2,
+      "teams": [
+       "FURIA",
+       "PARIVISION"
+      ]
+     },
+     {
+      "place": "7-8th",
+      "prize": 7000,
+      "club": 47500,
+      "spots": [],
+      "other": [],
+      "team": "Falcons",
+      "count": 2,
+      "teams": [
+       "Falcons",
+       "Liquid"
+      ]
+     },
+     {
+      "place": "9-12th",
+      "prize": 5000,
+      "club": 20000,
+      "spots": [],
+      "other": [],
+      "team": "B8",
+      "count": 4,
+      "teams": [
+       "B8",
+       "HEROIC",
+       "Aurora",
+       "TYLOO"
+      ]
+     },
+     {
+      "place": "13-16th",
+      "prize": 4000,
+      "club": null,
+      "spots": [],
+      "other": [],
+      "team": "Legacy",
+      "count": 4,
+      "teams": [
+       "Legacy",
+       "FaZe",
+       "G2",
+       "9z"
+      ]
+     }
+    ],
+    "teams": [
+     {
+      "name": "FURIA",
+      "how": "VRS (Global)"
+     },
+     {
+      "name": "MOUZ",
+      "how": "VRS (Global)"
+     },
+     {
+      "name": "Aurora",
+      "how": "VRS (Global)"
+     },
+     {
+      "name": "Falcons",
+      "how": "VRS (Global)"
+     },
+     {
+      "name": "Legacy",
+      "how": "VRS (Global)"
+     },
+     {
+      "name": "BETBOOM",
+      "how": "VRS (Global)"
+     },
+     {
+      "name": "G2",
+      "how": "VRS (Global)"
+     },
+     {
+      "name": "Natus Vincere",
+      "how": "VRS (Global)"
+     },
+     {
+      "name": "PARIVISION",
+      "how": "VRS (Global)"
+     },
+     {
+      "name": "9z",
+      "how": "VRS (South America)"
+     },
+     {
+      "name": "The MongolZ",
+      "how": "VRS (Asia)"
+     },
+     {
+      "name": "FaZe",
+      "how": "VRS (Global)"
+     },
+     {
+      "name": "B8",
+      "how": "Closed Qualifier"
+     },
+     {
+      "name": "Liquid",
+      "how": "VRS (North America)"
+     },
+     {
+      "name": "HEROIC",
+      "how": "Closed Qualifier"
+     },
+     {
+      "name": "TYLOO",
+      "how": "Asia Closed Qualifier"
+     }
+    ],
+    "lineups": {
+     "FURIA": [
+      {
+       "id": 2023,
+       "slug": "fallen",
+       "nick": "FalleN"
+      },
+      {
+       "id": 12553,
+       "slug": "yuurih",
+       "nick": "yuurih"
+      },
+      {
+       "id": 13915,
+       "slug": "yekindar",
+       "nick": "YEKINDAR"
+      },
+      {
+       "id": 15631,
+       "slug": "kscerato",
+       "nick": "KSCERATO"
+      },
+      {
+       "id": 24144,
+       "slug": "molodoy",
+       "nick": "molodoy"
+      }
+     ],
+     "MOUZ": [
+      {
+       "id": 18072,
+       "slug": "torzsi",
+       "nick": "torzsi"
+      },
+      {
+       "id": 18221,
+       "slug": "spinx",
+       "nick": "Spinx"
+      },
+      {
+       "id": 20312,
+       "slug": "xertion",
+       "nick": "xertioN"
+      },
+      {
+       "id": 22279,
+       "slug": "pr",
+       "nick": "PR"
+      },
+      {
+       "id": 24457,
+       "slug": "xelex",
+       "nick": "xelex"
+      }
+     ],
+     "Aurora": [
+      {
+       "id": 7938,
+       "slug": "xantares",
+       "nick": "XANTARES"
+      },
+      {
+       "id": 8574,
+       "slug": "woxic",
+       "nick": "woxic"
+      },
+      {
+       "id": 18850,
+       "slug": "jimpphat",
+       "nick": "Jimpphat"
+      },
+      {
+       "id": 19677,
+       "slug": "kyxsan",
+       "nick": "kyxsan"
+      },
+      {
+       "id": 21243,
+       "slug": "wicadia",
+       "nick": "Wicadia"
+      }
+     ],
+     "Falcons": [
+      {
+       "id": 429,
+       "slug": "karrigan",
+       "nick": "karrigan"
+      },
+      {
+       "id": 3741,
+       "slug": "niko",
+       "nick": "NiKo"
+      },
+      {
+       "id": 12018,
+       "slug": "teses",
+       "nick": "TeSeS"
+      },
+      {
+       "id": 19230,
+       "slug": "m0nesy",
+       "nick": "m0NESY"
+      },
+      {
+       "id": 24177,
+       "slug": "kyousuke",
+       "nick": "kyousuke"
+      }
+     ],
+     "Legacy": [
+      {
+       "id": 12521,
+       "slug": "art",
+       "nick": "arT"
+      },
+      {
+       "id": 15698,
+       "slug": "dumau",
+       "nick": "dumau"
+      },
+      {
+       "id": 19045,
+       "slug": "latto",
+       "nick": "latto"
+      },
+      {
+       "id": 19869,
+       "slug": "try",
+       "nick": "try"
+      },
+      {
+       "id": 22182,
+       "slug": "ksloks",
+       "nick": "ksloks"
+      }
+     ],
+     "BETBOOM": [
+      {
+       "id": 11840,
+       "slug": "boombl4",
+       "nick": "Boombl4"
+      },
+      {
+       "id": 15662,
+       "slug": "zorte",
+       "nick": "zorte"
+      },
+      {
+       "id": 18506,
+       "slug": "s1ren",
+       "nick": "S1ren"
+      },
+      {
+       "id": 20357,
+       "slug": "d1ledez",
+       "nick": "d1Ledez"
+      },
+      {
+       "id": 21667,
+       "slug": "magnojez",
+       "nick": "Magnojez"
+      }
+     ],
+     "G2": [
+      {
+       "id": 3972,
+       "slug": "hunter",
+       "nick": "huNter-"
+      },
+      {
+       "id": 9436,
+       "slug": "nertz",
+       "nick": "NertZ"
+      },
+      {
+       "id": 20425,
+       "slug": "r1nkle",
+       "nick": "r1nkle"
+      },
+      {
+       "id": 20447,
+       "slug": "heavygod",
+       "nick": "HeavyGod"
+      },
+      {
+       "id": 21062,
+       "slug": "matys",
+       "nick": "MATYS"
+      }
+     ],
+     "Natus Vincere": [
+      {
+       "id": 9816,
+       "slug": "aleksib",
+       "nick": "Aleksib"
+      },
+      {
+       "id": 14759,
+       "slug": "im",
+       "nick": "iM"
+      },
+      {
+       "id": 18987,
+       "slug": "b1t",
+       "nick": "b1t"
+      },
+      {
+       "id": 20127,
+       "slug": "w0nderful",
+       "nick": "w0nderful"
+      },
+      {
+       "id": 22673,
+       "slug": "makazze",
+       "nick": "makazze"
+      }
+     ],
+     "PARIVISION": [
+      {
+       "id": 8528,
+       "slug": "hobbit",
+       "nick": "HObbit"
+      },
+      {
+       "id": 12732,
+       "slug": "fl1t",
+       "nick": "FL1T"
+      },
+      {
+       "id": 13776,
+       "slug": "jame",
+       "nick": "Jame"
+      },
+      {
+       "id": 22471,
+       "slug": "xielo",
+       "nick": "xiELO"
+      },
+      {
+       "id": 23685,
+       "slug": "zweih",
+       "nick": "zweih"
+      }
+     ],
+     "9z": [
+      {
+       "id": 12092,
+       "slug": "max",
+       "nick": "max"
+      },
+      {
+       "id": 14736,
+       "slug": "dgt",
+       "nick": "dgt"
+      },
+      {
+       "id": 14737,
+       "slug": "meyern",
+       "nick": "meyern"
+      },
+      {
+       "id": 20394,
+       "slug": "luchov",
+       "nick": "luchov"
+      },
+      {
+       "id": 22613,
+       "slug": "huasopeek",
+       "nick": "HUASOPEEK"
+      }
+     ],
+     "The MongolZ": [
+      {
+       "id": 15072,
+       "slug": "nin9",
+       "nick": "nin9"
+      },
+      {
+       "id": 20194,
+       "slug": "blitz",
+       "nick": "bLitz"
+      },
+      {
+       "id": 20275,
+       "slug": "techno",
+       "nick": "Techno"
+      },
+      {
+       "id": 21809,
+       "slug": "910",
+       "nick": "910"
+      },
+      {
+       "id": 23402,
+       "slug": "cobrazera",
+       "nick": "cobrazera"
+      }
+     ],
+     "FaZe": [
+      {
+       "id": 9960,
+       "slug": "frozen",
+       "nick": "frozen"
+      },
+      {
+       "id": 10394,
+       "slug": "twistzz",
+       "nick": "Twistzz"
+      },
+      {
+       "id": 21972,
+       "slug": "neityu",
+       "nick": "Neityu"
+      },
+      {
+       "id": 22383,
+       "slug": "jcobbb",
+       "nick": "jcobbb"
+      },
+      {
+       "id": 22866,
+       "slug": "jboen",
+       "nick": "JBOEN"
+      }
+     ],
+     "B8": [
+      {
+       "id": 20112,
+       "slug": "alex666",
+       "nick": "alex666"
+      },
+      {
+       "id": 21708,
+       "slug": "npl",
+       "nick": "npl"
+      },
+      {
+       "id": 22842,
+       "slug": "kensizor",
+       "nick": "kensizor"
+      },
+      {
+       "id": 23643,
+       "slug": "esenthial",
+       "nick": "esenthial"
+      },
+      {
+       "id": 25619,
+       "slug": "s1zzi",
+       "nick": "s1zzi"
+      }
+     ],
+     "Liquid": [
+      {
+       "id": 8520,
+       "slug": "naf",
+       "nick": "NAF"
+      },
+      {
+       "id": 8738,
+       "slug": "elige",
+       "nick": "EliGE"
+      },
+      {
+       "id": 11617,
+       "slug": "malbsmd",
+       "nick": "malbsMd"
+      },
+      {
+       "id": 11630,
+       "slug": "jt",
+       "nick": "JT"
+      },
+      {
+       "id": 24203,
+       "slug": "jorko",
+       "nick": "Jorko"
+      }
+     ],
+     "HEROIC": [
+      {
+       "id": 13666,
+       "slug": "brollan",
+       "nick": "Brollan"
+      },
+      {
+       "id": 20119,
+       "slug": "nilo",
+       "nick": "nilo"
+      },
+      {
+       "id": 21163,
+       "slug": "susp",
+       "nick": "susp"
+      },
+      {
+       "id": 21239,
+       "slug": "martinezsa",
+       "nick": "MartinezSa"
+      },
+      {
+       "id": 21983,
+       "slug": "chr1zn",
+       "nick": "Chr1zN"
+      }
+     ],
+     "TYLOO": [
+      {
+       "id": 19645,
+       "slug": "jamyoung",
+       "nick": "JamYoung"
+      },
+      {
+       "id": 20702,
+       "slug": "jee",
+       "nick": "Jee"
+      },
+      {
+       "id": 20895,
+       "slug": "mercury",
+       "nick": "Mercury"
+      },
+      {
+       "id": 21621,
+       "slug": "moseyuh",
+       "nick": "Moseyuh"
+      },
+      {
+       "id": 24857,
+       "slug": "zero",
+       "nick": "Zero"
+      }
+     ]
+    },
+    "coach_ids": [
+     {
+      "id": 24267,
+      "slug": "sidde",
+      "nick": "sidde"
+     },
+     {
+      "id": 9295,
+      "slug": "sycrone",
+      "nick": "sycrone"
+     },
+     {
+      "id": 8975,
+      "slug": "ash",
+      "nick": "ash"
+     },
+     {
+      "id": 21,
+      "slug": "zonic",
+      "nick": "zonic"
+     },
+     {
+      "id": 2530,
+      "slug": "adrrr",
+      "nick": "adrrr"
+     },
+     {
+      "id": 1084,
+      "slug": "fierce",
+      "nick": "Fierce"
+     },
+     {
+      "id": 7821,
+      "slug": "saw",
+      "nick": "sAw"
+     },
+     {
+      "id": 472,
+      "slug": "b1ad3",
+      "nick": "B1ad3"
+     },
+     {
+      "id": 1865,
+      "slug": "dastan",
+      "nick": "dastan"
+     },
+     {
+      "id": 555,
+      "slug": "bit",
+      "nick": "BIT"
+     },
+     {
+      "id": 9243,
+      "slug": "maaraa",
+      "nick": "maaRaa"
+     },
+     {
+      "id": 7264,
+      "slug": "enkay-j",
+      "nick": "enkay J"
+     },
+     {
+      "id": 22458,
+      "slug": "maddened",
+      "nick": "maddened"
+     },
+     {
+      "id": 5440,
+      "slug": "flashie",
+      "nick": "flashie"
+     },
+     {
+      "id": 922,
+      "slug": "snappi",
+      "nick": "Snappi"
+     },
+     {
+      "id": 8601,
+      "slug": "zhoking",
+      "nick": "zhokiNg"
+     }
+    ],
+    "team_ids": {
+     "FURIA": {
+      "id": 8297,
+      "slug": "furia"
+     },
+     "MOUZ": {
+      "id": 4494,
+      "slug": "mouz"
+     },
+     "Aurora": {
+      "id": 11861,
+      "slug": "aurora"
+     },
+     "Falcons": {
+      "id": 11283,
+      "slug": "falcons"
+     },
+     "Legacy": {
+      "id": 12468,
+      "slug": "legacy"
+     },
+     "BETBOOM": {
+      "id": 12394,
+      "slug": "betboom"
+     },
+     "G2": {
+      "id": 5995,
+      "slug": "g2"
+     },
+     "Natus Vincere": {
+      "id": 4608,
+      "slug": "natus-vincere"
+     },
+     "PARIVISION": {
+      "id": 12467,
+      "slug": "parivision"
+     },
+     "9z": {
+      "id": 9996,
+      "slug": "9z"
+     },
+     "The MongolZ": {
+      "id": 6248,
+      "slug": "the-mongolz"
+     },
+     "FaZe": {
+      "id": 6667,
+      "slug": "faze"
+     },
+     "B8": {
+      "id": 11241,
+      "slug": "b8"
+     },
+     "Liquid": {
+      "id": 5973,
+      "slug": "liquid"
+     },
+     "HEROIC": {
+      "id": 7175,
+      "slug": "heroic"
+     },
+     "TYLOO": {
+      "id": 4863,
+      "slug": "tyloo"
+     }
+    },
+    "hltv": "https://www.hltv.org/events/8245/iem-beijing-2026"
+   },
+   "prize_usd": 1250000,
+   "results": 28,
+   "bracket": true
+  },
+  {
+   "id": "11137",
+   "name": "BLAST Rivals Fall 2026",
+   "tier": "s",
+   "image": null,
+   "begin": "2026-11-11T02:00:00Z",
+   "end": "2026-11-15T12:00:00Z",
+   "prize": "1,000,000 United States Dollar",
+   "matches": 13,
+   "next": "2026-11-11T02:00:00Z",
+   "live": 0,
+   "bg": "https://files.bo3.gg/uploads/tournament/4224/image/webp-ee43a48922a3356d2a03b095c6269922.webp",
+   "hltv": {
+    "prize": 1000000,
+    "player_share": 350000,
+    "club_share": 650000,
+    "places": [
+     {
+      "place": "1st",
+      "prize": 125000,
+      "club": 125000,
+      "spots": [],
+      "other": [],
+      "team": null,
+      "count": 1,
+      "teams": []
+     },
+     {
+      "place": "2nd",
+      "prize": 75000,
+      "club": 125000,
+      "spots": [],
+      "other": [],
+      "team": null,
+      "count": 1,
+      "teams": []
+     },
+     {
+      "place": "3-4th",
+      "prize": 40000,
+      "club": 90000,
+      "spots": [],
+      "other": [],
+      "team": null,
+      "count": 2,
+      "teams": []
+     },
+     {
+      "place": "5-6th",
+      "prize": 25000,
+      "club": 60000,
+      "spots": [],
+      "other": [],
+      "team": null,
+      "count": 2,
+      "teams": []
+     },
+     {
+      "place": "7-8th",
+      "prize": 10000,
+      "club": 50000,
+      "spots": [],
+      "other": [],
+      "team": null,
+      "count": 2,
+      "teams": []
+     }
+    ],
+    "teams": [
+     {
+      "name": "FURIA",
+      "how": "VRS (Global)"
+     },
+     {
+      "name": "Vitality",
+      "how": "VRS (Global)"
+     },
+     {
+      "name": "Spirit",
+      "how": "VRS (Global)"
+     },
+     {
+      "name": "MOUZ",
+      "how": "VRS (Global)"
+     },
+     {
+      "name": "Falcons",
+      "how": "VRS (Global)"
+     },
+     {
+      "name": "FUT",
+      "how": "VRS (Global)"
+     },
+     {
+      "name": "G2",
+      "how": "VRS (Global)"
+     },
+     {
+      "name": "Legacy",
+      "how": "VRS (Global)"
+     }
+    ],
+    "lineups": {
+     "FURIA": [
+      {
+       "id": 2023,
+       "slug": "fallen",
+       "nick": "FalleN"
+      },
+      {
+       "id": 12553,
+       "slug": "yuurih",
+       "nick": "yuurih"
+      },
+      {
+       "id": 13915,
+       "slug": "yekindar",
+       "nick": "YEKINDAR"
+      },
+      {
+       "id": 15631,
+       "slug": "kscerato",
+       "nick": "KSCERATO"
+      },
+      {
+       "id": 24144,
+       "slug": "molodoy",
+       "nick": "molodoy"
+      }
+     ],
+     "Vitality": [
+      {
+       "id": 7322,
+       "slug": "apex",
+       "nick": "apEX"
+      },
+      {
+       "id": 11816,
+       "slug": "ropz",
+       "nick": "ropz"
+      },
+      {
+       "id": 11893,
+       "slug": "zywoo",
+       "nick": "ZywOo"
+      },
+      {
+       "id": 16693,
+       "slug": "flamez",
+       "nick": "flameZ"
+      },
+      {
+       "id": 18462,
+       "slug": "mezii",
+       "nick": "mezii"
+      }
+     ],
+     "Spirit": [
+      {
+       "id": 16920,
+       "slug": "sh1ro",
+       "nick": "sh1ro"
+      },
+      {
+       "id": 18317,
+       "slug": "magixx",
+       "nick": "magixx"
+      },
+      {
+       "id": 19808,
+       "slug": "tn1r",
+       "nick": "tN1R"
+      },
+      {
+       "id": 20423,
+       "slug": "zont1x",
+       "nick": "zont1x"
+      },
+      {
+       "id": 21167,
+       "slug": "donk",
+       "nick": "donk"
+      }
+     ],
+     "MOUZ": [
+      {
+       "id": 18072,
+       "slug": "torzsi",
+       "nick": "torzsi"
+      },
+      {
+       "id": 18221,
+       "slug": "spinx",
+       "nick": "Spinx"
+      },
+      {
+       "id": 20312,
+       "slug": "xertion",
+       "nick": "xertioN"
+      },
+      {
+       "id": 22279,
+       "slug": "pr",
+       "nick": "PR"
+      },
+      {
+       "id": 24457,
+       "slug": "xelex",
+       "nick": "xelex"
+      }
+     ],
+     "Falcons": [
+      {
+       "id": 429,
+       "slug": "karrigan",
+       "nick": "karrigan"
+      },
+      {
+       "id": 3741,
+       "slug": "niko",
+       "nick": "NiKo"
+      },
+      {
+       "id": 12018,
+       "slug": "teses",
+       "nick": "TeSeS"
+      },
+      {
+       "id": 19230,
+       "slug": "m0nesy",
+       "nick": "m0NESY"
+      },
+      {
+       "id": 24177,
+       "slug": "kyousuke",
+       "nick": "kyousuke"
+      }
+     ],
+     "FUT": [
+      {
+       "id": 19164,
+       "slug": "sunpayus",
+       "nick": "SunPayus"
+      },
+      {
+       "id": 19187,
+       "slug": "xfl0ud",
+       "nick": "xfl0ud"
+      },
+      {
+       "id": 20584,
+       "slug": "dem0n",
+       "nick": "dem0n"
+      },
+      {
+       "id": 22203,
+       "slug": "krabeni",
+       "nick": "Krabeni"
+      },
+      {
+       "id": 23553,
+       "slug": "dziugss",
+       "nick": "dziugss"
+      }
+     ],
+     "G2": [
+      {
+       "id": 3972,
+       "slug": "hunter",
+       "nick": "huNter-"
+      },
+      {
+       "id": 9436,
+       "slug": "nertz",
+       "nick": "NertZ"
+      },
+      {
+       "id": 20425,
+       "slug": "r1nkle",
+       "nick": "r1nkle"
+      },
+      {
+       "id": 20447,
+       "slug": "heavygod",
+       "nick": "HeavyGod"
+      },
+      {
+       "id": 21062,
+       "slug": "matys",
+       "nick": "MATYS"
+      }
+     ],
+     "Legacy": [
+      {
+       "id": 12521,
+       "slug": "art",
+       "nick": "arT"
+      },
+      {
+       "id": 15698,
+       "slug": "dumau",
+       "nick": "dumau"
+      },
+      {
+       "id": 19045,
+       "slug": "latto",
+       "nick": "latto"
+      },
+      {
+       "id": 19869,
+       "slug": "try",
+       "nick": "try"
+      },
+      {
+       "id": 22182,
+       "slug": "ksloks",
+       "nick": "ksloks"
+      }
+     ]
+    },
+    "coach_ids": [
+     {
+      "id": 24267,
+      "slug": "sidde",
+      "nick": "sidde"
+     },
+     {
+      "id": 9086,
+      "slug": "xtqzzz",
+      "nick": "XTQZZZ"
+     },
+     {
+      "id": 2154,
+      "slug": "hally",
+      "nick": "hally"
+     },
+     {
+      "id": 9295,
+      "slug": "sycrone",
+      "nick": "sycrone"
+     },
+     {
+      "id": 21,
+      "slug": "zonic",
+      "nick": "zonic"
+     },
+     {
+      "id": 14202,
+      "slug": "coolio",
+      "nick": "coolio"
+     },
+     {
+      "id": 7821,
+      "slug": "saw",
+      "nick": "sAw"
+     },
+     {
+      "id": 2530,
+      "slug": "adrrr",
+      "nick": "adrrr"
+     }
+    ],
+    "team_ids": {
+     "FURIA": {
+      "id": 8297,
+      "slug": "furia"
+     },
+     "Vitality": {
+      "id": 9565,
+      "slug": "vitality"
+     },
+     "Spirit": {
+      "id": 7020,
+      "slug": "spirit"
+     },
+     "MOUZ": {
+      "id": 4494,
+      "slug": "mouz"
+     },
+     "Falcons": {
+      "id": 11283,
+      "slug": "falcons"
+     },
+     "FUT": {
+      "id": 13286,
+      "slug": "fut"
+     },
+     "G2": {
+      "id": 5995,
+      "slug": "g2"
+     },
+     "Legacy": {
+      "id": 12468,
+      "slug": "legacy"
+     }
+    },
+    "hltv": "https://www.hltv.org/events/8251/blast-rivals-2026-season-2"
+   },
+   "prize_usd": 1000000,
+   "results": 0,
+   "bracket": true
+  },
+  {
+   "id": "11176",
+   "name": "PGL Major Singapore 2026",
+   "tier": "s",
+   "image": "https://cdn-api.pandascore.co/images/league/image/4163/800px-pgl_allmode-png",
+   "begin": "2026-11-23T23:00:00Z",
+   "end": "2026-12-13T22:00:00Z",
+   "prize": null,
+   "matches": 0,
+   "next": null,
+   "live": 0,
+   "bg": "https://files.bo3.gg/uploads/tournament/4226/image/webp-ba72fed0f83d2c3ac2895440af551b44.webp",
+   "hltv": {
+    "prize": 1170000,
+    "player_share": null,
+    "club_share": null,
+    "places": [
+     {
+      "place": "1st",
+      "prize": 500000,
+      "club": null,
+      "spots": [],
+      "other": [],
+      "team": null,
+      "count": 1,
+      "teams": []
+     },
+     {
+      "place": "2nd",
+      "prize": 170000,
+      "club": null,
+      "spots": [],
+      "other": [],
+      "team": null,
+      "count": 1,
+      "teams": []
+     },
+     {
+      "place": "3rd",
+      "prize": 100000,
+      "club": null,
+      "spots": [],
+      "other": [],
+      "team": null,
+      "count": 1,
+      "teams": []
+     },
+     {
+      "place": "4th",
+      "prize": 60000,
+      "club": null,
+      "spots": [],
+      "other": [],
+      "team": null,
+      "count": 1,
+      "teams": []
+     },
+     {
+      "place": "5-8th",
+      "prize": 45000,
+      "club": null,
+      "spots": [],
+      "other": [],
+      "team": null,
+      "count": 4,
+      "teams": []
+     },
+     {
+      "place": "9-11th",
+      "prize": 20000,
+      "club": null,
+      "spots": [],
+      "other": [],
+      "team": null,
+      "count": 3,
+      "teams": []
+     },
+     {
+      "place": "12-14th",
+      "prize": 20000,
+      "club": null,
+      "spots": [],
+      "other": [],
+      "team": null,
+      "count": 3,
+      "teams": []
+     },
+     {
+      "place": "15-16th",
+      "prize": 20000,
+      "club": null,
+      "spots": [],
+      "other": [],
+      "team": null,
+      "count": 2,
+      "teams": []
+     }
+    ],
+    "teams": [
+     {
+      "name": "FURIA",
+      "how": "VRS (Americas)"
+     },
+     {
+      "name": "Vitality",
+      "how": "VRS (Europe)"
+     },
+     {
+      "name": "Spirit",
+      "how": "VRS (Europe)"
+     },
+     {
+      "name": "MOUZ",
+      "how": "VRS (Europe)"
+     },
+     {
+      "name": "Aurora",
+      "how": "VRS (Europe)"
+     },
+     {
+      "name": "Falcons",
+      "how": "VRS (Europe)"
+     },
+     {
+      "name": "BETBOOM",
+      "how": "VRS (Europe)"
+     },
+     {
+      "name": "Legacy",
+      "how": "VRS (Americas)"
+     }
+    ],
+    "lineups": {
+     "FURIA": [
+      {
+       "id": 2023,
+       "slug": "fallen",
+       "nick": "FalleN"
+      },
+      {
+       "id": 12553,
+       "slug": "yuurih",
+       "nick": "yuurih"
+      },
+      {
+       "id": 13915,
+       "slug": "yekindar",
+       "nick": "YEKINDAR"
+      },
+      {
+       "id": 15631,
+       "slug": "kscerato",
+       "nick": "KSCERATO"
+      },
+      {
+       "id": 24144,
+       "slug": "molodoy",
+       "nick": "molodoy"
+      }
+     ],
+     "Vitality": [
+      {
+       "id": 7322,
+       "slug": "apex",
+       "nick": "apEX"
+      },
+      {
+       "id": 11816,
+       "slug": "ropz",
+       "nick": "ropz"
+      },
+      {
+       "id": 11893,
+       "slug": "zywoo",
+       "nick": "ZywOo"
+      },
+      {
+       "id": 16693,
+       "slug": "flamez",
+       "nick": "flameZ"
+      },
+      {
+       "id": 18462,
+       "slug": "mezii",
+       "nick": "mezii"
+      }
+     ],
+     "Spirit": [
+      {
+       "id": 16920,
+       "slug": "sh1ro",
+       "nick": "sh1ro"
+      },
+      {
+       "id": 18317,
+       "slug": "magixx",
+       "nick": "magixx"
+      },
+      {
+       "id": 19808,
+       "slug": "tn1r",
+       "nick": "tN1R"
+      },
+      {
+       "id": 20423,
+       "slug": "zont1x",
+       "nick": "zont1x"
+      },
+      {
+       "id": 21167,
+       "slug": "donk",
+       "nick": "donk"
+      }
+     ],
+     "MOUZ": [
+      {
+       "id": 18072,
+       "slug": "torzsi",
+       "nick": "torzsi"
+      },
+      {
+       "id": 18221,
+       "slug": "spinx",
+       "nick": "Spinx"
+      },
+      {
+       "id": 20312,
+       "slug": "xertion",
+       "nick": "xertioN"
+      },
+      {
+       "id": 22279,
+       "slug": "pr",
+       "nick": "PR"
+      },
+      {
+       "id": 24457,
+       "slug": "xelex",
+       "nick": "xelex"
+      }
+     ],
+     "Aurora": [
+      {
+       "id": 7938,
+       "slug": "xantares",
+       "nick": "XANTARES"
+      },
+      {
+       "id": 8574,
+       "slug": "woxic",
+       "nick": "woxic"
+      },
+      {
+       "id": 18850,
+       "slug": "jimpphat",
+       "nick": "Jimpphat"
+      },
+      {
+       "id": 19677,
+       "slug": "kyxsan",
+       "nick": "kyxsan"
+      },
+      {
+       "id": 21243,
+       "slug": "wicadia",
+       "nick": "Wicadia"
+      }
+     ],
+     "Falcons": [
+      {
+       "id": 429,
+       "slug": "karrigan",
+       "nick": "karrigan"
+      },
+      {
+       "id": 3741,
+       "slug": "niko",
+       "nick": "NiKo"
+      },
+      {
+       "id": 12018,
+       "slug": "teses",
+       "nick": "TeSeS"
+      },
+      {
+       "id": 19230,
+       "slug": "m0nesy",
+       "nick": "m0NESY"
+      },
+      {
+       "id": 24177,
+       "slug": "kyousuke",
+       "nick": "kyousuke"
+      }
+     ],
+     "BETBOOM": [
+      {
+       "id": 11840,
+       "slug": "boombl4",
+       "nick": "Boombl4"
+      },
+      {
+       "id": 15662,
+       "slug": "zorte",
+       "nick": "zorte"
+      },
+      {
+       "id": 18506,
+       "slug": "s1ren",
+       "nick": "S1ren"
+      },
+      {
+       "id": 20357,
+       "slug": "d1ledez",
+       "nick": "d1Ledez"
+      },
+      {
+       "id": 21667,
+       "slug": "magnojez",
+       "nick": "Magnojez"
+      }
+     ],
+     "Legacy": [
+      {
+       "id": 12521,
+       "slug": "art",
+       "nick": "arT"
+      },
+      {
+       "id": 15698,
+       "slug": "dumau",
+       "nick": "dumau"
+      },
+      {
+       "id": 19045,
+       "slug": "latto",
+       "nick": "latto"
+      },
+      {
+       "id": 19869,
+       "slug": "try",
+       "nick": "try"
+      },
+      {
+       "id": 22182,
+       "slug": "ksloks",
+       "nick": "ksloks"
+      }
+     ]
+    },
+    "coach_ids": [
+     {
+      "id": 24267,
+      "slug": "sidde",
+      "nick": "sidde"
+     },
+     {
+      "id": 9086,
+      "slug": "xtqzzz",
+      "nick": "XTQZZZ"
+     },
+     {
+      "id": 2154,
+      "slug": "hally",
+      "nick": "hally"
+     },
+     {
+      "id": 9295,
+      "slug": "sycrone",
+      "nick": "sycrone"
+     },
+     {
+      "id": 8975,
+      "slug": "ash",
+      "nick": "ash"
+     },
+     {
+      "id": 21,
+      "slug": "zonic",
+      "nick": "zonic"
+     },
+     {
+      "id": 1084,
+      "slug": "fierce",
+      "nick": "Fierce"
+     },
+     {
+      "id": 2530,
+      "slug": "adrrr",
+      "nick": "adrrr"
+     }
+    ],
+    "team_ids": {
+     "FURIA": {
+      "id": 8297,
+      "slug": "furia"
+     },
+     "Vitality": {
+      "id": 9565,
+      "slug": "vitality"
+     },
+     "Spirit": {
+      "id": 7020,
+      "slug": "spirit"
+     },
+     "MOUZ": {
+      "id": 4494,
+      "slug": "mouz"
+     },
+     "Aurora": {
+      "id": 11861,
+      "slug": "aurora"
+     },
+     "Falcons": {
+      "id": 11283,
+      "slug": "falcons"
+     },
+     "BETBOOM": {
+      "id": 12394,
+      "slug": "betboom"
+     },
+     "Legacy": {
+      "id": 12468,
+      "slug": "legacy"
+     }
+    },
+    "hltv": "https://www.hltv.org/events/8302/pgl-major-singapore-2026"
+   },
+   "prize_usd": 1170000,
+   "results": 0,
+   "bracket": true,
+   "major": {
+    "final": true,
+    "invite_date": "2 ноября 2026",
+    "stages": [
+     {
+      "stage": "Stage 3",
+      "teams": [
+       {
+        "name": "MOUZ",
+        "region": "Европа"
+       },
+       {
+        "name": "Aurora",
+        "region": "Европа"
+       },
+       {
+        "name": "BetBoom",
+        "region": "Европа"
+       },
+       {
+        "name": "Vitality",
+        "region": "Европа"
+       },
+       {
+        "name": "Spirit",
+        "region": "Европа"
+       },
+       {
+        "name": "Falcons",
+        "region": "Европа"
+       },
+       {
+        "name": "FURIA",
+        "region": "Америка"
+       },
+       {
+        "name": "Legacy",
+        "region": "Америка"
+       }
+      ]
+     },
+     {
+      "stage": "Stage 2",
+      "teams": [
+       {
+        "name": "FUT",
+        "region": "Европа"
+       },
+       {
+        "name": "Natus Vincere",
+        "region": "Европа"
+       },
+       {
+        "name": "1win",
+        "region": "Европа"
+       },
+       {
+        "name": "Nemiga",
+        "region": "Европа"
+       },
+       {
+        "name": "G2",
+        "region": "Европа"
+       },
+       {
+        "name": "Astralis",
+        "region": "Европа"
+       },
+       {
+        "name": "MIBR",
+        "region": "Америка"
+       },
+       {
+        "name": "The MongolZ",
+        "region": "Азия"
+       }
+      ]
+     },
+     {
+      "stage": "Stage 1",
+      "teams": [
+       {
+        "name": "Ninjas in Pyjamas",
+        "region": "Европа"
+       },
+       {
+        "name": "HEROIC",
+        "region": "Европа"
+       },
+       {
+        "name": "Eternal Fire",
+        "region": "Европа"
+       },
+       {
+        "name": "PARIVISION",
+        "region": "Европа"
+       },
+       {
+        "name": "FaZe",
+        "region": "Европа"
+       },
+       {
+        "name": "100 Thieves",
+        "region": "Европа"
+       },
+       {
+        "name": "Liquid",
+        "region": "Америка"
+       },
+       {
+        "name": "M80",
+        "region": "Америка"
+       },
+       {
+        "name": "Imperial",
+        "region": "Америка"
+       },
+       {
+        "name": "9z",
+        "region": "Америка"
+       },
+       {
+        "name": "DENDELE",
+        "region": "Америка"
+       },
+       {
+        "name": "Wildcard",
+        "region": "Америка"
+       },
+       {
+        "name": "BC.Game",
+        "region": "Азия"
+       },
+       {
+        "name": "FlyQuest",
+        "region": "Азия"
+       },
+       {
+        "name": "Chinggis Warriors",
+        "region": "Азия"
+       },
+       {
+        "name": "Lynn Vision",
+        "region": "Азия"
+       }
+      ]
+     }
+    ],
+    "source": "https://www.hltv.org/news/45879/pgl-major-singapore-invites-set"
+   }
+  },
+  {
+   "id": "bo3-6202",
+   "name": "PGL Bucharest 2027",
+   "tier": "s",
+   "image": "https://files.bo3.gg/uploads/tournament/6202/image/webp-8a2dadf161be3ecd330a2dda85593078.webp",
+   "begin": "2027-01-17T12:20:00Z",
+   "end": "2027-01-24T12:20:00Z",
+   "prize": null,
+   "prize_usd": 1000000,
+   "matches": 0,
+   "next": null,
+   "live": 0,
+   "bg": "https://files.bo3.gg/uploads/tournament/6202/image/webp-8a2dadf161be3ecd330a2dda85593078.webp"
+  }
+ ],
+ "matches": [
+  {
+   "id": 1781487,
+   "begin_at": "2026-11-08T04:00:00Z",
+   "status": "not_started",
+   "bo": 3,
+   "name": "Third Place Match: NAVI vs BB",
+   "tournament": "IEM Beijing 2026",
+   "stage": "Playoffs · Third Place Match",
+   "tier": "s",
+   "serie": {
+    "id": 11136,
+    "begin": "2026-11-02T02:00:00Z",
+    "end": "2026-11-08T12:30:00Z",
+    "image": null,
+    "prize": "1,250,000 United States Dollar"
+   },
+   "teams": [
+    {
+     "id": 3216,
+     "name": "Natus Vincere",
+     "acronym": "NAVI",
+     "slug": "natus-vincere-cs-go",
+     "image": "https://cdn-api.pandascore.co/images/team/image/3216/1022px_natus_vincere_2021_lightmode.png",
+     "location": "UA"
+    },
+    {
+     "id": 133458,
+     "name": "BetBoom Team",
+     "acronym": "BB",
+     "slug": "betboom-team-cs-go",
+     "image": "https://cdn-api.pandascore.co/images/team/image/133458/bet_boom_team_2024_allmode.png",
+     "location": "RU"
+    }
+   ],
+   "stream": "https://www.twitch.tv/ESLCS",
+   "has_detail": true
+  },
+  {
+   "id": 1781486,
+   "begin_at": "2026-11-08T07:30:00Z",
+   "status": "not_started",
+   "bo": 5,
+   "name": "Grand Final: MGLZ vs MOUZ",
+   "tournament": "IEM Beijing 2026",
+   "stage": "Playoffs · Grand Final",
+   "tier": "s",
+   "serie": {
+    "id": 11136,
+    "begin": "2026-11-02T02:00:00Z",
+    "end": "2026-11-08T12:30:00Z",
+    "image": null,
+    "prize": "1,250,000 United States Dollar"
+   },
+   "teams": [
+    {
+     "id": 3272,
+     "name": "TheMongolz",
+     "acronym": "MGLZ",
+     "slug": "themongolz",
+     "image": "https://cdn-api.pandascore.co/images/team/image/3272/702px_the_mongol_z_2024_03_allmode.png",
+     "location": "MN"
+    },
+    {
+     "id": 3240,
+     "name": "MOUZ",
+     "acronym": "MOUZ",
+     "slug": "mousesports-cs-go",
+     "image": "https://cdn-api.pandascore.co/images/team/image/3240/208px_mouz_2021_allmode.png",
+     "location": "DE"
+    }
+   ],
+   "stream": "https://www.twitch.tv/ESLCS",
+   "has_detail": true
+  },
+  {
+   "id": 1762450,
+   "begin_at": "2026-11-11T02:00:00Z",
+   "status": "not_started",
+   "bo": 3,
+   "name": "LGC vs FURIA",
+   "tournament": "BLAST Rivals Fall 2026",
+   "stage": "Group A",
+   "tier": "s",
+   "serie": {
+    "id": 11137,
+    "begin": "2026-11-11T02:00:00Z",
+    "end": "2026-11-15T12:00:00Z",
+    "image": null,
+    "prize": null
+   },
+   "teams": [
+    {
+     "id": 133708,
+     "name": "Legacy",
+     "acronym": "LGC",
+     "slug": "legacy-48cb0f61-07e7-4b0d-85a0-5f837e29c807",
+     "image": "https://cdn-api.pandascore.co/images/team/image/133708/593px_legacy_allmode.png",
+     "location": "BR"
+    },
+    {
+     "id": 124530,
+     "name": "FURIA",
+     "acronym": "FURIA",
+     "slug": "furia",
+     "image": "https://cdn-api.pandascore.co/images/team/image/124530/8297.png",
+     "location": "BR"
+    }
+   ],
+   "stream": "https://www.twitch.tv/betboom_cs_ru",
+   "has_detail": true
+  },
+  {
+   "id": 1762451,
+   "begin_at": "2026-11-11T04:30:00Z",
+   "status": "not_started",
+   "bo": 3,
+   "name": "VIT vs FAL",
+   "tournament": "BLAST Rivals Fall 2026",
+   "stage": "Group A",
+   "tier": "s",
+   "serie": {
+    "id": 11137,
+    "begin": "2026-11-11T02:00:00Z",
+    "end": "2026-11-15T12:00:00Z",
+    "image": null,
+    "prize": null
+   },
+   "teams": [
+    {
+     "id": 3455,
+     "name": "Vitality",
+     "acronym": "VIT",
+     "slug": "vitality-cs-go",
+     "image": "https://cdn-api.pandascore.co/images/team/image/3455/team_vitalitylogo_square.png",
+     "location": "FR"
+    },
+    {
+     "id": 130564,
+     "name": "Team Falcons",
+     "acronym": "FAL",
+     "slug": "falcons-esports",
+     "image": "https://cdn-api.pandascore.co/images/team/image/130564/team_falconslogo_square.png",
+     "location": "SA"
+    }
+   ],
+   "stream": "https://www.twitch.tv/betboom_cs_ru",
+   "has_detail": true
+  },
+  {
+   "id": 1762459,
+   "begin_at": "2026-11-11T07:00:00Z",
+   "status": "not_started",
+   "bo": 3,
+   "name": "TS vs FUT",
+   "tournament": "BLAST Rivals Fall 2026",
+   "stage": "Group B",
+   "tier": "s",
+   "serie": {
+    "id": 11137,
+    "begin": "2026-11-11T02:00:00Z",
+    "end": "2026-11-15T12:00:00Z",
+    "image": null,
+    "prize": null
+   },
+   "teams": [
+    {
+     "id": 124523,
+     "name": "Spirit",
+     "acronym": "TS",
+     "slug": "spirit",
+     "image": "https://cdn-api.pandascore.co/images/team/image/124523/153px_team_spirit_2022_lightmode.png",
+     "location": "RU"
+    },
+    {
+     "id": 136955,
+     "name": "FUT Esports",
+     "acronym": "FUT",
+     "slug": "fut-esports-cs-go",
+     "image": "https://cdn-api.pandascore.co/images/team/image/136955/fut_esportslogo_square.png",
+     "location": "TR"
+    }
+   ],
+   "stream": "https://www.twitch.tv/betboom_cs_ru",
+   "has_detail": true
+  },
+  {
+   "id": 1762460,
+   "begin_at": "2026-11-11T09:30:00Z",
+   "status": "not_started",
+   "bo": 3,
+   "name": "MOUZ vs G2",
+   "tournament": "BLAST Rivals Fall 2026",
+   "stage": "Group B",
+   "tier": "s",
+   "serie": {
+    "id": 11137,
+    "begin": "2026-11-11T02:00:00Z",
+    "end": "2026-11-15T12:00:00Z",
+    "image": null,
+    "prize": null
+   },
+   "teams": [
+    {
+     "id": 3240,
+     "name": "MOUZ",
+     "acronym": "MOUZ",
+     "slug": "mousesports-cs-go",
+     "image": "https://cdn-api.pandascore.co/images/team/image/3240/208px_mouz_2021_allmode.png",
+     "location": "DE"
+    },
+    {
+     "id": 3210,
+     "name": "G2",
+     "acronym": "G2",
+     "slug": "g2",
+     "image": "https://cdn-api.pandascore.co/images/team/image/3210/5995.png",
+     "location": "DE"
+    }
+   ],
+   "stream": "https://www.twitch.tv/betboom_cs_ru",
+   "has_detail": true
+  },
+  {
+   "id": 1762452,
+   "begin_at": "2026-11-12T02:00:00Z",
+   "status": "not_started",
+   "bo": 3,
+   "name": "Elimination Match: TBD vs TBD",
+   "tournament": "BLAST Rivals Fall 2026",
+   "stage": "Group A · Elimination Match",
+   "tier": "s",
+   "serie": {
+    "id": 11137,
+    "begin": "2026-11-11T02:00:00Z",
+    "end": "2026-11-15T12:00:00Z",
+    "image": null,
+    "prize": null
+   },
+   "teams": [],
+   "stream": "https://www.twitch.tv/betboom_cs_ru",
+   "has_detail": false
+  },
+  {
+   "id": 1762453,
+   "begin_at": "2026-11-12T04:30:00Z",
+   "status": "not_started",
+   "bo": 3,
+   "name": "Winners Match: TBD vs TBD",
+   "tournament": "BLAST Rivals Fall 2026",
+   "stage": "Group A · Winners Match",
+   "tier": "s",
+   "serie": {
+    "id": 11137,
+    "begin": "2026-11-11T02:00:00Z",
+    "end": "2026-11-15T12:00:00Z",
+    "image": null,
+    "prize": null
+   },
+   "teams": [],
+   "stream": "https://www.twitch.tv/betboom_cs_ru",
+   "has_detail": false
+  },
+  {
+   "id": 1762461,
+   "begin_at": "2026-11-12T07:00:00Z",
+   "status": "not_started",
+   "bo": 3,
+   "name": "Elimination Match: TBD vs TBD",
+   "tournament": "BLAST Rivals Fall 2026",
+   "stage": "Group B · Elimination Match",
+   "tier": "s",
+   "serie": {
+    "id": 11137,
+    "begin": "2026-11-11T02:00:00Z",
+    "end": "2026-11-15T12:00:00Z",
+    "image": null,
+    "prize": null
+   },
+   "teams": [],
+   "stream": "https://www.twitch.tv/betboom_cs_ru",
+   "has_detail": false
+  },
+  {
+   "id": 1762462,
+   "begin_at": "2026-11-12T09:30:00Z",
+   "status": "not_started",
+   "bo": 3,
+   "name": "Winners Match: TBD vs TBD",
+   "tournament": "BLAST Rivals Fall 2026",
+   "stage": "Group B · Winners Match",
+   "tier": "s",
+   "serie": {
+    "id": 11137,
+    "begin": "2026-11-11T02:00:00Z",
+    "end": "2026-11-15T12:00:00Z",
+    "image": null,
+    "prize": null
+   },
+   "teams": [],
+   "stream": "https://www.twitch.tv/betboom_cs_ru",
+   "has_detail": false
+  },
+  {
+   "id": 1762445,
+   "begin_at": "2026-11-13T08:00:00Z",
+   "status": "not_started",
+   "bo": 3,
+   "name": "Quarterfinal 1: TBD vs TBD",
+   "tournament": "BLAST Rivals Fall 2026",
+   "stage": "Playoffs · Quarterfinal 1",
+   "tier": "s",
+   "serie": {
+    "id": 11137,
+    "begin": "2026-11-11T02:00:00Z",
+    "end": "2026-11-15T12:00:00Z",
+    "image": null,
+    "prize": "1,000,000 United States Dollar"
+   },
+   "teams": [],
+   "stream": "https://www.twitch.tv/betboom_cs_ru",
+   "has_detail": false
+  },
+  {
+   "id": 1762446,
+   "begin_at": "2026-11-13T10:30:00Z",
+   "status": "not_started",
+   "bo": 3,
+   "name": "Quarterfinal 2: TBD vs TBD",
+   "tournament": "BLAST Rivals Fall 2026",
+   "stage": "Playoffs · Quarterfinal 2",
+   "tier": "s",
+   "serie": {
+    "id": 11137,
+    "begin": "2026-11-11T02:00:00Z",
+    "end": "2026-11-15T12:00:00Z",
+    "image": null,
+    "prize": "1,000,000 United States Dollar"
+   },
+   "teams": [],
+   "stream": "https://www.twitch.tv/betboom_cs_ru",
+   "has_detail": false
+  },
+  {
+   "id": 1762447,
+   "begin_at": "2026-11-14T08:00:00Z",
+   "status": "not_started",
+   "bo": 3,
+   "name": "Semifinal 1: TBD vs TBD",
+   "tournament": "BLAST Rivals Fall 2026",
+   "stage": "Playoffs · Semifinal 1",
+   "tier": "s",
+   "serie": {
+    "id": 11137,
+    "begin": "2026-11-11T02:00:00Z",
+    "end": "2026-11-15T12:00:00Z",
+    "image": null,
+    "prize": "1,000,000 United States Dollar"
+   },
+   "teams": [],
+   "stream": "https://www.twitch.tv/betboom_cs_ru",
+   "has_detail": false
+  },
+  {
+   "id": 1762448,
+   "begin_at": "2026-11-14T10:30:00Z",
+   "status": "not_started",
+   "bo": 3,
+   "name": "Semifinal 2: TBD vs TBD",
+   "tournament": "BLAST Rivals Fall 2026",
+   "stage": "Playoffs · Semifinal 2",
+   "tier": "s",
+   "serie": {
+    "id": 11137,
+    "begin": "2026-11-11T02:00:00Z",
+    "end": "2026-11-15T12:00:00Z",
+    "image": null,
+    "prize": "1,000,000 United States Dollar"
+   },
+   "teams": [],
+   "stream": "https://www.twitch.tv/betboom_cs_ru",
+   "has_detail": false
+  },
+  {
+   "id": 1762449,
+   "begin_at": "2026-11-15T08:00:00Z",
+   "status": "not_started",
+   "bo": 5,
+   "name": "Grand Final: TBD vs TBD",
+   "tournament": "BLAST Rivals Fall 2026",
+   "stage": "Playoffs · Grand Final",
+   "tier": "s",
+   "serie": {
+    "id": 11137,
+    "begin": "2026-11-11T02:00:00Z",
+    "end": "2026-11-15T12:00:00Z",
+    "image": null,
+    "prize": "1,000,000 United States Dollar"
+   },
+   "teams": [],
+   "stream": "https://www.twitch.tv/betboom_cs_ru",
+   "has_detail": false
+  }
+ ],
+ "major_next": null,
+ "meta": {
+  "panda_requests": 17,
+  "bo3_requests": 61,
+  "liquipedia_requests": 0,
+  "translations": 0,
+  "warnings": [],
+  "dust2_requests": 18
+ }
+}
