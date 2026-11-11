@@ -973,16 +973,18 @@ a.ni { text-decoration: none; color: inherit; }
     if (DC_INFLIGHT[k]) return DC_INFLIGHT[k];
     var p = netFetch(u).then(function (r) {
       if (!r.ok) { delete DC_INFLIGHT[k]; return r; }
-      return r.text().then(function (txt) { dcPut(k, txt); delete DC_INFLIGHT[k]; return new Response(txt, { status: 200, headers: { "Content-Type": "application/json" } }); });
+      return r.text().then(function (txt) { txt = fixTxt(txt); dcPut(k, txt); delete DC_INFLIGHT[k]; return new Response(txt, { status: 200, headers: { "Content-Type": "application/json" } }); });
     }, function (e) { delete DC_INFLIGHT[k]; throw e; });
     DC_INFLIGHT[k] = p;
     return p.then(function (r) { return r.clone ? r.clone() : r; });
   }
+  // названия: Intel Extreme Masters → IEM (и дальше как есть)
+  function fixTxt(t) { return String(t).replace(/Intel Extreme Masters/gi, "IEM"); }
   function dfetch(u, fresh) {
     var k = dkey(u), c = !fresh && !state.refreshing && dcGet(k);
     if (c && c.body) {
       if (Date.now() - c.t > 20000) fromNet(u, k).catch(function () {});  // старше 20 с — обновим в фоне к следующему открытию
-      return Promise.resolve(new Response(c.body, { status: 200, headers: { "Content-Type": "application/json" } }));
+      return Promise.resolve(new Response(fixTxt(c.body), { status: 200, headers: { "Content-Type": "application/json" } }));
     }
     return fromNet(u, k);
   }
@@ -1216,8 +1218,9 @@ a.ni { text-decoration: none; color: inherit; }
   var SH = null;
   state.shk = {}; state.shs = {};
   function renderShell(cfg) {
-    var id = cfg.id, sc = state.shs[id] = state.shs[id] || {};
-    if (SH && SH.id === id) document.querySelectorAll(".sshell .pane").forEach(function (p) { sc[p.getAttribute("data-key")] = p.scrollTop; });
+    var id = cfg.id;
+    saveShell();  // уходим с экрана (например, из рейтинга в команду) — запомним, где были
+    var sc = state.shs[id] = state.shs[id] || {};
     var keys = cfg.tabs.map(function (t) { return t.key; });
     var key = state.shk[id];
     if (keys.indexOf(key) < 0) key = state.shk[id] = cfg.def && keys.indexOf(cfg.def) >= 0 ? cfg.def : keys[0];
@@ -1234,6 +1237,11 @@ a.ni { text-decoration: none; color: inherit; }
     trackTo(keys.indexOf(key), false);
     document.querySelectorAll(".sshell .pane").forEach(function (p) { var k = p.getAttribute("data-key"); if (sc[k]) p.scrollTop = sc[k]; });
     revealSel(q(".shead .filt"));
+  }
+  function saveShell() {
+    if (!SH || !q(".sshell")) return;
+    var sc = state.shs[SH.id] = state.shs[SH.id] || {};
+    document.querySelectorAll(".sshell .pane").forEach(function (p) { sc[p.getAttribute("data-key")] = p.scrollTop; });
   }
   function shellPane() { return SH ? document.querySelector('.sshell .pane[data-key="' + (window.CSS && CSS.escape ? CSS.escape(SH.key) : SH.key) + '"]') : null; }
   function markShell(k) {
@@ -2001,6 +2009,12 @@ a.ni { text-decoration: none; color: inherit; }
     st.forEach(function (x) { var k = mkey(x.map); if (k && x.act === "ban") order.push(k); });
     return { order: order, info: info };
   }
+  // порядок кнопок карт после вето: играемые по порядку, сыгранные уходят в конец — первой становится следующая
+  function vetoBtnOrder(m, Vn) {
+    var play = Vn.order.filter(function (k) { return Vn.info[k].act !== "ban"; }), bans = Vn.order.filter(function (k) { return Vn.info[k].act === "ban"; });
+    var done = play.filter(function (k) { return playedMap(m, Vn.info[k].map); });
+    return play.filter(function (k) { return done.indexOf(k) < 0; }).concat(bans, done);
+  }
   function mapsTable(m) {
     var M = m.maps, A = m.teams[0], B = m.teams[1];
     if (!M || !M.available || !M.table.length) return '<div class="sec"><h3>Карты</h3><div class="box note">Нет данных по картам за последние 4 месяца.</div></div>';
@@ -2018,7 +2032,8 @@ a.ni { text-decoration: none; color: inherit; }
 
   function mapNames() {  // как в ряду кнопок зоны карты: после вето — сначала карты в порядке игры
     var m = state.details[state.openId], M = m.maps, names = M && M.table ? M.table.map(function (r) { return r.map; }) : [], Vz = vetoNow(m);
-    if (Vz) names = names.slice().sort(function (a, b) { var ia = Vz.order.indexOf(mkey(a)), ib = Vz.order.indexOf(mkey(b)); return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib); });
+    var Oz = Vz && vetoBtnOrder(m, Vz);
+    if (Vz) names = names.slice().sort(function (a, b) { var ia = Oz.indexOf(mkey(a)), ib = Oz.indexOf(mkey(b)); return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib); });
     return names;
   }
   // свайп по картам: в «Статистике» — зона карты, в «Позициях» — таблицы позиций
@@ -2109,18 +2124,15 @@ a.ni { text-decoration: none; color: inherit; }
       html += '<div class="box form"><div class="tmh ' + (i ? "b" : "a") + '">' + esc(t.name) + '<span>' + w + '–' + (f.length - w) + '</span></div>';
       if (!f.length) { html += '<div class="note">нет данных</div></div>'; return; }
       html += '<div class="squares">' + f.map(function (x) { return '<span class="sq ' + (x.won ? "w" : "l") + '" title="' + esc("vs " + x.opponent_name) + '">' + (x.won ? "W" : "L") + '</span>'; }).join("") + '</div>';
-      var open = state.formAll && state.formAll[t.name], shown = open ? f : f.slice(0, FORM_SHOW);  // свёрнуто до последних серий
-      html += groupByTour(shown, function (x) {
+      html += groupByTour(f.slice(0, 10), function (x) {
         var has = x.sid != null && S[String(x.sid)];
         var inner = '<span>vs ' + logo(x.opponent_name, x.logo) + esc(x.opponent_name || x.opponent) + ' <span class="d">' + esc(dm(x.date)) + '</span></span><span class="wl ' + (x.won ? "w" : "l") + ' num">' + esc(x.score) + ':' + esc(x.opp_score) + (has ? ' <i class="chev2">›</i>' : '') + '</span>';
         return has ? '<button class="gr gbtn" data-series="' + esc(x.sid) + '">' + inner + '</button>' : '<div class="gr">' + inner + '</div>';
       });
-      if (f.length > FORM_SHOW) html += '<button class="fmore" data-formall="' + esc(t.name) + '">' + (open ? "Свернуть" : "Показать все " + f.length) + '</button>';
       html += '</div>';
     });
     return html + '</div>';
   }
-  var FORM_SHOW = 3;
 
   // место и очки VRS: сейчас и после матча (оценка)
   function miniOutc(m) {
@@ -2141,53 +2153,45 @@ a.ni { text-decoration: none; color: inherit; }
       return '<span class="oc ' + side + ' pc-' + c + (o === P.outcomes[0] ? ' top' : '') + '"><b class="num">' + esc(o.score) + '</b><small class="num">' + esc(o.p) + '%</small></span>';
     }).join("") + (P.source === "букмекеры" ? "" : '<span class="oc-src">оценка по рейтингу VRS</span>') + '</div>';
   }
-  // вероятный пик: вето по привычкам команд за 3 месяца, счёт — по винрейту карт
-  // вероятный счёт карты: шанс на серию до матча → шанс на карту, поправка на винрейты команд на этой карте
-  // (так же, как в сборщике build_prediction: одна шкала и для прогноза, и для настоящего вето)
-  function mapScoreFor(m, mp, idx) {
-    var w0 = winPct(m, 0), ps = w0 != null ? Math.min(0.97, Math.max(0.03, w0 / 100)) : 0.5, bo = +m.bo || 3, lo = 0, hi = 1;
-    for (var k = 0; k < 40; k++) {
-      var mid = (lo + hi) / 2, ser = bo === 1 ? mid : bo === 5 ? mid * mid * mid * (10 - 15 * mid + 6 * mid * mid) : mid * mid * (3 - 2 * mid);
-      if (ser < ps) lo = mid; else hi = mid;
-    }
-    var pv = (lo + hi) / 2, row = (((m.maps || {}).table) || []).find(function (r) { return mkey(r.map) === mkey(mp); });
-    var wr = function (i) { var t = row ? row.teams[i] : { won: 0, played: 0 }; return (t.won + 1.5) / (t.played + 3); };
-    var p = 1 / (1 + Math.exp(-(Math.log(pv / (1 - pv)) + (wr(0) - wr(1)))));
-    var ML = ((m.prediction || {}).map_lines || []), ln = idx != null ? ML[idx] : null;
-    if (ln != null) p = ln / 100;  // линия букмекеров на карту N (в порядке игры) — точнее винрейтов
-    // как в сборщике: по 2482 реальным картам проигравший берёт 7–8 раундов почти всегда (медиана 8, при явном фаворите 7);
-    // при фаворите карты по линии ≥80% — около 5
-    var fav = Math.max(ps, 1 - ps), lose = (ln != null && Math.max(p, 1 - p) >= 0.8) ? 5 : fav >= 0.85 ? 7 : 8;
-    var sc = p >= 0.5 ? [13, lose] : [lose, 13]; sc.ot = fav < 0.8 ? 15 : 11;
-    return sc;
+  // сыгранная карта идущей серии: настоящий счёт (порядок команд как в карточке) и индекс карты в серии
+  function playedMap(m, mp) {
+    var B = m.teams[1] || {}, sid = m.cur_sid, S = sid && (m.series || {})[sid], SM = (S && S.maps) || [];
+    var sflip = S && S.teams && S.teams[0] && mkey(S.teams[0].name) === mkey(B.name);  // порядок команд у bo3 бывает обратным
+    var mi = SM.findIndex(function (g) { return mkey(g.map) === mkey(mp) && g.score; });
+    if (mi < 0) return null;
+    var g = SM[mi];
+    return { sid: sid, i: mi, g: g, sc: sflip ? [g.score[1], g.score[0]] : g.score };
   }
-  // настоящее вето (dust2): карты в порядке игры, кто пикнул, вероятный счёт; ниже — кто что забанил
+  // строка банов: первой — команда, которая банила первой
+  function bansLine(list, A, B) {  // list: [{who: 0|1, map}]
+    if (!list.length) return "";
+    var first = list[0].who;
+    return (first === 1 ? [1, 0] : [0, 1]).map(function (i) {
+      var t = i ? B : A, ms = list.filter(function (x) { return x.who === i; }).map(function (x) { return x.map; });
+      return ms.length ? '<b>' + esc(abbr(t)) + '</b> — ' + esc(ms.join(", ")) : '';
+    }).filter(Boolean).join(' · ');
+  }
+  function ppCard(m, i, mapName, whoTxt, by) {  // карточка карты: без вероятного счёта, после карты — настоящий
+    var pm = playedMap(m, mapName), btn = pm && pm.g.players;
+    var inner = '<span class="pp-n">Карта ' + (i + 1) + (whoTxt ? ' · ' + esc(whoTxt) : '') + '</span><b>' + esc(mapName) + '</b>' +
+      (pm ? '<span class="num pp-s"><span class="a">' + pm.sc[0] + '</span>:<span class="b">' + pm.sc[1] + '</span></span>' +
+        '<small>' + (btn ? 'сыграна · статистика ›' : 'сыграна · статистика скоро') + '</small>' : '');
+    var cls = 'pp-m ' + (by === 0 ? "a" : by === 1 ? "b" : "n") + (btn ? " ppbtn" : "") + mapBg(mapName);  // mapBg дописывает style — он последним
+    return btn ? '<button class="' + cls + '" data-vser="' + esc(pm.sid) + '" data-vmap="' + pm.i + '">' + inner + '</button>' : '<div class="' + cls + '">' + inner + '</div>';
+  }
+  // настоящее вето (dust2): карты в порядке игры, кто пикнул; после карты — счёт; ниже — кто что забанил
   function vetoActualBlock(m, Vn) {
-    var A = m.teams[0] || {}, B = m.teams[1] || {}, P = m.prediction || {};
+    var A = m.teams[0] || {}, B = m.teams[1] || {};
     var side = function (who) { return who === abbr(A) ? 0 : who === abbr(B) ? 1 : null; };
     var play = Vn.order.filter(function (k) { return Vn.info[k].act !== "ban"; });
-    var top = ((P.outcomes || [])[0] || {}).score, bo = +m.bo || 3;
-    var sid = m.cur_sid, S = sid && (m.series || {})[sid], SM = (S && S.maps) || [];
-    var sflip = S && S.teams && S.teams[0] && mkey(S.teams[0].name) === mkey(B.name);  // порядок команд у bo3 бывает обратным
     var anyPlayed = false;
     var cards = play.map(function (k, i) {
-      var x = Vn.info[k], by = x.act === "decider" ? null : side(x.who), sc = mapScoreFor(m, x.map, i);
-      var mi = SM.findIndex(function (g) { return mkey(g.map) === mkey(x.map) && g.score; }), g = mi >= 0 ? SM[mi] : null;
-      var z = !g && bo === 3 && i === 2 && (top === "2:0" || top === "0:2") && !SM.some(function (q) { return q.score; });
-      if (g) { sc = sflip ? [g.score[1], g.score[0]] : g.score; anyPlayed = true; }
-      var inner = '<span class="pp-n">Карта ' + (i + 1) + ' · ' + (x.act === "decider" ? "десайдер" : esc(x.who)) + '</span><b>' + esc(x.map) + '</b>' +
-        '<span class="num pp-s"><span class="a">' + sc[0] + '</span>:<span class="b">' + sc[1] + '</span></span>' +
-        (g ? (g.players ? '<small>сыграна · статистика ›</small>' : '<small>сыграна · статистика скоро</small>') : '<small>' + (z ? 'если понадобится · ' : 'вероятный · ') + 'допы ~' + sc.ot + '%</small>');
-      var btn = g && g.players;  // нажимается, когда bo3 отдал статистику игроков
-      var cls = 'pp-m ' + (by === 0 ? "a" : by === 1 ? "b" : "n") + (btn ? " ppbtn" : "") + mapBg(x.map);  // mapBg дописывает style — он последним
-      return btn ? '<button class="' + cls + '" data-vser="' + esc(sid) + '" data-vmap="' + mi + '">' + inner + '</button>' : '<div class="' + cls + '">' + inner + '</div>';
+      var x = Vn.info[k], by = x.act === "decider" ? null : side(x.who);
+      if (playedMap(m, x.map)) anyPlayed = true;
+      return ppCard(m, i, x.map, x.act === "decider" ? "десайдер" : x.who, by);
     }).join("");
-    var firstBan = Vn.order.find(function (k) { return Vn.info[k].act === "ban"; }), fb = firstBan ? Vn.info[firstBan].who : null;
-    var bans = (fb === abbr(B) ? [B, A] : [A, B]).map(function (t) {  // первой — команда, которая банила первой
-      var list = Vn.order.filter(function (k) { return Vn.info[k].act === "ban" && Vn.info[k].who === abbr(t); }).map(function (k) { return Vn.info[k].map; });
-      return list.length ? '<b>' + esc(abbr(t)) + '</b> — ' + esc(list.join(", ")) : '';
-    }).filter(Boolean).join(' · ');
-    return '<div class="sec" data-nav><h3>Вето <span>' + (anyPlayed ? 'нажми на сыгранную карту' : 'dust2 · счёт вероятный') + '</span></h3><div class="box ppick"><div class="pp-maps">' + cards + '</div>' +
+    var bans = bansLine(Vn.order.filter(function (k) { return Vn.info[k].act === "ban"; }).map(function (k) { return { who: side(Vn.info[k].who), map: Vn.info[k].map }; }).filter(function (x) { return x.who != null; }), A, B);
+    return '<div class="sec" data-nav><h3>Вето <span>' + (anyPlayed ? 'нажми на сыгранную карту' : 'dust2') + '</span></h3><div class="box ppick"><div class="pp-maps">' + cards + '</div>' +
       (bans ? '<div class="note" style="padding:10px 4px 2px">Баны: ' + bans + '</div>' : '') + '</div></div>';
   }
   function pickBlock(m) {
@@ -2195,14 +2199,11 @@ a.ni { text-decoration: none; color: inherit; }
     if (m.tbd) return '<div class="sec"><h3>Вероятный пик</h3><div class="box note">Ждём соперника.</div></div>';
     var Vn = vetoNow(m), act = Vn && Vn.order.some(function (k) { return Vn.info[k].act !== "ban"; }) ? vetoActualBlock(m, Vn) : "";  // вето проведено — блок «Вето» под вероятным
     if (!P || !(P.maps || []).length) return act;
+    var bans = bansLine((P.steps || []).filter(function (x) { return x.act === "ban" && (x.team === 0 || x.team === 1); }).map(function (x) { return { who: x.team, map: x.map }; }), A, B);
     var html = '<div class="sec" data-nav><h3>Вероятный пик <span>по вето за 3 мес.</span></h3><div class="box ppick"><div class="pp-maps">' + P.maps.map(function (x, i) {
-      var who = x.by === 0 ? abbr(A) : x.by === 1 ? abbr(B) : "";  // кто пикает карту
-      var z = x.score && x.score[0] === 0 && x.score[1] === 0, sc = z ? mapScoreFor(m, x.map, i) : x.score;  // вероятный счёт — даже если карта может не понадобиться
-      var otp = x.ot != null ? x.ot : (mapScoreFor(m, x.map, i).ot);
-      return '<div class="pp-m ' + (x.by === 0 ? "a" : x.by === 1 ? "b" : "n") + mapBg(x.map) + '"><span class="pp-n">Карта ' + (i + 1) + (who ? ' · ' + esc(who) : '') + '</span><b>' + esc(x.map) + '</b>' +
-        '<span class="num pp-s"><span class="a">' + esc(sc ? sc[0] : "–") + '</span>:<span class="b">' + esc(sc ? sc[1] : "–") + '</span></span>' +
-        '<small>' + (z ? 'если понадобится · ' : '') + 'допы ~' + otp + '%</small></div>';  // строки с процентами нет — по просьбе владельца
-    }).join("") + '</div></div></div>';
+      var who = x.by === 0 ? abbr(A) : x.by === 1 ? abbr(B) : "десайдер";  // кто пикает карту
+      return ppCard(m, i, x.map, who, x.by);
+    }).join("") + '</div>' + (bans ? '<div class="note" style="padding:10px 4px 2px">Баны: ' + bans + '</div>' : '') + '</div></div>';
     return html + act;
   }
   function vrsBlock(m) {
@@ -2367,8 +2368,9 @@ a.ni { text-decoration: none; color: inherit; }
     // касание в Telegram часто даёт микро-прокрутку — её не считаем: закрываем только на заметное движение и не сразу после открытия
     var y0 = null;
     function fresh() { return state.pop && Date.now() - (state.popAt || 0) < 600; }
-    document.addEventListener("touchstart", function (e) { y0 = state.pop && e.touches.length === 1 && !e.target.closest(".pop-in") ? e.touches[0].clientY : null; }, { passive: true, capture: true });
-    document.addEventListener("touchmove", function (e) { if (y0 != null && !fresh() && Math.abs(e.touches[0].clientY - y0) > 14) { y0 = null; closePop(); } }, { passive: true, capture: true });
+    var x0 = null;  // и вверх-вниз, и вбок (свайп на соседнюю вкладку) — окно сворачивается
+    document.addEventListener("touchstart", function (e) { var ok = state.pop && e.touches.length === 1 && !e.target.closest(".pop-in"); y0 = ok ? e.touches[0].clientY : null; x0 = ok ? e.touches[0].clientX : null; }, { passive: true, capture: true });
+    document.addEventListener("touchmove", function (e) { if (y0 != null && !fresh() && (Math.abs(e.touches[0].clientY - y0) > 14 || Math.abs(e.touches[0].clientX - x0) > 14)) { y0 = null; closePop(); } }, { passive: true, capture: true });
     // тап по свободному месту — тоже закрывает (в Telegram на iPhone по пустому месту «клик» не приходит, ловим само касание)
     var tx = null, ty = null, moved = false;
     document.addEventListener("touchstart", function (e) { moved = false; if (state.pop && e.touches.length === 1 && !e.target.closest(".pop-in")) { tx = e.touches[0].clientX; ty = e.touches[0].clientY; } else tx = null; }, { passive: true, capture: true });
@@ -2494,7 +2496,7 @@ a.ni { text-decoration: none; color: inherit; }
     var P = state.pos; if (!P) return [];
     var T = m.teams.map(function (t) { return posTeam(P, t); });
     var maps = (P.maps || []).filter(function (mp) { return T.some(function (x) { return x && x[mp]; }); });
-    var Vn = vetoNow(m), order = (Vn ? Vn.order.filter(function (k) { return Vn.info[k].act !== "ban"; }) : []).concat(((m.maps || {}).table || []).map(function (r) { return mkey(r.map); }));
+    var Vn = vetoNow(m), order = (Vn ? vetoBtnOrder(m, Vn).filter(function (k) { return Vn.info[k].act !== "ban"; }) : []).concat(((m.maps || {}).table || []).map(function (r) { return mkey(r.map); }));
     return maps.sort(function (a, b) { var ia = order.indexOf(a), ib = order.indexOf(b); return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib); });
   }
   function posBody(m, cur) {
@@ -2788,6 +2790,7 @@ a.ni { text-decoration: none; color: inherit; }
     else if (ty < D) target.scrollTop = y;
   }
   function markTabs(key) {
+    closePop();  // сменили вкладку (свайп или плашка в шапке) — окно наград сворачивается
     var tab = isNews(key) ? "news" : isTeamK(key) ? "players" : key, nf = isNews(key) ? key.slice(5) : null;
     if (isTeamK(key)) document.querySelectorAll(".mhead [data-tsub]").forEach(function (b) { b.setAttribute("aria-pressed", String(b.getAttribute("data-tsub") === key.slice(5))); });
     subGroup(key);
@@ -2873,6 +2876,17 @@ a.ni { text-decoration: none; color: inherit; }
     if (/гранд|grand/i.test(name + " " + (rd.bracket || ""))) return [["🏆", 'Победитель — <b>чемпион</b>' + reward(1)], ["🥈", 'Проигравший — <b>2-е место</b>' + reward(2)]];
     if (/3rd|3-е|третье/i.test(name)) return [["🥉", 'Победитель — 3-е место' + reward(3)], ["✗", 'Проигравший — 4-е место' + reward(4)]];
     var out = [];
+    if (hit.st.format === "group" && rounds.length >= 2) {  // группа GSL (BLAST, IEM): стартовые → матч победителей / на вылет → решающий
+      var gst = stages.filter(function (st) { return st.format === "group"; }), G = gst.length || 1;
+      var N = gst.reduce(function (a, st) { return a + (((st.rounds || [])[0] || {}).matches || []).length * 2; }, 0) || 4 * G;
+      var nxt = stages.filter(function (st) { return st.format !== "group"; })[0], into = nxt ? 'в ' + esc(String(nxt.title || "плей-офф").toLowerCase()) : 'дальше';
+      var kind = hit.ri === 0 ? "open" : /вылет|elimin|lower|loser/i.test(name) ? "elim" : /decid|решающ|третий/i.test(name) ? "dec" : /winner|победител|upper/i.test(name) ? "win" : "dec";
+      var lose = function (lo, hi) { return ["✗", 'Проигравший вылетает, ' + (lo === hi ? lo : lo + '–' + hi) + '-е место' + reward(lo)]; };
+      if (kind === "open") return [["↗", 'Победитель — в матч победителей группы'], ["↘", 'Проигравший — в матч на вылет, ещё один шанс']];
+      if (kind === "win") return [["↗", 'Победитель выходит ' + into], ["↘", 'Проигравший — в решающий матч группы, ещё один шанс']];
+      if (kind === "elim") return [["↗", 'Победитель — в решающий матч группы'], lose(N - G + 1, N)];
+      return [["↗", 'Победитель выходит ' + into], lose(N - 2 * G + 1, N - G)];
+    }
     if (rd.bracket === "upper") {
       var nu = nextR && nextR.bracket === "upper" ? nextR : null;
       out.push(["↗", 'Победитель идёт дальше по верхней сетке' + (nu ? ' — ' + esc(String(nu.name || "").toLowerCase()) : '')]);
@@ -3202,6 +3216,8 @@ a.ni { text-decoration: none; color: inherit; }
   var depth = 0;
   var navT = 0;
   function route() {
+    closePop();  // переход на другую страницу (в т.ч. «назад» свайпом) — окно наград сворачивается
+    saveShell();  // и место в списке (рейтинг, турниры) — чтобы вернуться туда же
     // плавное появление новой страницы — только при переходе, не при тихом обновлении данных
     document.body.classList.add("nav"); clearTimeout(navT); navT = setTimeout(function () { document.body.classList.remove("nav"); }, 360);
     var h = location.hash.replace("#", "");
@@ -3311,7 +3327,7 @@ a.ni { text-decoration: none; color: inherit; }
 
   // ---------- клики
   document.addEventListener("click", function (e) {
-    if (state.pop && !e.target.closest(".pop-in")) { closePop(); if (!e.target.closest("[data-pop]")) { e.preventDefault(); e.stopPropagation(); return; } }
+    if (state.pop && !e.target.closest(".pop-in")) { closePop(); if (!e.target.closest("[data-pop],[data-tab],[data-tsub],[data-nf]")) { e.preventDefault(); e.stopPropagation(); return; } }  // плашка вкладки в шапке — закрывает окно и переключает
     var t = e.target.closest("[data-pop],[data-vplay],[data-snav],[data-goto],[data-sk],[data-team],[data-tname],[data-tseries],[data-fread],[data-close],#facts-more,[data-home],[data-feedch],[data-tg],[data-reader],[data-fact],[data-formall],[data-tsub],[data-pmap],[data-tpmap],[data-open],[data-tour],[data-tab],[data-map],[data-nf],[data-player],[data-link],[data-read],[data-series],[data-vser],[data-rseries],[data-smap],[data-ttab],#back");
     if (!t) return;
     if (t.hasAttribute("data-pop")) { e.stopPropagation(); e.preventDefault(); openPop(t.getAttribute("data-pop"), t); return; }
