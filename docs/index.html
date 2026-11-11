@@ -331,6 +331,7 @@ html { overflow-anchor: none; }
 .mapzone { position: relative; gap: 8px; }
 .mapzone .mapsel { position: sticky; top: var(--hcur, 0px); z-index: 2; background: var(--bg); padding-block: 8px; margin-block: -8px 0; }
 .sshell .mapzone .mapsel { top: var(--shh, 0px); }
+.sw-m.ph { opacity: .45; }
 .mzbody { display: flex; flex-direction: column; gap: 14px; }
 .mzsec { display: flex; flex-direction: column; gap: 10px; }
 .mzh { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 600; margin: 0; display: flex; justify-content: space-between; gap: 8px; }
@@ -1735,10 +1736,19 @@ a.ni { text-decoration: none; color: inherit; }
       return h + '</div>';
     }
     function tile(x) {
+      if (x.ph) return '<div class="sw-m ph"><span class="sw-l">?</span><span class="sw-l">?</span></div>';
       var fin = x.st === "finished" && x.w != null;
       var attr = (box(x).match(/data-(rseries|open)="[^"]*"/) || [""])[0];
       var inner = circ(x.a, fin ? (x.w === 0 ? "w" : "l") : "") + circ(x.b, fin ? (x.w === 1 ? "w" : "l") : "");
       return attr ? '<button class="sw-m" ' + attr + '>' + inner + '</button>' : '<div class="sw-m">' + inner + '</div>';
+    }
+    // будущие раунды ещё без матчей (у мейджора до начала есть только раунд 1) — пустые места по счёту, как на HLTV
+    var n0 = ((st.rounds[0] || {}).matches || []).length * 2;
+    var SW16 = [null, { "1:0": 4, "0:1": 4 }, { "2:0": 2, "1:1": 4, "0:2": 2 }, { "2:1": 3, "1:2": 3 }, { "2:2": 3 }];
+    if (n0 === 16) for (var fr = cols.length; fr < 5; fr++) {
+      var gph = {};
+      Object.keys(SW16[fr]).forEach(function (g) { gph[g] = []; for (var i = 0; i < SW16[fr][g]; i++) gph[g].push({ ph: true }); });
+      cols.push({ groups: gph, done: { q: [], out: [] } });
     }
     var last = cols.length - 1;
     var html = '<div class="sec stage" style="--stc:' + STAGE_COL[si % STAGE_COL.length] + '"><h3>' + esc(st.title) + (st.status === "current" ? ' <span>идёт · швейцарская система</span>' : ' <span>швейцарская система</span>') + '</h3>';
@@ -2954,6 +2964,27 @@ a.ni { text-decoration: none; color: inherit; }
     if (/гранд|grand/i.test(name + " " + (rd.bracket || ""))) return [["🏆", 'Победитель — <b>чемпион</b>' + reward(1)], ["🥈", 'Проигравший — <b>2-е место</b>' + reward(2)]];
     if (/3rd|3-е|третье/i.test(name)) return [["🥉", 'Победитель — 3-е место' + reward(3)], ["✗", 'Проигравший — 4-е место' + reward(4)]];
     var out = [];
+    if (isSwiss(hit.st)) {  // швейцарка: 3 победы — дальше, 3 поражения — вылет; до этого — только счёт
+      var rec = function (n) {
+        var w = 0, l = 0;
+        rounds.forEach(function (r2, k) { if (k >= hit.ri) return; (r2.matches || []).forEach(function (x) {
+          if (x.st !== "finished" || x.w == null) return;
+          if (is(x.a, n)) { if (x.w === 0) w++; else l++; } else if (is(x.b, n)) { if (x.w === 1) w++; else l++; }
+        }); });
+        return [w, l];
+      };
+      var ra = rec(an), rb = rec(bn), wv = Math.max(ra[0], rb[0]), lv = Math.max(ra[1], rb[1]);  // в швейцарке счёт у соперников одинаковый
+      var S = ((rounds[0] || {}).matches || []).length * 2;
+      var sw = stages.filter(function (x) { return isSwiss(x); }), k = sw.indexOf(hit.st);
+      var later = /major|мейдж|мажор/i.test(String((m.serie || {}).name || m.tournament || "")) && /(stage|стадия)\s*([123])/i.test(hit.st.title || "") ? (3 - +RegExp.$2) * 8 : sw.slice(k + 1).reduce(function (a, x) { return a + Math.max(0, (((x.rounds || [])[0] || {}).matches || []).length * 2 - S / 2); }, 0);
+      var nx = stages[stages.indexOf(hit.st) + 1], into = nx ? 'в ' + esc(String(nx.title || "следующую стадию").toLowerCase()) : 'дальше';
+      var outRank = function (w) { var lo = S / 2 + 1 + [0, 3, 6][2 - w], hi = lo + (w === 0 ? 1 : 2); return [later + lo, later + hi]; };  // 2:3 → 9–11, 1:3 → 12–14, 0:3 → 15–16 в стадии из 16
+      out.push(wv + 1 >= 3 ? ["↗", 'Победитель выходит ' + into + ' (' + (wv + 1) + ':' + lv + ')'] : ["↗", 'Победитель — ' + (wv + 1) + ':' + lv]);
+      if (lv + 1 >= 3 && S === 16) { var rr = outRank(wv); out.push(["✗", 'Проигравший вылетает (' + wv + ':3), ' + rr[0] + '–' + rr[1] + '-е место' + reward(rr[0])]); }
+      else if (lv + 1 >= 3) out.push(["✗", 'Проигравший вылетает (' + wv + ':3)']);
+      else out.push(["↘", 'Проигравший — ' + wv + ':' + (lv + 1) + ', ещё не вылетает']);
+      return out;
+    }
     if (hit.st.format === "group" && rounds.length >= 2) {  // группа GSL (BLAST, IEM): стартовые → матч победителей / на вылет → решающий
       var gst = stages.filter(function (st) { return st.format === "group"; }), G = gst.length || 1;
       var N = gst.reduce(function (a, st) { return a + (((st.rounds || [])[0] || {}).matches || []).length * 2; }, 0) || 4 * G;
