@@ -224,6 +224,10 @@ a { color: inherit; }
 .tour-card .tn { font-family: var(--display); font-weight: 600; font-size: 15px; line-height: 1.25; text-wrap: balance; min-width: 0; }
 .tour-card .tm2 { font-size: 12px; color: var(--muted); display: flex; gap: 6px; flex-wrap: wrap; align-items: center; grid-column: 1 / -1; }
 .tour-card .tm2 b { color: var(--fg); font-weight: 600; }
+.tour-card .tm2 { row-gap: 2px; column-gap: 0; }
+.tour-card .tm2:empty { display: none; }
+.tour-card .ck { white-space: nowrap; }
+.tour-card .ck + .ck::before { content: "·"; margin: 0 6px; color: var(--muted); font-weight: 400; }
 .tour-card .tm2 .live { color: var(--onair); font-weight: 700; }
 .tour-card .go { align-self: start; }
 .tour-card.today { border-color: var(--fg); }
@@ -1195,9 +1199,10 @@ a.ni { text-decoration: none; color: inherit; }
       : '<span class="muted">расписание пока не опубликовано</span>';
     return '<button class="tour-card' + (todayN ? " today" : "") + (t.tier !== "s" ? " t2" : "") + (t.bg ? ' tbg" style="--tb:url(' + esc(t.bg) + ')' : '') + '" data-tour="' + esc(t.id) + '">' +
       '<span class="tn">' + esc(withYear(t.name, t.begin || t.next)) + '</span><span class="pill go ' + esc(t.tier) + '">' + esc((t.tier || "?").toUpperCase()) + '</span>' +
-      '<span class="tm2">' + [dates && '<b>' + esc(dates) + '</b>', live && !t.live ? '<span class="live">идёт сейчас</span>' : '',
-        (t.prize_usd || t.prize) && esc(t.prize_usd ? usd(t.prize_usd) : prize(t.prize)),
-        todayN ? '<b>сегодня ' + todayN + '</b>' : (!t.finished && ms.length ? ms.length + ' матч.' : ''), next].filter(Boolean).join(' · ') + '</span>' +
+      // строки карточки: даты (и «идёт сейчас») отдельно, ниже — призовые, матчи, ближайший; каждый кусок не рвётся посередине
+      '<span class="tm2">' + [dates && '<b>' + esc(dates) + '</b>', live && !t.live ? '<span class="live">идёт сейчас</span>' : ''].filter(Boolean).map(function (x) { return '<span class="ck">' + x + '</span>'; }).join('') + '</span>' +
+      '<span class="tm2">' + [(t.prize_usd || t.prize) && esc(t.prize_usd ? usd(t.prize_usd) : prize(t.prize)),
+        todayN ? '<b>сегодня ' + todayN + '</b>' : (!t.finished && ms.length ? ms.length + ' ' + plural(ms.length, "матч", "матча", "матчей") : ''), next].filter(Boolean).map(function (x) { return '<span class="ck">' + x + '</span>'; }).join('') + '</span>' +
       (span ? '<span class="tm2 spanrow">' + span + '</span>' : '') + '</button>';
   }
 
