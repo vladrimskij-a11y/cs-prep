@@ -2402,9 +2402,17 @@ a.ni { text-decoration: none; color: inherit; }
     var n = {}; H.forEach(function (h) { n[h.team] = 1; });
     return '<span role="button" class="medal tms" data-pop="' + esc(JSON.stringify({ t: "👥 Команды: " + Object.keys(n).length + (p.aka && p.aka.length ? " · другие ники: " + p.aka.join(", ") : ""), l: l })) + '">👥<b>' + Object.keys(n).length + '</b></span>';
   }
+  // турниры без года в названии (HLTV пишет «cs_summit 5») — год по известной серии
+  var EV_YEAR = { "cs_summit 1": 2017, "cs_summit 2": 2018, "cs_summit 3": 2018, "cs_summit 4": 2019, "cs_summit 5": 2019, "cs_summit 6": 2020, "cs_summit 7": 2020, "cs_summit 8": 2021 };
+  function evYear(name) {
+    name = String(name || "");
+    if (/\b(19|20)\d\d\b/.test(name)) return name;
+    var m = name.match(/^(cs_summit \d+)/i), y = m && EV_YEAR[m[1].toLowerCase()];
+    return y ? name.replace(/^cs_summit/i, "CS Summit") + " " + y : name;
+  }
   function mvpBadge(p) {
     if (!p.mvp) return "";
-    return '<span role="button" class="medal mvp" data-pop="' + esc(JSON.stringify({ t: "🏅 MVP на HLTV: " + p.mvp, l: p.mvp_events || [] })) + '">🏅<b>' + esc(p.mvp) + '</b></span>';
+    return '<span role="button" class="medal mvp" data-pop="' + esc(JSON.stringify({ t: "🏅 MVP на HLTV: " + p.mvp, l: (p.mvp_events || []).map(evYear) })) + '">🏅<b>' + esc(p.mvp) + '</b></span>';
   }
   function openPop(data, anchor) {
     closePop();
