@@ -1,11 +1,116 @@
 {
-  "note": "Блок «VRS forecast» со страниц матчей HLTV (скриншоты владельца 06.11, ~01:30 МСК). Эталон для проверки нашего прогноза VRS. a/b — очки сейчас, aw/al — изменение команды A при победе/поражении, bw/bl — команды B.",
+  "note": "Блок «VRS forecast» со страниц матчей HLTV (скриншоты владельца 06.11, ~01:30 МСК). Эталон для проверки нашего прогноза VRS. a/b — очки сейчас, aw/al — изменение команды A при победе/поражении, bw/bl — команды B. Добавлены скриншоты 11.11 ~21:30 МСК (BLAST Rivals): у нас 10 из 16 изменений точно, 6 — меньше на 1–2 очка; места все совпали.",
   "samples": [
-    {"match": "PARIVISION vs Natus Vincere", "event": "IEM Beijing 2026, QF", "date": "2026-11-06", "a": 1659, "b": 1728, "aw": 39, "al": -9, "bw": 30, "bl": -17},
-    {"match": "FURIA vs BETBOOM", "event": "IEM Beijing 2026, QF", "date": "2026-11-06", "a": 1916, "b": 1860, "aw": 6, "al": -21, "bw": 21, "bl": -23},
-    {"match": "Legacy vs FURIA", "event": "BLAST Rivals Fall 2026", "date": "2026-11-11", "a": 1632, "b": 1916, "aw": 43, "al": -15, "bw": -4, "bl": -26, "hltv_note": "teams ensured a minimum prize of $10,000 after this match"},
-    {"match": "Vitality vs Falcons", "event": "BLAST Rivals Fall 2026", "date": "2026-11-11", "a": 1929, "b": 1774, "aw": 18, "al": -15, "bw": 52, "bl": 4},
-    {"match": "Spirit vs FUT", "event": "BLAST Rivals Fall 2026", "date": "2026-11-11", "a": 1844, "b": 1708, "aw": 21, "al": -16, "bw": 71, "bl": 7},
-    {"match": "MOUZ vs G2", "event": "BLAST Rivals Fall 2026", "date": "2026-11-11", "a": 1980, "b": 1602, "aw": 4, "al": -25, "bw": 61, "bl": 8}
+    {
+      "match": "PARIVISION vs Natus Vincere",
+      "event": "IEM Beijing 2026, QF",
+      "date": "2026-11-06",
+      "a": 1659,
+      "b": 1728,
+      "aw": 39,
+      "al": -9,
+      "bw": 30,
+      "bl": -17
+    },
+    {
+      "match": "FURIA vs BETBOOM",
+      "event": "IEM Beijing 2026, QF",
+      "date": "2026-11-06",
+      "a": 1916,
+      "b": 1860,
+      "aw": 6,
+      "al": -21,
+      "bw": 21,
+      "bl": -23
+    },
+    {
+      "match": "Legacy vs FURIA",
+      "event": "BLAST Rivals Fall 2026",
+      "date": "2026-11-11",
+      "a": 1632,
+      "b": 1916,
+      "aw": 43,
+      "al": -15,
+      "bw": -4,
+      "bl": -26,
+      "hltv_note": "teams ensured a minimum prize of $10,000 after this match"
+    },
+    {
+      "match": "Vitality vs Falcons",
+      "event": "BLAST Rivals Fall 2026",
+      "date": "2026-11-11",
+      "a": 1929,
+      "b": 1774,
+      "aw": 18,
+      "al": -15,
+      "bw": 52,
+      "bl": 4
+    },
+    {
+      "match": "Spirit vs FUT",
+      "event": "BLAST Rivals Fall 2026",
+      "date": "2026-11-11",
+      "a": 1844,
+      "b": 1708,
+      "aw": 21,
+      "al": -16,
+      "bw": 71,
+      "bl": 7
+    },
+    {
+      "match": "MOUZ vs G2",
+      "event": "BLAST Rivals Fall 2026",
+      "date": "2026-11-11",
+      "a": 1980,
+      "b": 1602,
+      "aw": 4,
+      "al": -25,
+      "bw": 61,
+      "bl": 8
+    },
+    {
+      "match": "Legacy vs Falcons",
+      "event": "BLAST Rivals Fall 2026, Group A Elimination",
+      "date": "2026-11-11",
+      "a": 1609,
+      "b": 1749,
+      "aw": 37,
+      "al": -8,
+      "bw": 26,
+      "bl": -19
+    },
+    {
+      "match": "FURIA vs Vitality",
+      "event": "BLAST Rivals Fall 2026, Group A Winners",
+      "date": "2026-11-11",
+      "a": 1902,
+      "b": 1927,
+      "aw": 11,
+      "al": -13,
+      "bw": 22,
+      "bl": -24
+    },
+    {
+      "match": "FUT vs MOUZ",
+      "event": "BLAST Rivals Fall 2026, Group B Elimination",
+      "date": "2026-11-11",
+      "a": 1667,
+      "b": 1963,
+      "aw": 64,
+      "al": -4,
+      "bw": 4,
+      "bl": -23
+    },
+    {
+      "match": "Spirit vs G2",
+      "event": "BLAST Rivals Fall 2026, Group B Winners",
+      "date": "2026-11-11",
+      "a": 1837,
+      "b": 1630,
+      "aw": 15,
+      "al": -21,
+      "bw": 45,
+      "bl": -6
+    }
   ]
 }
