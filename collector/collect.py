@@ -1985,6 +1985,31 @@ def _days(s) -> float | None:
     return d.timestamp() / 86400 if d else None
 
 
+def _fill_top_places(places: list, tn: str) -> list:
+    """Места 1–4 без команд (HLTV запомнили до финала) — по нашей сетке: гранд-финал → 1/2, матч за 3-е → 3/4."""
+    if not any(p.get("count") and not p.get("teams") for p in places):
+        return places
+    got = {}
+    for f in (OUT / "results").glob("*.json"):
+        r = load_json(f, {}) or {}
+        if r.get("tournament") != tn:
+            continue
+        for m in r.get("matches") or []:
+            tm, w = m.get("teams") or [], m.get("winner")
+            if len(tm) != 2 or w not in (0, 1):
+                continue
+            rn = f"{m.get('stage') or ''} {m.get('round') or ''}"
+            if re.search(r"(?i)гранд|grand", rn):
+                got["1st"], got["2nd"] = tm[w].get("name"), tm[1 - w].get("name")
+            elif re.search(r"(?i)3rd|3-е|третье", rn):
+                got["3rd"], got["4th"] = tm[w].get("name"), tm[1 - w].get("name")
+    out = []
+    for p in places:
+        n = got.get(p.get("place"))
+        out.append({**p, "teams": [n], "team": n} if n and not p.get("teams") and p.get("count") == 1 else p)
+    return out
+
+
 def vrs_live():
     """«Живой» рейтинг, как на HLTV: снимок Valve + матчи после него (итоги турниров, история bo3, форма команд)
     + гарантированные призовые идущих турниров (выбывшим — их место, остальным сыгравшим — худшее незанятое)."""
@@ -2027,13 +2052,14 @@ def vrs_live():
             if t is not None and t >= ds["end"] - VRS_FORM_DAYS and x.get("won") is not None and tj.get("name"):
                 s_ = (x.get("tier") or "").lower() == "s"
                 L.add_match(t, tj["name"], x.get("opponent_name"), x["won"], 1.0 if s_ else 0.5, s_)
-    now = _days(NOW)
+    now = math.floor(_days(NOW))  # HLTV считает «на сегодня» (полночь UTC): сверено 11.11, ср. ошибка 4.6 → 3.7
     for tn, keys in played.items():
         if last.get(tn, 0) <= ds["end"]:
             continue  # турнир доигран до снимка — его призовые уже у Valve
         places = ((hltv_cache.get("event3:" + tn) or {}).get("data") or {}).get("places")
         if not places:
             continue
+        places = _fill_top_places(places, tn)
         done = set()
         for p in places:
             usd = float(p.get("prize") or 0) + float(p.get("club") or 0)
@@ -2083,7 +2109,7 @@ def vrs_outcomes_live(a: dict, b: dict, table: list[dict], brief: dict, lan: boo
         if PLAYOFF_RX.search((brief.get("stage") or "") + " " + (brief.get("name") or "")):
             wp = max(0.0, VM.playoff_win_prize(places, (brief.get("stage") or "") + " " + (brief.get("name") or "")) - g)
             win = (wp, wp)
-    f = L.forecast(a["name"], b["name"], _days(NOW), ew=ew, lan=lan, win_prize=win, both_prize=both, base=L.base)
+    f = L.forecast(a["name"], b["name"], math.floor(_days(NOW)), ew=ew, lan=lan, win_prize=win, both_prize=both, base=L.base)
     if not f:
         return None
     # Места — по всей пересчитанной таблице, как у HLTV: матч сдвигает очки и других команд (Vitality при победе FURIA
@@ -3009,14 +3035,25 @@ def hltv_cached(key: str, fn, ttl_h: float | None = None):
 def tournament_extras(name: str, final: bool = False) -> dict | None:
     c = hltv_cache.get("event3:" + name)
     if final and c and c.get("data"):
-        return c["data"]  # у сыгранного турнира призовые и участники уже не меняются
-    def fn():
-        href = hltv_event_for(name, hltv_events())
-        if not href:
-            return None
-        h = hltv_get(href)
-        return {**parse_hltv_event(h), "hltv": HLTV + href} if h else None
-    return hltv_cached("event3:" + name, fn)
+        pl = c["data"].get("places") or []
+        # у сыгранного турнира призовые не меняются — но если запомнили до финала (места 1–4 без команд), перечитываем
+        # (11.11: IEM Beijing остался с пустыми 1–4 местами — у MOUZ, MongolZ, NAVI, BetBoom не было призовых в VRS)
+        gap = any(p.get("count") and not p.get("teams") for p in pl)
+        if not gap or (c.get("fin_try") or 0) >= 6:
+            return c["data"]
+        n = (c.get("fin_try") or 0) + 1
+        r = hltv_cached("event3:" + name, lambda: _tour_extras_net(name), ttl_h=0) or c["data"]
+        hltv_cache["event3:" + name]["fin_try"] = n  # не больше 6 попыток (раз в сбор)
+        return r
+    return hltv_cached("event3:" + name, lambda: _tour_extras_net(name))
+
+
+def _tour_extras_net(name: str) -> dict | None:
+    href = hltv_event_for(name, hltv_events())
+    if not href:
+        return None
+    h = hltv_get(href)
+    return {**parse_hltv_event(h), "hltv": HLTV + href} if h else None
 
 
 def parse_vrs_major(html: str) -> dict:
