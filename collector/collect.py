@@ -4932,6 +4932,22 @@ def _tkey(name: str | None) -> str:
     return norm(re.sub(r"(?i)^(the|team)\s+|\s+(team|esports|e-sports|gaming|club)$", "", name or ""))
 
 
+def _days(a: str, b: str) -> int:
+    try:
+        da, db = datetime.strptime(a[:10], "%Y-%m-%d"), datetime.strptime(b[:10], "%Y-%m-%d")
+        return (db - da).days
+    except ValueError:
+        try:
+            return (int(b[:4]) - int(a[:4])) * 365
+        except ValueError:
+            return 0
+
+
+def _yr(lo: str, hi: str, today: str) -> str:
+    a, b = lo[:4], ("н.в." if hi == today else hi[:4])
+    return a if a == b else f"{a}–{b}"
+
+
 def player_links(d: dict) -> list[dict]:
     """Связи игроков для эфира (Liquipedia, история команд): кто с кем играл вместе и когда, кто играл за соперника."""
     teams = [t for t in d.get("teams") or [] if not t.get("tbd")]
@@ -4949,8 +4965,10 @@ def player_links(d: dict) -> list[dict]:
     tkeys = [{_tkey(t.get("name")), _tkey(t.get("acronym"))} - {""} for t in teams]
     def same_team(a, keys):
         k = _tkey(a)
-        return bool(k) and k in keys  # только точно: Team Spirit Academy и MOUZ NXT — другие команды
-    cross, ex, mates = [], [], []
+        words = re.findall(r"[A-Za-z0-9]+", a or "")
+        ini = "".join(w[0] for w in words).lower() if len(words) >= 3 else ""
+        return bool(k) and (k in keys or (ini and ini in keys))  # точно или по первым буквам (Ninjas in Pyjamas = NIP); Team Spirit Academy и MOUZ NXT — другие
+    cross, ex, mates = [], [], {}
     seen = set()
     for a in range(len(people)):
         ia, na, ra, ha = people[a]
@@ -4968,10 +4986,11 @@ def player_links(d: dict) -> list[dict]:
                     if _tkey(x["team"]) != _tkey(y["team"]) or "inactive" in (x.get("note") or "") + (y.get("note") or ""):
                         continue
                     lo, hi = max(x["from"], y["from"]), min(x["to"] or today, y["to"] or today)
-                    if hi <= lo or (parse_iso(hi + "T00:00:00Z") - parse_iso(lo + "T00:00:00Z")).days < 21:
+                    if hi <= lo or _days(lo, hi) < 60:  # короткие пересечения (пара недель) — не связь
                         continue
-                    cur = same_team(x["team"], tkeys[ia]) and ia == ib and not x["to"] and not y["to"]
-                    if cur:  # нынешняя общая команда — не связь
+                    if ia == ib and not x["to"] and not y["to"]:  # нынешняя общая команда (хоть и под старым названием) — не связь
+                        continue
+                    if any(same_team(x["team"], k) for k in tkeys):  # в команде соперника/своей — это уже «раньше играл за …»
                         continue
                     key = (min(na, nb), max(na, nb), _tkey(x["team"]))
                     if key in seen:
@@ -4980,9 +4999,18 @@ def player_links(d: dict) -> list[dict]:
                     per = f"{_ym(lo)} — {_ym(hi if hi != today else None)}"
                     if ia != ib:
                         cross.append({"tag": "Связь", "kind": "link", "text": f"{ra}{na} ({teams[ia]['name']}) и {rb}{nb} ({teams[ib]['name']}) вместе играли в {x['team']}: {per}."})
-                    else:
-                        mates.append({"tag": "Связь", "kind": "link", "text": f"{ra}{na} и {rb}{nb} ({teams[ia]['name']}) раньше вместе играли в {x['team']}: {per}."})
-    return (cross + ex + mates)[:20]
+                    else:  # одноклубники — одной строкой на команду прошлого: «В Sharks Esports вместе играли …»
+                        g = mates.setdefault((ia, _tkey(x["team"])), {"team": x["team"], "who": [], "lo": lo, "hi": hi})
+                        for w in (ra + na, rb + nb):
+                            if w not in g["who"]:
+                                g["who"].append(w)
+                        g["lo"], g["hi"] = min(g["lo"], lo), max(g["hi"], hi)
+    def who_txt(ws):
+        pl = [w for w in ws if not w.startswith("тренер ")] + [w for w in ws if w.startswith("тренер ")]
+        return ", ".join(pl[:-1]) + " и " + pl[-1] if len(pl) > 1 else pl[0]
+    mt = [{"tag": "Связь", "kind": "link", "text": f"{teams[ia]['name']}: {who_txt(g['who'])} раньше вместе играли в {g['team']} ({_yr(g['lo'], g['hi'], today)})."}
+          for (ia, _), g in sorted(mates.items(), key=lambda kv: (-len(kv[1]["who"]), kv[1]["lo"]))]
+    return (cross + ex + mt)[:20]
 
 
 def build_facts(d: dict, prev: dict | None) -> list | None:
@@ -6003,6 +6031,10 @@ def build_detail(m: dict, prev: dict | None) -> dict:
         if not lpr and alt:
             lpr = lp_roster({**t, "id": "n:" + norm(alt), "name": alt})
         players, coach = merge_roster(players, lpr)
+        if not alt:  # у PandaScore состава нет — узнаём по составу с Liquipedia
+            alt = team_by_roster(players, full.get("name") or t.get("name"))
+            if alt:
+                t["_alt"] = alt
         try:
             add_pronunciation(players + coach)
         except Exception as e:
