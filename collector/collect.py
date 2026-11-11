@@ -5161,9 +5161,19 @@ def hltv_players_warm() -> None:
     running = [tour_norm(x) for x in CURRENT_TOURS]
     def event_ended_since(n, since):
         """Команда игрока доиграла турнир после прошлой проверки — могли дать MVP, мог закончиться мейджор."""
+        end: dict = {}
         for x in forms.get(n) or []:
             tn = x.get("tournament") or ""
-            if (x.get("date") or "") > since and tn and not any(tour_same(tn, r) for r in running):
+            if not tn or any(tour_same(tn, r) for r in running):
+                continue
+            if (x.get("date") or "") > since:
+                return True
+            end[tn] = max(end.get(tn) or "", x.get("date") or "")
+        # MVP на HLTV дают не сразу после финала: если страницу читали раньше, чем через 2 дня после последней серии
+        # турнира, — перечитать ещё раз, когда 2 дня прошли (11.11: xertioN — MVP IEM Beijing, а страница прочитана в день финала)
+        for d in end.values():
+            t2 = parse_iso(d)
+            if t2 and since < iso(t2 + timedelta(days=2)) and t2 + timedelta(days=2) <= NOW:
                 return True
         return False
     queue = []
