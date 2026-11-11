@@ -550,6 +550,7 @@ html { overflow-anchor: none; }
 .medals { display: inline-flex; gap: 4px; flex-wrap: wrap; grid-column: auto; margin: 0; }
 .medal { display: inline-flex; align-items: center; gap: 2px; padding: 1px 6px; border-radius: 6px; background: var(--sunk); font-size: 13px; }
 .medal b { font-size: 12px; font-weight: 700; }
+.medal.tms { margin-left: 4px; }
 .medal.mvp { background: var(--t-soft); color: var(--t); }
 .roster .hd .medals { justify-self: end; }
 .medal { cursor: pointer; }
@@ -2000,18 +2001,12 @@ a.ni { text-decoration: none; color: inherit; }
   }
 
   function factsBlock(m) {
-    // сначала факты из новостей (самые интересные для эфира), потом посчитанные по статистике; нажимается каждый
-    var F = (m.facts || []).map(function (f, i) { return { f: f, i: i, s: factSrc(m, f) }; });
+    // факты для эфира — связи игроков: кто с кем играл вместе и когда, кто играл за соперника (Liquipedia)
+    var F = (m.facts || []).filter(function (f) { return f.kind === "link"; });
     if (!F.length) return "";
-    F.sort(function (a, b) { return (b.s ? 1 : 0) - (a.s ? 1 : 0) || a.i - b.i; });
     var shown = state.factsAll ? F : F.slice(0, 10);
-    var html = '<div class="sec"><h3>Факты для эфира <span>по данным матча</span></h3><div class="box facts">';
-    shown.forEach(function (x) {
-      var f = x.f;
-      html += x.s
-        ? '<button class="fact link" data-reader="' + esc(x.s) + '"><span class="ftag">' + esc(f.tag || "") + ' <span class="fsrc" aria-label="открыть новость">' + SRC_ICON + 'новость</span></span><span>' + esc(f.text) + '</span></button>'
-        : '<button class="fact link" data-fact="' + x.i + '"><span class="ftag">' + esc(f.tag || "") + ' <span class="fsrc">' + SRC_ICON + 'статистика</span></span><span>' + esc(f.text) + '</span></button>';
-    });
+    var html = '<div class="sec"><h3>Связи игроков <span>по истории команд · Liquipedia</span></h3><div class="box facts">';
+    shown.forEach(function (f) { html += '<div class="fact"><span>' + esc(f.text) + '</span></div>'; });
     if (F.length > 10) html += '<button class="fmore" id="facts-more">' + (state.factsAll ? "Свернуть" : "Показать ещё " + (F.length - 10)) + '</button>';
     return html + '</div></div>';
   }
@@ -2380,7 +2375,7 @@ a.ni { text-decoration: none; color: inherit; }
     var majList = (p.major_events || []).map(function (x) { return majLine(x, p.event_wins); });
     var maj = !p.majors ? '' : '<span class="pmaj tap" role="button" data-pop="' + esc(JSON.stringify({ t: "🏟 Мейджоры: " + p.majors + (p.major_wins ? ", выиграл " + p.major_wins : ""),
       l: majList.length ? majList : ["Список турниров появится после ближайшего полного сбора"] })) + '">' + majTxt + ' ›</span>';
-    return '<' + (attrs ? 'button class="pl"' + attrs : 'div class="pl"') + '><span class="nickline"><span class="pflag">' + esc(flag(p.nationality || p.flag)) + '</span><span class="nick">' + esc(p.nick) + '</span>' + mvpBadge(p) + '</span>' +
+    return '<' + (attrs ? 'button class="pl"' + attrs : 'div class="pl"') + '><span class="nickline"><span class="pflag">' + esc(flag(p.nationality || p.flag)) + '</span><span class="nick">' + esc(p.nick) + '</span>' + mvpBadge(p) + teamsBadge(p) + '</span>' +
       (roles.length ? '<span class="rcol">' + roles.map(function (r) { return '<span class="rt ' + r[1] + '">' + esc(r[0]) + '</span>'; }).join("") + '</span>' : '') +
       '<span class="rn">' + info.join(" · ") + '</span>' + maj + (statsHtml ? '<span class="ps">' + statsHtml + '</span>' : "") + '</' + (attrs ? 'button' : 'div') + '>';
   }
@@ -2396,6 +2391,17 @@ a.ni { text-decoration: none; color: inherit; }
     return '<span role="button" class="medal cup" data-pop="' + esc(JSON.stringify({ t: "🏆 Трофеи с 1 января: " + pr.length, c: cols })) + '">🏆<b>' + pr.length + '</b></span>';
   }
   function trophyCount(pr) { return ""; }
+  // команды игрока (Liquipedia): окно со списком — от нынешней к первой, с годами
+  function teamsBadge(p) {
+    var H = (p.hist || []).slice();
+    if (!H.length) return "";
+    var NOTE = { loan: "аренда", "stand-in": "замена", inactive: "неактивен" };
+    H.sort(function (a, b) { return String(b.from).localeCompare(String(a.from)); });
+    var yr = function (d) { return d ? String(d).slice(0, 4) : "н.в."; };
+    var l = H.map(function (h) { var a = yr(h.from), b = yr(h.to); return h.team + " · " + (a === b ? a : a + "–" + b) + (h.note && NOTE[h.note] ? " (" + NOTE[h.note] + ")" : ""); });
+    var n = {}; H.forEach(function (h) { n[h.team] = 1; });
+    return '<span role="button" class="medal tms" data-pop="' + esc(JSON.stringify({ t: "👥 Команды: " + Object.keys(n).length + (p.aka && p.aka.length ? " · другие ники: " + p.aka.join(", ") : ""), l: l })) + '">👥<b>' + Object.keys(n).length + '</b></span>';
+  }
   function mvpBadge(p) {
     if (!p.mvp) return "";
     return '<span role="button" class="medal mvp" data-pop="' + esc(JSON.stringify({ t: "🏅 MVP на HLTV: " + p.mvp, l: p.mvp_events || [] })) + '">🏅<b>' + esc(p.mvp) + '</b></span>';
@@ -2518,11 +2524,10 @@ a.ni { text-decoration: none; color: inherit; }
   }
   function posTeam(P, t) {
     if (!P || !P.teams || !t) return null;
-    var nicks = (t.players || []).map(function (p) { return String(p.nick || "").toLowerCase(); });
     var best = null, bs = 0;
     Object.keys(P.teams).forEach(function (tn) {
       var names = {}; Object.keys(P.teams[tn]).forEach(function (mp) { Object.keys(P.teams[tn][mp]).forEach(function (n) { names[n.toLowerCase()] = 1; }); });
-      var sc = nicks.filter(function (n) { return names[n]; }).length;
+      var keys = Object.keys(names), sc = (t.players || []).filter(function (p) { return p && p.nick && nickIn(p, keys); }).length;
       var nm = function (x) { return String(x || "").toLowerCase().replace(/^team\s+|\s+(team|esports|gaming|club)$/g, "").replace(/[^a-z0-9]/g, ""); };
       if (nm(tn) === nm(t.name) || (t.acronym && nm(tn) === nm(t.acronym))) sc += 1.5;
       if (sc > bs) { bs = sc; best = tn; }
@@ -2557,10 +2562,9 @@ a.ni { text-decoration: none; color: inherit; }
   function posBody(m, cur) {
     var P = state.pos, T = m.teams.map(function (t) { return posTeam(P, t); }), html = "";
     m.teams.forEach(function (t, i) {
-      var D = (T[i] || {})[cur] || {}, low = {};
-      Object.keys(D).forEach(function (n) { low[n.toLowerCase()] = n; });
-      var players = (t.players || []).map(function (p) { return p.nick; });
-      Object.keys(D).forEach(function (n) { if (players.map(function (x) { return String(x).toLowerCase(); }).indexOf(n.toLowerCase()) < 0 && players.length < 5) players.push(n); });
+      var D = (T[i] || {})[cur] || {}, low = posLow(D, t.players);
+      var players = (t.players || []).map(function (p) { return p.nick; }), used = players.map(function (x) { return low[String(x).toLowerCase()]; });
+      Object.keys(D).forEach(function (n) { if (used.indexOf(n) < 0 && players.length < 5) players.push(n); });
       html += '<div class="sec"><div class="box"><div class="st-h ' + (i ? "b" : "a") + '">' + (t.tbd ? mixLogo(t) + ' ' : logo(t.name, t.logo)) + esc(t.name) + '</div>';
       if (t.tbd) html += '<div class="note">Соперник ещё не определён.</div>';
       else if (!T[i]) html += '<div class="note">Команды нет в базе ProRoles (там только топ-50).</div>';
@@ -2571,6 +2575,18 @@ a.ni { text-decoration: none; color: inherit; }
     return html;
   }
   // таблица позиций одной команды на карте: игрок, где держит за CT, куда идёт за T (матч и страница команды)
+  // ник в ProRoles/dust2 может отличаться: прежний ник (Liquipedia aka) или короче/длиннее хвостом (Techno ↔ Techno4K)
+  function nickIn(p, keys) {
+    var k = String(p.nick || "").toLowerCase(), all = [k].concat((p.aka || []).map(function (x) { return String(x).toLowerCase(); }));
+    for (var i = 0; i < all.length; i++) if (keys.indexOf(all[i]) >= 0) return all[i];
+    var c = keys.filter(function (x) { return Math.min(x.length, k.length) >= 4 && Math.abs(x.length - k.length) <= 3 && (x.indexOf(k) === 0 || k.indexOf(x) === 0); });
+    return c.length === 1 ? c[0] : null;
+  }
+  function posLow(D, plist) {  // {ник игрока в нижнем регистре → ключ в данных ProRoles}
+    var low = {}, keys = Object.keys(D).map(function (n) { low[n.toLowerCase()] = n; return n.toLowerCase(); });
+    (plist || []).forEach(function (p) { var k = nickIn(p, keys); if (k) low[String(p.nick).toLowerCase()] = low[k]; });
+    return low;
+  }
   function posTable(players, D, low) {
     var html = '';
     {
@@ -2600,10 +2616,9 @@ a.ni { text-decoration: none; color: inherit; }
       .sort(function (a, b) { var ia = order.indexOf(a), ib = order.indexOf(b); return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib); });
   }
   function teamPosBody(T, cur) {
-    var t = teamPosT(T), D = (posTeam(state.pos, t) || {})[cur] || {}, low = {};
-    Object.keys(D).forEach(function (n) { low[n.toLowerCase()] = n; });
-    var players = t.players.map(function (p) { return p.nick; });
-    Object.keys(D).forEach(function (n) { if (players.map(function (x) { return String(x).toLowerCase(); }).indexOf(n.toLowerCase()) < 0 && players.length < 5) players.push(n); });
+    var t = teamPosT(T), D = (posTeam(state.pos, t) || {})[cur] || {}, low = posLow(D, t.players);
+    var players = t.players.map(function (p) { return p.nick; }), used = players.map(function (x) { return low[String(x).toLowerCase()]; });
+    Object.keys(D).forEach(function (n) { if (used.indexOf(n) < 0 && players.length < 5) players.push(n); });
     return '<div class="box">' + (Object.keys(D).length ? posTable(players, D, low) : '<div class="note">На ' + esc(POS_MAPNAME[cur] || cur) + ' демо этой команды пока нет.</div>') + '</div>';
   }
   function teamPosBlock(T) {

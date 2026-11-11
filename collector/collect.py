@@ -707,11 +707,66 @@ def lp_prefetch(teams: list[dict]) -> None:
         warn(f"Liquipedia предзагрузка: {e!r}")
 
 
+NICK_AKA: dict = {}  # norm(ник) → {прежние/другие ники} (Liquipedia |ids=): Techno4K ↔ Techno на HLTV и dust2
+
+
+def lp_aka(text: str) -> list[str]:
+    """Другие ники игрока из инфобокса Liquipedia (|ids=Techno)."""
+    m = re.search(r"^\|\s*ids\s*=([^\n]*)", text or "", re.M)
+    return [x.strip() for x in re.split(r"[,;/]", m.group(1)) if x.strip()] if m else []
+
+
+def lp_history(text: str) -> list[dict]:
+    """История команд игрока из инфобокса Liquipedia: {{TH|2020-09-12 — 2022-03-06|Команда|Loan}} → [{team, from, to, note}]."""
+    out = []
+    for a, b, team, note in re.findall(r"\{\{TH\|\s*([0-9?]{4}-[0-9?]{2}-[0-9?]{2})\s*[—–-]+\s*([^|]*?)\s*\|\s*([^|}]+?)\s*(?:\|\s*([^|}]*?)\s*)?\}\}", text or ""):
+        b = re.sub(r"'+", "", b).strip()
+        team = re.sub(r"\s*\((?:[^)]*\b(?:team|esports|gaming|squad|club)\b[^)]*)\)\s*$", "", team.strip(), flags=re.I)  # «Checkmate (Mongolian team)» → Checkmate
+        out.append({"team": team, "from": a.replace("??", "01") if a[:4] != "????" else None,
+                    "to": None if re.match(r"(?i)present", b) else (b.replace("??", "01") if re.match(r"\d{4}", b) else None),
+                    "note": (note or "").strip().lower() or None})
+    return [x for x in out if x["from"]]
+
+
+def remember_aka(nick: str, aka: list | None) -> None:
+    k = norm(nick)
+    for a in aka or []:
+        if norm(a) and norm(a) != k:
+            NICK_AKA.setdefault(k, set()).add(norm(a))
+            NICK_AKA.setdefault(norm(a), set()).add(k)
+
+
+def nick_keys(nick: str) -> list[str]:
+    """Ключи для поиска игрока: сам ник, «без цифр» (dev1ce → device) и прежние ники с Liquipedia."""
+    k = norm(nick)
+    keys = [k, leet(k)] + sorted(NICK_AKA.get(k) or [])
+    return [x for x in dict.fromkeys(keys) if x]
+
+
+def nick_find(nick: str, pool) -> str | None:
+    """Ключ из pool для ника: точно, «без цифр», прежний ник, иначе единственный вариант с отличием только в хвосте
+    (Techno ↔ Techno4K: короткий ≥4 букв, хвост ≤3 знаков)."""
+    if not nick:
+        return None
+    for k in nick_keys(nick):
+        if k in pool:
+            return k
+    k = norm(nick)
+    lk = {leet(x): x for x in pool}
+    if leet(k) in lk:
+        return lk[leet(k)]
+    c = [x for x in pool if x and min(len(x), len(k)) >= 4 and abs(len(x) - len(k)) <= 3 and (x.startswith(k) or k.startswith(x))]
+    return c[0] if len(c) == 1 else None
+
+
 def lp_roster(t: dict) -> dict | None:
     """Активный состав с Liquipedia: тренер, капитан, роли. Кэш (см. lp_fresh)."""
     key = str(t["id"])
     cached = roster_cache.get(key)
-    if cached and lp_fresh(key):
+    cd = (cached or {}).get("data") or {}
+    if cached and lp_fresh(key) and (not cd.get("players") or "hist" in cd["players"][0]):  # без истории команд — перечитать
+        for p in (cd.get("players") or []) + (cd.get("coach") or []):
+            remember_aka(p.get("nick"), p.get("aka"))
         return cached.get("data")
     names = lp_names(t)
     data = None
@@ -781,6 +836,11 @@ def lp_roster(t: dict) -> dict | None:
                         p["loan_from"] = owner
                     else:
                         p["loan_from"] = None
+            for p in people:
+                pg = ppages.get(p["page"], "")
+                p["aka"] = lp_aka(pg)
+                p["hist"] = lp_history(pg)
+                remember_aka(p["nick"], p["aka"])
             any_igl = any(p["igl"] for p in players)
             for p in players:
                 roles, igl = player_roles(ppages.get(p["page"], ""))
@@ -788,8 +848,8 @@ def lp_roster(t: dict) -> dict | None:
                 if not any_igl and igl:
                     p["igl"] = True  # в составе капитан не отмечен — берём со страницы игрока
             data = {
-                "coach": [{"nick": p["nick"], "name": p["name"], "flag": p["flag"], "birth": p["birth"]} for p in people if p["coach"]],
-                "players": [{k: p.get(k) for k in ("nick", "name", "flag", "igl", "roles", "note", "birth", "loan_from", "stand_for")} for p in players],
+                "coach": [{"nick": p["nick"], "name": p["name"], "flag": p["flag"], "birth": p["birth"], "aka": p["aka"], "hist": p["hist"]} for p in people if p["coach"]],
+                "players": [{k: p.get(k) for k in ("nick", "name", "flag", "igl", "roles", "note", "birth", "loan_from", "stand_for", "aka", "hist")} for p in players],
             }
     except Exception as e:
         warn(f"Liquipedia {t.get('name')}: {e!r}")
@@ -819,7 +879,7 @@ def merge_roster(panda_players: list[dict], lp: dict | None) -> tuple[list[dict]
     by_nick = {norm(p.get("nick")): p for p in panda_players}
     res = []
     for lp_p in lp["players"]:
-        pp = by_nick.get(norm(lp_p["nick"]), {})
+        pp = by_nick.get(nick_find(lp_p["nick"], by_nick) or norm(lp_p["nick"]), {})
         tags = list(dict.fromkeys((["Капитан"] if lp_p.get("igl") else []) + list(lp_p.get("roles") or [])))
         if lp_p.get("note") and lp_p["note"] not in ("player",):
             note = lp_p["note"]
@@ -843,6 +903,8 @@ def merge_roster(panda_players: list[dict], lp: dict | None) -> tuple[list[dict]
             "birth": lp_p.get("birth"),
             "image": pp.get("image"),
             "tags": tags,
+            "aka": lp_p.get("aka") or None,
+            "hist": lp_p.get("hist") or None,
         })
     coach = [{**c, "age": age_from(c.get("birth"))} for c in lp.get("coach") or []]
     return res, coach
@@ -2988,13 +3050,13 @@ hltv_coach_ids: dict = {}    # norm(ник тренера) → {"id","slug"} —
 def hltv_ref(nick: str, coach: bool = False):
     """Страница HLTV человека: тренер — его страница тренера (если id известен), иначе страница игрока.
     → (запись id/slug, префикс кэша, путь)."""
-    k1, k2 = norm(nick), leet(norm(nick))  # у HLTV ник в адресе бывает «без цифр»: dev1ce → device
+    # у HLTV ник в адресе бывает «без цифр» (dev1ce → device) или прежний/короткий (Techno4K → techno) — см. nick_find
     if coach:
-        c = hltv_coach_ids.get(k1) or hltv_coach_ids.get(k2)
-        if c:
-            return c, "cinfo1", "/coach"
-    pl = hltv_player_ids.get(k1) or hltv_player_ids.get(k2)
-    return (pl, "pinfo5", "/player") if pl else (None, None, None)
+        k = nick_find(nick, hltv_coach_ids)
+        if k:
+            return hltv_coach_ids[k], "cinfo1", "/coach"
+    k = nick_find(nick, hltv_player_ids)
+    return (hltv_player_ids[k], "pinfo5", "/player") if k else (None, None, None)
 
 
 _LEET = str.maketrans("0134578", "oieastb")
@@ -3468,7 +3530,7 @@ def d2_player_stats(team: dict, days: int = 90) -> list[dict]:
             first = min(first or ed, ed)
             for r in tab[tn]:
                 k = norm(r[0])
-                k = k if k in roster else leet(k) if leet(k) in roster else k
+                k = k if k in roster else (nick_find(r[0], roster) or k)  # Techno (dust2) ↔ Techno4K (состав)
                 if roster and k not in roster:
                     continue
                 a = agg.setdefault(k, {"nick": roster.get(k, r[0]), "maps": 0, "k": 0, "d": 0, "adr": 0.0, "kast": 0.0, "r": 0.0, "per_map": {}})
@@ -4461,8 +4523,9 @@ def gather_news(teams: list[dict]) -> list[dict]:
             nick = p.get("nick") or ""
             if len(nick) < 2:
                 continue
-            amb = is_ambiguous(nick)
-            entities.append((nick, entity_re(nick, case=amb), amb, ti))
+            for alt in [nick] + [a for a in (p.get("aka") or []) if len(a) >= 4]:  # и прежний ник (Techno4K — он же Techno)
+                amb = is_ambiguous(alt)
+                entities.append((nick, entity_re(alt, case=amb), amb, ti))
 
     # Источник новостей — только новостные Telegram-каналы (TG_NEWS_CHANNELS).
     # Сайты (Google News, RSS) отключены по просьбе пользователя: USE_WEB_NEWS=1 вернёт их.
@@ -4846,6 +4909,76 @@ def fact_source(f: dict, news_items: list) -> str | None:
         if sc > score:
             best, score = n.get("key"), sc
     return best if score >= 0.4 else None
+
+
+RU_MON = ["января", "февраля", "марта", "апреля", "мая", "июня", "июля", "августа", "сентября", "октября", "ноября", "декабря"]
+RU_MON_N = ["январь", "февраль", "март", "апрель", "май", "июнь", "июль", "август", "сентябрь", "октябрь", "ноябрь", "декабрь"]
+
+
+def _ym(d: str | None) -> str:
+    if not d:
+        return "наст. время"
+    try:
+        return f"{RU_MON_N[int(d[5:7]) - 1]} {d[:4]}"
+    except (ValueError, IndexError):
+        return d[:4]
+
+
+def _tkey(name: str | None) -> str:
+    return norm(re.sub(r"(?i)^(the|team)\s+|\s+(team|esports|e-sports|gaming|club)$", "", name or ""))
+
+
+def player_links(d: dict) -> list[dict]:
+    """Связи игроков для эфира (Liquipedia, история команд): кто с кем играл вместе и когда, кто играл за соперника."""
+    teams = [t for t in d.get("teams") or [] if not t.get("tbd")]
+    if len(teams) != 2:
+        return []
+    today = NOW.strftime("%Y-%m-%d")
+    people = []  # (команда, ник, роль, история)
+    for i, t in enumerate(teams):
+        for p in t.get("players") or []:
+            if p.get("hist"):
+                people.append((i, p["nick"], "", p["hist"]))
+        for c in t.get("coach") or []:
+            if c.get("hist"):
+                people.append((i, c["nick"], "тренер ", c["hist"]))
+    tkeys = [{_tkey(t.get("name")), _tkey(t.get("acronym"))} - {""} for t in teams]
+    def same_team(a, keys):
+        k = _tkey(a)
+        return bool(k) and k in keys  # только точно: Team Spirit Academy и MOUZ NXT — другие команды
+    cross, ex, mates = [], [], []
+    seen = set()
+    for a in range(len(people)):
+        ia, na, ra, ha = people[a]
+        # играл за соперника
+        for h in ha:
+            if same_team(h["team"], tkeys[1 - ia]) and h.get("note") not in ("stand-in",):
+                key = ("ex", na, _tkey(h["team"]))
+                if key not in seen:
+                    seen.add(key)
+                    ex.append({"tag": "Связь", "kind": "link", "text": f"{ra}{na} ({teams[ia]['name']}) раньше играл за {h['team']}: {_ym(h['from'])} — {_ym(h['to'])}."})
+        for b in range(a + 1, len(people)):
+            ib, nb, rb, hb = people[b]
+            for x in ha:
+                for y in hb:
+                    if _tkey(x["team"]) != _tkey(y["team"]) or "inactive" in (x.get("note") or "") + (y.get("note") or ""):
+                        continue
+                    lo, hi = max(x["from"], y["from"]), min(x["to"] or today, y["to"] or today)
+                    if hi <= lo or (parse_iso(hi + "T00:00:00Z") - parse_iso(lo + "T00:00:00Z")).days < 21:
+                        continue
+                    cur = same_team(x["team"], tkeys[ia]) and ia == ib and not x["to"] and not y["to"]
+                    if cur:  # нынешняя общая команда — не связь
+                        continue
+                    key = (min(na, nb), max(na, nb), _tkey(x["team"]))
+                    if key in seen:
+                        continue
+                    seen.add(key)
+                    per = f"{_ym(lo)} — {_ym(hi if hi != today else None)}"
+                    if ia != ib:
+                        cross.append({"tag": "Связь", "kind": "link", "text": f"{ra}{na} ({teams[ia]['name']}) и {rb}{nb} ({teams[ib]['name']}) вместе играли в {x['team']}: {per}."})
+                    else:
+                        mates.append({"tag": "Связь", "kind": "link", "text": f"{ra}{na} и {rb}{nb} ({teams[ia]['name']}) раньше вместе играли в {x['team']}: {per}."})
+    return (cross + ex + mates)[:20]
 
 
 def build_facts(d: dict, prev: dict | None) -> list | None:
@@ -6021,15 +6154,10 @@ def build_detail(m: dict, prev: dict | None) -> dict:
                 detail[k] = prev[k]
     if one:
         return detail
-    try:
-        if (soon or not prev) and brief.get("tier") == "s" and not STATS:
-            detail["facts"] = build_facts(detail, prev)
-        elif STATS and prev:
-            detail["facts"] = prev.get("facts")
-        else:
-            detail["facts"] = prev.get("facts") or (code_facts(detail)[:20] or None)  # до матча ещё далеко — нейросеть не тратим
+    try:  # факты для эфира — только связи игроков (владелец 11.11: прежние факты из новостей и статистики убраны)
+        detail["facts"] = player_links(detail) or None
     except Exception as e:
-        warn(f"Факты: {e!r}")
+        warn(f"Связи игроков: {e!r}")
     return detail
 
 
