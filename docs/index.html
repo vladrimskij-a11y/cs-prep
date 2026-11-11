@@ -330,6 +330,7 @@ html { overflow-anchor: none; }
 /* зона карты */
 .mapzone { position: relative; gap: 8px; }
 .mapzone .mapsel { position: sticky; top: var(--hcur, 0px); z-index: 2; background: var(--bg); padding-block: 8px; margin-block: -8px 0; }
+.sshell .mapzone .mapsel { top: var(--shh, 0px); }
 .mzbody { display: flex; flex-direction: column; gap: 14px; }
 .mzsec { display: flex; flex-direction: column; gap: 10px; }
 .mzh { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 600; margin: 0; display: flex; justify-content: space-between; gap: 8px; }
@@ -1263,6 +1264,7 @@ a.ni { text-decoration: none; color: inherit; }
     if (!SH || !q(".sshell") || state.ovl || e.touches.length !== 1) return;
     var x = e.touches[0].clientX;
     if (x < 20 || x > window.innerWidth - 20 || e.target.closest("video, input")) return;
+    if (e.target.closest(".tmz")) return;  // зона карты на странице команды листает карты сама
     var sc = e.target.closest(".filt, .bracket, .swg"), edge = null;
     if (sc && sc.scrollWidth > sc.clientWidth + 2) {
       if (!sc.classList.contains("bracket") && !sc.classList.contains("swg")) return;  // сетка и швейцарка листаются сами
@@ -1462,10 +1464,63 @@ a.ni { text-decoration: none; color: inherit; }
       html += '<div class="sec"><h3>Карты <span>за ' + Math.round((M.window_days || 120) / 30) + ' мес.</span></h3><div class="box"><table class="mtab"><thead><tr><th>Карта</th><th>Винрейт</th></tr></thead><tbody>' +
         M.table.map(function (r) { var t = r.teams[0], p = pct(t.won, t.played); return '<tr><td class="mn">' + esc(r.map) + '</td><td class="a"><span class="wr"><span class="pct">' + p + '%</span><span class="track"><i style="width:' + p + '%"></i></span><span class="gp">' + t.won + '/' + t.played + '</span></span></td></tr>'; }).join("") +
         '</tbody></table></div></div>';
+      html += teamMapZone(T);
     }
     html += teamPosBlock(T);
     return html;
   }
+  // страница команды: зона карты как в матче — липкая строка карт, стороны и пистолетки, последние игры на карте; свайп листает карты
+  function teamMapNames(T) { return (((T.maps || {}).table) || []).map(function (r) { return r.map; }); }
+  function teamMapZone(T) {
+    var names = teamMapNames(T);
+    if (!names.length) return "";
+    if (names.indexOf(state.tmap) < 0) state.tmap = names[0];
+    return '<div class="sec mapzone tmz"><div class="mapsel" role="group" aria-label="Карта">' +
+      names.map(function (n) { return '<button class="chip" data-tmap="' + esc(n) + '" aria-pressed="' + (n === state.tmap) + '">' + esc(n) + '</button>'; }).join("") +
+      '</div><div class="mzbody">' + teamMapBody(T, state.tmap) + '</div></div>';
+  }
+  function teamMapBody(T, mp) {
+    var html = "", S = T.sides, ab = esc(T.name);
+    if (S) {
+      var r = ((S.maps || {})[mp] || [])[0], tot = (S.total || [])[0];
+      var cell = function (v) { return '<span class="num' + (v != null && v >= 55 ? ' good' : v != null && v <= 45 ? ' bad' : '') + '">' + (v != null ? v + '%' : '—') + '</span>'; };
+      html += '<div class="mzsec"><h3 class="mzh">Стороны и пистолетки <span>' + esc(mp) + ' · за ' + Math.round((S.window_days || 90) / 30) + ' мес.</span></h3><div class="box sides">' +
+        '<div class="sd-head"><span></span><span>CT</span><span>T</span><span>Пистолетки</span></div>' +
+        '<div class="sd-row a"><span class="sd-t">' + ab + '<small>' + (r ? r.maps + ' карт' : 'не играли') + '</small></span>' + cell(r && r.ct) + cell(r && r.t) +
+        '<span class="num">' + (r && r.pistol != null ? r.pistol + '%<small>' + r.pistol_n[0] + '/' + r.pistol_n[1] + '</small>' : '—') + '</span></div>' +
+        (tot ? '<div class="sd-all"><span>все карты:</span> CT ' + (tot.ct != null ? tot.ct + '%' : '—') + ' · T ' + (tot.t != null ? tot.t + '%' : '—') + ' · пистолетки ' + (tot.pistol != null ? tot.pistol + '%' : '—') + '</div>' : '') +
+        '</div></div>';
+    }
+    var list = (((T.maps || {}).recent || {})[mp] || []).slice(0, 8), w = list.filter(function (g) { return g.won; }).length, SS = T.series || {};
+    html += '<div class="mzsec"><h3 class="mzh">Последние игры на карте</h3><div class="box form"><div class="tmh a">' + ab + (list.length ? '<span>' + w + '–' + (list.length - w) + '</span>' : '') + '</div>' +
+      (list.length ? groupByTour(list, function (g) {
+        var has = g.sid != null && SS[String(g.sid)];
+        var inner = '<span>vs ' + logo(g.vs, g.logo) + esc(g.vs) + ' <span class="d">' + esc(dm(g.date)) + '</span></span><span class="wl ' + (g.won ? "w" : "l") + '">' + (g.score ? esc(g.score) : (g.won ? "W" : "L")) + (has ? ' <i class="chev2">›</i>' : '') + '</span>';
+        return has ? '<button class="gr gbtn" data-tseries="' + esc(g.sid) + '">' + inner + '</button>' : '<div class="gr">' + inner + '</div>';
+      }) : '<div class="note">' + (T.maps && T.maps.recent ? 'На ' + esc(mp) + ' не играли' : 'Появится после ближайшего сбора') + '</div>') + '</div></div>';
+    return html;
+  }
+  function teamMapGo(mp) {
+    var T = (state.teams || {})[state.teamSlug], z = document.querySelector(".tmz");
+    if (!T || !z || !mp) return;
+    state.tmap = mp;
+    z.querySelector(".mzbody").innerHTML = teamMapBody(T, mp);
+    z.querySelectorAll("[data-tmap]").forEach(function (b) { b.setAttribute("aria-pressed", String(b.getAttribute("data-tmap") === mp)); });
+    var bt = z.querySelector('[data-tmap="' + (window.CSS && CSS.escape ? CSS.escape(mp) : mp) + '"]'); if (bt) bt.scrollIntoView({ block: "nearest", inline: "center", behavior: "smooth" });
+    try { TG && TG.HapticFeedback && TG.HapticFeedback.selectionChanged(); } catch (err) {}
+  }
+  (function () {  // свайп по зоне карты на странице команды — соседняя карта
+    var s0 = null;
+    document.addEventListener("touchstart", function (e) { var z = e.target.closest(".tmz"); s0 = z && e.touches.length === 1 && !e.target.closest(".mapsel") ? { x: e.touches[0].clientX, y: e.touches[0].clientY } : null; }, { passive: true });
+    document.addEventListener("touchend", function (e) {
+      if (!s0) return;
+      var t = e.changedTouches[0], dx = t.clientX - s0.x, dy = t.clientY - s0.y; s0 = null;
+      if (Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+      var T = (state.teams || {})[state.teamSlug]; if (!T) return;
+      var names = teamMapNames(T), i = names.indexOf(state.tmap) + (dx < 0 ? 1 : -1);
+      if (i >= 0 && i < names.length) teamMapGo(names[i]);
+    }, { passive: true });
+  })();
   var SIDES_LEGEND = '<div class="sd-leg">Раунды на карте: за <i class="sct">CT</i> и за <i class="st">T</i></div>';
   // квадрат сыгранной карты: картинка карты, счёт цветом команд и раунды по сторонам (CT — голубой, T — золотой)
   function mapSquare(g, i, A, B, small, withSides) {
@@ -3328,7 +3383,7 @@ a.ni { text-decoration: none; color: inherit; }
   // ---------- клики
   document.addEventListener("click", function (e) {
     if (state.pop && !e.target.closest(".pop-in")) { closePop(); if (!e.target.closest("[data-pop],[data-tab],[data-tsub],[data-nf]")) { e.preventDefault(); e.stopPropagation(); return; } }  // плашка вкладки в шапке — закрывает окно и переключает
-    var t = e.target.closest("[data-pop],[data-vplay],[data-snav],[data-goto],[data-sk],[data-team],[data-tname],[data-tseries],[data-fread],[data-close],#facts-more,[data-home],[data-feedch],[data-tg],[data-reader],[data-fact],[data-formall],[data-tsub],[data-pmap],[data-tpmap],[data-open],[data-tour],[data-tab],[data-map],[data-nf],[data-player],[data-link],[data-read],[data-series],[data-vser],[data-rseries],[data-smap],[data-ttab],#back");
+    var t = e.target.closest("[data-pop],[data-tmap],[data-vplay],[data-snav],[data-goto],[data-sk],[data-team],[data-tname],[data-tseries],[data-fread],[data-close],#facts-more,[data-home],[data-feedch],[data-tg],[data-reader],[data-fact],[data-formall],[data-tsub],[data-pmap],[data-tpmap],[data-open],[data-tour],[data-tab],[data-map],[data-nf],[data-player],[data-link],[data-read],[data-series],[data-vser],[data-rseries],[data-smap],[data-ttab],#back");
     if (!t) return;
     if (t.hasAttribute("data-pop")) { e.stopPropagation(); e.preventDefault(); openPop(t.getAttribute("data-pop"), t); return; }
     if (t.hasAttribute("data-vplay")) { var vv = t.parentNode.querySelector("video"); if (vv) { t.remove(); vv.play().catch(function () {}); } return; }
@@ -3351,6 +3406,7 @@ a.ni { text-decoration: none; color: inherit; }
     if (t.id === "facts-more") { state.factsAll = !state.factsAll; renderMatch(state.details[state.openId]); return; }
     if (t.hasAttribute("data-tg")) { if (TG) { e.preventDefault(); try { TG.openTelegramLink(t.getAttribute("data-tg")); } catch (x) { openLink(t.getAttribute("data-tg")); } } return; }
     if (t.hasAttribute("data-tsub")) { goKey("team:" + t.getAttribute("data-tsub")); return; }  // «Команда»: Игроки / Позиции — как фильтры новостей
+    if (t.hasAttribute("data-tmap")) { teamMapGo(t.getAttribute("data-tmap")); return; }
     if (t.hasAttribute("data-tpmap")) {  // карта в «Позициях» на странице команды
       state.tposMap = t.getAttribute("data-tpmap");
       var tb = document.querySelector("#tpos .tposbody"), TT = state.teams[state.teamSlug];

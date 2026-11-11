@@ -6143,7 +6143,18 @@ def build_team_page(r: dict) -> dict | None:
             "players": players or r.get("roster") or [], "roster": roster, "coach": coach, "logo": r.get("logo"), "roster_src": roster_src,
             "stats": build_player_stats({"players": roster, "name": r["name"]}, bid, hist) if roster else [],
             "form": form, "series": series, "upcoming": bo3_upcoming(bid),
-            "maps": {"window_days": maps.get("window_days"), "table": maps.get("table") or []}, "prizes": ach}
+            "maps": {"window_days": maps.get("window_days"), "table": maps.get("table") or [],
+                     "recent": {k: v[:8] for k, v in (maps.get("recent") or {}).items()}},  # как в матче: последние игры на карте
+            "sides": _team_sides(bid, hist), "prizes": ach}
+
+
+def _team_sides(bid, hist) -> dict | None:
+    """Стороны и пистолетки для страницы команды (одна команда)."""
+    try:
+        return build_sides([bid], [hist])
+    except Exception as e:
+        warn(f"Стороны команды {bid}: {e!r}")
+        return None
 
 
 def team_slug(name: str) -> str:
