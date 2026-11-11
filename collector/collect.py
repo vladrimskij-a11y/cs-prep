@@ -4932,7 +4932,7 @@ def _tkey(name: str | None) -> str:
     return norm(re.sub(r"(?i)^(the|team)\s+|\s+(team|esports|e-sports|gaming|club)$", "", name or ""))
 
 
-def _days(a: str, b: str) -> int:
+def _span_days(a: str, b: str) -> int:
     try:
         da, db = datetime.strptime(a[:10], "%Y-%m-%d"), datetime.strptime(b[:10], "%Y-%m-%d")
         return (db - da).days
@@ -4986,7 +4986,7 @@ def player_links(d: dict) -> list[dict]:
                     if _tkey(x["team"]) != _tkey(y["team"]) or "inactive" in (x.get("note") or "") + (y.get("note") or ""):
                         continue
                     lo, hi = max(x["from"], y["from"]), min(x["to"] or today, y["to"] or today)
-                    if hi <= lo or _days(lo, hi) < 60:  # короткие пересечения (пара недель) — не связь
+                    if hi <= lo or _span_days(lo, hi) < 60:  # короткие пересечения (пара недель) — не связь
                         continue
                     if ia == ib and not x["to"] and not y["to"]:  # нынешняя общая команда (хоть и под старым названием) — не связь
                         continue
