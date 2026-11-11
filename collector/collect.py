@@ -669,6 +669,8 @@ def lp_fresh(key: str) -> bool:
         return False
     age = NOW - (parse_iso(cached.get("t")) or NOW)
     d = cached.get("data") or {}
+    if (d.get("players") or []) and "hist" not in d["players"][0]:
+        return False  # записано до 11.11 — без истории команд и прежних ников: перечитать (пачкой в lp_prefetch)
     shaky = not d or any(not p.get("roles") for p in d.get("players") or []) or not d.get("coach") \
         or any(p.get("note") for p in d.get("players") or [])
     return age < (timedelta(days=1) if shaky else timedelta(days=ROSTER_TTL_DAYS))
@@ -764,7 +766,7 @@ def lp_roster(t: dict) -> dict | None:
     key = str(t["id"])
     cached = roster_cache.get(key)
     cd = (cached or {}).get("data") or {}
-    if cached and lp_fresh(key) and (not cd.get("players") or "hist" in cd["players"][0]):  # без истории команд — перечитать
+    if cached and lp_fresh(key):
         for p in (cd.get("players") or []) + (cd.get("coach") or []):
             remember_aka(p.get("nick"), p.get("aka"))
         return cached.get("data")
@@ -5047,6 +5049,9 @@ MVP_PER_RUN = int(os.environ.get("MVP_PER_RUN", "30"))  # страниц игр�
 def hltv_ids_from_cache() -> None:
     """id игроков HLTV со страниц команд и рейтинга из прошлых сборов — без запросов. Нужно в ЛЮБОМ режиме:
     быстрый сбор (stats.yml) тоже пересобирает карточки, и без этих id затирал у игроков MVP и мажоры (06.11)."""
+    for v in roster_cache.values():  # прежние ники с Liquipedia — до очереди HLTV (Techno4K → techno)
+        for p in (((v or {}).get("data") or {}).get("players") or []) + (((v or {}).get("data") or {}).get("coach") or []):
+            remember_aka(p.get("nick"), p.get("aka"))
     for k, v in list(hltv_cache.items()):
         if k.startswith("tpl:") or k == "rkpl":
             for n, x in ((v or {}).get("data") or {}).items():
