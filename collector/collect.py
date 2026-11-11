@@ -1742,6 +1742,8 @@ def vrs_find(t: dict, table: list[dict]) -> dict | None:
         ini = "".join(w[0] for w in words).lower()
         if len(words) >= 3 and ini in keys:
             return r
+    if t.get("_alt"):  # то же, но под названием со страницы команды (по составу: PVISION → PARIVISION)
+        return vrs_find({"name": t["_alt"]}, table)
     return None
 
 
@@ -5965,19 +5967,50 @@ def build_prediction(d: dict, bids: list) -> dict | None:
     return res
 
 
+_roster_idx: list = []
+
+
+def team_by_roster(players: list[dict], name: str | None = None) -> str | None:
+    """Команда под другим названием (PandaScore «PVISION» = PARIVISION): ≥3 игроков совпадают с составом
+    страницы команды из рейтинга. Возвращает название со страницы команды."""
+    if not _roster_idx:
+        for f in (OUT / "team").glob("*.json"):
+            d = load_json(f, {}) or {}
+            ks = {norm(p.get("nick")) for p in (d.get("roster") or [])} - {""}
+            if d.get("name") and len(ks) >= 3:
+                _roster_idx.append((d["name"], ks))
+        _roster_idx.append(("", set()))  # индекс собран (даже пустой)
+    best, bn = None, 0
+    for tn, ks in _roster_idx:
+        n = sum(1 for p in players if nick_find(p.get("nick") or "", ks))
+        if n > bn:
+            best, bn = tn, n
+    if bn >= 3 and best and norm(best) != norm(name):
+        return best
+    return None
+
+
 def build_detail(m: dict, prev: dict | None) -> dict:
     brief = match_brief(m)
     teams, bids, hists = [], [], []
     for t in brief["teams"]:
         full = fetch_team(t["id"])
         players = [player_brief(p) for p in full.get("players") or [] if p.get("active", True)]
-        players, coach = merge_roster(players, lp_roster({**t, "name": full.get("name") or t.get("name")}))
+        alt = team_by_roster(players, full.get("name") or t.get("name"))  # «PVISION» у PandaScore — это PARIVISION
+        if alt:
+            t["_alt"] = alt
+        lpr = lp_roster({**t, "name": full.get("name") or t.get("name")})
+        if not lpr and alt:
+            lpr = lp_roster({**t, "id": "n:" + norm(alt), "name": alt})
+        players, coach = merge_roster(players, lpr)
         try:
             add_pronunciation(players + coach)
         except Exception as e:
             warn(f"Произношение: {e!r}")
         fix_names(players)
         bid = bo3_team_id({**t, "slug": full.get("slug") or t.get("slug")})
+        if not bid and alt:
+            bid = team_by_name(alt)
         add_alias(bid, t.get("name"), t.get("acronym"), t.get("slug"), full.get("name"), full.get("acronym"))
         hist = bo3_history(bid) if bid else []
         if not coach and bid and len(players) > 5:  # состава с Liquipedia нет, а у PandaScore больше пятерых — оставляем тех, кто играл последние карты
