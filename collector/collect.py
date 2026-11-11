@@ -5414,6 +5414,69 @@ def vrs_log_put(brief: dict, bids: list, rows: list, O: dict | None) -> None:
         "pred": [[[x["rank"], x["delta"]] for x in O["win0"]], [[x["rank"], x["delta"]] for x in O["win1"]]]}
 
 
+PICK_LOG_F = OUT / "pick_log.json"
+pick_log: dict = {}
+
+
+def pick_log_put(d: dict) -> None:
+    """Журнал «Вероятного пика»: последний прогноз вето до начала матча и до настоящего вето (потом сверяем с dust2)."""
+    P = d.get("prediction") or {}
+    st = parse_iso(d.get("begin_at") or "")
+    if not P.get("steps") or not st or st <= NOW or d.get("veto_now") or d.get("tbd"):
+        return
+    if not pick_log:
+        pick_log.update((load_json(PICK_LOG_F, {}) or {}).get("entries") or {})
+    pick_log[str(d["id"])] = {"begin": d.get("begin_at"), "t": iso(NOW), "names": [t.get("name") for t in d["teams"]],
+                              "bo": d.get("bo"), "steps": P["steps"]}
+
+
+def pick_log_resolve() -> None:
+    """Сверка журнала пика с настоящим вето (итоги турниров, dust2): пики команд, первый бан, десайдер, сыгранные карты."""
+    if not pick_log:
+        pick_log.update((load_json(PICK_LOG_F, {}) or {}).get("entries") or {})
+    if not pick_log:
+        return
+    real = {}
+    for f in (OUT / "results").glob("*.json"):
+        for m in (load_json(f, {}) or {}).get("matches") or []:
+            if m.get("veto") and len(m.get("teams") or []) == 2:
+                real.setdefault(frozenset(norm(t.get("name")) for t in m["teams"]), []).append(m)
+    for e in pick_log.values():
+        st = parse_iso(e.get("begin"))
+        if "res" in e or not st or st > NOW - timedelta(hours=2):
+            continue
+        cand = [m for m in real.get(frozenset(norm(n) for n in e["names"]), []) if abs((parse_iso(m.get("date") or "") or st) - st) <= timedelta(hours=36)]
+        if not cand:
+            if st < NOW - timedelta(days=5):
+                e["res"] = None  # вето так и не нашлось
+            continue
+        V = cand[0]["veto"]
+        side = lambda tn: 0 if norm(tn) == norm(e["names"][0]) else 1 if norm(tn) == norm(e["names"][1]) else None
+        act = [{"team": side(x.get("team")) if x.get("team") else None, "act": x["act"], "map": x["map"]} for x in V]
+        pr = e["steps"]
+        pk = lambda L, i: {norm(x["map"]) for x in L if x["act"] == "pick" and x["team"] == i}
+        bans = lambda L: [x for x in L if x["act"] == "ban"]
+        dec = lambda L: next((norm(x["map"]) for x in L if x["act"] == "decider"), None)
+        played = lambda L: {norm(x["map"]) for x in L if x["act"] != "ban"}
+        e["res"] = {
+            "picks": sum(len(pk(pr, i) & pk(act, i)) for i in (0, 1)), "picks_n": sum(len(pk(act, i)) for i in (0, 1)),
+            "first_ban": bool(bans(pr) and bans(act) and norm(bans(pr)[0]["map"]) == norm(bans(act)[0]["map"])),
+            "decider": dec(pr) is not None and dec(pr) == dec(act),
+            "played": len(played(pr) & played(act)), "played_n": len(played(act))}
+    for k in [k for k, e in pick_log.items() if (parse_iso(e.get("begin")) or NOW) < NOW - timedelta(days=120)]:
+        del pick_log[k]
+    done = [e["res"] for e in pick_log.values() if e.get("res")]
+    summ = {"n": len(done)}
+    if done:
+        pct = lambda a, b: round(100 * a / b) if b else None
+        summ.update({
+            "picks": pct(sum(r["picks"] for r in done), sum(r["picks_n"] for r in done)),
+            "first_ban": pct(sum(r["first_ban"] for r in done), len(done)),
+            "decider": pct(sum(r["decider"] for r in done), len(done)),
+            "played": pct(sum(r["played"] for r in done), sum(r["played_n"] for r in done))})
+    save_json(PICK_LOG_F, {"updated": iso(NOW), "summary": summ, "entries": pick_log})
+
+
 def vrs_log_resolve(table: list[dict]) -> None:
     """Итог по журналу VRS: победитель (bo3.gg) и настоящие место и очки после матча по живому рейтингу.
     Снимок берём на первом полном сборе, где очки хоть одной команды изменились (не раньше 6 ч после начала),
@@ -5424,9 +5487,26 @@ def vrs_log_resolve(table: list[dict]) -> None:
         return
     by = {norm(r["name"]): r for r in table or []}
     asked = 0
+    for e in vrs_log.values():  # 11.11: FUT нашёлся как чужая «FUT» с 148 места (−854 очка) — такие итоги не считаем
+        if e.get("act") and any(abs(x[1]) > 250 for x in e["act"]):
+            e["act"] = None
+            e["bad"] = "команда не найдена в рейтинге"
+
+    def row_for(name, cur):  # строка рейтинга: по названию, иначе по сокращению; очки должны быть рядом с прежними
+        r = by.get(norm(name)) or (vrs_find({"name": name}, table) if table else None)
+        return r if r and abs(r["points"] - cur[1]) <= 250 else None
+
+    def next_started(e, st):  # у команды уже начался следующий матч — его очки смешаются с этим
+        nm = {norm(n) for n in e["names"]}
+        for o in vrs_log.values():
+            ob = parse_iso(o.get("begin"))
+            if o is not e and ob and st < ob <= NOW and nm & {norm(n) for n in o.get("names") or []}:
+                return True
+        return False
+
     for e in vrs_log.values():
         st = parse_iso(e.get("begin"))
-        if "act" in e or not st or st > NOW - timedelta(hours=6):
+        if "act" in e or not st or st > NOW - timedelta(hours=3):  # раньше 6 ч: успеваем до следующего матча команды
             continue
         if "w" not in e and e.get("slug") and asked < 60:
             asked += 1
@@ -5441,8 +5521,13 @@ def vrs_log_resolve(table: list[dict]) -> None:
             if st < NOW - timedelta(days=4):
                 e["act"] = None  # итога нет — больше не ждём
             continue
-        now = [by.get(norm(n)) for n in e["names"]]
+        now = [row_for(n, e["cur"][i]) for i, n in enumerate(e["names"])]
         if not by or not all(now):
+            if st < NOW - timedelta(days=4):
+                e["act"], e["bad"] = None, "команда не найдена в рейтинге"
+            continue
+        if next_started(e, st):
+            e["act"], e["bad"] = None, "следующий матч начался раньше, чем сдвинулись очки"
             continue
         moved = any(now[i]["points"] != e["cur"][i][1] for i in (0, 1))
         if moved or st < NOW - timedelta(days=3):
@@ -6127,6 +6212,10 @@ def build_detail(m: dict, prev: dict | None) -> dict:
             detail["prediction"] = build_prediction(detail, bids)
         except Exception as e:
             warn(f"Прогноз: {e!r}")
+        try:
+            pick_log_put(detail)
+        except Exception as e:
+            warn(f"Журнал пика: {e!r}")
         # после начала матча прогноз не меняем: шанс на победу и исходы (2:0, 2:1…) — как перед матчем
         # (линия букмекера по ходу игры прыгает — владелец 06.11)
         bg = parse_iso(detail.get("begin_at") or "")
@@ -6884,6 +6973,11 @@ def main() -> int:
         odds_log_resolve()
     except Exception as e:
         warn(f"Журнал прогнозов: {e!r}")
+    try:
+        if pick_log or PICK_LOG_F.exists():
+            pick_log_resolve()
+    except Exception as e:
+        warn(f"Журнал пика: {e!r}")
     try:
         if vrs_log or VRS_LOG_F.exists():
             vrs_log_resolve(vrs_table())  # в быстром сборе — рейтинг из кэша полного
