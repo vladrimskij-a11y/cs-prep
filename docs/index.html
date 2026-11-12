@@ -235,7 +235,8 @@ a { color: inherit; }
 .tour-card .spanrow { margin-top: -2px; }
 /* фон турнира, как шапка события на HLTV: картинка справа, затемнение слева под текст */
 .tour-card.tbg { position: relative; isolation: isolate; overflow: hidden; background: #12151c; border-color: rgba(255,255,255,.08); color: #fff; }
-.tour-card.tbg::before { content: ""; position: absolute; inset: 0; z-index: -2; background: var(--tb) right center / contain no-repeat; filter: saturate(1.1); }  /* картинка целиком в рамке (по высоте карточки), не обрезается */
+.tour-card.tbg::before { content: ""; position: absolute; inset: 0; z-index: -2; background: var(--tb) right center / contain no-repeat; filter: saturate(1.1); }  /* квадратная картинка — целиком в рамке, не обрезается */
+.tour-card.tbg.wide::before { background-size: cover; }  /* широкий баннер (BLAST) — на всю карточку, как было */
 .tour-card.tbg::after { content: ""; position: absolute; inset: 0; z-index: -1; background: linear-gradient(90deg, rgba(10,12,17,.94) 0%, rgba(10,12,17,.82) 45%, rgba(10,12,17,.45) 100%); }
 .tour-card.tbg .tn, .tour-card.tbg .tm2 b { color: #fff; }
 .tour-card.tbg .tm2, .tour-card.tbg .muted { color: rgba(255,255,255,.75); }
@@ -986,6 +987,22 @@ a.ni { text-decoration: none; color: inherit; }
     DC_INFLIGHT[k] = p;
     return p.then(function (r) { return r.clone ? r.clone() : r; });
   }
+  // фон карточки турнира: широкий баннер — на всю карточку (cover), квадратный — целиком по высоте (contain)
+  var BG_RATIO = {};
+  try { BG_RATIO = JSON.parse(localStorage.getItem("bgr") || "{}"); } catch (e) {}
+  function bgWide(u) {
+    if (BG_RATIO[u] == null) {
+      BG_RATIO[u] = -1;
+      var im = new Image();
+      im.onload = function () {
+        BG_RATIO[u] = im.naturalWidth / Math.max(1, im.naturalHeight);
+        try { localStorage.setItem("bgr", JSON.stringify(BG_RATIO)); } catch (e) {}
+        if (BG_RATIO[u] >= 2.2) document.querySelectorAll(".tour-card.tbg").forEach(function (c) { if ((c.getAttribute("style") || "").indexOf(u) >= 0) c.classList.add("wide"); });
+      };
+      im.src = u;
+    }
+    return BG_RATIO[u] >= 2.2;
+  }
   // названия: Intel Extreme Masters → IEM (и дальше как есть)
   function fixTxt(t) { return String(t).replace(/Intel Extreme Masters/gi, "IEM"); }
   function dfetch(u, fresh) {
@@ -1198,7 +1215,7 @@ a.ni { text-decoration: none; color: inherit; }
       : t.live ? '<span class="live">● LIVE ' + t.live + '</span>'
       : ms.length ? (t.next ? 'ближайший <b>' + esc(dayKey(t.next) === today ? "сегодня " + hm(t.next) : dm(t.next) + " " + hm(t.next)) + '</b>' : '')
       : '<span class="muted">расписание пока не опубликовано</span>';
-    return '<button class="tour-card' + (todayN ? " today" : "") + (t.tier !== "s" ? " t2" : "") + (t.bg ? ' tbg" style="--tb:url(' + esc(t.bg) + ')' : '') + '" data-tour="' + esc(t.id) + '">' +
+    return '<button class="tour-card' + (todayN ? " today" : "") + (t.tier !== "s" ? " t2" : "") + (t.bg ? ' tbg' + (bgWide(t.bg) ? ' wide' : '') + '" style="--tb:url(' + esc(t.bg) + ')' : '') + '" data-tour="' + esc(t.id) + '">' +
       '<span class="tn">' + esc(withYear(t.name, t.begin || t.next)) + '</span><span class="pill go ' + esc(t.tier) + '">' + esc((t.tier || "?").toUpperCase()) + '</span>' +
       // строки карточки: даты (и «идёт сейчас») отдельно, ниже — призовые, матчи, ближайший; каждый кусок не рвётся посередине
       '<span class="tm2">' + [dates && '<b>' + esc(dates) + '</b>', live && !t.live ? '<span class="live">идёт сейчас</span>' : ''].filter(Boolean).map(function (x) { return '<span class="ck">' + x + '</span>'; }).join('') + '</span>' +
