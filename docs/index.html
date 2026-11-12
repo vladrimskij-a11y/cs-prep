@@ -559,6 +559,8 @@ html { overflow-anchor: none; }
 .medals { display: inline-flex; gap: 4px; flex-wrap: wrap; grid-column: auto; margin: 0; }
 .medal { display: inline-flex; align-items: center; gap: 2px; padding: 1px 6px; border-radius: 6px; background: var(--sunk); font-size: 13px; }
 .medal b { font-size: 12px; font-weight: 700; }
+.pop-in li.ph { list-style: none; margin: 8px 0 2px -14px; font-size: 11px; font-weight: 700; letter-spacing: .06em; color: var(--muted); }
+.pop-in li.ph:first-child { margin-top: 0; }
 .medal.tms { margin-left: 10px; position: relative; z-index: 2; }  /* зона нажатия MVP рядом не перекрывает кнопку команд */
 .medal.mvp { background: var(--t-soft); color: var(--t); }
 .roster .hd .medals { justify-self: end; }
@@ -2441,7 +2443,14 @@ a.ni { text-decoration: none; color: inherit; }
     var NOTE = { loan: "аренда", "stand-in": "замена", inactive: "неактивен" };
     H.sort(function (a, b) { return String(b.from).localeCompare(String(a.from)); });
     var yr = function (d) { return d ? String(d).slice(0, 4) : "н.в."; };
-    var l = H.map(function (h) { var a = yr(h.from), b = yr(h.to); return h.team + " · " + (a === b ? a : a + "–" + b) + (h.note && NOTE[h.note] ? " (" + NOTE[h.note] + ")" : ""); });
+    // версия игры, как в истории на Liquipedia: шапка «CS2» / «CS:GO» / «CS 1.6» над командами (по дате прихода: CS:GO — с 21.08.2012, CS2 — с 27.09.2023)
+    var game = function (d) { d = String(d || ""); return d >= "2023-09-27" ? "CS2" : d >= "2012-08-21" ? "CS:GO" : "CS 1.6"; };
+    var l = [], g0 = null;
+    H.forEach(function (h) {
+      var g = game(h.from), a = yr(h.from), b = yr(h.to);
+      if (g !== g0) { l.push("§" + g); g0 = g; }
+      l.push(h.team + " · " + (a === b ? a : a + "–" + b) + (h.note && NOTE[h.note] ? " (" + NOTE[h.note] + ")" : ""));
+    });
     var n = {}; H.forEach(function (h) { n[h.team] = 1; });
     return '<span role="button" class="medal tms" data-pop="' + esc(JSON.stringify({ t: "👥 Команды: " + Object.keys(n).length + (p.aka && p.aka.length ? " · другие ники: " + p.aka.join(", ") : ""), l: l })) + '">👥<b>' + Object.keys(n).length + '</b></span>';
   }
@@ -2461,7 +2470,7 @@ a.ni { text-decoration: none; color: inherit; }
     closePop();
     var d = JSON.parse(data), el = document.createElement("div");
     el.className = "pop";
-    el.innerHTML = '<div class="pop-in' + (d.c ? ' wide' : '') + '"><b>' + esc(d.t) + '</b>' + (d.c ? '<div class="pcols">' + d.c.map(function (c) { return '<div class="pcol"><div class="pci">' + c.i + ' <b>' + c.l.length + '</b></div>' + (c.l.length ? c.l.map(function (x) { return '<div class="pce">' + esc(x) + '</div>'; }).join("") : '<div class="pce none">—</div>') + '</div>'; }).join("") + '</div>' : (d.l || []).length ? '<ul>' + d.l.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join("") + '</ul>' : '<p>Список турниров появится после обновления данных.</p>') + '</div>';
+    el.innerHTML = '<div class="pop-in' + (d.c ? ' wide' : '') + '"><b>' + esc(d.t) + '</b>' + (d.c ? '<div class="pcols">' + d.c.map(function (c) { return '<div class="pcol"><div class="pci">' + c.i + ' <b>' + c.l.length + '</b></div>' + (c.l.length ? c.l.map(function (x) { return '<div class="pce">' + esc(x) + '</div>'; }).join("") : '<div class="pce none">—</div>') + '</div>'; }).join("") + '</div>' : (d.l || []).length ? '<ul>' + d.l.map(function (x) { return String(x).charAt(0) === "§" ? '<li class="ph">' + esc(String(x).slice(1)) + '</li>' : '<li>' + esc(x) + '</li>'; }).join("") + '</ul>' : '<p>Список турниров появится после обновления данных.</p>') + '</div>';
     document.body.appendChild(el);
     var r = anchor.getBoundingClientRect(), box = el.firstChild, W = window.innerWidth;
     var li = box.querySelectorAll("li");
