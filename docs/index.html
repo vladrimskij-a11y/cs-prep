@@ -946,7 +946,7 @@ a.ni { text-decoration: none; color: inherit; }
     cc = String(cc || "").toUpperCase();
     if (CC_SUB[cc]) return CC_SUB[cc];
     cc = CC_FIX[cc] || cc;
-    if (!cc || cc.length !== 2) return "";
+    if (!cc || cc.length !== 2 || cc === "XX") return "";  // XX — «страна не указана», не флаг
     return String.fromCodePoint.apply(null, cc.toUpperCase().split("").map(function (c) { return 127397 + c.charCodeAt(0); }));
   }
   function pct(w, p) { return p ? Math.round(100 * w / p) : 0; }

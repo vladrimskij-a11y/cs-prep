@@ -635,6 +635,44 @@ def player_roles(wikitext: str) -> tuple[list[str], bool]:
     return res, igl
 
 
+COUNTRY_CC = {
+    "ukraine": "UA", "russia": "RU", "belarus": "BY", "kazakhstan": "KZ", "uzbekistan": "UZ", "kyrgyzstan": "KG", "latvia": "LV",
+    "lithuania": "LT", "estonia": "EE", "poland": "PL", "czech republic": "CZ", "czechia": "CZ", "slovakia": "SK", "hungary": "HU",
+    "romania": "RO", "bulgaria": "BG", "serbia": "RS", "croatia": "HR", "bosnia and herzegovina": "BA", "slovenia": "SI",
+    "montenegro": "ME", "north macedonia": "MK", "macedonia": "MK", "albania": "AL", "kosovo": "XK", "greece": "GR", "turkey": "TR", "türkiye": "TR",
+    "israel": "IL", "georgia": "GE", "armenia": "AM", "azerbaijan": "AZ", "moldova": "MD", "germany": "DE", "austria": "AT",
+    "switzerland": "CH", "france": "FR", "belgium": "BE", "netherlands": "NL", "luxembourg": "LU", "united kingdom": "GB", "uk": "GB",
+    "england": "GB", "scotland": "GB", "wales": "GB", "ireland": "IE", "denmark": "DK", "sweden": "SE", "norway": "NO", "finland": "FI",
+    "iceland": "IS", "spain": "ES", "portugal": "PT", "italy": "IT", "malta": "MT", "cyprus": "CY", "united states": "US", "usa": "US",
+    "canada": "CA", "mexico": "MX", "brazil": "BR", "argentina": "AR", "chile": "CL", "uruguay": "UY", "peru": "PE", "colombia": "CO",
+    "venezuela": "VE", "ecuador": "EC", "paraguay": "PY", "bolivia": "BO", "guatemala": "GT", "china": "CN", "hong kong": "HK",
+    "taiwan": "TW", "mongolia": "MN", "japan": "JP", "south korea": "KR", "korea": "KR", "india": "IN", "pakistan": "PK",
+    "indonesia": "ID", "malaysia": "MY", "singapore": "SG", "thailand": "TH", "vietnam": "VN", "philippines": "PH",
+    "australia": "AU", "new zealand": "NZ", "south africa": "ZA", "egypt": "EG", "morocco": "MA", "tunisia": "TN", "algeria": "DZ",
+    "saudi arabia": "SA", "united arab emirates": "AE", "jordan": "JO", "lebanon": "LB", "iran": "IR", "iraq": "IQ", "syria": "SY",
+}
+
+
+def cc_of(v: str | None) -> str | None:
+    """Флаг Liquipedia → код страны: «ua» → UA, «Ukraine» → UA (раньше брались первые две буквы: «ukraine» → UK → GB)."""
+    v = re.sub(r"\s+", " ", (v or "").strip().lower())
+    if not v or v in ("xx", "none", "unknown"):
+        return None
+    if v in COUNTRY_CC:
+        return COUNTRY_CC[v]
+    return v.upper() if re.fullmatch(r"[a-z]{2}", v) else None
+
+
+def infobox_cc(wikitext: str) -> str | None:
+    """Страна из инфобокса игрока Liquipedia (|country=Ukraine) — если в составе команды флаг не указан."""
+    for k in ("country", "nationality", "flag"):
+        m = re.search(r"^\|\s*" + k + r"\s*=\s*([^\n|}]+)", wikitext or "", re.M)
+        c = cc_of(m.group(1)) if m else None
+        if c:
+            return c
+    return None
+
+
 def birth_date(wikitext: str) -> str | None:
     """Дата рождения из инфобокса: |birth_date={{Birth date and age|2005|5|1}} или |birth_date=2005-05-01."""
     m = re.search(r"\|\s*birth_date\s*=\s*([^\n]*)", infobox(wikitext))
@@ -669,7 +707,8 @@ def lp_fresh(key: str) -> bool:
         return False
     age = NOW - (parse_iso(cached.get("t")) or NOW)
     d = cached.get("data") or {}
-    if (d.get("players") or []) and ("hist" not in d["players"][0] or "moves" not in d):
+    if (d.get("players") or []) and ("hist" not in d["players"][0] or "moves" not in d
+                                     or any((p.get("flag") or "") in ("XX", "UK") for p in (d.get("players") or []) + (d.get("coach") or []))):
         return False  # записано до 11.11 — без истории команд и прежних ников: перечитать (пачкой в lp_prefetch)
     shaky = not d or any(not p.get("roles") for p in d.get("players") or []) or not d.get("coach") \
         or any(p.get("note") for p in d.get("players") or [])
@@ -829,7 +868,7 @@ def lp_roster(t: dict) -> dict | None:
                     "nick": pid,
                     "page": lp_param(line, "link") or pid,
                     "name": lp_param(line, "name"),
-                    "flag": (lp_param(line, "flag") or "").upper()[:2] or None,
+                    "flag": cc_of(lp_param(line, "flag")),
                     "igl": lp_param(line, "igl") == "y",
                     "coach": "coach" in role,
                     "note": None if "coach" in role or not role else role,
@@ -868,6 +907,7 @@ def lp_roster(t: dict) -> dict | None:
                         p["loan_from"] = None
             for p in people:
                 pg = ppages.get(p["page"], "")
+                p["flag"] = p["flag"] or infobox_cc(pg)  # 13.11: у тренера B8 Maddened флага в составе не было
                 p["aka"] = lp_aka(pg)
                 p["hist"] = lp_history(pg)
                 remember_aka(p["nick"], p["aka"])
