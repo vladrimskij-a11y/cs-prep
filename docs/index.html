@@ -555,7 +555,7 @@ html { overflow-anchor: none; }
 .medals { display: inline-flex; gap: 4px; flex-wrap: wrap; grid-column: auto; margin: 0; }
 .medal { display: inline-flex; align-items: center; gap: 2px; padding: 1px 6px; border-radius: 6px; background: var(--sunk); font-size: 13px; }
 .medal b { font-size: 12px; font-weight: 700; }
-.medal.tms { margin-left: 4px; }
+.medal.tms { margin-left: 10px; position: relative; z-index: 2; }  /* зона нажатия MVP рядом не перекрывает кнопку команд */
 .medal.mvp { background: var(--t-soft); color: var(--t); }
 .roster .hd .medals { justify-self: end; }
 .medal { cursor: pointer; }
@@ -1271,7 +1271,7 @@ a.ni { text-decoration: none; color: inherit; }
     if (!SH || !q(".sshell") || state.ovl || e.touches.length !== 1) return;
     var x = e.touches[0].clientX;
     if (x < 20 || x > window.innerWidth - 20 || e.target.closest("video, input")) return;
-    if (e.target.closest(".tmz")) return;  // зона карты на странице команды листает карты сама
+    if (e.target.closest(".tmz, #tpos")) return;  // зона карты и «Позиции» на странице команды листают карты сами
     var sc = e.target.closest(".filt, .bracket, .swg"), edge = null;
     if (sc && sc.scrollWidth > sc.clientWidth + 2) {
       if (!sc.classList.contains("bracket") && !sc.classList.contains("swg")) return;  // сетка и швейцарка листаются сами
@@ -1516,16 +1516,16 @@ a.ni { text-decoration: none; color: inherit; }
     var bt = z.querySelector('[data-tmap="' + (window.CSS && CSS.escape ? CSS.escape(mp) : mp) + '"]'); if (bt) bt.scrollIntoView({ block: "nearest", inline: "center", behavior: "smooth" });
     try { TG && TG.HapticFeedback && TG.HapticFeedback.selectionChanged(); } catch (err) {}
   }
-  (function () {  // свайп по зоне карты на странице команды — соседняя карта
+  (function () {  // свайп по зоне карты и по «Позициям» на странице команды — соседняя карта
     var s0 = null;
-    document.addEventListener("touchstart", function (e) { var z = e.target.closest(".tmz"); s0 = z && e.touches.length === 1 && !e.target.closest(".mapsel") ? { x: e.touches[0].clientX, y: e.touches[0].clientY } : null; }, { passive: true });
+    document.addEventListener("touchstart", function (e) { var z = e.target.closest(".tmz, #tpos"); s0 = z && e.touches.length === 1 && !e.target.closest(".mapsel") ? { x: e.touches[0].clientX, y: e.touches[0].clientY, z: z } : null; }, { passive: true });
     document.addEventListener("touchend", function (e) {
       if (!s0) return;
-      var t = e.changedTouches[0], dx = t.clientX - s0.x, dy = t.clientY - s0.y; s0 = null;
+      var t = e.changedTouches[0], dx = t.clientX - s0.x, dy = t.clientY - s0.y, z = s0.z; s0 = null;
       if (Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
-      var T = (state.teams || {})[state.teamSlug]; if (!T) return;
-      var names = teamMapNames(T), i = names.indexOf(state.tmap) + (dx < 0 ? 1 : -1);
-      if (i >= 0 && i < names.length) teamMapGo(names[i]);
+      var bs = [].slice.call(z.querySelectorAll("[data-tmap], [data-tpmap]")), i = bs.findIndex(function (b) { return b.getAttribute("aria-pressed") === "true"; });
+      var nb = bs[(i < 0 ? 0 : i) + (dx < 0 ? 1 : -1)];
+      if (nb) { nb.click(); nb.scrollIntoView({ block: "nearest", inline: "center", behavior: "smooth" }); }
     }, { passive: true });
   })();
   var SIDES_LEGEND = '<div class="sd-leg">Раунды на карте: за <i class="sct">CT</i> и за <i class="st">T</i></div>';
