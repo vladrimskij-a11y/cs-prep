@@ -997,11 +997,11 @@ a.ni { text-decoration: none; color: inherit; }
       im.onload = function () {
         BG_RATIO[u] = im.naturalWidth / Math.max(1, im.naturalHeight);
         try { localStorage.setItem("bgr", JSON.stringify(BG_RATIO)); } catch (e) {}
-        if (BG_RATIO[u] >= 2.2) document.querySelectorAll(".tour-card.tbg").forEach(function (c) { if ((c.getAttribute("style") || "").indexOf(u) >= 0) c.classList.add("wide"); });
+        if (BG_RATIO[u] >= 1.5) document.querySelectorAll(".tour-card.tbg").forEach(function (c) { if ((c.getAttribute("style") || "").indexOf(u) >= 0) c.classList.add("wide"); });
       };
       im.src = u;
     }
-    return BG_RATIO[u] >= 2.2;
+    return BG_RATIO[u] >= 1.5;
   }
   // названия: Intel Extreme Masters → IEM (и дальше как есть)
   function fixTxt(t) { return String(t).replace(/Intel Extreme Masters/gi, "IEM"); }
