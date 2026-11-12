@@ -336,6 +336,7 @@ html { overflow-anchor: none; }
 .mapzone .mapsel { position: sticky; top: var(--hcur, 0px); z-index: 2; background: var(--bg); padding-block: 8px; margin-block: -8px 0; }
 .sshell .mapzone .mapsel { top: var(--shh, 0px); }
 .sw-m.ph { opacity: .45; }
+.sw-box .sw-l.ph { opacity: .5; }
 .mzbody { display: flex; flex-direction: column; gap: 14px; }
 .mzsec { display: flex; flex-direction: column; gap: 10px; }
 .mzh { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 600; margin: 0; display: flex; justify-content: space-between; gap: 8px; }
@@ -1724,20 +1725,27 @@ a.ni { text-decoration: none; color: inherit; }
       });
       cols.push({ groups: groups, done: done });
     });
-    function boxOf(list, cls) {  // несколько счётов рядом (3:1 и 3:2), команды столбиком под своим счётом
-      if (!list.length) return "";
+    function boxOf(list, cls, exp) {  // несколько счётов рядом (3:1 и 3:2), команды столбиком под своим счётом
+      // exp — сколько мест под каждый счёт (швейцарка на 16): пока не сыграно, места пустые «?»
+      if (!list.length && !exp) return "";
       var by = {}, ks = [];
+      if (exp) Object.keys(exp).forEach(function (k) { by[k] = []; ks.push(k); });
       list.forEach(function (t) { if (!by[t.r]) { by[t.r] = []; ks.push(t.r); } by[t.r].push(t.n); });
+      var ph = '<span class="sw-l ph">?</span>';
+      if (exp) {
+        Object.keys(exp).forEach(function (k) { while (by[k].length < exp[k]) by[k].push(null); });
+      }
       ks.sort(function (a, b) { var x = a.split(":"), y = b.split(":"); return cls === "q" ? (x[1] - y[1]) : (y[0] - x[0]) * -1; });
       if (ks.length === 1) {  // один счёт (3:0, 0:3) — команды по две в ряд, так ниже по высоте
         var k1 = ks[0];
-        return '<div class="sw-box ' + cls + '" data-recs="' + k1 + '" style="grid-template-columns:repeat(2,1fr)"><div class="swh num" style="grid-column:1/-1">' + k1 + '</div>' +
-          by[k1].map(function (n) { return circ(n, cls === "q" ? "w" : ""); }).join("") + '</div>';
+        var h1 = '<div class="sw-box ' + cls + '" data-recs="' + k1 + '" style="grid-template-columns:repeat(2,1fr)"><div class="swh num" style="grid-column:1/-1">' + k1 + '</div>' +
+          by[k1].map(function (n) { return n ? circ(n, cls === "q" ? "w" : "") : ph; }).join("") + '</div>';
+        return h1;
       }
       var h = '<div class="sw-box ' + cls + '" data-recs="' + ks.join(",") + '" style="grid-template-columns:repeat(' + ks.length + ',1fr)">';
       ks.forEach(function (k) { h += '<div class="swh num">' + k + '</div>'; });
       var mx = Math.max.apply(null, ks.map(function (k) { return by[k].length; }));
-      for (var r = 0; r < mx; r++) ks.forEach(function (k) { h += by[k][r] ? circ(by[k][r], cls === "q" ? "w" : "") : '<span></span>'; });
+      for (var r = 0; r < mx; r++) ks.forEach(function (k) { h += r < by[k].length ? (by[k][r] ? circ(by[k][r], cls === "q" ? "w" : "") : ph) : '<span></span>'; });
       return h + '</div>';
     }
     function tile(x) {
@@ -1761,8 +1769,9 @@ a.ni { text-decoration: none; color: inherit; }
       var prev = ci ? cols[ci - 1].done : { q: [], out: [] };
       var q = prev.q.concat(ci === last ? c.done.q : []), out = prev.out.concat(ci === last ? c.done.out : []);
       var gk = Object.keys(c.groups).sort(function (a, b) { var x = a.split(":"), y = b.split(":"); return (y[0] - y[1]) - (x[0] - x[1]) || y[0] - x[0]; });
-      return '<div class="swc">' + boxOf(q, "q") + gk.map(function (g) { return '<div class="swgr" data-rec="' + g + '"><div class="swh num">' + g + '</div>' + c.groups[g].map(tile).join("") + '</div>'; }).join("") +
-        '<div class="sp"></div>' + boxOf(out, "out") + '</div>';
+      var EQ = n0 === 16 ? [null, null, null, { "3:0": 2 }, { "3:1": 3, "3:2": 3 }][ci] : null, EO = n0 === 16 ? [null, null, null, { "0:3": 2 }, { "1:3": 3, "2:3": 3 }][ci] : null;
+      return '<div class="swc">' + boxOf(q, "q", EQ) + gk.map(function (g) { return '<div class="swgr" data-rec="' + g + '"><div class="swh num">' + g + '</div>' + c.groups[g].map(tile).join("") + '</div>'; }).join("") +
+        '<div class="sp"></div>' + boxOf(out, "out", EO) + '</div>';
     }).join("") + '</div></div>';
     return html;
   }
