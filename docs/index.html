@@ -337,6 +337,14 @@ html { overflow-anchor: none; }
 .mapzone .mapsel { position: sticky; top: var(--hcur, 0px); z-index: 2; background: var(--bg); padding-block: 8px; margin-block: -8px 0; }
 .sshell .mapzone .mapsel { top: var(--shh, 0px); }
 .sw-m.ph { opacity: .45; }
+.box.mv { padding: 6px 14px 10px; }
+.mv-y { font: 700 11px/1 var(--mono, monospace); letter-spacing: .08em; color: var(--muted); margin: 12px 0 4px; }
+.mv-r { display: grid; grid-template-columns: 58px 20px 1fr; align-items: baseline; gap: 6px; padding: 5px 0; border-top: 1px solid var(--line, rgba(255,255,255,.06)); font-size: 14px; }
+.mv-y + .mv-r { border-top: 0; }
+.mv-r .d { color: var(--muted); font-size: 12px; }
+.mv-r small { color: var(--muted); font-size: 11px; }
+.mv-i { font-style: normal; font-weight: 800; text-align: center; }
+.mv-i.in { color: var(--good, #4caf50); } .mv-i.out { color: var(--bad, #e05252); } .mv-i.ia { color: var(--muted); font-size: 11px; }
 .sw-box .sw-l.ph { opacity: .5; }
 .mzbody { display: flex; flex-direction: column; gap: 14px; }
 .mzsec { display: flex; flex-direction: column; gap: 10px; }
@@ -1463,6 +1471,7 @@ a.ni { text-decoration: none; color: inherit; }
       (tiles.length ? '<div class="th-tiles" style="--n:' + tiles.length + '">' + tiles.join("") + '</div>' : '<div class="note">Команды нет в рейтинге Valve</div>') + '</section>';
     if ((T.roster || []).length) html += '<div class="sec"><div class="box roster a"><div class="hd"><span class="tn">Состав</span></div>' + rosterRows(T.roster, T.coach, { stats: T.stats || [] }, false) + '</div></div>';
     else if ((T.players || []).length) html += '<div class="sec"><div class="box"><div class="tm-pl" style="padding:12px">' + T.players.map(function (p) { return '<span>' + esc(typeof p === "string" ? p : p.nick) + '</span>'; }).join("") + '</div></div></div>';
+    html += teamMovesBlock(T);
     // будущие игры — как в форме: по турнирам, дата, соперник, формат; если матч уже в расписании приложения — открывается карточка
     var U = (T.upcoming || []).slice(0, 10);
     if (U.length) {
@@ -1497,6 +1506,24 @@ a.ni { text-decoration: none; color: inherit; }
     }
     html += teamPosBlock(T);
     return html;
+  }
+  // изменения состава за всё время (Liquipedia): пришёл / ушёл (куда) / стал неактивным; по годам, сначала новые
+  function teamMovesBlock(T) {
+    var M = T.moves || [];
+    if (!M.length) return "";
+    var ROLE = { coach: "тренер", "head coach": "главный тренер", "assistant coach": "ассистент тренера", "asst. coach": "ассистент тренера",
+      analyst: "аналитик", manager: "менеджер", "interim coach": "временный тренер", "stand-in": "замена", loan: "аренда", substitute: "запасной", trial: "на просмотре" };
+    var all = state.movesAll === T.name, shown = all ? M : M.slice(0, 12), y0 = null;
+    var html = '<div class="sec"><h3>Изменения состава <span>за всё время · Liquipedia</span></h3><div class="box mv">';
+    shown.forEach(function (x) {
+      var y = String(x.d).slice(0, 4);
+      if (y !== y0) { html += '<div class="mv-y">' + y + '</div>'; y0 = y; }
+      var r = x.role && (ROLE[x.role] || x.role), ic = x.k === "in" ? '<i class="mv-i in">+</i>' : x.k === "out" ? '<i class="mv-i out">−</i>' : '<i class="mv-i ia">⏸</i>';
+      var what = x.k === "in" ? "пришёл" : x.k === "out" ? "ушёл" + (x.to ? " → " + esc(x.to) : "") : "неактивен";
+      html += '<div class="mv-r"><span class="d">' + esc(dm(x.d)) + '</span>' + ic + '<span><b>' + esc(x.nick) + '</b>' + (r ? ' <small>' + esc(r) + '</small>' : '') + ' <span class="muted">' + what + '</span></span></div>';
+    });
+    if (M.length > 12) html += '<button class="fmore" data-moves="' + esc(T.name) + '">' + (all ? "Свернуть" : "Показать все " + M.length) + '</button>';
+    return html + '</div></div>';
   }
   // страница команды: зона карты как в матче — липкая строка карт, стороны и пистолетки, последние игры на карте; свайп листает карты
   function teamMapNames(T) { return (((T.maps || {}).table) || []).map(function (r) { return r.map; }); }
@@ -3484,7 +3511,7 @@ a.ni { text-decoration: none; color: inherit; }
   // ---------- клики
   document.addEventListener("click", function (e) {
     if (state.pop && !e.target.closest(".pop-in")) { closePop(); if (!e.target.closest("[data-pop],[data-tab],[data-tsub],[data-nf]")) { e.preventDefault(); e.stopPropagation(); return; } }  // плашка вкладки в шапке — закрывает окно и переключает
-    var t = e.target.closest("[data-pop],[data-tmap],[data-vplay],[data-snav],[data-goto],[data-sk],[data-team],[data-tname],[data-tseries],[data-fread],[data-close],#facts-more,[data-home],[data-feedch],[data-tg],[data-reader],[data-fact],[data-formall],[data-tsub],[data-pmap],[data-tpmap],[data-open],[data-tour],[data-tab],[data-map],[data-nf],[data-player],[data-link],[data-read],[data-series],[data-vser],[data-rseries],[data-smap],[data-ttab],#back");
+    var t = e.target.closest("[data-pop],[data-tmap],[data-moves],[data-vplay],[data-snav],[data-goto],[data-sk],[data-team],[data-tname],[data-tseries],[data-fread],[data-close],#facts-more,[data-home],[data-feedch],[data-tg],[data-reader],[data-fact],[data-formall],[data-tsub],[data-pmap],[data-tpmap],[data-open],[data-tour],[data-tab],[data-map],[data-nf],[data-player],[data-link],[data-read],[data-series],[data-vser],[data-rseries],[data-smap],[data-ttab],#back");
     if (!t) return;
     if (t.hasAttribute("data-pop")) { e.stopPropagation(); e.preventDefault(); openPop(t.getAttribute("data-pop"), t); return; }
     if (t.hasAttribute("data-vplay")) { var vv = t.parentNode.querySelector("video"); if (vv) { t.remove(); vv.play().catch(function () {}); } return; }
@@ -3507,6 +3534,7 @@ a.ni { text-decoration: none; color: inherit; }
     if (t.id === "facts-more") { state.factsAll = !state.factsAll; renderMatch(state.details[state.openId]); return; }
     if (t.hasAttribute("data-tg")) { if (TG) { e.preventDefault(); try { TG.openTelegramLink(t.getAttribute("data-tg")); } catch (x) { openLink(t.getAttribute("data-tg")); } } return; }
     if (t.hasAttribute("data-tsub")) { goKey("team:" + t.getAttribute("data-tsub")); return; }  // «Команда»: Игроки / Позиции — как фильтры новостей
+    if (t.hasAttribute("data-moves")) { var nm = t.getAttribute("data-moves"); state.movesAll = state.movesAll === nm ? null : nm; var TT = state.teams[state.teamSlug]; if (TT) showTeam(state.teamSlug); return; }
     if (t.hasAttribute("data-tmap")) { teamMapGo(t.getAttribute("data-tmap")); return; }
     if (t.hasAttribute("data-tpmap")) {  // карта в «Позициях» на странице команды
       state.tposMap = t.getAttribute("data-tpmap");

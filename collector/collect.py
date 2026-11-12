@@ -669,7 +669,7 @@ def lp_fresh(key: str) -> bool:
         return False
     age = NOW - (parse_iso(cached.get("t")) or NOW)
     d = cached.get("data") or {}
-    if (d.get("players") or []) and "hist" not in d["players"][0]:
+    if (d.get("players") or []) and ("hist" not in d["players"][0] or "moves" not in d):
         return False  # записано до 11.11 — без истории команд и прежних ников: перечитать (пачкой в lp_prefetch)
     shaky = not d or any(not p.get("roles") for p in d.get("players") or []) or not d.get("coach") \
         or any(p.get("note") for p in d.get("players") or [])
@@ -761,6 +761,33 @@ def nick_find(nick: str, pool) -> str | None:
     return c[0] if len(c) == 1 else None
 
 
+def lp_moves(text: str) -> list[dict]:
+    """Изменения состава за всё время со страницы команды Liquipedia (все блоки {{Squad|status=…}}: действующие, неактивные,
+    бывшие): пришёл (joindate), ушёл (leavedate → newteam), стал неактивным (inactivedate). Роль: игрок / тренер / аналитик…"""
+    out, seen = [], set()
+    for m in re.finditer(r"\{\{Squad\|status=(\w+)", text or ""):
+        st = m.group(1).lower()
+        blk = text[m.start(): text.find("\n}}", m.start())]
+        for ln in blk.split("\n"):
+            if "{{Person" not in ln:
+                continue
+            pid = lp_param(ln, "id")
+            if not pid:
+                continue
+            role = (lp_param(ln, "role") or "").strip().lower() or None
+            def d(k):
+                v = re.sub(r"[^0-9?-]", "", (lp_param(ln, k) or "")[:10])
+                return v.replace("??", "01") if re.match(r"\d{4}-", v) else None
+            jd, ld, idt = d("joindate"), d("leavedate"), d("inactivedate")
+            nt = re.sub(r"\[\[|\]\]", "", lp_param(ln, "newteam") or "").split("|")[-1].strip() or None
+            for kind, dt, extra in (("in", jd, None), ("out", ld, nt), ("inactive", idt if st != "former" or not ld else None, None)):
+                if dt and (kind, pid, dt) not in seen:
+                    seen.add((kind, pid, dt))
+                    out.append({"d": dt, "k": kind, "nick": pid, "role": role, **({"to": extra} if extra else {})})
+    out.sort(key=lambda x: (x["d"], {"out": 0, "inactive": 1, "in": 2}[x["k"]]), reverse=True)
+    return out[:300]
+
+
 def lp_roster(t: dict) -> dict | None:
     """Активный состав с Liquipedia: тренер, капитан, роли. Кэш (см. lp_fresh)."""
     key = str(t["id"])
@@ -826,6 +853,7 @@ def lp_roster(t: dict) -> dict | None:
                     jd = next((lp_param(ln, "joindate") or "" for ln in block.split("\n") if "{{Person" in ln and norm(lp_param(ln, "id")) == norm(p["nick"])), "")[:10]
                     f = next((x["nick"] for x in inactive if jd and x["date"] == jd), None) or (inactive[0]["nick"] if len(inactive) == 1 else None)
                 p["stand_for"] = f
+            moves = lp_moves(text)
             ppages = lp_pages([p["page"] for p in people]) if people else {}
             for p in people:
                 p["birth"] = birth_date(ppages.get(p["page"], ""))
@@ -852,6 +880,7 @@ def lp_roster(t: dict) -> dict | None:
             data = {
                 "coach": [{"nick": p["nick"], "name": p["name"], "flag": p["flag"], "birth": p["birth"], "aka": p["aka"], "hist": p["hist"]} for p in people if p["coach"]],
                 "players": [{k: p.get(k) for k in ("nick", "name", "flag", "igl", "roles", "note", "birth", "loan_from", "stand_for", "aka", "hist")} for p in players],
+                "moves": moves,
             }
     except Exception as e:
         warn(f"Liquipedia {t.get('name')}: {e!r}")
@@ -6414,7 +6443,7 @@ def build_team_page(r: dict) -> dict | None:
     for row in maps.get("table") or []:
         row["teams"] = row["teams"][:1]
     players = list((bo3_team_players(bid, hist) or {}).values())
-    roster, coach = [], []
+    roster, coach, moves = [], [], []
     key = "n:" + norm(r["name"])
     # призовые и id игроков с HLTV — раньше состава: по этим id ищутся MVP и мейджоры игроков
     ach = []
@@ -6429,7 +6458,9 @@ def build_team_page(r: dict) -> dict | None:
         if not roster_cache.get(key):
             _team_lp_new[0] += 1
         try:
-            roster, coach = merge_roster([], lp_roster({"id": key, "name": r["name"]}))
+            lpd = lp_roster({"id": key, "name": r["name"]})
+            moves = (lpd or {}).get("moves") or []
+            roster, coach = merge_roster([], lpd)
             fix_names(roster)
             for p, isc in [(x, False) for x in roster] + [(x, True) for x in coach]:
                 info = hltv_player_info(p.get("nick") or "", coach=isc)
@@ -6477,6 +6508,7 @@ def build_team_page(r: dict) -> dict | None:
                 p["name_ru"] = pc["name_ru"]
     return {"updated": iso(NOW), "name": r["name"], "vrs": {k: r.get(k) for k in ("rank", "points", "region", "reg_rank", "hltv_rank")},
             "players": players or r.get("roster") or [], "roster": roster, "coach": coach, "logo": r.get("logo"), "roster_src": roster_src,
+            "moves": moves,
             "stats": build_player_stats({"players": roster, "name": r["name"]}, bid, hist) if roster else [],
             "form": form, "series": series, "upcoming": bo3_upcoming(bid),
             "maps": {"window_days": maps.get("window_days"), "table": maps.get("table") or [],
