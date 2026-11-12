@@ -6842,6 +6842,8 @@ def main() -> int:
         ex = tournament_extras(tr["name"], final=fin)
         print(f"Призовые/участники {tr['name']}: " + (f"мест {len((ex or {}).get('places') or [])}, команд {len((ex or {}).get('teams') or [])}" if ex else "нет (событие на HLTV не найдено или страница недоступна)"))
         if ex:
+            if ex.get("places"):  # места 1–4 без команд (HLTV запомнили до финала) — по нашей сетке
+                ex = {**ex, "places": _fill_top_places(ex["places"], tr["name"])}
             tr["hltv"] = ex
             if ex.get("prize"):
                 tr["prize_usd"] = ex["prize"]
