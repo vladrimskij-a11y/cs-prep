@@ -502,6 +502,8 @@ html { overflow-anchor: none; }
 .stage .brk { border-left: 3px solid var(--stc); }
 .sshell .pane:has(.stage) { scroll-snap-type: y proximity; scroll-padding-top: calc(var(--shh, 120px) + 6px); }
 .stage { scroll-snap-align: start; }
+/* после стадий (призовые, участники) — привязка к низу: на телефоне притягивание к последней стадии не мешает долистать до конца */
+.sshell .pane:has(.stage) .sec:not(.stage) { scroll-snap-align: end; }
 .stage > h3 { color: var(--stc); }
 .bracket { overflow-x: hidden; padding-bottom: 4px; }
 .brk-h { position: sticky; left: 0; color: var(--stc); }
