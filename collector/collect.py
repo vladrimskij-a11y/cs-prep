@@ -6529,23 +6529,6 @@ def team_slug(name: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", norm(name) or name.lower()).strip("-") or "team"
 
 
-def refresh_team_upcoming() -> None:
-    """Между пересборками страниц команд (3–12 ч) обновляем только «Будущие игры» — один запрос к bo3 на команду
-    (12.11: у Vitality решающий матч группы появился у bo3 позже пересборки, и страница была без следующего матча)."""
-    n = 0
-    for f in sorted((OUT / "team").glob("*.json")):
-        d = load_json(f, {}) or {}
-        bid = d.get("bid") or team_by_name(d.get("name") or "")
-        if not bid:
-            continue
-        up = bo3_upcoming(bid)
-        if up != d.get("upcoming"):
-            d["upcoming"], d["bid"] = up, bid
-            save_json(f, d)
-            n += 1
-    print(f"Будущие игры команд: обновлено {n}")
-
-
 def build_ranking() -> dict:
     """Вкладка «Рейтинг»: топ-100 VRS (живой с HLTV, иначе официальный снимок Valve) и рейтинг HLTV."""
     vrs = vrs_table()
@@ -7018,8 +7001,6 @@ def main() -> int:
         stale = not rk or (parse_iso(rk.get("updated")) or NOW) < NOW - timedelta(hours=3 if active else 12)
         if not STATS and stale:  # без турниров рейтинг и страницы команд — раз в 12 часов
             save_json(OUT / "ranking.json", build_ranking())
-        elif not STATS:
-            refresh_team_upcoming()  # «Будущие игры» на страницах команд — каждый полный сбор (раз в час)
     except Exception as e:
         warn(f"Рейтинг: {e!r}")
     for k in [k for k, v in tg_cache.items() if (v.get("t") or "") < iso(NOW - timedelta(days=NEWS_DAYS + 3))]:
