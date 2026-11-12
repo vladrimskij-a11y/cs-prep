@@ -5015,12 +5015,14 @@ def player_links(d: dict) -> list[dict]:
                 key = ("ex", na, _tkey(h["team"]))
                 if key not in seen:
                     seen.add(key)
-                    ex.append({"tag": "Связь", "kind": "link", "text": f"{ra}{na} ({teams[ia]['name']}) раньше играл за {h['team']}: {_ym(h['from'])} — {_ym(h['to'])}."})
+                    role = "тренировал" if "coach" in (h.get("note") or "") else "работал в" if re.search(r"analyst|manager", h.get("note") or "") else "играл за"
+                    ex.append({"tag": "Связь", "kind": "link", "text": f"{ra}{na} ({teams[ia]['name']}) раньше {role} {h['team']}: {_ym(h['from'])} — {_ym(h['to'])}."})
         for b in range(a + 1, len(people)):
             ib, nb, rb, hb = people[b]
             for x in ha:
                 for y in hb:
-                    if _tkey(x["team"]) != _tkey(y["team"]) or "inactive" in (x.get("note") or "") + (y.get("note") or ""):
+                    nt = (x.get("note") or "") + " " + (y.get("note") or "")
+                    if _tkey(x["team"]) != _tkey(y["team"]) or re.search(r"inactive|coach|analyst|manager|streamer|org", nt):  # только время, когда оба играли
                         continue
                     lo, hi = max(x["from"], y["from"]), min(x["to"] or today, y["to"] or today)
                     if hi <= lo or _span_days(lo, hi) < 60:  # короткие пересечения (пара недель) — не связь
