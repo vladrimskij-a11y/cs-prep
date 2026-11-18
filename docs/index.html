@@ -571,6 +571,12 @@ html { overflow-anchor: none; }
 .medal b { font-size: 12px; font-weight: 700; }
 .pop-in li.ph { list-style: none; margin: 8px 0 2px -14px; font-size: 11px; font-weight: 700; letter-spacing: .06em; color: var(--muted); }
 .pop-in li.ph:first-child { margin-top: 0; }
+.pop-in li.mj { margin-bottom: 7px; line-height: 1.3; }
+.pop-in li.mj .mj-e { color: var(--fg); font-weight: 650; }
+.pop-in li.mj.win .mj-e { color: var(--t); }
+.pop-in li.mj .mj-p { color: var(--muted); }
+.pop-in li.mj .mj-t { display: block; color: var(--ct); font-weight: 600; font-size: .92em; }
+.pop-in li.mj .mj-t small { color: var(--muted); font-weight: 400; font-size: 1em; }
 .medal.tms { margin-left: 10px; position: relative; z-index: 2; }  /* зона нажатия MVP рядом не перекрывает кнопку команд */
 .medal.mvp { background: var(--t-soft); color: var(--t); }
 .roster .hd .medals { justify-self: end; }
@@ -2531,7 +2537,11 @@ a.ni { text-decoration: none; color: inherit; }
       p.age ? esc(p.age) + " " + years(p.age) : ""].concat(extra || []).filter(Boolean);
     var majTxt = '🏟 Мейджоры <b>' + esc(p.majors) + '</b>' + (p.major_wins ? ' · 🏆 выиграл <b>' + esc(p.major_wins) + '</b>' : '');
     // мажоры нажимаются всегда: есть список — показываем его (выигранные с 🏆, у остальных место), нет — говорим, что он ещё собирается
-    var majList = (p.major_events || []).map(function (x) { var tm = teamInYear(p, x); return majLine(x, p.event_wins) + (tm ? " · " + tm : ""); });
+    // строка мейджора — объект: турнир выделен, место приглушено, команда отдельной строкой цветом (владелец 18.11)
+    var majList = (p.major_events || []).map(function (x) {
+      var ln = majLine(x, p.event_wins), m = ln.match(/^(🏆 )?(.*?)(?: — (.+))?$/), tm = teamInYear(p, x);
+      return { w: !!m[1], e: m[2], p: m[3] || "", tm: tm };
+    });
     var maj = !p.majors ? '' : '<span class="pmaj tap" role="button" data-pop="' + esc(JSON.stringify({ t: "🏟 Мейджоры: " + p.majors + (p.major_wins ? ", выиграл " + p.major_wins : ""),
       l: majList.length ? majList : ["Список турниров появится после ближайшего полного сбора"] })) + '">' + majTxt + ' ›</span>';
     return '<' + (attrs ? 'button class="pl"' + attrs : 'div class="pl"') + '><span class="nickline"><span class="pflag">' + esc(flag(p.nationality || p.flag)) + '</span><span class="nick">' + esc(p.nick) + '</span>' + mvpBadge(p) + teamsBadge(p) + '</span>' +
@@ -2593,7 +2603,8 @@ a.ni { text-decoration: none; color: inherit; }
     closePop();
     var d = JSON.parse(data), el = document.createElement("div");
     el.className = "pop";
-    el.innerHTML = '<div class="pop-in' + (d.c ? ' wide' : '') + '"><b>' + esc(d.t) + '</b>' + (d.c ? '<div class="pcols">' + d.c.map(function (c) { return '<div class="pcol"><div class="pci">' + c.i + ' <b>' + c.l.length + '</b></div>' + (c.l.length ? c.l.map(function (x) { return '<div class="pce">' + esc(x) + '</div>'; }).join("") : '<div class="pce none">—</div>') + '</div>'; }).join("") + '</div>' : (d.l || []).length ? '<ul>' + d.l.map(function (x) { return String(x).charAt(0) === "§" ? '<li class="ph">' + esc(String(x).slice(1)) + '</li>' : '<li>' + esc(x) + '</li>'; }).join("") + '</ul>' : '<p>Список турниров появится после обновления данных.</p>') + '</div>';
+    el.innerHTML = '<div class="pop-in' + (d.c ? ' wide' : '') + '"><b>' + esc(d.t) + '</b>' + (d.c ? '<div class="pcols">' + d.c.map(function (c) { return '<div class="pcol"><div class="pci">' + c.i + ' <b>' + c.l.length + '</b></div>' + (c.l.length ? c.l.map(function (x) { return '<div class="pce">' + esc(x) + '</div>'; }).join("") : '<div class="pce none">—</div>') + '</div>'; }).join("") + '</div>' : (d.l || []).length ? '<ul>' + d.l.map(function (x) { if (x && typeof x === "object") { var tmm = String(x.tm || "").match(/^(.*?)( \(.*\))?$/); return '<li class="mj' + (x.w ? ' win' : '') + '"><span class="mj-e">' + (x.w ? '🏆 ' : '') + esc(x.e) + '</span>' + (x.p ? ' <span class="mj-p">— ' + esc(x.p) + '</span>' : '') + (x.tm ? '<span class="mj-t">' + esc(tmm[1]) + (tmm[2] ? '<small>' + esc(tmm[2]) + '</small>' : '') + '</span>' : '') + '</li>'; }
+      return String(x).charAt(0) === "§" ? '<li class="ph">' + esc(String(x).slice(1)) + '</li>' : '<li>' + esc(x) + '</li>'; }).join("") + '</ul>' : '<p>Список турниров появится после обновления данных.</p>') + '</div>';
     document.body.appendChild(el);
     var r = anchor.getBoundingClientRect(), box = el.firstChild, W = window.innerWidth;
     var li = box.querySelectorAll("li");
