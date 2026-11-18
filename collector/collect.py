@@ -6581,7 +6581,7 @@ def team_slug(name: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", norm(name) or name.lower()).strip("-") or "team"
 
 
-TEAM_PAGES_TOP = 50
+TEAM_PAGES_TOP = 100  # владелец 18.11: страницы у всей сотни рейтинга; чего нет у PandaScore — добираем с Liquipedia
 TEAM_PAGES_REG = 20
 
 
