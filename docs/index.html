@@ -1559,7 +1559,8 @@ a.ni { text-decoration: none; color: inherit; }
       var y = String(x.d).slice(0, 4);
       if (y !== y0) { html += '<div class="mv-y">' + y + '</div>'; y0 = y; }
       var r = x.role && (ROLE[x.role] || x.role), ic = x.k === "in" ? '<i class="mv-i in">+</i>' : x.k === "out" ? '<i class="mv-i out">−</i>' : '<i class="mv-i ia">⏸</i>';
-      var what = x.k === "in" ? "пришёл" : x.k === "out" ? "ушёл" + (x.to ? " → " + esc(x.to) : "") : "неактивен";
+      var what = x.k === "in" ? (x.from === "—" ? "дебют в профи" : "пришёл" + (x.from ? " из " + esc(x.from) : ""))
+        : x.k === "out" ? "ушёл" + (x.to ? " → " + esc(x.to) : "") : "на скамейку";
       html += '<div class="mv-r"><span class="d">' + esc(dm(x.d)) + '</span>' + ic + '<span><b>' + esc(x.nick) + '</b>' + (r ? ' <small>' + esc(r) + '</small>' : '') + ' <span class="muted">' + what + '</span></span></div>';
     });
     if (M.length > 12) html += '<button class="fmore" data-moves="' + esc(T.name) + '">' + (all ? "Свернуть" : "Показать все " + M.length) + '</button>';
@@ -1770,7 +1771,9 @@ a.ni { text-decoration: none; color: inherit; }
         else (rd.bracket === "lower" ? lower : rd.bracket === "upper" ? upper : other).push(rd);
       });
       var rows = [];
-      if (upper.length) rows.push({ t: "Верхняя сетка", r: upper });
+      // без нижней сетки (одиночное выбывание, матч за 3-е у bo3 помечен «lower») — одна сетка: 1/4 → 1/2 → финал в один ряд
+      if (!lower.length && upper.length && other.length) { upper = st.rounds.filter(function (rd) { return upper.indexOf(rd) >= 0 || other.indexOf(rd) >= 0; }); other = []; rows.push({ t: "", r: upper }); }
+      else if (upper.length) rows.push({ t: "Верхняя сетка", r: upper });
       if (other.length) rows.push({ t: "", r: other });
       if (lower.length) rows.push({ t: "Нижняя сетка", r: lower });
       // где гранд-финал: под ним и ставим матч за 3-е место, без ниточек

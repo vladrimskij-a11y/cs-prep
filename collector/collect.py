@@ -708,7 +708,7 @@ def lp_fresh(key: str) -> bool:
         return False
     age = NOW - (parse_iso(cached.get("t")) or NOW)
     d = cached.get("data") or {}
-    if (d.get("players") or []) and ("hist" not in d["players"][0] or "moves" not in d or (d.get("v") or 0) < LP_VER
+    if (d.get("players") or []) and ("hist" not in d["players"][0] or "moves" not in d or any("page" not in m for m in d["moves"][:1]) or (d.get("v") or 0) < LP_VER
                                      or any((p.get("flag") or "") in ("XX", "UK") for p in (d.get("players") or []) + (d.get("coach") or []))):
         return False  # записано до 11.11 — без истории команд и прежних ников: перечитать (пачкой в lp_prefetch)
     shaky = not d or any(not p.get("roles") for p in d.get("players") or []) or not d.get("coach") \
@@ -832,9 +832,71 @@ def lp_moves(text: str) -> list[dict]:
             for kind, dt, extra in (("in", jd, None), ("out", ld, nt), ("inactive", idt if st != "former" or not ld else None, None)):
                 if dt and (kind, pid, dt) not in seen:
                     seen.add((kind, pid, dt))
-                    out.append({"d": dt, "k": kind, "nick": pid, "role": role, **({"to": extra} if extra else {})})
+                    out.append({"d": dt, "k": kind, "nick": pid, "page": lp_param(ln, "link") or pid, "role": role, **({"to": extra} if extra else {})})
     out.sort(key=lambda x: (x["d"], {"out": 0, "inactive": 1, "in": 2}[x["k"]]), reverse=True)
     return out[:300]
+
+
+PHIST_F = CACHE / "lp_player_hist.json"  # история команд игроков из изменений состава: страница → TH-список (обновляем раз в 60 дн.)
+phist_cache: dict = load_json(PHIST_F, {})
+_phist_budget = [int(os.environ.get("PHIST_NEW", "250"))]  # новых страниц игроков за сбор (50 за запрос Liquipedia)
+
+
+def moves_teams(moves: list, t: dict, title: str | None) -> None:
+    """Откуда пришёл и куда ушёл (если в составе Liquipedia newteam пусто) — по истории команд самого игрока.
+    Владелец 18.11: в списке трансферов писать, откуда пришёл и куда ушёл."""
+    pages = [m.get("page") or m["nick"] for m in moves if m["k"] in ("in", "out")]
+    stale = lambda pg: not phist_cache.get(pg) or (parse_iso(phist_cache[pg].get("t")) or NOW) < NOW - timedelta(days=60)
+    need = [pg for pg in dict.fromkeys(pages) if stale(pg)][: max(0, _phist_budget[0])]
+    if need:
+        try:
+            got = lp_pages(need)
+        except Exception as e:
+            warn(f"Liquipedia история игроков: {e!r}")
+            _phist_budget[0] = 0
+            got = None
+        if got is not None:
+            _phist_budget[0] -= len(need)
+            for pg in need:  # страницы нет — помним пустую историю (не спрашиваем каждый сбор)
+                phist_cache[pg] = {"t": iso(NOW), "h": lp_history(got.get(pg, ""))}
+    me = {norm(x) for x in (t.get("name"), t.get("acronym"), title) if x} - {""}
+    def mine(team):
+        n = norm(team)
+        return n in me or any(len(c) >= 4 and (c in n or n in c) for c in me)
+    def day(x):
+        try:
+            return datetime.fromisoformat(str(x)[:10].replace("-00", "-01")).replace(tzinfo=timezone.utc)
+        except Exception:
+            return None
+    for m in moves:
+        h = (phist_cache.get(m.get("page") or m["nick"]) or {}).get("h") or []
+        d0 = day(m["d"])
+        if not h or not d0:
+            continue
+        if m["k"] == "in" and not m.get("from"):
+            best = None
+            for e in h:
+                end = day(e.get("to")) if e.get("to") else None
+                if mine(e["team"]) or not end or "inactive" in (e.get("note") or ""):
+                    continue
+                gap = (d0 - end).days
+                if -10 <= gap <= 120 and (best is None or abs(gap) < best[0]):
+                    best = (abs(gap), e["team"])
+            if best:
+                m["from"] = best[1]
+            elif not any(day(e.get("from")) and day(e.get("from")) < d0 - timedelta(days=10) for e in h):
+                m["from"] = "—"  # до этого команд не было: дебют
+        elif m["k"] == "out" and not m.get("to"):
+            best = None
+            for e in h:
+                st = day(e.get("from"))
+                if mine(e["team"]) or not st:
+                    continue
+                gap = (st - d0).days
+                if -10 <= gap <= 120 and (best is None or abs(gap) < best[0]):
+                    best = (abs(gap), e["team"] + (" (тренер)" if "coach" in (e.get("note") or "") else ""))
+            if best:
+                m["to"] = best[1]
 
 
 def lp_roster(t: dict) -> dict | None:
@@ -845,6 +907,12 @@ def lp_roster(t: dict) -> dict | None:
     if cached and lp_fresh(key):
         for p in (cd.get("players") or []) + (cd.get("coach") or []):
             remember_aka(p.get("nick"), p.get("aka"))
+        mv = cd.get("moves") or []
+        if _phist_budget[0] > 0 and any((m["k"] == "in" and not m.get("from")) or (m["k"] == "out" and not m.get("to")) for m in mv):
+            try:
+                moves_teams(mv, t, None)  # дописываем откуда/куда по мере того, как подгружаются страницы игроков
+            except Exception as e:
+                warn(f"Откуда/куда в изменениях состава {t.get('name')}: {e!r}")
         return cached.get("data")
     names = lp_names(t)
     data = None
@@ -903,6 +971,11 @@ def lp_roster(t: dict) -> dict | None:
                     f = next((x["nick"] for x in inactive if jd and x["date"] == jd), None) or (inactive[0]["nick"] if len(inactive) == 1 else None)
                 p["stand_for"] = f
             moves = lp_moves(text)
+            try:
+                title = next((n for n in names if pages.get(n) is text), None)
+                moves_teams(moves, t, title)
+            except Exception as e:
+                warn(f"Откуда/куда в изменениях состава {t.get('name')}: {e!r}")
             ppages = lp_pages([p["page"] for p in people]) if people else {}
             for p in people:
                 p["birth"] = birth_date(ppages.get(p["page"], ""))
@@ -7225,6 +7298,7 @@ def main() -> int:
     save_json(TEAMS_CACHE_F, teams_map)
     save_json(TR_CACHE_F, tr_cache)
     save_json(ROSTER_CACHE_F, roster_cache)
+    save_json(PHIST_F, phist_cache)
     for k in [k for k, v in art_cache.items() if (v.get("t") or "") < iso(NOW - timedelta(days=NEWS_DAYS + 7))]:
         del art_cache[k]
     save_json(ART_CACHE_F, art_cache)
