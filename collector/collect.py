@@ -28,6 +28,7 @@ import gzip
 import hashlib
 import html as _html
 import json
+import collections
 import math
 import os
 import re
@@ -993,6 +994,61 @@ def merge_roster(panda_players: list[dict], lp: dict | None) -> tuple[list[dict]
     return res, coach
 
 # ---------------------------------------------------------------- bo3.gg: история, карты
+
+def team_name_cands(name: str | None, players: list[dict]) -> list[str]:
+    """Другие названия команды по истории игроков Liquipedia: нынешняя команда большинства (GOSH у PandaScore = BC.Game Esports)
+    и прежнее название, если ≥3 игрока перешли в нынешнюю одновременно (переименование: Sharks → DENDELE)."""
+    cur, prev = collections.Counter(), collections.Counter()
+    for p in players or []:
+        H = [h for h in (p.get("hist") or []) if h.get("from")]
+        now = [h for h in H if not h.get("to") and not re.search(r"loan|stand-in|inactive|trial", h.get("note") or "")]
+        if not now:
+            continue
+        c = max(now, key=lambda h: h["from"])
+        cur[c["team"]] += 1
+        for h in H:
+            if h.get("to") and abs(_span_days(h["to"], c["from"])) <= 20 and h["team"] != c["team"]:
+                prev[h["team"]] += 1
+    out = [n for n, k in cur.most_common() if k >= 3] + [n for n, k in prev.most_common() if k >= 3]
+    return [n for n in dict.fromkeys(out) if norm(n) != norm(name)]
+
+
+def bo3_by_roster(names: list[str], players: list[dict]) -> int | None:
+    """Команда bo3 по составу: из найденных по названиям берём ту, где ≥3 игрока совпадают с нашим составом
+    (18.11: GOSH = BC.Game; у bo3 «GOSH» — новая пустая команда, а под «BC.Game» — другая бразильская)."""
+    nicks = {norm(p.get("nick")) for p in players or []} - {""}
+    if len(nicks) < 3:
+        return None
+    key = "r:" + "|".join(sorted(nicks))
+    if key in teams_map:
+        return teams_map[key]
+    best, bn = None, 0
+    for nm in names:
+        bare = re.sub(r"\s+(esports|e-sports|gaming|team|clan|club)$", "", nm, flags=re.IGNORECASE).strip()
+        for q in dict.fromkeys([nm, bare]):
+            try:
+                res = bo3("/teams", {"filter[teams.name][eq]": q, "with": "players"}).get("results") or []
+            except Exception as e:
+                warn(f"bo3 состав {q}: {e!r}")
+                continue
+            for r in res:
+                n = sum(1 for x in r.get("players") or [] if nick_find(x.get("nickname") or "", nicks))
+                if n > bn:
+                    best, bn = r.get("id"), n
+    teams_map[key] = best if bn >= 3 else None
+    return teams_map[key]
+
+
+def bo3_roster_ok(bid: int | None, hist: list, players: list[dict]) -> bool:
+    """Найденная на bo3 команда — та же, что у нас: ≥2 общих игрока (или нам не с чем сравнить)."""
+    nicks = {norm(p.get("nick")) for p in players or []} - {""}
+    if not bid or len(nicks) < 3:
+        return bool(bid)
+    if not hist:
+        return False
+    bp = bo3_team_players(bid, hist)
+    return not bp or sum(1 for n in bp.values() if nick_find(n, nicks)) >= 2
+
 
 def bo3_team_id(t: dict) -> int | None:
     """Ищет команду PandaScore на bo3.gg: по ps_id, слагу, названию."""
@@ -6258,8 +6314,13 @@ def build_detail(m: dict, prev: dict | None) -> dict:
         bid = bo3_team_id({**t, "slug": full.get("slug") or t.get("slug")})
         if not bid and alt:
             bid = team_by_name(alt)
-        add_alias(bid, t.get("name"), t.get("acronym"), t.get("slug"), full.get("name"), full.get("acronym"))
         hist = bo3_history(bid) if bid else []
+        if not bo3_roster_ok(bid, hist, players):  # на bo3 под этим названием другая/пустая команда — ищем по составу
+            b2 = bo3_by_roster([full.get("name") or t.get("name")] + ([alt] if alt else []) + team_name_cands(t.get("name"), players), players)
+            if b2 and b2 != bid:
+                print(f"bo3: {t.get('name')} — по составу это команда {b2} (было {bid})")
+                bid, hist = b2, bo3_history(b2)
+        add_alias(bid, t.get("name"), t.get("acronym"), t.get("slug"), full.get("name"), full.get("acronym"))
         if not coach and bid and len(players) > 5:  # состава с Liquipedia нет, а у PandaScore больше пятерых — оставляем тех, кто играл последние карты
             recent = set()
             for m0 in hist[:2]:
@@ -6477,10 +6538,17 @@ def team_by_name(name: str) -> int | None:
 def build_team_page(r: dict) -> dict | None:
     """Страница команды из рейтинга: место, состав, форма, карты, призовые."""
     bid = team_by_name(r["name"])
+    lpc = lp_roster({"id": "n:" + norm(r["name"]), "name": r["name"]}) or {}  # состав с Liquipedia — проверить, та ли команда на bo3
+    lpp = lpc.get("players") or []
+    hist = bo3_history(bid, pages=2) if bid else []
+    if not bo3_roster_ok(bid, hist[:10], lpp):
+        b2 = bo3_by_roster([r["name"]] + team_name_cands(r["name"], lpp), lpp)
+        if b2 and b2 != bid:
+            print(f"bo3: {r['name']} — по составу это команда {b2} (было {bid})")
+            bid, hist = b2, bo3_history(b2, pages=2)
     if not bid:
         return None
     add_alias(bid, r["name"])
-    hist = bo3_history(bid, pages=2)
     form = build_form(bid, hist)
     series = {}
     for m0 in hist[:10]:
