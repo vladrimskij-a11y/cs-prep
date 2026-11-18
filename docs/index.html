@@ -510,6 +510,8 @@ html { overflow-anchor: none; }
 .stage .brk { border-left: 3px solid var(--stc); }
 .sshell .pane:has(.stage) { scroll-snap-type: y proximity; scroll-padding-top: calc(var(--shh, 120px) + 6px); }
 .stage { scroll-snap-align: start; }
+.stage.tall { scroll-snap-align: none; }
+.snap-end { height: 1px; scroll-snap-align: end; }
 /* после стадий (призовые, участники) — привязка к низу: на телефоне притягивание к последней стадии не мешает долистать до конца */
 .sshell .pane:has(.stage) .sec:not(.stage) { scroll-snap-align: end; }
 .stage > h3 { color: var(--stc); }
@@ -1273,9 +1275,22 @@ a.ni { text-decoration: none; color: inherit; }
     var sh = q(".sshell");
     sh.style.setProperty("--shh", q(".shead").offsetHeight + "px");
     trackTo(keys.indexOf(key), false);
+    fixSnap();
     document.querySelectorAll(".sshell .pane").forEach(function (p) { var k = p.getAttribute("data-key"); if (sc[k]) p.scrollTop = sc[k]; });
     revealSel(q(".shead .filt"));
   }
+  // притягивание стадий: стадия выше экрана (швейцарка мейджора) не держит прокрутку — иначе на телефоне её низ и всё,
+  // что ниже, достаётся только оттягиванием; в конце обзора — точка притягивания к низу
+  function fixSnap() {
+    document.querySelectorAll(".sshell .pane").forEach(function (p) {
+      if (!p.querySelector(".stage")) return;
+      var h = p.clientHeight;
+      p.querySelectorAll(".stage").forEach(function (st) { st.classList.toggle("tall", st.offsetHeight > h * 0.8); });
+      if (!p.querySelector(":scope > .snap-end")) { var e = document.createElement("div"); e.className = "snap-end"; p.appendChild(e); }
+    });
+  }
+  document.addEventListener("touchstart", function (e) { if (e.target.closest && e.target.closest(".sshell .pane .stage")) fixSnap(); }, { passive: true, capture: true });
+  window.addEventListener("resize", fixSnap);
   function saveShell() {
     if (!SH || !q(".sshell")) return;
     var sc = state.shs[SH.id] = state.shs[SH.id] || {};
