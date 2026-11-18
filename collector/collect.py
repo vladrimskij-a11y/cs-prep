@@ -2301,7 +2301,7 @@ def bo3_prize_places(bid: int | None, hist: list[dict]) -> list[dict]:
     return out
 
 
-QUAL_RX = re.compile(r"(?i)qualif|квалиф|\bqual\b")
+QUAL_RX = re.compile(r"(?i)qualif|квалиф|\bqual\b|\bstage\s*\d|стади[яи]\s*\d|play-?in")  # отборочные и отдельные стадии турнира (IEM Kraków Stage 1 — не трофей)
 
 
 def tour_brand(ev: str) -> str:
