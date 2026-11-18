@@ -6581,6 +6581,9 @@ def team_slug(name: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", norm(name) or name.lower()).strip("-") or "team"
 
 
+TEAM_PAGES_TOP = 50
+
+
 def build_ranking() -> dict:
     """Вкладка «Рейтинг»: топ-100 VRS (живой с HLTV, иначе официальный снимок Valve) и рейтинг HLTV."""
     vrs = vrs_table()
@@ -6596,6 +6599,9 @@ def build_ranking() -> dict:
         r["hltv_rank"] = hm0.get(norm(r["name"]))
     (OUT / "team").mkdir(parents=True, exist_ok=True)
     keep = set()
+    # страницы команд — только топ-50 и те, у кого есть карточка матча (владелец 18.11: хвост рейтинга — тир-2/3 с пустыми данными)
+    playing = {norm(t.get("name")) for f in (OUT / "match").glob("*.json") for t in ((load_json(f, {}) or {}).get("teams") or [])}
+    vrs_all, vrs = vrs, [r for i, r in enumerate(vrs) if i < TEAM_PAGES_TOP or norm(r["name"]) in playing]
     if not STATS:  # составы команд рейтинга — тоже пачками (новых — не больше 40 за сбор, как в build_team_page)
         cand, new = [], 0
         for r in vrs:
@@ -6620,7 +6626,9 @@ def build_ranking() -> dict:
     for f in (OUT / "team").glob("*.json"):
         if f.name not in keep:
             f.unlink()
-    return {"updated": iso(NOW), "vrs": {"source": src, "date": date, "teams": vrs}}
+    for r in vrs_all:
+        r.setdefault("slug", team_slug(r["name"]))
+    return {"updated": iso(NOW), "vrs": {"source": src, "date": date, "teams": vrs_all}}
 
 
 def finished_tournaments() -> list[dict]:
