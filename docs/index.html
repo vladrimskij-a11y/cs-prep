@@ -1715,6 +1715,16 @@ a.ni { text-decoration: none; color: inherit; }
     });
     // порядок стадий: доигранный турнир — плей-офф сверху; идущий — сначала текущая стадия (группы A, потом B),
     // плей-офф поднимается наверх, когда идёт или до его начала меньше 12 часов
+    // мейджор: в первом раунде Stage 2/3 до жеребьёвки пары пустые — ставим уже приглашённые туда команды (по одной на матч, соперник «?»)
+    var TR = ((state.list || {}).tournaments || []).find(function (t) { return t.name === R.tournament || String(t.id) === String(R.id); });
+    var MST = ((TR || {}).major || {}).stages || [];
+    stages.forEach(function (st) {
+      var mm = String(st.title || "").match(/(?:stage|стадия)\s*(\d)/i), inv = mm && MST.find(function (x) { return new RegExp("stage\\s*" + mm[1], "i").test(x.stage || ""); });
+      var r1 = st.rounds[0];
+      if (!inv || !r1 || !(inv.teams || []).length || r1.matches.some(function (x) { return x.a || x.b; })) return;
+      st.rounds = st.rounds.slice();
+      st.rounds[0] = Object.assign({}, r1, { matches: r1.matches.map(function (x, i) { var t = inv.teams[i]; return t ? Object.assign({}, x, { a: t.name, inv: true }) : x; }) });
+    });
     stages.forEach(function (st, i) { st._i = i; st._last = i === stages.length - 1; });
     function isPO(st) { return /плей|playoff/i.test(st.title || "") || (st.format === "playoff" && !/групп|group|стади|stage/i.test(st.title || "")); }
     function firstDate(st) { var d = null; st.rounds.forEach(function (rd) { rd.matches.forEach(function (x) { if (x.date && (!d || x.date < d)) d = x.date; }); }); return d ? new Date(d).getTime() : null; }
@@ -1821,10 +1831,12 @@ a.ni { text-decoration: none; color: inherit; }
     // будущие раунды ещё без матчей (у мейджора до начала есть только раунд 1) — пустые места по счёту, как на HLTV
     var n0 = ((st.rounds[0] || {}).matches || []).length * 2;
     var SW16 = [null, { "1:0": 4, "0:1": 4 }, { "2:0": 2, "1:1": 4, "0:2": 2 }, { "2:1": 3, "1:2": 3 }, { "2:2": 3 }];
-    if (n0 === 16) for (var fr = cols.length; fr < 5; fr++) {
+    if (n0 === 16) for (var fr = 1; fr < 5; fr++) {
+      var rdf = st.rounds[fr];  // раунда ещё нет или пары в нём без команд (мейджор до жеребьёвки) — пустые места по счёту
+      if (rdf && rdf.matches.some(function (x) { return x.a || x.b; })) continue;
       var gph = {};
       Object.keys(SW16[fr]).forEach(function (g) { gph[g] = []; for (var i = 0; i < SW16[fr][g]; i++) gph[g].push({ ph: true }); });
-      cols.push({ groups: gph, done: { q: [], out: [] } });
+      cols[fr] = { groups: gph, done: (cols[fr] || {}).done || { q: [], out: [] } };
     }
     var last = cols.length - 1;
     var html = '<div class="sec stage" style="--stc:' + STAGE_COL[si % STAGE_COL.length] + '"><h3>' + esc(st.title) + (st.status === "current" ? ' <span>идёт · швейцарская система</span>' : ' <span>швейцарская система</span>') + '</h3>';
