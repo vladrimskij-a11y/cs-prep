@@ -6582,6 +6582,7 @@ def team_slug(name: str) -> str:
 
 
 TEAM_PAGES_TOP = 50
+TEAM_PAGES_REG = 20
 
 
 def build_ranking() -> dict:
@@ -6601,7 +6602,8 @@ def build_ranking() -> dict:
     keep = set()
     # страницы команд — только топ-50 и те, у кого есть карточка матча (владелец 18.11: хвост рейтинга — тир-2/3 с пустыми данными)
     playing = {norm(t.get("name")) for f in (OUT / "match").glob("*.json") for t in ((load_json(f, {}) or {}).get("teams") or [])}
-    vrs_all, vrs = vrs, [r for i, r in enumerate(vrs) if i < TEAM_PAGES_TOP or norm(r["name"]) in playing]
+    # + топ-20 каждого региона: в фильтрах «Америка» и «Азия» открываются все команды из сотни
+    vrs_all, vrs = vrs, [r for i, r in enumerate(vrs) if i < TEAM_PAGES_TOP or (r.get("reg_rank") or 99) <= TEAM_PAGES_REG or norm(r["name"]) in playing]
     if not STATS:  # составы команд рейтинга — тоже пачками (новых — не больше 40 за сбор, как в build_team_page)
         cand, new = [], 0
         for r in vrs:
