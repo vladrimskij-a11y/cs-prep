@@ -2450,7 +2450,10 @@ a.ni { text-decoration: none; color: inherit; }
 
   function vrsShort(t) { vrsLine(t); var v = t.vrs; return v ? 'Мир #' + esc(v.rank) + (v.region ? ' · ' + esc(REG_ABBR[v.region] || v.region) + (v.reg_rank ? ' #' + esc(v.reg_rank) : '') : '') : ''; }
   function miniVrs(t) { vrsLine(t); var v = t.vrs; return v ? '<small>Мир#' + esc(v.rank) + (v.region ? ' ' + esc(REG_MINI[v.region] || v.region) + '#' + esc(v.reg_rank || "") : '') + '</small>' : ''; }
-  function heroVrs(t) { var x = vrsShort(t); return x ? '<span class="tvrs">' + x + '</span>' : ''; }
+  function heroVrs(t) {  // под названием: обычное имя команды, если на турнире она под временным (GOSH → BC.Game)
+    var x = vrsShort(t), al = t._alt && nkey(t._alt) !== nkey(t.name) ? '<span class="tvrs">это ' + esc(t._alt) + '</span>' : '';
+    return al + (x ? '<span class="tvrs">' + x + '</span>' : '');
+  }
   // место на мажоре по-русски: 1st → чемпион, 1/4 final → четвертьфинал, 9-11th → 9–11 место, Group stage → групповой этап
   function majPlace(pl) {
     pl = String(pl || "").trim();

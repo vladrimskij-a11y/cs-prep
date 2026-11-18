@@ -6266,6 +6266,8 @@ def build_prediction(d: dict, bids: list) -> dict | None:
     return res
 
 
+# временные названия на турнирах (PGL Major Singapore 2026: беттинг-спонсоров в Сингапуре нельзя) → обычное название команды
+TEAM_TEMP_NAMES = {"gosh": "BC.Game", "theone": "1win", "bbteam": "BetBoom", "pvision": "PARIVISION"}
 _roster_idx: list = []
 
 
@@ -6295,7 +6297,7 @@ def build_detail(m: dict, prev: dict | None) -> dict:
     for t in brief["teams"]:
         full = fetch_team(t["id"])
         players = [player_brief(p) for p in full.get("players") or [] if p.get("active", True)]
-        alt = team_by_roster(players, full.get("name") or t.get("name"))  # «PVISION» у PandaScore — это PARIVISION
+        alt = TEAM_TEMP_NAMES.get(norm(full.get("name") or t.get("name"))) or team_by_roster(players, full.get("name") or t.get("name"))  # «PVISION» у PandaScore — это PARIVISION
         if alt:
             t["_alt"] = alt
         lpr = lp_roster({**t, "name": full.get("name") or t.get("name")})
