@@ -3167,7 +3167,7 @@ def hltv_events() -> dict:
         slugs = dict((slug, href) for href, slug in re.findall(r'href="(/events/\d+/([^"#?]+))"', h))
         return {"slugs": slugs, "big": hltv_big_events(h)} if slugs else None
     ev = hltv_cached("evlist2", evlist, ttl_h=3) or {}
-    out = dict(ev.get("slugs") or {})
+    out = dict(ev.get("slugs") or (hltv_cache.get("evlist") or {}).get("data") or {})  # прежний кэш — пока /events на паузе
 
     def arch():  # архив листается страницами по 50 — берём до 6 страниц (весь год), раз в сутки
         res: dict = {}
