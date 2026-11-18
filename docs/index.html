@@ -2496,6 +2496,16 @@ a.ni { text-decoration: none; color: inherit; }
     if (/^2nd$/i.test(pl)) return "финалист, 2 место";
     return M[pl.toLowerCase()] || (/\d(st|nd|rd|th)$/i.test(pl) ? placeRu(pl) : pl);
   }
+  // за какую команду (или тренером какой) был на этом турнире — по истории Liquipedia и году в названии турнира
+  function teamInYear(p, ev) {
+    var y = (String(ev).match(/\b(19|20)\d\d\b/) || [])[0];
+    if (!y || !(p.hist || []).length) return "";
+    var c = p.hist.filter(function (h) { return h.from && String(h.from).slice(0, 4) <= y && (!h.to || String(h.to).slice(0, 4) >= y) && !/manager|analyst|streamer|org/.test(h.note || ""); });
+    if (!c.length) return "";
+    c.sort(function (a, b) { return (/coach/.test(b.note || "") ? 1 : 0) - (/coach/.test(a.note || "") ? 1 : 0); });  // у тренера — тренерская строка
+    var h = c[0];
+    return h.team + (/coach/.test(h.note || "") ? " (тренер)" : /stand-in/.test(h.note || "") ? " (замена)" : /loan/.test(h.note || "") ? " (аренда)" : "");
+  }
   function majLine(x, wins) {  // «PGL Major Copenhagen 2024 — 1st» → «🏆 PGL Major Copenhagen 2024 — чемпион»
     var m = String(x).match(/^(.*) — (.+)$/);
     if (!m) return (wins || []).indexOf(String(x)) >= 0 ? "🏆 " + x + " — чемпион" : String(x);
@@ -2506,7 +2516,7 @@ a.ni { text-decoration: none; color: inherit; }
       p.age ? esc(p.age) + " " + years(p.age) : ""].concat(extra || []).filter(Boolean);
     var majTxt = '🏟 Мейджоры <b>' + esc(p.majors) + '</b>' + (p.major_wins ? ' · 🏆 выиграл <b>' + esc(p.major_wins) + '</b>' : '');
     // мажоры нажимаются всегда: есть список — показываем его (выигранные с 🏆, у остальных место), нет — говорим, что он ещё собирается
-    var majList = (p.major_events || []).map(function (x) { return majLine(x, p.event_wins); });
+    var majList = (p.major_events || []).map(function (x) { var tm = teamInYear(p, x); return majLine(x, p.event_wins) + (tm ? " · " + tm : ""); });
     var maj = !p.majors ? '' : '<span class="pmaj tap" role="button" data-pop="' + esc(JSON.stringify({ t: "🏟 Мейджоры: " + p.majors + (p.major_wins ? ", выиграл " + p.major_wins : ""),
       l: majList.length ? majList : ["Список турниров появится после ближайшего полного сбора"] })) + '">' + majTxt + ' ›</span>';
     return '<' + (attrs ? 'button class="pl"' + attrs : 'div class="pl"') + '><span class="nickline"><span class="pflag">' + esc(flag(p.nationality || p.flag)) + '</span><span class="nick">' + esc(p.nick) + '</span>' + mvpBadge(p) + teamsBadge(p) + '</span>' +
