@@ -707,7 +707,7 @@ def lp_fresh(key: str) -> bool:
         return False
     age = NOW - (parse_iso(cached.get("t")) or NOW)
     d = cached.get("data") or {}
-    if (d.get("players") or []) and ("hist" not in d["players"][0] or "moves" not in d
+    if (d.get("players") or []) and ("hist" not in d["players"][0] or "moves" not in d or (d.get("v") or 0) < LP_VER
                                      or any((p.get("flag") or "") in ("XX", "UK") for p in (d.get("players") or []) + (d.get("coach") or []))):
         return False  # записано до 11.11 — без истории команд и прежних ников: перечитать (пачкой в lp_prefetch)
     shaky = not d or any(not p.get("roles") for p in d.get("players") or []) or not d.get("coach") \
@@ -748,6 +748,7 @@ def lp_prefetch(teams: list[dict]) -> None:
         warn(f"Liquipedia предзагрузка: {e!r}")
 
 
+LP_VER = 3  # версия разбора составов Liquipedia: выросла — все составы перечитываются пачкой (18.11: имена и флаги из инфобокса)
 NICK_AKA: dict = {}  # norm(ник) → {прежние/другие ники} (Liquipedia |ids=): Techno4K ↔ Techno на HLTV и dust2
 
 
@@ -763,9 +764,17 @@ def lp_history(text: str) -> list[dict]:
     for a, b, team, note in re.findall(r"\{\{TH\|\s*([0-9?]{4}-[0-9?]{2}-[0-9?]{2})\s*[—–-]+\s*([^|]*?)\s*\|\s*([^|}]+?)\s*(?:\|\s*([^|}]*?)\s*)?\}\}", text or ""):
         b = re.sub(r"'+", "", b).strip()
         team = re.sub(r"\s*\((?:[^)]*\b(?:team|esports|gaming|squad|club)\b[^)]*)\)\s*$", "", team.strip(), flags=re.I)  # «Checkmate (Mongolian team)» → Checkmate
-        out.append({"team": team, "from": a.replace("??", "01") if a[:4] != "????" else None,
-                    "to": None if re.match(r"(?i)present", b) else (b.replace("??", "01") if re.match(r"\d{4}", b) else None),
-                    "note": (note or "").strip().lower() or None})
+        def fixd(x):  # «2015-0?-01», «200?-01-01», «2013-??-??» → допустимая дата или None
+            if not re.match(r"\d{4}-", x or ""):
+                return None
+            y, mo, dd = (x.split("-") + ["01", "01"])[:3]
+            mo = "01" if "?" in mo or mo in ("", "00") else mo
+            dd = "01" if "?" in dd or dd in ("", "00") else dd[:2]
+            return f"{y}-{mo}-{dd}" if "?" not in y else None
+        fa, tb = fixd(a), (None if re.match(r"(?i)present", b) else fixd(b))
+        if fa and tb and tb < fa:  # на Liquipedia бывает перепутан порядок
+            fa, tb = tb, fa
+        out.append({"team": team, "from": fa, "to": tb, "note": (note or "").strip().lower() or None})
     return [x for x in out if x["from"]]
 
 
@@ -908,6 +917,9 @@ def lp_roster(t: dict) -> dict | None:
             for p in people:
                 pg = ppages.get(p["page"], "")
                 p["flag"] = p["flag"] or infobox_cc(pg)  # 13.11: у тренера B8 Maddened флага в составе не было
+                if not p.get("name"):  # 18.11: у команд без игроков PandaScore (Pure, Acend…) не было имён — берём из инфобокса
+                    mm = re.search(r"^\|\s*(?:romanized_name|name)\s*=\s*([^\n|}]+)", pg or "", re.M)
+                    p["name"] = mm.group(1).strip() if mm else None
                 p["aka"] = lp_aka(pg)
                 p["hist"] = lp_history(pg)
                 remember_aka(p["nick"], p["aka"])
@@ -920,7 +932,7 @@ def lp_roster(t: dict) -> dict | None:
             data = {
                 "coach": [{"nick": p["nick"], "name": p["name"], "flag": p["flag"], "birth": p["birth"], "aka": p["aka"], "hist": p["hist"]} for p in people if p["coach"]],
                 "players": [{k: p.get(k) for k in ("nick", "name", "flag", "igl", "roles", "note", "birth", "loan_from", "stand_for", "aka", "hist")} for p in players],
-                "moves": moves,
+                "moves": moves, "v": LP_VER,
             }
     except Exception as e:
         warn(f"Liquipedia {t.get('name')}: {e!r}")

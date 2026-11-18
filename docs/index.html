@@ -2519,7 +2519,11 @@ a.ni { text-decoration: none; color: inherit; }
     name = String(name || "");
     if (/\b(19|20)\d\d\b/.test(name)) return name;
     var m = name.match(/^(cs_summit \d+)/i), y = m && EV_YEAR[m[1].toLowerCase()];
-    return y ? name.replace(/^cs_summit/i, "CS Summit") + " " + y : name;
+    if (y) return name.replace(/^cs_summit/i, "CS Summit") + " " + y;
+    // сезоны без года в названии: ESL Pro League (S1 — 2015, по два сезона в год), ECS (S1 — 2016, по два в год)
+    var s = name.match(/ESL Pro League Season (\d+)/i) || name.match(/^ECS Season (\d+)/i);
+    if (s) { var base = /ECS/i.test(s[0]) ? 2016 : 2015; return name + " " + (base + Math.floor((+s[1] - 1) / 2)); }
+    return name;
   }
   function mvpBadge(p) {
     if (!p.mvp) return "";
