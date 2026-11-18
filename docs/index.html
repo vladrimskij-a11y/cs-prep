@@ -897,7 +897,9 @@ a.ni { text-decoration: none; color: inherit; }
   function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
   var TZ = "Europe/Moscow";
   function d(s) { return s ? new Date(s) : null; }
-  function fmt(dt, opts) { return new Intl.DateTimeFormat("ru-RU", Object.assign({ timeZone: TZ }, opts)).format(dt); }
+  // форматтеры дат создаются один раз на набор опций: new Intl.DateTimeFormat на каждый вызов — самое дорогое при отрисовке списков
+  var FMT = {};
+  function fmt(dt, opts) { var k = JSON.stringify(opts || {}); return (FMT[k] || (FMT[k] = new Intl.DateTimeFormat("ru-RU", Object.assign({ timeZone: TZ }, opts)))).format(dt); }
   function hm(s) { var x = d(s); return x ? fmt(x, { hour: "2-digit", minute: "2-digit" }) : "—"; }
   function dmy(s) { var x = d(s); return x ? fmt(x, { day: "numeric", month: "short", year: "2-digit" }).replace(" г.", "") : ""; }
   function dm(s) { var x = d(s); return x ? fmt(x, { day: "numeric", month: "short" }) : ""; }
@@ -934,7 +936,7 @@ a.ni { text-decoration: none; color: inherit; }
   function oppWord(t) { var k = (t.opp || {}).kind; return k === "loser" ? "Проигравший" : "Победитель"; }
   function mixLogo(t, big) {
     var c = ((t && t.opp) || {}).cands || [], a = c[0] || {}, b = c[1] || {};
-    function im(x, cls) { var k = nkey(x.name), u = PRIMARY[k] || x.image || LOGOS[k]; return u ? '<img class="' + cls + '" src="' + esc(u) + '" alt="" loading="lazy" onerror="this.remove()">' : '<i class="' + cls + '">' + esc(String(x.acronym || x.name || "?").slice(0, 2)) + '</i>'; }
+    function im(x, cls) { var k = nkey(x.name), u = PRIMARY[k] || x.image || LOGOS[k]; return u ? '<img class="' + cls + '" src="' + esc(u) + '" alt="" loading="lazy" decoding="async" onerror="this.remove()">' : '<i class="' + cls + '">' + esc(String(x.acronym || x.name || "?").slice(0, 2)) + '</i>'; }
     return '<span class="mixlg' + (big ? ' big' : '') + '">' + (c.length ? im(a, "h1") + im(b, "h2") : '<i class="h0">?</i>') + '</span>';
   }
   function sameTeam(z, name) {  // «TheMongolz» = «The MongolZ», «BetBoom Team» = «BetBoom»
@@ -985,7 +987,9 @@ a.ni { text-decoration: none; color: inherit; }
   }
   function dcPut(k, txt) {
     var v = { t: Date.now(), body: txt }; DC[k] = v;
-    try { if (txt.length < 600000) localStorage.setItem("dc:" + k, JSON.stringify(v)); } catch (e) { try { dcTrim(); } catch (e2) {} }
+    // запись в память устройства — в простое, а не посреди отрисовки (JSON.stringify больших файлов тормозил открытие экранов)
+    var put = function () { try { if (txt.length < 600000) localStorage.setItem("dc:" + k, JSON.stringify(v)); } catch (e) { try { dcTrim(); } catch (e2) {} } };
+    if (window.requestIdleCallback) requestIdleCallback(put, { timeout: 2000 }); else setTimeout(put, 300);
   }
   function dcTrim() {  // память устройства переполнена — убираем самые старые записи
     var ks = []; for (var i = 0; i < localStorage.length; i++) { var k = localStorage.key(i); if (k && k.indexOf("dc:") === 0) ks.push(k); }
@@ -1080,14 +1084,15 @@ a.ni { text-decoration: none; color: inherit; }
   document.addEventListener("visibilitychange", function () { if (!document.hidden) refreshOpen(); });
 
   // ---------- списки
-  function usd(n) { return n == null ? "" : "$" + Number(n).toLocaleString("ru-RU"); }
+  var NUMF = new Intl.NumberFormat("ru-RU");
+  function usd(n) { return n == null ? "" : "$" + NUMF.format(Number(n)); }
   function prize(p) {
     if (!p) return "";
     var m = /^([\d,.\s]+?)\s*([^\d,.\s].*)?$/.exec(String(p).trim());
     if (!m) return String(p);
     m[2] = m[2] || "";
     var cur = /dollar|usd|\$/i.test(m[2]) ? "$" : /euro|eur|€/i.test(m[2]) ? "€" : "";
-    var n = Number(m[1].replace(/[,\s]/g, "")).toLocaleString("ru-RU");
+    var n = NUMF.format(Number(m[1].replace(/[,\s]/g, "")));
     return cur ? cur + n : n + " " + m[2];
   }
   function tourOf(m) { return String((m.serie && m.serie.id) || m.tournament); }
@@ -1098,7 +1103,7 @@ a.ni { text-decoration: none; color: inherit; }
   function nkeyG(n) { return nkey(n); }
   function nkey(n) { return String(n || "").toLowerCase().replace(/^(the|team)\s+|\s+(team|esports|gaming)$/g, "").replace(/[^a-z0-9а-я]/g, ""); }
   function rememberLogo(name, url) { if (name && url) LOGOS[nkey(name)] = LOGOS[nkey(name)] || url; }
-  function logo(name, url) { var k = nkey(name), u = PRIMARY[k] || url || LOGOS[k]; return u ? '<img class="lg" src="' + esc(u) + '" alt="" loading="lazy" onerror="this.remove()">' : ''; }
+  function logo(name, url) { var k = nkey(name), u = PRIMARY[k] || url || LOGOS[k]; return u ? '<img class="lg" src="' + esc(u) + '" alt="" loading="lazy" decoding="async" onerror="this.remove()">' : ''; }
   function matchRow(m, showTour) {
     m = withOpp(m);
     var a = m.teams[0], b = m.teams[1], on = mine.has(String(m.id));
@@ -1136,9 +1141,9 @@ a.ni { text-decoration: none; color: inherit; }
     }
     if (video) {
       return '<a class="vid vtg" href="' + esc(url) + '" data-tg="' + esc(url) + '" target="_blank" rel="noopener">' +
-        (img ? '<img src="' + esc(img) + '" alt="" loading="lazy" onerror="this.remove()">' : '') + '<span class="vplay">▶ Смотреть видео в Telegram</span></a>';
+        (img ? '<img src="' + esc(img) + '" alt="" loading="lazy" decoding="async" onerror="this.remove()">' : '') + '<span class="vplay">▶ Смотреть видео в Telegram</span></a>';
     }
-    return img ? '<img src="' + esc(img) + '" alt="" loading="lazy" onerror="this.remove()">' : '';
+    return img ? '<img src="' + esc(img) + '" alt="" loading="lazy" decoding="async" onerror="this.remove()">' : '';
   }
   // видео: зажать у левого или правого края — скорость ×2, пока держишь
   (function () {
@@ -1198,7 +1203,7 @@ a.ni { text-decoration: none; color: inherit; }
 
   var MONTHS = ["январь", "февраль", "март", "апрель", "май", "июнь", "июль", "август", "сентябрь", "октябрь", "ноябрь", "декабрь"];
   var MONTHS_IN = ["январе", "феврале", "марте", "апреле", "мае", "июне", "июле", "августе", "сентябре", "октябре", "ноябре", "декабре"];
-  function ym(s) { var d = new Date(s); var p = new Intl.DateTimeFormat("en-CA", { timeZone: TZ, year: "numeric", month: "2-digit" }).format(d).split("-"); return { y: +p[0], m: +p[1] - 1 }; }
+  function ym(s) { var d = new Date(s); var p = (FMT.ym || (FMT.ym = new Intl.DateTimeFormat("en-CA", { timeZone: TZ, year: "numeric", month: "2-digit" }))).format(d).split("-"); return { y: +p[0], m: +p[1] - 1 }; }
   function ymKey(o) { return o.y * 12 + o.m; }
 
   // турниры: идущие, грядущие, завершённые (тир-1 всегда выше тир-2)
@@ -1269,8 +1274,12 @@ a.ni { text-decoration: none; color: inherit; }
     var tabsHtml = keys.length < 2 ? '' : many
       ? '<div class="filt stabs" role="tablist">' + cfg.tabs.map(function (t) { return '<button class="chip" data-sk="' + esc(t.key) + '" aria-pressed="' + (t.key === key) + '">' + esc(t.label) + '</button>'; }).join("") + '</div>'
       : '<nav class="tabs stabs n' + keys.length + '" role="tablist">' + cfg.tabs.map(function (t) { return '<button class="tab" data-sk="' + esc(t.key) + '" aria-selected="' + (t.key === key) + '">' + esc(t.label) + '</button>'; }).join("") + '</nav>';
+    // сначала только открытая вкладка, соседние — сразу после первого кадра: экран появляется быстрее, свайп к соседней уже готов
+    var lazy = keys.length > 1, rest = [];
     $app.innerHTML = '<div class="sshell"><div class="mviewport"><div class="mtrack">' + cfg.tabs.map(function (t) {
-      return '<div class="pane" data-key="' + esc(t.key) + '"><div class="pin">' + cfg.pane(t.key) + '</div></div>';
+      var now = !lazy || t.key === key;
+      if (!now) rest.push(t.key);
+      return '<div class="pane" data-key="' + esc(t.key) + '"><div class="pin">' + (now ? cfg.pane(t.key) : '') + '</div></div>';
     }).join("") + '</div></div><div class="shead"><div class="pin"><div class="hbar">' + backBtn(cfg.back || "Назад") + '</div><div class="shtitle">' + cfg.title + '</div>' + tabsHtml + '</div></div></div>';
     var sh = q(".sshell");
     sh.style.setProperty("--shh", q(".shead").offsetHeight + "px");
@@ -1278,18 +1287,34 @@ a.ni { text-decoration: none; color: inherit; }
     fixSnap();
     document.querySelectorAll(".sshell .pane").forEach(function (p) { var k = p.getAttribute("data-key"); if (sc[k]) p.scrollTop = sc[k]; });
     revealSel(q(".shead .filt"));
+    if (rest.length) {
+      var shEl = sh, sid = SH;
+      requestAnimationFrame(function () { setTimeout(function () {
+        if (!shEl.isConnected || SH !== sid) return;  // уже ушли с экрана
+        rest.forEach(function (k) {
+          var p = shEl.querySelector('.pane[data-key="' + k + '"]');
+          if (!p) return;
+          p.firstElementChild.innerHTML = cfg.pane(k);
+          if (sc[k]) p.scrollTop = sc[k];
+        });
+        fixSnap();
+        if (shEl.querySelector(".brk-row, .swg")) drawBrackets();
+      }, 0); });
+    }
   }
   // притягивание стадий: стадия выше экрана (швейцарка мейджора) не держит прокрутку — иначе на телефоне её низ и всё,
   // что ниже, достаётся только оттягиванием; в конце обзора — точка притягивания к низу
+  // размеры стадий отслеживает ResizeObserver — без замеров в начале касания (они тормозили старт прокрутки)
+  var stageRO = window.ResizeObserver ? new ResizeObserver(function (es) {
+    es.forEach(function (e) { var p = e.target.closest(".pane"); if (p) e.target.classList.toggle("tall", e.contentRect.height > p.clientHeight * 0.8); });
+  }) : null;
   function fixSnap() {
     document.querySelectorAll(".sshell .pane").forEach(function (p) {
       if (!p.querySelector(".stage")) return;
-      var h = p.clientHeight;
-      p.querySelectorAll(".stage").forEach(function (st) { st.classList.toggle("tall", st.offsetHeight > h * 0.8); });
+      p.querySelectorAll(".stage").forEach(function (st) { if (stageRO) stageRO.observe(st); else st.classList.toggle("tall", st.offsetHeight > p.clientHeight * 0.8); });
       if (!p.querySelector(":scope > .snap-end")) { var e = document.createElement("div"); e.className = "snap-end"; p.appendChild(e); }
     });
   }
-  document.addEventListener("touchstart", function (e) { if (e.target.closest && e.target.closest(".sshell .pane .stage")) fixSnap(); }, { passive: true, capture: true });
   window.addEventListener("resize", fixSnap);
   function saveShell() {
     if (!SH || !q(".sshell")) return;
@@ -1386,7 +1411,7 @@ a.ni { text-decoration: none; color: inherit; }
       html += '<button class="box ni fi" data-fread="' + esc(n.key) + '">' +
         '<span class="src"><span><b class="chn">' + esc(n.channel_title) + '</b> · ' + esc(hm(n.date)) + '</span>' +
         ((n.also || []).length ? '<span>ещё в ' + n.also.length + ' ' + (n.also.length === 1 ? "канале" : "каналах") + '</span>' : '') + '</span>' +
-        '<span class="fi-body">' + (n.photo ? '<span class="thumb"><img src="' + esc(n.photo) + '" alt="" loading="lazy" onerror="this.parentNode.remove()">' + (n.video ? '<i class="play" aria-label="видео">▶</i>' : '') + '</span>' : '') +
+        '<span class="fi-body">' + (n.photo ? '<span class="thumb"><img src="' + esc(n.photo) + '" alt="" loading="lazy" decoding="async" onerror="this.parentNode.remove()">' + (n.video ? '<i class="play" aria-label="видео">▶</i>' : '') + '</span>' : '') +
         '<span><h4>' + esc(n.title) + '</h4>' + (n.text && n.text !== n.title ? '<p>' + esc(n.text) + '</p>' : '') + '</span></span></button>';
     });
     return html + '</div>';
@@ -1886,10 +1911,13 @@ a.ni { text-decoration: none; color: inherit; }
       g.insertBefore(svg, g.firstChild);
     });
   }
-  function drawBrackets() {
+  var brkRaf = 0;
+  function drawBrackets() { if (!brkRaf) brkRaf = requestAnimationFrame(function () { brkRaf = 0; drawBracketsNow(); }); }  // несколько вызовов подряд — одна отрисовка за кадр
+  function drawBracketsNow() {
     drawSwiss();
+    // сначала все замеры, потом все вставки: чередование чтения и записи пересчитывало раскладку на каждой сетке
+    var jobs = [];
     document.querySelectorAll(".brk-row:not(.nolines)").forEach(function (row) {
-      var old = row.querySelector("svg.brk-lines"); if (old) old.remove();
       var cols = [].slice.call(row.children).filter(function (c) { return c.classList.contains("brk-col"); });
       var R0 = row.getBoundingClientRect(), d = "";
       for (var c = 0; c < cols.length - 1; c++) {
@@ -1902,11 +1930,15 @@ a.ni { text-decoration: none; color: inherit; }
           d += "M" + x1.toFixed(1) + " " + y1.toFixed(1) + "H" + xm.toFixed(1) + "V" + y2.toFixed(1) + "H" + x2.toFixed(1);
         }
       }
-      if (!d) return;
+      jobs.push({ row: row, d: d, w: row.scrollWidth, h: row.scrollHeight });
+    });
+    jobs.forEach(function (j) {
+      var old = j.row.querySelector("svg.brk-lines"); if (old) old.remove();
+      if (!j.d) return;
       var svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-      svg.setAttribute("class", "brk-lines"); svg.setAttribute("width", row.scrollWidth); svg.setAttribute("height", row.scrollHeight);
-      svg.innerHTML = '<path d="' + d + '" fill="none" stroke="currentColor" stroke-width="1.5"/>';
-      row.insertBefore(svg, row.firstChild);
+      svg.setAttribute("class", "brk-lines"); svg.setAttribute("width", j.w); svg.setAttribute("height", j.h);
+      svg.innerHTML = '<path d="' + j.d + '" fill="none" stroke="currentColor" stroke-width="1.5"/>';
+      j.row.insertBefore(svg, j.row.firstChild);
     });
   }
   window.addEventListener("resize", function () { if (q(".brk-row, .swg")) drawBrackets(); });
@@ -3132,9 +3164,10 @@ a.ni { text-decoration: none; color: inherit; }
     panes().forEach(function (p) { state.scrolls[p.getAttribute("data-key")] = p.scrollTop; });
     var keys = paneKeys();
     if (keys.indexOf(curKey()) < 0) setKey("team:players");
-    var html = '<div class="mshell"><div class="mviewport"><div class="mtrack">';
-    keys.forEach(function (k) {
-      html += '<div class="pane' + (hasSub(k) ? ' np' : '') + '" data-key="' + esc(k) + '"><div class="pin"><div class="tabbody">' + tabBodyHtml(m, k) + '</div></div></div>';
+    var html = '<div class="mshell"><div class="mviewport"><div class="mtrack">', cur = curKey(), rest = [];
+    keys.forEach(function (k) {  // открытая вкладка — сразу, остальные — после первого кадра (быстрее открывается матч)
+      if (k !== cur) rest.push(k);
+      html += '<div class="pane' + (hasSub(k) ? ' np' : '') + '" data-key="' + esc(k) + '"><div class="pin"><div class="tabbody">' + (k === cur ? tabBodyHtml(m, k) : '') + '</div></div></div>';
     });
     $app.innerHTML = html + '</div></div><div class="mhead"><div class="pin">' + headHtml(m) + '</div></div>' +
       '</div>';  // стрелки разделов в «Статистике» убраны по просьбе владельца
@@ -3154,6 +3187,17 @@ a.ni { text-decoration: none; color: inherit; }
     headNow(false);
     revealSel(q(".mhead .nfilt"));
     try { TG && TG.disableVerticalSwipes && TG.disableVerticalSwipes(); } catch (e) {}
+    var shEl = q(".mshell"), ci = keys.indexOf(cur);
+    rest.sort(function (a, b) { return Math.abs(keys.indexOf(a) - ci) - Math.abs(keys.indexOf(b) - ci); });  // сначала соседние
+    requestAnimationFrame(function () { setTimeout(function () {
+      if (!shEl.isConnected) return;
+      rest.forEach(function (k) {
+        var p = shEl.querySelector('.pane[data-key="' + k + '"]');
+        if (!p) return;
+        p.querySelector(".tabbody").innerHTML = tabBodyHtml(m, k);
+        if (state.scrolls[k]) p.scrollTop = state.scrolls[k];
+      });
+    }, 0); });
   }
   function goKey(k) {
     var keys = paneKeys(), i = keys.indexOf(k);
