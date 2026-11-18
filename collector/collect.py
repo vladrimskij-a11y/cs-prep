@@ -3040,14 +3040,59 @@ def hclean(h: str) -> str:
 _events_cache: dict = {}
 
 
+def hltv_big_events(h: str) -> list[dict]:
+    """Крупные события со страницы /events (блоки big-event): название, даты, призовые, число команд.
+    18.11: BLAST Bounty 2027 Season 1 был только на HLTV — у bo3.gg и PandaScore его ещё не завели."""
+    out = []
+    for m in re.finditer(r'<a href="(/events/\d+/[^"]+)" class="[^"]*big-event[^"]*">(.*?)</a>', h, re.S):
+        b = m.group(2)
+        nm = re.search(r'class="big-event-name">([^<]+)<', b)
+        ts = [int(x) for x in re.findall(r'data-unix="(\d+)"', b)]
+        if not nm or not ts:
+            continue
+        pr = re.search(r'<td class="col-value" title="\$([\d,]+)"', b)
+        loc = re.search(r'class="big-event-location">([^<]+)<', b)
+        bg = re.search(r'<img src="([^"]+)" class="event-header"', b)
+        out.append({"href": m.group(1), "name": _html.unescape(nm.group(1)).strip(),
+                    "begin": iso(datetime.fromtimestamp(ts[0] / 1000, timezone.utc)),
+                    "end": iso(datetime.fromtimestamp(ts[-1] / 1000, timezone.utc) + timedelta(hours=20)),
+                    "prize_usd": int(pr.group(1).replace(",", "")) if pr else None,
+                    "location": _html.unescape(loc.group(1)).strip() if loc else None,
+                    "bg": _html.unescape(bg.group(1)) if bg else None})
+    return out
+
+
+TIER1_BRANDS = re.compile(r"\b(blast|iem|intel extreme|esl pro league|pgl|starladder|thunderpick|fissure|esports world cup|major|perfect world|cs asia)\b", re.I)
+
+
+def hltv_future_tournaments() -> list[dict]:
+    """Будущие турниры тир-1 из кэша списка событий HLTV (без запроса — список обновляет полный сбор)."""
+    c = (hltv_cache.get("evlist2") or {}).get("data") or {}
+    end = NOW + timedelta(days=31 * TOURS_MONTHS_AHEAD)
+    out = []
+    for e in c.get("big") or []:
+        b = parse_iso(e.get("begin"))
+        if not b or b > end or (parse_iso(e.get("end")) or b) < NOW - timedelta(hours=12) or not TIER1_BRANDS.search(e["name"]):
+            continue
+        if re.search(r"qualif|closed|open qual|academy|\bcq\b", e["name"], re.I):
+            continue
+        out.append({"id": "hltv-" + e["href"].split("/")[2], "name": e["name"].replace("Intel Extreme Masters", "IEM"), "tier": "s",
+                    "image": None, "bg": e.get("bg"), "begin": e["begin"], "end": e["end"], "prize": None, "prize_usd": e.get("prize_usd"),
+                    "matches": 0, "next": None, "live": 0})
+    return out
+
+
 def hltv_events() -> dict:
     """slug → путь страницы события: текущие и будущие (/events) + сыгранные в этом году (архив, раз в сутки)."""
     if _events_cache:
         return _events_cache
     # список событий — раз в 3 ч (сбор теперь каждый час, лишний запрос к HLTV не нужен)
-    out = dict(hltv_cached("evlist", lambda: dict((slug, href) for href, slug in
-                                                  re.findall(r'href="(/events/\d+/([^"#?]+))"', hltv_get("/events") or "")) or None,
-                           ttl_h=3) or {})
+    def evlist():
+        h = hltv_get("/events") or ""
+        slugs = dict((slug, href) for href, slug in re.findall(r'href="(/events/\d+/([^"#?]+))"', h))
+        return {"slugs": slugs, "big": hltv_big_events(h)} if slugs else None
+    ev = hltv_cached("evlist2", evlist, ttl_h=3) or {}
+    out = dict(ev.get("slugs") or {})
 
     def arch():  # архив листается страницами по 50 — берём до 6 страниц (весь год), раз в сутки
         res: dict = {}
@@ -6975,6 +7020,11 @@ def main() -> int:
     for tr in fetch_bo3_tournaments():
         if not any(tour_same(tr["name"], h) for h in have):
             future.append(tr)
+            have.add(tour_norm(tr["name"]))
+    for tr in hltv_future_tournaments():  # чего нет ни у PandaScore, ни у bo3.gg (BLAST Bounty 2027 Season 1)
+        if not any(tour_same(tr["name"], h) or tour_same(h, tour_norm(tr["name"])) for h in have):
+            future.append(tr)
+            have.add(tour_norm(tr["name"]))
     for tr in future:
         cur = tours.get(tr["id"])
         if cur:
