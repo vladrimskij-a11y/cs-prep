@@ -2496,13 +2496,23 @@ a.ni { text-decoration: none; color: inherit; }
     if (/^2nd$/i.test(pl)) return "финалист, 2 место";
     return M[pl.toLowerCase()] || (/\d(st|nd|rd|th)$/i.test(pl) ? placeRu(pl) : pl);
   }
-  // за какую команду (или тренером какой) был на этом турнире — по истории Liquipedia и году в названии турнира
+  // за какую команду (или тренером какой) был на мейджоре — по дате мейджора и истории Liquipedia;
+  // аренда и замена важнее основной команды (Hobbit в Кракове 2017 играл за Gambit в аренде из Tengri)
+  var MAJOR_DATES = [[/DreamHack Winter 2013/i, "2013-11-30"], [/Katowice 2014/i, "2014-03-16"], [/Cologne 2014/i, "2014-08-17"], [/DreamHack Winter 2014/i, "2014-11-29"],
+    [/Katowice 2015/i, "2015-03-15"], [/Cologne 2015/i, "2015-08-23"], [/Cluj/i, "2015-11-01"], [/Columbus/i, "2016-04-03"], [/Cologne 2016/i, "2016-07-10"],
+    [/ELEAGUE Major 2017|Atlanta/i, "2017-01-29"], [/Krak[oó]w 2017/i, "2017-07-23"], [/ELEAGUE Major 2018|Boston/i, "2018-01-28"], [/FACEIT Major|London 2018/i, "2018-09-23"],
+    [/Katowice 2019/i, "2019-03-03"], [/Berlin 2019/i, "2019-09-08"], [/Stockholm 2021/i, "2021-11-07"], [/Antwerp 2022/i, "2022-05-22"], [/Rio 2022/i, "2022-11-13"],
+    [/Paris 2023/i, "2023-05-21"], [/Copenhagen 2024/i, "2024-03-31"], [/Shanghai 2024/i, "2024-12-15"], [/Austin 2025/i, "2025-06-22"], [/Budapest 2025/i, "2025-12-14"],
+    [/Cologne Major 2026/i, "2026-06-21"], [/Singapore 2026/i, "2026-12-14"]];
   function teamInYear(p, ev) {
-    var y = (String(ev).match(/\b(19|20)\d\d\b/) || [])[0];
-    if (!y || !(p.hist || []).length) return "";
-    var c = p.hist.filter(function (h) { return h.from && String(h.from).slice(0, 4) <= y && (!h.to || String(h.to).slice(0, 4) >= y) && !/manager|analyst|streamer|org/.test(h.note || ""); });
+    ev = String(ev);
+    var md = MAJOR_DATES.find(function (x) { return x[0].test(ev); }), y = (ev.match(/\b(19|20)\d\d\b/) || [])[0];
+    var at = md ? md[1] : y ? y + "-07-01" : null;
+    if (!at || !(p.hist || []).length) return "";
+    var c = p.hist.filter(function (h) { return h.from && String(h.from).slice(0, 10) <= at && (!h.to || String(h.to).slice(0, 10) >= at) && !/manager|analyst|streamer|org/.test(h.note || ""); });
     if (!c.length) return "";
-    c.sort(function (a, b) { return (/coach/.test(b.note || "") ? 1 : 0) - (/coach/.test(a.note || "") ? 1 : 0); });  // у тренера — тренерская строка
+    var rank = function (h) { var n = h.note || ""; return /coach/.test(n) ? 0 : /loan|stand-in/.test(n) ? 1 : !n ? 2 : 3; };  // inactive — последним
+    c.sort(function (a, b) { return rank(a) - rank(b) || String(b.from).localeCompare(String(a.from)); });
     var h = c[0];
     return h.team + (/coach/.test(h.note || "") ? " (тренер)" : /stand-in/.test(h.note || "") ? " (замена)" : /loan/.test(h.note || "") ? " (аренда)" : "");
   }
