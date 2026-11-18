@@ -3067,6 +3067,8 @@ TIER1_BRANDS = re.compile(r"\b(blast|iem|intel extreme|esl pro league|pgl|starla
 
 def hltv_future_tournaments() -> list[dict]:
     """Будущие турниры тир-1 из кэша списка событий HLTV (без запроса — список обновляет полный сбор)."""
+    if not STATS and os.environ.get("NEWS_ONLY") != "1":
+        hltv_events()  # в полном сборе — тот же запрос списка событий, что и для призовых (раз в 3 ч)
     c = (hltv_cache.get("evlist2") or {}).get("data") or {}
     end = NOW + timedelta(days=31 * TOURS_MONTHS_AHEAD)
     out = []
