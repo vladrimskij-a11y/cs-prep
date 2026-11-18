@@ -2513,8 +2513,10 @@ a.ni { text-decoration: none; color: inherit; }
     if (!c.length) return "";
     var rank = function (h) { var n = h.note || ""; return /coach/.test(n) ? 0 : /loan|stand-in/.test(n) ? 1 : !n ? 2 : 3; };  // inactive — последним
     c.sort(function (a, b) { return rank(a) - rank(b) || String(b.from).localeCompare(String(a.from)); });
-    var h = c[0];
-    return h.team + (/coach/.test(h.note || "") ? " (тренер)" : /stand-in/.test(h.note || "") ? " (замена)" : /loan/.test(h.note || "") ? " (аренда)" : "");
+    var h = c[0], n = h.note || "";
+    // аренда: откуда — основная команда в то же время (Hobbit: Gambit, аренда из Tengri)
+    var home = /loan/.test(n) ? c.find(function (x) { return !x.note && x.team !== h.team; }) : null;
+    return h.team + (/coach/.test(n) ? " (тренер)" : /stand-in/.test(n) ? " (замена)" : /loan/.test(n) ? (home ? " (аренда из " + home.team + ")" : " (аренда)") : "");
   }
   function majLine(x, wins) {  // «PGL Major Copenhagen 2024 — 1st» → «🏆 PGL Major Copenhagen 2024 — чемпион»
     var m = String(x).match(/^(.*) — (.+)$/);
