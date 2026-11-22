@@ -2532,6 +2532,8 @@ a.ni { text-decoration: none; color: inherit; }
     if (!m) return (wins || []).indexOf(String(x)) >= 0 ? "🏆 " + x + " — чемпион" : String(x);
     return (/^1st$/i.test(m[2]) ? "🏆 " : "") + m[1] + " — " + majPlace(m[2]);
   }
+  // ручные флаги: на Liquipedia у некоторых белый флаг/пусто (Maddened, тренер B8, — из России; владелец 22.11)
+  var NICK_CC = { maddened: "RU" };
   function personRow(p, roles, real, extra, statsHtml, attrs) {
     var info = [real ? esc(real) + (p.name_ru ? ' <span class="pron">[' + esc(plain(p.name_ru)) + ']</span>' : '') : (p.name_ru ? esc(plain(p.name_ru)) : ""),
       p.age ? esc(p.age) + " " + years(p.age) : ""].concat(extra || []).filter(Boolean);
@@ -2544,7 +2546,7 @@ a.ni { text-decoration: none; color: inherit; }
     });
     var maj = !p.majors ? '' : '<span class="pmaj tap" role="button" data-pop="' + esc(JSON.stringify({ t: "🏟 Мейджоры: " + p.majors + (p.major_wins ? ", выиграл " + p.major_wins : ""),
       l: majList.length ? majList : ["Список турниров появится после ближайшего полного сбора"] })) + '">' + majTxt + ' ›</span>';
-    return '<' + (attrs ? 'button class="pl"' + attrs : 'div class="pl"') + '><span class="nickline"><span class="pflag">' + esc(flag(p.nationality || p.flag)) + '</span><span class="nick">' + esc(p.nick) + '</span>' + mvpBadge(p) + teamsBadge(p) + '</span>' +
+    return '<' + (attrs ? 'button class="pl"' + attrs : 'div class="pl"') + '><span class="nickline"><span class="pflag">' + esc(flag(NICK_CC[String(p.nick || "").toLowerCase()] || p.nationality || p.flag)) + '</span><span class="nick">' + esc(p.nick) + '</span>' + mvpBadge(p) + teamsBadge(p) + '</span>' +
       (roles.length ? '<span class="rcol">' + roles.map(function (r) { return '<span class="rt ' + r[1] + '">' + esc(r[0]) + '</span>'; }).join("") + '</span>' : '') +
       '<span class="rn">' + info.join(" · ") + '</span>' + maj + (statsHtml ? '<span class="ps">' + statsHtml + '</span>' : "") + '</' + (attrs ? 'button' : 'div') + '>';
   }
