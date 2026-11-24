@@ -2584,12 +2584,17 @@ a.ni { text-decoration: none; color: inherit; }
   function teamInYear(p, ev) {
     ev = String(ev);
     var md = MAJOR_DATES.find(function (x) { return x[0].test(ev); }), y = (ev.match(/\b(19|20)\d\d\b/) || [])[0];
-    var at = md ? md[1] : y ? y + "-07-01" : null;
-    if (!at || !(p.hist || []).length) return "";
-    var c = p.hist.filter(function (h) { return h.from && String(h.from).slice(0, 10) <= at && (!h.to || String(h.to).slice(0, 10) >= at) && !/manager|analyst|streamer|org/.test(h.note || ""); });
+    if (!(md || y) || !(p.hist || []).length) return "";
+    // точная дата (мейджоры) — команда на эту дату; только год (MVP) — команда, где провёл в том году больше всего времени
+    // сезон в названии — примерная дата (DreamHack Winter 2018 — декабрь, BLAST Spring — апрель)
+    var sz = !md && y && (/winter/i.test(ev) ? "-12-01" : /spring/i.test(ev) ? "-04-15" : /summer/i.test(ev) ? "-07-01" : /fall|autumn/i.test(ev) ? "-10-15" : null);
+    if (sz) md = [null, y + sz];
+    var lo = md ? md[1] : y + "-01-01", hi = md ? md[1] : y + "-12-31";
+    var c = p.hist.filter(function (h) { return h.from && String(h.from).slice(0, 10) <= hi && (!h.to || String(h.to).slice(0, 10) >= lo) && !/manager|analyst|streamer|org/.test(h.note || ""); });
     if (!c.length) return "";
+    var span = function (h) { var a = String(h.from).slice(0, 10) > lo ? String(h.from).slice(0, 10) : lo, b = h.to && String(h.to).slice(0, 10) < hi ? String(h.to).slice(0, 10) : hi; return (Date.parse(b) - Date.parse(a)) || 0; };
     var rank = function (h) { var n = h.note || ""; return /coach/.test(n) ? 0 : /loan|stand-in/.test(n) ? 1 : !n ? 2 : 3; };  // inactive — последним
-    c.sort(function (a, b) { return rank(a) - rank(b) || String(b.from).localeCompare(String(a.from)); });
+    c.sort(function (a, b) { return rank(a) - rank(b) || (md ? 0 : span(b) - span(a)) || String(b.from).localeCompare(String(a.from)); });
     var h = c[0], n = h.note || "";
     // аренда: откуда — основная команда в то же время (Hobbit: Gambit, аренда из Tengri)
     var home = /loan/.test(n) ? c.find(function (x) { return !x.note && x.team !== h.team; }) : null;
@@ -2667,7 +2672,7 @@ a.ni { text-decoration: none; color: inherit; }
   }
   function mvpBadge(p) {
     if (!p.mvp) return "";
-    return '<span role="button" class="medal mvp" data-pop="' + esc(JSON.stringify({ t: "🏅 MVP на HLTV: " + p.mvp, l: (p.mvp_events || []).map(evYear) })) + '">🏅<b>' + esc(p.mvp) + '</b></span>';
+    return '<span role="button" class="medal mvp" data-pop="' + esc(JSON.stringify({ t: "🏅 MVP на HLTV: " + p.mvp, l: (p.mvp_events || []).map(function (x) { var e = evYear(x); return { e: e, p: "", tm: teamInYear(p, e) }; }) })) + '">🏅<b>' + esc(p.mvp) + '</b></span>';
   }
   function openPop(data, anchor) {
     closePop();
