@@ -584,6 +584,9 @@ html { overflow-anchor: none; }
 .pop-in li.mj.win .mj-e { color: var(--t); }
 .pop-in li.mj.sec .mj-e { color: #c9ced6; }
 .pop-in li.mj .mj-p { color: var(--muted); }
+.pop-in li.psub { color: var(--t); cursor: pointer; }
+.pop-in li.psub i { font-style: normal; color: var(--muted); float: right; margin-left: 10px; }
+.pop-in li.pback { color: var(--muted); cursor: pointer; font-weight: 600; list-style: none; margin-left: -1em; }
 .pop-in li.mj .mj-t { display: block; color: var(--ct); font-weight: 600; font-size: .92em; }
 .pop-in li.mj .mj-t small { color: var(--muted); font-weight: 400; font-size: 1em; }
 .nickline .medal ~ .medal { margin-left: 10px; position: relative; z-index: 2; }  /* зоны нажатия соседних кнопок не перекрывают друг друга */
@@ -2654,7 +2657,11 @@ a.ni { text-decoration: none; color: inherit; }
     H.forEach(function (h) {
       var g = game(h.from), a = yr(h.from), b = yr(h.to);
       if (g !== g0) { l.push("§" + g); g0 = g; }
-      l.push(h.team + " · " + (a === b ? a : a + "–" + b) + (h.note && NOTE[h.note] ? " (" + NOTE[h.note] + ")" : ""));
+      var line = h.team + " · " + (a === b ? a : a + "–" + b) + (h.note && NOTE[h.note] ? " (" + NOTE[h.note] + ")" : "");
+      // нажать — кто был в команде одновременно с ним (владелец 24.11)
+      var M = h.mates || [], pl = M.filter(function (m) { return !m[2]; }), st = M.filter(function (m) { return m[2]; });
+      l.push(M.length ? { e: line, sub: { t: "👥 " + h.team + " · " + (a === b ? a : a + "–" + b), l: (pl.length ? ["§Тиммейты: " + pl.length] : []).concat(pl.map(function (m) { return m[0] + " · " + m[1]; }),
+        st.length ? ["§Штаб"] : [], st.map(function (m) { return m[0] + " · " + m[1] + " (" + (NOTE[m[2]] || m[2]) + ")"; })) } } : line);
     });
     var n = {}; H.forEach(function (h) { n[h.team] = 1; });
     return '<span role="button" class="medal tms" data-pop="' + esc(JSON.stringify({ t: "👥 Команды: " + Object.keys(n).length + (p.aka && p.aka.length ? " · другие ники: " + p.aka.join(", ") : ""), l: l })) + '">👥<b>' + Object.keys(n).length + '</b></span>';
@@ -2706,20 +2713,30 @@ a.ni { text-decoration: none; color: inherit; }
     return '<span role="button" class="medal mvp" data-pop="' + esc(JSON.stringify({ t: "🏅 MVP на HLTV: " + p.mvp, l: (p.mvp_events || []).map(function (x) { var e = evYear(x); return { e: e, p: "", tm: teamInYear(p, e) }; }) })) + '">🏅<b>' + esc(p.mvp) + '</b></span>';
   }
   function openPop(data, anchor) {
+    // окно из окна (тиммейты в «Командах»): новое встаёт на место прежнего, «‹ Назад» возвращает его
+    var inner = state.pop && anchor.closest && anchor.closest(".pop-in"), r0 = inner ? inner.getBoundingClientRect() : null;
+    if (data === "__back") { data = (state.popStack || []).pop(); if (!data) { closePop(); return; } }
+    else if (inner) (state.popStack = state.popStack || []).push(state.popData);
+    else state.popStack = [];
+    var r = anchor.getBoundingClientRect();
     closePop();
+    state.popData = data;
     var d = JSON.parse(data), el = document.createElement("div");
+    if (inner && state.popStack.length) d.l = ['__back'].concat(d.l || []);
     el.className = "pop";
-    el.innerHTML = '<div class="pop-in' + (d.c ? ' wide' : '') + '"><b>' + esc(d.t) + '</b>' + (d.c ? '<div class="pcols">' + d.c.map(function (c) { return '<div class="pcol"><div class="pci">' + c.i + ' <b>' + c.l.length + '</b></div>' + (c.l.length ? c.l.map(function (x) { return '<div class="pce">' + esc(x) + '</div>'; }).join("") : '<div class="pce none">—</div>') + '</div>'; }).join("") + '</div>' : (d.l || []).length ? '<ul>' + d.l.map(function (x) { if (x && typeof x === "object") { var tmm = String(x.tm || "").match(/^(.*?)( \(.*\))?$/); return '<li class="mj' + (x.w ? ' win' : x.s ? ' sec' : '') + '"><span class="mj-e">' + (x.w ? '🏆 ' : x.s ? '🥈 ' : '') + esc(x.e) + '</span>' + (x.p ? ' <span class="mj-p">— ' + esc(x.p) + '</span>' : '') + (x.tm ? '<span class="mj-t">' + esc(tmm[1]) + (tmm[2] ? '<small>' + esc(tmm[2]) + '</small>' : '') + '</span>' : '') + '</li>'; }
+    el.innerHTML = '<div class="pop-in' + (d.c ? ' wide' : '') + '"><b>' + esc(d.t) + '</b>' + (d.c ? '<div class="pcols">' + d.c.map(function (c) { return '<div class="pcol"><div class="pci">' + c.i + ' <b>' + c.l.length + '</b></div>' + (c.l.length ? c.l.map(function (x) { return '<div class="pce">' + esc(x) + '</div>'; }).join("") : '<div class="pce none">—</div>') + '</div>'; }).join("") + '</div>' : (d.l || []).length ? '<ul>' + d.l.map(function (x) { if (x && typeof x === "object" && !x.sub) { var tmm = String(x.tm || "").match(/^(.*?)( \(.*\))?$/); return '<li class="mj' + (x.w ? ' win' : x.s ? ' sec' : '') + '"><span class="mj-e">' + (x.w ? '🏆 ' : x.s ? '🥈 ' : '') + esc(x.e) + '</span>' + (x.p ? ' <span class="mj-p">— ' + esc(x.p) + '</span>' : '') + (x.tm ? '<span class="mj-t">' + esc(tmm[1]) + (tmm[2] ? '<small>' + esc(tmm[2]) + '</small>' : '') + '</span>' : '') + '</li>'; }
+      if (x === "__back") return '<li class="pback" data-pop="__back">‹ Назад</li>';
+      if (x && typeof x === "object" && x.sub) return '<li class="psub" data-pop="' + esc(JSON.stringify(x.sub)) + '">' + esc(x.e) + '<i>›</i></li>';
       return String(x).charAt(0) === "§" ? '<li class="ph">' + esc(String(x).slice(1)) + '</li>' : '<li>' + esc(x) + '</li>'; }).join("") + '</ul>' : '<p>Список турниров появится после обновления данных.</p>') + '</div>';
     document.body.appendChild(el);
-    var r = anchor.getBoundingClientRect(), box = el.firstChild, W = window.innerWidth;
+    var box = el.firstChild, W = window.innerWidth;
     var li = box.querySelectorAll("li");
     if (li.length > 10) {  // больше 10 строк (мейджоры ветеранов): окно — по первым десяти, остальное листается внутри
       box.classList.add("long");
       box.style.maxHeight = Math.round(li[10].offsetTop + li[10].offsetHeight * 0.5) + "px";
     }
-    var top = r.bottom + 6, left = d.c ? Math.max(12, (W - box.offsetWidth) / 2) : Math.min(Math.max(12, r.left), W - box.offsetWidth - 12);
-    if (top + box.offsetHeight > window.innerHeight - 12) top = Math.max(12, r.top - box.offsetHeight - 6);
+    var top = r0 ? r0.top : r.bottom + 6, left = d.c ? Math.max(12, (W - box.offsetWidth) / 2) : Math.min(Math.max(12, r0 ? r0.left : r.left), W - box.offsetWidth - 12);
+    if (top + box.offsetHeight > window.innerHeight - 12) top = r0 ? Math.max(12, window.innerHeight - box.offsetHeight - 12) : Math.max(12, r.top - box.offsetHeight - 6);
     box.style.top = top + "px"; box.style.left = left + "px";
     state.pop = el; state.popAt = Date.now(); state.popTop = null; state.popEl = null;
   }

@@ -985,6 +985,102 @@ def moves_teams(moves: list, t: dict, title: str | None) -> None:
                 m["to"] = best[1]
 
 
+SQUAD_F = CACHE / "lp_team_squads.json"  # составы команд за всё время (Liquipedia): страница → [{n, j, l, r}] — для тиммейтов
+squad_cache: dict = load_json(SQUAD_F, {})
+SQUAD_NEW = int(os.environ.get("SQUAD_NEW", "500"))  # новых страниц команд за полный сбор (по 50 за запрос)
+
+
+def lp_squad_people(text: str) -> list[dict]:
+    """Все люди из блоков {{Squad|status=…}} страницы команды: ник, пришёл, ушёл (или стал неактивным), роль."""
+    out, seen = [], set()
+    def d(v):
+        v = re.sub(r"[^0-9?-]", "", (v or "")[:10])
+        if not re.match(r"\d{4}-", v):
+            return None
+        y, mo, dd = (v.split("-") + ["01", "01"])[:3]
+        mo = "01" if "?" in mo or not mo.strip("0") else mo
+        dd = "01" if "?" in dd or not dd.strip("0") else dd[:2]
+        return None if "?" in y else f"{y}-{mo}-{dd}"
+    for m in re.finditer(r"\{\{Squad\|status=(\w+)", text or ""):
+        st = m.group(1).lower()
+        blk = text[m.start(): text.find("\n}}", m.start())]
+        for ln in blk.split("\n"):
+            if "{{Person" not in ln:
+                continue
+            pid = lp_param(ln, "id")
+            j = d(lp_param(ln, "joindate"))
+            if not pid or not j:
+                continue
+            l = d(lp_param(ln, "leavedate")) or (d(lp_param(ln, "inactivedate")) if st != "active" else None)
+            if st == "former" and not l:
+                continue  # бывший без даты ухода — не знаем, когда ушёл
+            r = (lp_param(ln, "role") or "").strip().lower() or None
+            k = (norm(pid), j)
+            if k not in seen:
+                seen.add(k)
+                out.append({"n": pid, "j": j, "l": l, "r": r})
+    return out
+
+
+def squads_enrich(files: list) -> None:
+    """Тиммейты (владелец 24.11): у каждой записи истории команд игрока (`hist`) — кто был в той же команде одновременно
+    с ним (`mates`: [ник, «2016–2017», роль]). Составы — со страниц команд Liquipedia (кэш; новые — только в полном сборе)."""
+    docs, need = [], {}
+    for f in files:
+        d = load_json(f, None)
+        if not d:
+            continue
+        people = []
+        for t in ([d] if "roster" in d else []) + (d.get("teams") or []):
+            people += (t.get("roster") or []) + (t.get("players") or []) + (t.get("coach") or [])
+        hs = [(p, h) for p in people if isinstance(p, dict) for h in p.get("hist") or [] if h.get("team")]
+        if not hs:
+            continue
+        docs.append((f, d, hs))
+        for _, h in hs:
+            c = squad_cache.get(h["team"])
+            ttl = 7 if not h.get("to") else 90
+            if not c or (parse_iso(c.get("t")) or NOW) < NOW - timedelta(days=ttl):
+                need[h["team"]] = need.get(h["team"], 0) + 1
+    if need and not STATS and not _lp_blocked[0]:
+        ask = sorted(need, key=lambda k: (k in squad_cache, -need[k]))[:SQUAD_NEW]
+        try:
+            got = lp_pages(ask)
+            for k in ask:
+                squad_cache[k] = {"t": iso(NOW), "sq": lp_squad_people(got.get(k, ""))}
+        except Exception as e:
+            warn(f"Liquipedia составы для тиммейтов: {e!r}")
+    def day(x):
+        return str(x)[:10] if x else iso(NOW)[:10]
+    n_doc = 0
+    for f, d, hs in docs:
+        ch = False
+        for p, h in hs:
+            sq = (squad_cache.get(h["team"]) or {}).get("sq")
+            if sq is None:
+                continue
+            me = set(nick_keys(p.get("nick") or "")) | {norm(a) for a in p.get("aka") or []}
+            a0, b0 = day(h.get("from")), day(h.get("to"))
+            mates = []
+            for x in sq:
+                if norm(x["n"]) in me:
+                    continue
+                a, b = max(a0, x["j"]), min(b0, day(x["l"]))
+                if a > b or (datetime.fromisoformat(b) - datetime.fromisoformat(a)).days < 14:
+                    continue
+                ya, yb = a[:4], (b[:4] if x["l"] or h.get("to") else "н.в.")
+                mates.append([x["n"], ya if ya == yb else f"{ya}–{yb}", x["r"], a])
+            mates.sort(key=lambda m: (bool(m[2]), m[3]))
+            mates = [m[:3] if m[2] else m[:2] for m in mates][:30]
+            if h.get("mates") != mates:
+                h["mates"] = mates
+                ch = True
+        if ch:
+            save_json(f, d)
+            n_doc += 1
+    print(f"Тиммейты: обновлено файлов {n_doc}, страниц команд в кэше {len(squad_cache)}, не хватает {len([k for k in need if k not in squad_cache])}")
+
+
 def lp_roster(t: dict) -> dict | None:
     """Активный состав с Liquipedia: тренер, капитан, роли. Кэш (см. lp_fresh)."""
     key = str(t["id"])
@@ -7676,6 +7772,11 @@ def main() -> int:
             save_json(OUT / "ranking.json", build_ranking())
     except Exception as e:
         warn(f"Рейтинг: {e!r}")
+    try:  # тиммейты в истории команд игроков — по готовым карточкам и страницам команд
+        squads_enrich(sorted((OUT / "match").glob("*.json")) + sorted((OUT / "team").glob("*.json")))
+    except Exception as e:
+        warn(f"Тиммейты: {e!r}")
+    save_json(SQUAD_F, squad_cache)
     for k in [k for k, v in tg_cache.items() if (v.get("t") or "") < iso(NOW - timedelta(days=NEWS_DAYS + 3))]:
         del tg_cache[k]
     save_json(TG_CACHE_F, tg_cache)
