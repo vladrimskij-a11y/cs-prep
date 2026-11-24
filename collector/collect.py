@@ -5947,10 +5947,11 @@ def hltv_player_info(nick: str, force: bool = False, coach: bool = False) -> dic
                 wins.append(name)
     # трофеи игрока: ряд .trophy-row-trophy (название — в title картинки) и подписи span.trophyDescription
     tro = []
-    cells = re.findall(r'<td class="trophy-row-trophy"[^>]*>(.*?)</td>', b)  # в ячейке команды несколько трофеев подряд
+    # класс ячейки бывает с добавками (у трофеев, выигранных на замене, — свой класс): 24.11 у jks на HLTV 5 трофеев, у нас было 4
+    cells = re.findall(r'<td class="trophy-row-trophy[^"]*"[^>]*>(.*?)</td>', b)  # в ячейке команды несколько трофеев подряд
     for t in [x for c0 in cells for x in re.findall(r'<img[^>]*title="([^"]+)"', c0)] + re.findall(r'class="trophyDescription"[^>]*title="([^"]+)"', b):
         t = _html.unescape(t).strip()
-        if t and t not in tro:
+        if t and t not in tro and not re.search(r"(?i)top\s*\d+|\btop20\b|player of the year", t):  # значки «топ-20 HLTV» — не трофеи
             tro.append(t)
     if not mj:  # запасной разбор: любые ссылки на события со словом Major
         for e in re.findall(r'<a href="/events/\d+/[^"]+"[^>]*>(?:<[^>]+>)*\s*([^<]*Major[^<]*)<', b):
