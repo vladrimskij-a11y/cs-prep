@@ -632,6 +632,13 @@ def lp_prize_slots(name: str) -> list[float]:
     return slots
 
 
+def lp_date(line: str, key: str) -> str | None:
+    """Дата из параметра шаблона Liquipedia, в т.ч. «joindate={{Abbr|2023-07-29|Was on trial…}}» (24.11: у MOUZ NXT так
+    записаны Neityu и Nexius — lp_param видел только «{{Abbr», и в тиммейтах sirah их не было)."""
+    m = re.search(r"\|\s*" + key + r"\s*=\s*(?:\{\{Abbr\|)?\s*(\d{4}-[0-9?]{2}-[0-9?]{2})", line)
+    return m.group(1) if m else None
+
+
 def lp_param(line: str, key: str) -> str | None:
     m = re.search(r"\|\s*" + key + r"\s*=\s*([^|}<\n]*)", line)
     return m.group(1).strip() if m and m.group(1).strip() else None
@@ -911,7 +918,7 @@ def lp_moves(text: str) -> list[dict]:
                 continue
             role = (lp_param(ln, "role") or "").strip().lower() or None
             def d(k):
-                v = re.sub(r"[^0-9?-]", "", (lp_param(ln, k) or "")[:10])
+                v = lp_date(ln, k) or ""
                 return v.replace("??", "01") if re.match(r"\d{4}-", v) else None
             jd, ld, idt = d("joindate"), d("leavedate"), d("inactivedate")
             nt = re.sub(r"\[\[|\]\]", "", lp_param(ln, "newteam") or "").split("|")[-1].strip() or None
@@ -1008,10 +1015,10 @@ def lp_squad_people(text: str) -> list[dict]:
             if "{{Person" not in ln:
                 continue
             pid = lp_param(ln, "id")
-            j = d(lp_param(ln, "joindate"))
+            j = d(lp_date(ln, "joindate"))
             if not pid or not j:
                 continue
-            l = d(lp_param(ln, "leavedate")) or (d(lp_param(ln, "inactivedate")) if st != "active" else None)
+            l = d(lp_date(ln, "leavedate")) or (d(lp_date(ln, "inactivedate")) if st != "active" else None)
             if st == "former" and not l:
                 continue  # бывший без даты ухода — не знаем, когда ушёл
             r = (lp_param(ln, "role") or "").strip().lower() or None
@@ -1040,14 +1047,14 @@ def squads_enrich(files: list) -> None:
         for _, h in hs:
             c = squad_cache.get(h["team"])
             ttl = 7 if not h.get("to") else 90
-            if not c or (parse_iso(c.get("t")) or NOW) < NOW - timedelta(days=ttl):
+            if not c or c.get("v") != 2 or (parse_iso(c.get("t")) or NOW) < NOW - timedelta(days=ttl):  # v2: даты в {{Abbr}}
                 need[h["team"]] = need.get(h["team"], 0) + 1
     if need and not STATS and not _lp_blocked[0]:
-        ask = sorted(need, key=lambda k: (k in squad_cache, -need[k]))[:SQUAD_NEW]
+        ask = sorted(need, key=lambda k: (k in squad_cache, (squad_cache.get(k) or {}).get("v") == 2, -need[k]))[:SQUAD_NEW]
         try:
             got = lp_pages(ask)
             for k in ask:
-                squad_cache[k] = {"t": iso(NOW), "sq": lp_squad_people(got.get(k, ""))}
+                squad_cache[k] = {"t": iso(NOW), "v": 2, "sq": lp_squad_people(got.get(k, ""))}
         except Exception as e:
             warn(f"Liquipedia составы для тиммейтов: {e!r}")
     def day(x):
@@ -2207,6 +2214,8 @@ def valve_md_table() -> list[dict]:
 
 
 def vrs_find(t: dict, table: list[dict]) -> dict | None:
+    if t.get("_alt") and norm(t.get("name")) in TEAM_TEMP_NAMES:  # временное имя на мейджоре: GOSH — это BC.Game, а не
+        return vrs_find({"name": t["_alt"]}, table)                   # другая «GOSH» со 170-го места (24.11: очки 765 вместо 1266)
     keys = []
     for x in (t.get("name"), t.get("acronym"), re.sub(r"(?<=[a-z])(?=[A-Z])", " ", t.get("name") or "")):
         if x:
@@ -2507,7 +2516,7 @@ VRS_WARM_TOP = int(os.environ.get("VRS_WARM_TOP", "150"))
 # Стадии мейджора у Valve — отдельные «события» со своим весом: в данных снимка 02.11 у IEM Cologne Major 2026
 # Stage 1 (2–5 июня) вес 0.624, Stage 2 (6–9 июня) 0.809, Stage 3 и плей-офф 1.0. Гарантированных призовых
 # в Stage 1/2 нет (24.11: мы давали $20k за 9–16 место — прогноз Stage 1 был вдвое выше HLTV: CW +77 против +30).
-MAJOR_STAGE_EW = {1: 0.624, 2: 0.809}
+MAJOR_STAGE_EW = {1: 0.3, 2: 0.39}  # 24.11 подбор по прогнозам HLTV на 8 матчей Stage 1 (было 0.624/0.809 из снимка Cologne): ошибка побед 3.3 → 1.1 очка; Stage 2 — в той же пропорции, не сверено
 
 
 def major_stage(tn: str, stage_text: str | None) -> int | None:
@@ -2673,6 +2682,9 @@ def vrs_live():
 PLAYOFF_RX = re.compile(r"(?i)quarter|semi|final|playoff|1/4|1/2|bracket")
 
 
+_vrs_base_day: dict = {}
+
+
 def vrs_outcomes_live(a: dict, b: dict, table: list[dict], brief: dict, lan: bool = True) -> dict | None:
     """Прогноз «как на HLTV»: полный пересчёт модели Valve с добавленным матчем (сверено 06.11 с 6 образцами HLTV:
     из 24 чисел 20 совпали, 4 — ±1). Меняются сид обеих (баунти, сеть, LAN, гарантированные призовые), личные
@@ -2698,7 +2710,12 @@ def vrs_outcomes_live(a: dict, b: dict, table: list[dict], brief: dict, lan: boo
         if PLAYOFF_RX.search((brief.get("stage") or "") + " " + (brief.get("name") or "")):
             wp = max(0.0, VM.playoff_win_prize(places, (brief.get("stage") or "") + " " + (brief.get("name") or "")) - g)
             win = (wp, wp)
-    f = L.forecast(a["name"], b["name"], math.floor(_days(NOW)), ew=ew, lan=lan, win_prize=win, both_prize=both, base=L.base)
+    # 24.11: как HLTV — на день матча и относительно рейтинга того же дня (старые результаты за ночь чуть «стареют»):
+    # по 8 матчам Stage 1 ошибка поражений 1.6 → 0.6 очка
+    day = max(math.floor(_days(NOW)), math.floor(_days(brief.get("begin_at")) or _days(NOW)))
+    if day not in _vrs_base_day:
+        _vrs_base_day[day] = L.base if day == math.floor(_days(NOW)) else L.compute(day)["rating"]
+    f = L.forecast(a["name"], b["name"], day, ew=ew, lan=lan, win_prize=win, both_prize=both, base=_vrs_base_day[day])
     if not f:
         return None
     # Места — по всей пересчитанной таблице, как у HLTV: матч сдвигает очки и других команд (Vitality при победе FURIA
