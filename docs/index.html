@@ -2715,8 +2715,9 @@ a.ni { text-decoration: none; color: inherit; }
     if (!T.length) return "";
     var l = T.map(function (x, i) {
       var e = evYear(String(x).replace(/^Winner of\s+/i, "")), y = (e.match(/\b(19|20)\d\d\b/g) || []).pop();
-      return { e: e, p: "", tm: teamInYear(p, e), y: +y || 9999, i: i };  // без w — белым, как в мейджорах (владелец 25.11)
-    }).sort(function (a, b) { return a.y - b.y || b.i - a.i; })  // HLTV пишет новые первыми — внутри года наоборот
+      var wt = (p.win_teams || {})[String(x).replace(/^Winner of\s+/i, "")];  // команда из строки HLTV (jks — FaZe на замене)
+      return { e: e, p: "", tm: wt || teamInYear(p, e), y: +y || 0, i: i };  // без w — белым, как в мейджорах (владелец 25.11)
+    }).sort(function (a, b) { return b.y - a.y || a.i - b.i; })  // сверху новые, снизу старые (владелец 25.11)
       .map(function (x) { return { e: x.e, p: "", tm: x.tm }; });
     return '<span role="button" class="medal cup pcup" data-pop="' + esc(JSON.stringify({ t: "🏆 Трофеи: " + l.length, l: l })) + '">🏆<b>' + l.length + '</b></span>';
   }

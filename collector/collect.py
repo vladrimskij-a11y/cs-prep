@@ -5997,7 +5997,7 @@ def hltv_players_warm() -> None:
         short = bool(cd.get("majors")) and len(cd.get("major_events") or []) < cd["majors"]  # список мейджоров неполный
         if short and (c.get("fix") or 0) < 1:
             rank = 1
-        if c and (not c.get("wfix2") or kp == "cinfo1" and not c.get("pref")):  # 25.11: тренерам — ссылка на страницу игрока; 24.11: первые/вторые места из всех таблиц достижений — перечитать всех
+        if c and (not c.get("wfix3") or kp == "cinfo1" and not c.get("pref")):  # 25.11: тренерам — ссылка на страницу игрока; 24.11: первые/вторые места из всех таблиц достижений — перечитать всех
             rank = 1
         # MVP и мейджоры меняются только по итогам турниров: страницу перечитываем, когда команда доиграла турнир
         # после прошлой проверки, а без этого — раз в 3 недели (раньше — каждую неделю всех подряд)
@@ -6042,6 +6042,7 @@ def hltv_player_info(nick: str, force: bool = False, coach: bool = False) -> dic
     m = dict(d)
     for f in ("trophies", "event_wins", "event_seconds", "major_events", "mvp_events"):
         m[f] = u(pd.get(f), d.get(f))
+    m["win_teams"] = {**(pd.get("win_teams") or {}), **(d.get("win_teams") or {})}
     m["mvp"] = max(d.get("mvp") or 0, pd.get("mvp") or 0, len(m["mvp_events"]))
     m["majors"] = (d.get("majors") or 0) + (pd.get("majors") or 0)
     m["major_wins"] = (d.get("major_wins") or 0) + (pd.get("major_wins") or 0)
@@ -6057,7 +6058,7 @@ def _hltv_person_info(nick: str, force: bool = False, coach: bool = False) -> di
         return None
     key = f"{kp}:{pl['id']}"
     c = hltv_cache.get(key)
-    no_ev = c and ((c.get("data") or {}).get("mvp") and not (c.get("data") or {}).get("mvp_events") and not c.get("mvfix") or not c.get("wfix2")
+    no_ev = c and ((c.get("data") or {}).get("mvp") and not (c.get("data") or {}).get("mvp_events") and not c.get("mvfix") or not c.get("wfix3")
                    or kp == "cinfo1" and not c.get("pref"))
     if c and not no_ev and (not force or _mvp_new[0] >= MVP_PER_RUN) and (parse_iso(c.get("t")) or NOW) > NOW - timedelta(days=PINFO_TTL_DAYS):
         return c["data"]  # свежее — из кэша; очередь (force) перечитывает тех, чья команда доиграла турнир
@@ -6103,7 +6104,7 @@ def _hltv_person_info(nick: str, force: bool = False, coach: bool = False) -> di
     wm = re.search(r'<div class="stat">(\d+)</div><div class="description">Majors? won', b)
     # места на турнирах — таблица .achievement-table (так её разбирают gigobyte/HLTV и hltv-scraper-api):
     # строка .team, место в .achievement, турнир в .tournament-name-cell a
-    mj, wins, seconds = [], [], []
+    mj, wins, seconds, wteams = [], [], [], {}
     # 24.11: победы на замене (jks — IEM Katowice 2022 за FaZe) не попадают в ряд трофеев — первые места берём из ВСЕХ
     # таблиц достижений (первая — мейджоры, дальше — остальные турниры); мейджоры по-прежнему из первой
     ks = [m_.start() for m_ in re.finditer("achievement-table", b)]
@@ -6122,6 +6123,12 @@ def _hltv_person_info(nick: str, force: bool = False, coach: bool = False) -> di
                     mj.append(lab)
             if re.match(r"1st$|winner", place, re.I) and name not in wins and not QUAL_RX.search(name):
                 wins.append(name)
+                # 25.11: команда из строки достижения (jks — IEM Katowice 2022 за FaZe на замене, в истории Liquipedia этого нет)
+                m_tm = re.search(r'href="/team/\d+/[^"]*"[^>]*>(?:\s*<img[^>]*>)*\s*(?:<[^>]+>\s*)*([^<]+?)\s*<', row) \
+                    or re.search(r'<img[^>]*class="[^"]*team-logo[^"]*"[^>]*title="([^"]+)"', row) \
+                    or re.search(r'<img[^>]*title="([^"]+)"[^>]*class="[^"]*team-logo', row)
+                if m_tm and _html.unescape(m_tm.group(1)).strip():
+                    wteams[name] = _html.unescape(m_tm.group(1)).strip()
             elif re.match(r"2nd$|runner", place, re.I) and name not in seconds and not QUAL_RX.search(name):
                 seconds.append(name)  # вторые места — владелец 24.11
     # трофеи игрока: ряд .trophy-row-trophy (название — в title картинки) и подписи span.trophyDescription
@@ -6143,7 +6150,7 @@ def _hltv_person_info(nick: str, force: bool = False, coach: bool = False) -> di
     if not mj and old.get("major_events"):  # новый разбор ничего не нашёл — старый список мажоров не теряем
         mj = list(old["major_events"])
     d = {"mvp": mvp, "mvp_events": ev, "majors": int(pm.group(1)) if pm else 0, "major_wins": int(wm.group(1)) if wm else 0,
-         "major_events": mj, "trophies": tro[:40], "event_wins": wins[:40], "event_seconds": seconds[:40]}
+         "major_events": mj, "trophies": tro[:40], "event_wins": wins[:40], "event_seconds": seconds[:40], "win_teams": wteams}
     d["mvp_events"] = [str(x) for x in d["mvp_events"]] if isinstance(d["mvp_events"], list) else []
     if kp == "cinfo1":  # 25.11: у тренера-бывшего игрока (TaZ) на странице тренера ссылка на его страницу игрока
         sl = leet(norm(nick))
@@ -6151,7 +6158,7 @@ def _hltv_person_info(nick: str, force: bool = False, coach: bool = False) -> di
             if leet(norm(slug)) == sl:
                 d["pref"] = {"id": int(pid), "slug": slug}
                 break
-    hltv_cache[key] = {"t": iso(NOW), "data": d, "fix": 1, "mvfix": 1, "wfix2": 1, "pref": 1}  # fix=1 — разобрано с полным списком мейджоров (MAJOR_RX)
+    hltv_cache[key] = {"t": iso(NOW), "data": d, "fix": 1, "mvfix": 1, "wfix2": 1, "wfix3": 1, "pref": 1}  # fix=1 — разобрано с полным списком мейджоров (MAJOR_RX)
     return d
 
 
@@ -7945,7 +7952,7 @@ def main() -> int:
         warn(f"Позиции ProRoles: {e!r}")
     # «Будущие игры» на страницах команд — на каждом сборе (страницы целиком пересобираются раз в 3–12 ч, а расписание меняется чаще)
     # и сверка со свежими карточками матчей: состав, трофеи, MVP и мажоры у команды должны совпадать с тем, что в матче
-    PFIELDS = ("mvp", "mvp_events", "majors", "major_wins", "major_events", "trophies", "event_wins", "event_seconds", "name_ru", "tags")
+    PFIELDS = ("mvp", "mvp_events", "majors", "major_wins", "major_events", "trophies", "event_wins", "event_seconds", "win_teams", "name_ru", "tags")
     by_team: dict = {}
     for mf in (OUT / "match").glob("*.json"):
         md = load_json(mf, {}) or {}
