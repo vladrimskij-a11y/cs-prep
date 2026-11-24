@@ -2416,7 +2416,14 @@ a.ni { text-decoration: none; color: inherit; }
       var x = o.score.split(":"), side = +x[0] > +x[1] ? "a" : "b", r = rank.indexOf(o.score);
       var c = r === 0 ? "g" : r === rank.length - 1 ? "r" : ["g", "y", "o"][Math.min(r, 2)];
       return '<span class="oc ' + side + ' pc-' + c + (o === P.outcomes[0] ? ' top' : '') + '"><b class="num">' + esc(o.score) + '</b><small class="num">' + esc(o.p) + '%</small></span>';
-    }).join("") + (P.source === "букмекеры" ? "" : '<span class="oc-src">оценка по рейтингу VRS</span>') + '</div>';
+    }).join("") + '<span class="oc-src">' + esc(predSrc(P)) + '</span></div>';
+  }
+  // откуда прогноз (владелец 24.11 — подписывать): Pinnacle перед стартом, до этого линия bo3 (Thunderpick), иначе VRS
+  function predSrc(P) {
+    var cap = function (x) { x = String(x || ""); return x.charAt(0).toUpperCase() + x.slice(1); };
+    if (P.win) { var s = String(P.lines_src || P.provider || ""); return "по линии " + (/pinn/i.test(s) ? "Pinnacle" : s && !/market|median/i.test(s) ? cap(s) : "букмекеров"); }
+    if (P.odds && P.odds.win) return "по линии " + (P.odds.provider ? cap(P.odds.provider) : "букмекера");
+    return "оценка по рейтингу VRS";
   }
   // сыгранная карта идущей серии: настоящий счёт (порядок команд как в карточке) и индекс карты в серии
   function playedMap(m, mp) {
