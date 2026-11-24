@@ -749,7 +749,7 @@ def lp_prefetch(teams: list[dict]) -> None:
         warn(f"Liquipedia предзагрузка: {e!r}")
 
 
-LP_VER = 3  # версия разбора составов Liquipedia: выросла — все составы перечитываются пачкой (18.11: имена и флаги из инфобокса)
+LP_VER = 4  # 24.11: родня со страниц игроков (`rel`); версия разбора составов Liquipedia: выросла — все составы перечитываются пачкой (18.11: имена и флаги из инфобокса)
 NICK_AKA: dict = {}  # norm(ник) → {прежние/другие ники} (Liquipedia |ids=): Techno4K ↔ Techno на HLTV и dust2
 
 
@@ -757,6 +757,27 @@ def lp_aka(text: str) -> list[str]:
     """Другие ники игрока из инфобокса Liquipedia (|ids=Techno)."""
     m = re.search(r"^\|\s*ids\s*=([^\n]*)", text or "", re.M)
     return [x.strip() for x in re.split(r"[,;/]", m.group(1)) if x.strip()] if m else []
+
+
+REL_EN = [(r"twin brother", "брат-близнец"), (r"twin sister", "сестра-близнец"), (r"twin", "близнец"), (r"(?:older|younger|little|big)?\s*brother", "брат"),
+          (r"(?:older|younger|little|big)?\s*sister", "сестра"), (r"cousin", "двоюродный брат"), (r"father", "отец"), (r"\bson\b", "сын"),
+          (r"uncle", "дядя"), (r"nephew", "племянник"), (r"(?:wife|husband|girlfriend|boyfriend|partner)", "пара")]
+
+
+def lp_rel(text: str) -> list[dict]:
+    """Родня со страницы игрока Liquipedia: «He is the twin brother of [[Xyz]]» → [{k: брат-близнец, nick: Xyz}]."""
+    out = []
+    for sent in re.split(r"(?<=[.!?])\s+|\n", text or ""):
+        if not re.search(r"\b(twin|brother|sister|cousin|father|son|uncle|nephew|wife|husband|girlfriend|boyfriend)\b", sent, re.I):
+            continue
+        for rx, ru in REL_EN:
+            m = re.search(r"\b" + rx + r"\b[^.\[\]]{0,25}?\[\[([^\]|#]+)(?:\|([^\]]+))?\]\]", sent, re.I)
+            if m:
+                nick = (m.group(2) or m.group(1)).strip()
+                if nick and not any(o["nick"].lower() == nick.lower() for o in out):
+                    out.append({"k": ru, "nick": nick})
+                break
+    return out[:4]
 
 
 def lp_history(text: str) -> list[dict]:
@@ -996,6 +1017,7 @@ def lp_roster(t: dict) -> dict | None:
                     p["name"] = mm.group(1).strip() if mm else None
                 p["aka"] = lp_aka(pg)
                 p["hist"] = lp_history(pg)
+                p["rel"] = lp_rel(pg) or None
                 remember_aka(p["nick"], p["aka"])
             any_igl = any(p["igl"] for p in players)
             for p in players:
@@ -1004,8 +1026,8 @@ def lp_roster(t: dict) -> dict | None:
                 if not any_igl and igl:
                     p["igl"] = True  # в составе капитан не отмечен — берём со страницы игрока
             data = {
-                "coach": [{"nick": p["nick"], "name": p["name"], "flag": p["flag"], "birth": p["birth"], "aka": p["aka"], "hist": p["hist"]} for p in people if p["coach"]],
-                "players": [{k: p.get(k) for k in ("nick", "name", "flag", "igl", "roles", "note", "birth", "loan_from", "stand_for", "aka", "hist")} for p in players],
+                "coach": [{"nick": p["nick"], "name": p["name"], "flag": p["flag"], "birth": p["birth"], "aka": p["aka"], "hist": p["hist"], "rel": p.get("rel")} for p in people if p["coach"]],
+                "players": [{k: p.get(k) for k in ("nick", "name", "flag", "igl", "roles", "note", "birth", "loan_from", "stand_for", "aka", "hist", "rel")} for p in players],
                 "moves": moves, "v": LP_VER,
             }
     except Exception as e:
@@ -1062,6 +1084,7 @@ def merge_roster(panda_players: list[dict], lp: dict | None) -> tuple[list[dict]
             "tags": tags,
             "aka": lp_p.get("aka") or None,
             "hist": lp_p.get("hist") or None,
+            "rel": lp_p.get("rel") or None,
         })
     coach = [{**c, "age": age_from(c.get("birth"))} for c in lp.get("coach") or []]
     return res, coach
@@ -5249,6 +5272,15 @@ BEEF_F = CACHE / "beef_search.json"
 beef_cache: dict = load_json(BEEF_F, {})      # ник → {"t": когда искали, "posts": [{url, date, text}]}
 BEEF_REQ = [int(os.environ.get("BEEF_REQ", "150"))]  # запросов к t.me за сбор (ник × канал)
 BEEF_TTL_DAYS = 7
+# не только конфликты (владелец 24.11): родня, друзья, вместе работали/жили/учились, наставник — всё, что связывает людей матча
+STORY_KINDS = [
+    ("Родня", r"брат|близнец|сестр|двоюродн|кузен|отец|сын\b|сына\b|дяд|племянник|родственн"),
+    ("Дружба", r"друз|друг\b|друга\b|другом|дружб|лучш\w+ друг|сосед\w* по комнат|жили вместе|живут вместе|кум\b"),
+    ("Работали вместе", r"тренировал|наставник|учени|воспитанник|открыл\w* для|позвал в|привёл в|привел в|вместе работал|работал\w* вместе|"
+                        r"бывш\w+ тиммейт|экс-тиммейт|бывш\w+ партн|вместе игра|вместе выступа|в одной команде"),
+    ("Встреча", r"впервые сыграют против|встретятся|встреча бывших|против бывш\w+ (команды|клуба|тиммейт)|реванш|принцип"),
+]
+STORY_RX = re.compile("|".join(f"(?:{r})" for _, r in STORY_KINDS), re.I)
 BEEF_RX = re.compile(r"конфликт|скандал|тр[эе]ш.?ток|оскорб|ссор|вражд|обвин|наехал|токсич|драм[аы]|измен[аи]л|девушк|"
                      r"извин|прощени|посвят|хейт|тролл|подкол|разборк|перепалк|высмеял|унизил|провокац|не здоровал|не пожал|руку не|"
                      r"беф|beef|drama|trash.?talk|чит[еа]р|обман|предал|предательств|кинул|слил|ненавид|злост|публично ответил|ответил на слова",
@@ -5322,9 +5354,9 @@ def player_beef(d: dict) -> list[dict]:
     out, seen = [], []
     for x in sorted(pool.values(), key=lambda x: x.get("date") or "", reverse=True):
         txt = x.get("text") or ""
-        if not BEEF_RX.search(txt) or re.search(r"дайджест", txt, re.I) or len(re.findall(r"^\s*[—•▪️-]", txt, re.M)) >= 4:
+        if not (BEEF_RX.search(txt) or STORY_RX.search(txt)) or re.search(r"дайджест", txt, re.I) or len(re.findall(r"^\s*[—•▪️-]", txt, re.M)) >= 4:
             continue  # дайджесты и списки новостей — не история про двоих
-        kw = [k.start() for k in BEEF_RX.finditer(txt)]
+        kw = [k.start() for k in BEEF_RX.finditer(txt)] + [k.start() for k in STORY_RX.finditer(txt)]
         near = lambda r: any(abs(m.start() - k) <= 350 for m in r.finditer(txt) for k in kw)
         a = [n for i, n, _ in who if i == 0 and rx[n].search(txt)]
         b = [n for i, n, _ in who if i == 1 and rx[n].search(txt)]
@@ -5337,10 +5369,36 @@ def player_beef(d: dict) -> list[dict]:
         lines = [l.strip() for l in txt.split("\n") if l.strip()]
         head = lines[0] if lines else txt
         body = " ".join(lines[1:])
-        out.append({"tag": "Конфликт", "kind": "beef", "who": f"{', '.join(a)} ({teams[0]['name']}) — {', '.join(b)} ({teams[1]['name']})",
+        tag = "Конфликт" if any(abs(m.start() - k.start()) <= 350 for n in a + b for m in rx[n].finditer(txt) for k in BEEF_RX.finditer(txt)) else \
+            next((t for t, r in STORY_KINDS if re.search(r, txt, re.I)), "История")
+        out.append({"tag": tag, "kind": "beef", "who": f"{', '.join(a)} ({teams[0]['name']}) — {', '.join(b)} ({teams[1]['name']})",
                     "text": head[:220], "more": body[:600] or None, "date": x.get("date"), "url": x["url"]})
-        if len(out) >= 6:
+        if len(out) >= 16:
             break
+    pri = {"Конфликт": 0, "Родня": 1, "Дружба": 2, "Встреча": 3, "Работали вместе": 4}
+    out.sort(key=lambda f: (pri.get(f["tag"], 5), "" if not f.get("date") else "~" + str(9999 - int(f["date"][:4])) + f["date"][4:]))
+    return out[:8]
+
+
+def player_rel_links(teams: list) -> list[dict]:
+    """Родня между людьми матча (Liquipedia): братья-близнецы в разных командах, отец и сын…"""
+    ppl = [(i, p) for i, t in enumerate(teams) for p in (t.get("players") or []) + (t.get("coach") or [])]
+    def find(nick):
+        n = norm(nick)
+        return next(((i, p) for i, p in ppl if norm(p.get("nick")) == n or n in {norm(a) for a in p.get("aka") or []}), None)
+    out, seen = [], set()
+    for i, p in ppl:
+        for r in p.get("rel") or []:
+            o = find(r["nick"])
+            if not o or o[1] is p:
+                continue
+            key = frozenset((p["nick"], o[1]["nick"]))
+            if key in seen:
+                continue
+            seen.add(key)
+            j, q = o
+            where = "в разных командах" if i != j else "в одной команде"
+            out.append({"tag": "Родня", "kind": "link", "text": f"{q['nick']} ({teams[j]['name']}) — {r['k']} {p['nick']} ({teams[i]['name']}), {where}."})
     return out
 
 
@@ -5349,6 +5407,11 @@ def player_links(d: dict) -> list[dict]:
     teams = [t for t in d.get("teams") or [] if not t.get("tbd")]
     if len(teams) != 2:
         return []
+    rel = player_rel_links(teams)
+    return rel + _player_links(d, teams)
+
+
+def _player_links(d: dict, teams: list) -> list[dict]:
     today = NOW.strftime("%Y-%m-%d")
     people = []  # (команда, ник, роль, история)
     for i, t in enumerate(teams):
