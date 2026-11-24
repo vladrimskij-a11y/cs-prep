@@ -51,6 +51,7 @@ jobs:
       - name: Новости каждые 5 минут, около часа
         env:
           NEWS_ONLY: "1"
+          PANDASCORE_TOKEN: ${{ secrets.PANDASCORE_TOKEN }}
           GIGACHAT_KEY: ${{ secrets.GIGACHAT_KEY }}
           GEMINI_KEY: ${{ secrets.GEMINI_KEY }}
           ODDSPAPI_KEY: ${{ secrets.ODDSPAPI_KEY }}

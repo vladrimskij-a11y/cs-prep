@@ -85,6 +85,22 @@ def merge(dst: Path) -> None:
     if a is not None and (b is None or newer(a, b)):
         shutil.copy2(OURS / "feed.json", dst / "feed.json")
     if MODE == "news":  # только новости матчей
+        # и новые пары тир-1 после жеребьёвки (sched_sync помечает их `t_sched`)
+        a, b = load(OURS / "matches.json"), load(dst / "matches.json")
+        if a and b:
+            bm = {str(x.get("id")): x for x in b.get("matches") or []}
+            ch = False
+            for x in a.get("matches") or []:
+                y = bm.get(str(x.get("id")))
+                if x.get("t_sched") and (y is None or (y.get("t_sched") or "") < x["t_sched"]) and (y is None or not y.get("has_detail") or [t.get("name") for t in y.get("teams") or []] != [t.get("name") for t in x.get("teams") or []]):
+                    if y is None:
+                        b.setdefault("matches", []).append(x)
+                    else:
+                        y.update({k: x[k] for k in ("teams", "begin_at", "name", "stage", "t_sched") if k in x})
+                    ch = True
+            if ch:
+                b["matches"].sort(key=lambda m: m.get("begin_at") or "")
+                (dst / "matches.json").write_text(json.dumps(b, ensure_ascii=False, separators=(",", ":")), "utf-8")
         for f in (OURS / "match").glob("*.json"):
             g = dst / "match" / f.name
             a, b = load(f), load(g)

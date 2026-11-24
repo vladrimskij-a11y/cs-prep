@@ -7744,6 +7744,47 @@ def main() -> int:
     return 0
 
 
+def sched_sync(L: dict) -> None:
+    """Владелец 24.11: после жеребьёвки мейджора новые пары — за 5–10 минут, а не через 30–60.
+    Только пока идёт турнир тир-1 (есть его матч в ближайшие/последние сутки): один запрос к PandaScore.
+    Новые матчи и пары, где появились команды, попадают в список (`t_sched`); карточку соберёт ближайший сбор статистики."""
+    ms = L.get("matches") or []
+    live = {m.get("tournament") for m in ms if m.get("tier") == "s" and m.get("begin_at")
+            and abs((parse_iso(m["begin_at"]) or NOW) - NOW) < timedelta(hours=24)}
+    if not live or not TOKEN:
+        return
+    try:
+        batch = panda("/csgo/matches/upcoming", {"sort": "begin_at", "per_page": 100,
+                                                 "range[begin_at]": f"{iso(NOW - timedelta(hours=6))},{iso(NOW + timedelta(days=4))}"})
+    except Exception as e:
+        warn(f"PandaScore расписание: {e!r}")
+        return
+    by = {str(m.get("id")): m for m in ms}
+    added = changed = 0
+    for m in batch:
+        if ((m.get("tournament") or {}).get("tier") or "").lower() != "s":
+            continue
+        b = match_brief(m)
+        if b["tournament"] not in live:
+            continue
+        old = by.get(str(b["id"]))
+        names = [t.get("name") for t in b["teams"]]
+        if old is None:
+            if not names:
+                continue
+            b.update({"has_detail": False, "t_sched": iso(NOW)})
+            ms.append(b)
+            added += 1
+        elif [t.get("name") for t in old.get("teams") or []] != names or old.get("begin_at") != b["begin_at"]:
+            old.update({"teams": b["teams"], "begin_at": b["begin_at"], "name": b["name"], "stage": b["stage"], "t_sched": iso(NOW)})
+            changed += 1
+    if added or changed:
+        ms.sort(key=lambda x: x.get("begin_at") or "")
+        L["matches"] = ms
+        save_json(OUT / "matches.json", L)
+    print(f"Расписание: новых матчей {added}, обновлено пар {changed}")
+
+
 def news_main() -> int:
     """Каждые ~20 минут: свежие посты каналов → лента и новости уже собранных матчей. Статистику не трогаем."""
     L = load_json(OUT / "matches.json", {}) or {}
@@ -7761,6 +7802,10 @@ def news_main() -> int:
             save_json(f, d)
         except Exception as e:
             warn(f"Новости {f.stem}: {e!r}")
+    try:
+        sched_sync(L)  # в дни тир-1 турнира — новые пары сразу после жеребьёвки
+    except Exception as e:
+        warn(f"Новые матчи: {e!r}")
     try:
         d2_sync()  # каждые 5 минут: вето перед матчем и время начала
     except Exception as e:
