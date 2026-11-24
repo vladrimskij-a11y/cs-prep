@@ -2576,7 +2576,7 @@ a.ni { text-decoration: none; color: inherit; }
   // за какую команду (или тренером какой) был на мейджоре — по дате мейджора и истории Liquipedia;
   // аренда и замена важнее основной команды (Hobbit в Кракове 2017 играл за Gambit в аренде из Tengri)
   var MAJOR_DATES = [[/DreamHack Winter 2013/i, "2013-11-30"], [/Katowice 2014/i, "2014-03-16"], [/Cologne 2014/i, "2014-08-17"], [/DreamHack Winter 2014/i, "2014-11-29"],
-    [/Katowice 2015/i, "2015-03-15"], [/Cologne 2015/i, "2015-08-23"], [/Cluj/i, "2015-11-01"], [/Columbus/i, "2016-04-03"], [/Cologne 2016/i, "2016-07-10"],
+    [/Katowice 2015/i, "2015-03-15"], [/Cologne 2015/i, "2015-08-23"], [/Cluj.*2015/i, "2015-11-01"], [/Columbus.*2016/i, "2016-04-03"], [/Cologne 2016/i, "2016-07-10"],
     [/ELEAGUE Major 2017|Atlanta/i, "2017-01-29"], [/Krak[oó]w 2017/i, "2017-07-23"], [/ELEAGUE Major 2018|Boston/i, "2018-01-28"], [/FACEIT Major|London 2018/i, "2018-09-23"],
     [/Katowice 2019/i, "2019-03-03"], [/Berlin 2019/i, "2019-09-08"], [/Stockholm 2021/i, "2021-11-07"], [/Antwerp 2022/i, "2022-05-22"], [/Rio 2022/i, "2022-11-13"],
     [/Paris 2023/i, "2023-05-21"], [/Copenhagen 2024/i, "2024-03-31"], [/Shanghai 2024/i, "2024-12-15"], [/Austin 2025/i, "2025-06-22"], [/Budapest 2025/i, "2025-12-14"],
@@ -2619,7 +2619,7 @@ a.ni { text-decoration: none; color: inherit; }
     });
     var maj = !p.majors ? '' : '<span class="pmaj tap" role="button" data-pop="' + esc(JSON.stringify({ t: "🏟 Мейджоры: " + p.majors + (p.major_wins ? ", выиграл " + p.major_wins : ""),
       l: majList.length ? majList : ["Список турниров появится после ближайшего полного сбора"] })) + '">' + majTxt + ' ›</span>';
-    return '<' + (attrs ? 'button class="pl"' + attrs : 'div class="pl"') + '><span class="nickline"><span class="pflag">' + esc(flag(NICK_CC[String(p.nick || "").toLowerCase()] || p.nationality || p.flag)) + '</span><span class="nick">' + esc(p.nick) + '</span>' + mvpBadge(p) + teamsBadge(p) + '</span>' +
+    return '<' + (attrs ? 'button class="pl"' + attrs : 'div class="pl"') + '><span class="nickline"><span class="pflag">' + esc(flag(NICK_CC[String(p.nick || "").toLowerCase()] || p.nationality || p.flag)) + '</span><span class="nick">' + esc(p.nick) + '</span>' + mvpBadge(p) + cupBadge(p) + teamsBadge(p) + '</span>' +
       (roles.length ? '<span class="rcol">' + roles.map(function (r) { return '<span class="rt ' + r[1] + '">' + esc(r[0]) + '</span>'; }).join("") + '</span>' : '') +
       '<span class="rn">' + info.join(" · ") + '</span>' + maj + (statsHtml ? '<span class="ps">' + statsHtml + '</span>' : "") + '</' + (attrs ? 'button' : 'div') + '>';
   }
@@ -2669,6 +2669,13 @@ a.ni { text-decoration: none; color: inherit; }
     var s = name.match(/ESL Pro League Season (\d+)/i) || name.match(/^ECS Season (\d+)/i);
     if (s) { var base = /ECS/i.test(s[0]) ? 2016 : 2015; return name + " " + (base + Math.floor((+s[1] - 1) / 2)); }
     return name;
+  }
+  // трофеи игрока (HLTV, все годы) — как мейджоры и MVP: турнир с годом выделен, ниже команда (владелец 24.11)
+  function cupBadge(p) {
+    var T = (p.trophies || []).filter(function (x, i, a) { return x && a.indexOf(x) === i; });
+    if (!T.length) return "";
+    var l = T.map(function (x) { var e = evYear(String(x).replace(/^Winner of\s+/i, "")); return { e: e, p: "", tm: teamInYear(p, e), w: true }; });
+    return '<span role="button" class="medal cup pcup" data-pop="' + esc(JSON.stringify({ t: "🏆 Трофеи: " + T.length, l: l })) + '">🏆<b>' + T.length + '</b></span>';
   }
   function mvpBadge(p) {
     if (!p.mvp) return "";
