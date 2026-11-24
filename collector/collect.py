@@ -1813,15 +1813,37 @@ def bo3_tournament_for(name: str) -> dict | None:
     if not name:
         return None
     nn = tour_norm(name)
-    pick = next((t for t in res if tour_same((t.get("name") or "").replace("Intel Extreme Masters", "IEM"), nn)
-                 or tour_same(name, tour_norm((t.get("name") or "").replace("Intel Extreme Masters", "IEM")))), None)
+    same = lambda t: tour_same((t.get("name") or "").replace("Intel Extreme Masters", "IEM"), nn) or \
+        tour_same(name, tour_norm((t.get("name") or "").replace("Intel Extreme Masters", "IEM")))
+    STG = re.compile(r"\s+(Stage\s*\d+|Play-?in|Opening Stage|Elimination Stage)\s*$", re.I)
+    cands = [t for t in res if same(t)]
+    pick = next((t for t in cands if not STG.search(t.get("name") or "")), cands[0] if cands else None)
     if not pick:
         return None
     try:
-        return bo3(f"/tournaments/{pick['slug']}")
+        T = bo3(f"/tournaments/{pick['slug']}")
     except Exception as e:
         warn(f"bo3 турнир {pick.get('slug')}: {e!r}")
         return None
+    # 24.11: bo3 вынес Stage 1 и Stage 2 мейджора в отдельные турниры («PGL Major Singapore 2026 Stage 1») — пропали из обзора.
+    # Собираем их обратно в один турнир: стадии по дате начала, перед стадиями основного.
+    base = STG.sub("", pick.get("name") or "").strip().lower()
+    kids = sorted([t for t in res if t is not pick and STG.search(t.get("name") or "") and STG.sub("", t["name"]).strip().lower() == base],
+                  key=lambda t: t.get("start_date") or "")
+    pre = []
+    for k in kids:
+        try:
+            K = bo3(f"/tournaments/{k['slug']}")
+        except Exception as e:
+            warn(f"bo3 стадия {k.get('slug')}: {e!r}")
+            continue
+        for st in K.get("stages") or []:
+            title = re.sub(re.escape(K.get("name") or "") + r"\s*", "", st.get("title") or "").strip() or STG.search(k["name"]).group(1)
+            pre.append({**st, "title": title})
+    if pre:
+        main = sorted(T.get("stages") or [], key=lambda x: x.get("sequence_number") or 0)
+        T = {**T, "stages": [{**st, "sequence_number": i} for i, st in enumerate(pre + main)]}
+    return T
 
 
 _refill_n = [0]
