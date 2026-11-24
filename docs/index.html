@@ -633,11 +633,12 @@ html { overflow-anchor: none; }
 .home-brand h1 { margin: 0; font-family: var(--display); font-weight: 800; font-size: 34px; line-height: 1; letter-spacing: .01em; }
 .home-brand h1 b { color: var(--onair); }
 /* плавные переходы: страница въезжает чуть снизу и проявляется; окна раскрываются; всё на transform/opacity */
-@keyframes viewIn { from { opacity: 0; transform: translate3d(0, 10px, 0); } to { opacity: 1; transform: none; } }
+/* 24.11: без прозрачности — страница иногда рисуется дважды за переход (сразу и после смены адреса), и проявление
+   с нуля начиналось заново: «моргание». Теперь только лёгкий сдвиг, повторная отрисовка не видна */
+@keyframes viewIn { from { transform: translate3d(0, 6px, 0); } to { transform: none; } }
 @keyframes popIn { from { opacity: 0; transform: translate3d(0, 6px, 0) scale(.97); } to { opacity: 1; transform: none; } }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 body.nav #app > .view, body.nav #app > .sshell .pane, body.nav #app > .mshell .mviewport { animation: viewIn .28s cubic-bezier(.2,.8,.25,1) both; }
-body.nav #app > .sshell .shead, body.nav #app > .mshell .mhead { animation: fadeIn .2s ease-out both; }
 .pop .pop-in { animation: popIn .18s cubic-bezier(.2,.8,.25,1) both; transform-origin: top center; }
 .empty { animation: fadeIn .25s ease-out both; }
 .tab, .chip, .mcard, .match, .tour-card, .bm, .rk, .gbtn, .ptile, .pp-m, .fact.link, .ni { -webkit-tap-highlight-color: transparent; }
