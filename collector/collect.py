@@ -568,6 +568,64 @@ def lp_search(name: str) -> str | None:
     return None
 
 
+LP_PRIZE_F = CACHE / "lp_prize.json"
+lp_prize_cache: dict = load_json(LP_PRIZE_F, {})  # турнир (название bo3) → {"t", "title", "slots": [$ по местам]}
+_lp_prize_new = [0]
+
+
+def lp_opensearch(q: str) -> list[str]:
+    if _lp_blocked[0]:
+        return []
+    wait = 2.5 - (time.time() - _lp_last[0])
+    if wait > 0:
+        time.sleep(wait)
+    _lp_last[0] = time.time()
+    stats["liquipedia_requests"] += 1
+    url = LP_API + "?" + urllib.parse.urlencode({"action": "opensearch", "search": q, "limit": 10, "format": "json"})
+    try:
+        res = json.loads(http_get(url, {"User-Agent": LP_UA, "Accept": "application/json"}))
+        return res[1] if len(res) > 1 else []
+    except Exception as e:
+        warn(f"Liquipedia поиск {q}: {e!r}")
+        return []
+
+
+def lp_prize_slots(name: str) -> list[float]:
+    """Призовые по местам с Liquipedia ({{PrizePool}} → {{Slot|usdprize=25,000|count=2}}): [$ за 1-е, 2-е, …].
+    Команд в слотах нет (их подставляет сетка) — места берём из сетки bo3. Владелец 24.11: «призовые — с Liquipedia».
+    Найденное хранится навсегда, не найденное — повтор через 3 дня; до 8 новых турниров за сбор."""
+    c = lp_prize_cache.get(name)
+    if c and (c.get("slots") or (NOW - (parse_iso(c.get("t")) or NOW)) < timedelta(days=3)):
+        return c.get("slots") or []
+    if _lp_prize_new[0] >= 8 or _lp_blocked[0] or STATS or os.environ.get("NEWS_ONLY") == "1":
+        return (c or {}).get("slots") or []  # Liquipedia — только в полном сборе
+    _lp_prize_new[0] += 1
+    words = re.findall(r"[A-Za-z0-9]+", name)
+    nn = tour_norm(name)
+    best = None
+    for q in dict.fromkeys([" ".join(words[:2]), words[0] if words else ""]):
+        if not q:
+            continue
+        for t in lp_opensearch(q):
+            if re.search(r"(?i)qualifier|/open|/closed", t):
+                continue
+            tn = tour_norm(t.replace("/", " "))
+            if tour_same(t.replace("/", " "), nn) or tour_same(name, tn):
+                best = t
+                break
+        if best:
+            break
+    slots: list[float] = []
+    if best:
+        pg = lp_pages([best]).get(best, "")
+        blk = pg[pg.find("PrizePool"):] if "PrizePool" in pg else ""
+        blk = blk[:blk.find("==") if "==" in blk else len(blk)]
+        for usd, cnt in re.findall(r"\{\{Slot\|usdprize=([\d,.]+)(?:\|count=(\d+))?", blk):
+            slots += [float(usd.replace(",", ""))] * int(cnt or 1)
+    lp_prize_cache[name] = {"t": iso(NOW), "title": best, "slots": slots}
+    return slots
+
+
 def lp_param(line: str, key: str) -> str | None:
     m = re.search(r"\|\s*" + key + r"\s*=\s*([^|}<\n]*)", line)
     return m.group(1).strip() if m and m.group(1).strip() else None
@@ -2367,10 +2425,20 @@ def vrs_live():
         if not pl:
             continue
         P = _tprize(x_["T"])
-        share = {"1st": .40, "2nd": .20, "3rd": .10, "3-4th": .10, "4th": .10}
         rest = [i for i in x_["ids"] if i not in pl]
+        try:
+            sl = lp_prize_slots(nm)  # суммы по местам с Liquipedia; нет — типичные доли
+        except Exception as e:
+            warn(f"VRS: призовые Liquipedia {nm}: {e!r}")
+            sl = []
+        if len(sl) >= 4:
+            by = {"1st": sl[0], "2nd": sl[1], "3rd": sl[2], "4th": sl[3], "3-4th": (sl[2] + sl[3]) / 2}
+            other = sum(sl[4:]) / max(len(rest), 1) if rest else 0
+        else:
+            by = {k: P * v for k, v in {"1st": .40, "2nd": .20, "3rd": .10, "3-4th": .10, "4th": .10}.items()}
+            other = P * .20 / len(rest) if rest else 0
         for i, n in x_["ids"].items():
-            usd = P * share.get(pl.get(i), 0) if i in pl else (P * .20 / len(rest) if rest else 0)
+            usd = by.get(pl.get(i), 0) if i in pl else other
             if usd > 0:
                 L.add_prize(n, usd, math.floor(x_["t"]))
     for f in (OUT / "team").glob("*.json"):
@@ -7578,6 +7646,7 @@ def main() -> int:
     save_json(ROSTER_CACHE_F, roster_cache)
     save_json(PHIST_F, phist_cache)
     save_json(BEEF_F, beef_cache)
+    save_json(LP_PRIZE_F, lp_prize_cache)
     for k in [k for k, v in art_cache.items() if (v.get("t") or "") < iso(NOW - timedelta(days=NEWS_DAYS + 7))]:
         del art_cache[k]
     save_json(ART_CACHE_F, art_cache)
