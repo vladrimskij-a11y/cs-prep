@@ -6817,10 +6817,10 @@ def build_prediction(d: dict, bids: list) -> dict | None:
         warn(f"OddsPapi линии: {e!r}")
         opl = None
     try:
-        if odds and odds.get("win"):  # владелец 24.11: сначала бесплатная линия (bo3), потом Pinnacle (OddsPapi), потом VRS
+        if opl and opl.get("win") is not None:
+            ps = min(0.97, max(0.03, opl["win"]))  # Pinnacle (или рынок) точнее одной линии Thunderpick
+        elif odds and odds.get("win"):
             ps = min(0.97, max(0.03, odds["win"][0] / 100))
-        elif opl and opl.get("win") is not None:
-            ps = min(0.97, max(0.03, opl["win"]))
         else:
             tbl = vrs_table()
             ra, rb = (vrs_find(t, tbl) if tbl else None for t in (d.get("teams") or [{}, {}])[:2])
