@@ -1,0 +1,16 @@
+name: probe
+on: workflow_dispatch
+jobs:
+  p:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12"}
+      - run: pip install -q pillow
+      - uses: actions/cache/restore@v4
+        with:
+          path: cache
+          key: collector-cache-${{ github.run_id }}
+          restore-keys: collector-cache-
+      - run: python tools/probe_odds.py
