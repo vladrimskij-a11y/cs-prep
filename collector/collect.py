@@ -2265,9 +2265,26 @@ def _fill_top_places(places: list, tn: str) -> list:
     return out
 
 
+VRS_WARM_TOP = int(os.environ.get("VRS_WARM_TOP", "150"))
+
+
 def vrs_live():
     """«Живой» рейтинг, как на HLTV: снимок Valve + матчи после него (итоги турниров, история bo3, форма команд)
     + гарантированные призовые идущих турниров (выбывшим — их место, остальным сыгравшим — худшее незанятое)."""
+    # 24.11: расхождение с HLTV выросло до ~16 (BIG −52, Luminosity −51, Sangal −42): после снимка у команд вне наших
+    # турниров не было новых матчей — старые победы «стареют», а новых нет. Добираем историю bo3 у всей таблицы (топ-150),
+    # раз за запуск (bo3 не блокирует, ~1 запрос на команду).
+    if not _vrs_live.get("warm") and not FAST:
+        _vrs_live["warm"] = True
+        n0 = len(_bo3_hist)
+        try:
+            for r in vrs_table()[:VRS_WARM_TOP]:
+                bid = team_by_name(r["name"])
+                if bid and bid not in _bo3_hist:
+                    bo3_history(bid, pages=1)
+        except Exception as e:
+            warn(f"VRS: история команд таблицы: {e!r}")
+        print(f"VRS: история bo3 добрана у {len(_bo3_hist) - n0} команд таблицы")
     sig = len(_bo3_hist)
     if _vrs_live.get("sig") == sig:
         return _vrs_live.get("L")
