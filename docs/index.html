@@ -586,8 +586,8 @@ html { overflow-anchor: none; }
 .pop-in li.mj .mj-p { color: var(--muted); }
 .pop-in li.mj .mj-t { display: block; color: var(--ct); font-weight: 600; font-size: .92em; }
 .pop-in li.mj .mj-t small { color: var(--muted); font-weight: 400; font-size: 1em; }
-.medal.tms { margin-left: 10px; position: relative; z-index: 2; }  /* зона нажатия MVP рядом не перекрывает кнопку команд */
-.medal.mvp { background: var(--t-soft); color: var(--t); }
+.nickline .medal ~ .medal { margin-left: 10px; position: relative; z-index: 2; }  /* зоны нажатия соседних кнопок не перекрывают друг друга */
+.medal.mvp, .medal.pcup, .medal.tms { background: var(--t-soft); color: var(--t); }  /* кубки, MVP, составы — подсвечены одинаково */
 .roster .hd .medals { justify-self: end; }
 .medal { cursor: pointer; }
 /* зона нажатия на награды больше самой плашки: палец попадает с первого раза */
@@ -2620,7 +2620,7 @@ a.ni { text-decoration: none; color: inherit; }
     });
     var maj = !p.majors ? '' : '<span class="pmaj tap" role="button" data-pop="' + esc(JSON.stringify({ t: "🏟 Мейджоры: " + p.majors + (p.major_wins ? ", выиграл " + p.major_wins : ""),
       l: majList.length ? majList : ["Список турниров появится после ближайшего полного сбора"] })) + '">' + majTxt + ' ›</span>';
-    return '<' + (attrs ? 'button class="pl"' + attrs : 'div class="pl"') + '><span class="nickline"><span class="pflag">' + esc(flag(NICK_CC[String(p.nick || "").toLowerCase()] || p.nationality || p.flag)) + '</span><span class="nick">' + esc(p.nick) + '</span>' + mvpBadge(p) + cupBadge(p) + teamsBadge(p) + '</span>' +
+    return '<' + (attrs ? 'button class="pl"' + attrs : 'div class="pl"') + '><span class="nickline"><span class="pflag">' + esc(flag(NICK_CC[String(p.nick || "").toLowerCase()] || p.nationality || p.flag)) + '</span><span class="nick">' + esc(p.nick) + '</span>' + cupBadge(p) + mvpBadge(p) + teamsBadge(p) + '</span>' +
       (roles.length ? '<span class="rcol">' + roles.map(function (r) { return '<span class="rt ' + r[1] + '">' + esc(r[0]) + '</span>'; }).join("") + '</span>' : '') +
       '<span class="rn">' + info.join(" · ") + '</span>' + maj + (statsHtml ? '<span class="ps">' + statsHtml + '</span>' : "") + '</' + (attrs ? 'button' : 'div') + '>';
   }
