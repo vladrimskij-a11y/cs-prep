@@ -5242,6 +5242,106 @@ def _yr(lo: str, hi: str, today: str) -> str:
     return a if a == b else f"{a}–{b}"
 
 
+# ---------------------------------------------------------------- конфликты и громкие истории между игроками матча
+# Владелец 24.11: «такие штуки знать надо» (история stavn — malbsMd/Swisher). Источник — поиск по всей истории
+# новостных Telegram-каналов (t.me/s/<канал>?q=<ник>): пост, где упомянуты люди из обеих команд и есть слова про конфликт.
+BEEF_F = CACHE / "beef_search.json"
+beef_cache: dict = load_json(BEEF_F, {})      # ник → {"t": когда искали, "posts": [{url, date, text}]}
+BEEF_REQ = [int(os.environ.get("BEEF_REQ", "150"))]  # запросов к t.me за сбор (ник × канал)
+BEEF_TTL_DAYS = 7
+BEEF_RX = re.compile(r"конфликт|скандал|тр[эе]ш.?ток|оскорб|ссор|вражд|обвин|наехал|токсич|драм[аы]|измен|девушк|отношени|"
+                     r"извин|посвят|хейт|тролл|подкол|разборк|перепалк|высмеял|унизил|провокац|не здоровал|не пожал|руку не|"
+                     r"беф|beef|drama|trash.?talk|чит[еа]р|обман|предал|предательств|кинул|слил|ненавид|злост|публично ответил|ответил на слова",
+                     re.I)
+
+
+def tg_search(ch: str, q: str, pages: int = 2) -> list[dict]:
+    """Поиск по всей истории канала: t.me/s/<канал>?q=… (свежие сверху, страница ~20 постов)."""
+    out, before = [], None
+    for _ in range(pages):
+        url = f"https://t.me/s/{ch}?q={urllib.parse.quote(q)}" + (f"&before={before}" if before else "")
+        try:
+            html = http_get(url, {"Accept": "text/html"}, timeout=25).decode("utf-8", "replace")
+        except Exception as e:
+            warn(f"Telegram поиск @{ch} «{q}»: {e!r}")
+            BEEF_REQ[0] = 0  # отказ — до следующего сбора не спрашиваем
+            break
+        BEEF_REQ[0] -= 1
+        page = []
+        for b in html.split('class="tgme_widget_message_wrap')[1:]:
+            pm = re.search(r'data-post="([^"]+)/(\d+)"', b)
+            tm = re.search(r'<time datetime="([^"]+)"', b)
+            body = tg_text_html(b)
+            if not pm or not tm or not body:
+                continue
+            body = re.sub(r"<(?:blockquote|/blockquote|/p|p|br\s*/?)[^>]*>", "\n", body)
+            page.append({"url": f"https://t.me/{ch}/{pm.group(2)}", "id": int(pm.group(2)), "date": tm.group(1)[:10],
+                         "text": re.sub(r"\n{3,}", "\n\n", strip_html(body)).strip()[:2500]})
+        out += page
+        if len(page) < 15:
+            break
+        before = min(x["id"] for x in page)
+        time.sleep(1)
+    for x in out:
+        x.pop("id", None)
+    return out
+
+
+def player_beef(d: dict) -> list[dict]:
+    teams = [t for t in d.get("teams") or [] if not t.get("tbd")]
+    if len(teams) != 2:
+        return []
+    who = []  # (команда, ник, варианты ника)
+    for i, t in enumerate(teams):
+        for p in (t.get("players") or []) + (t.get("coach") or []):
+            n = p.get("nick") or ""
+            vs = {x for x in [n] + list(p.get("aka") or []) if x and len(x) >= 3}
+            if vs:
+                who.append((i, n, vs))
+    can_net = not FAST and not STATS
+    for _, n, _ in who:  # поиск по нику во всех каналах, раз в неделю
+        c = beef_cache.get(n.lower())
+        if c and (parse_iso(c.get("t")) or NOW) > NOW - timedelta(days=BEEF_TTL_DAYS):
+            continue
+        if not can_net or BEEF_REQ[0] < len(TG_NEWS_CHANNELS):
+            continue
+        posts = []
+        for ch in TG_NEWS_CHANNELS:
+            posts += tg_search(ch, n)
+            time.sleep(1)
+        if BEEF_REQ[0] >= 0:
+            beef_cache[n.lower()] = {"t": iso(NOW), "posts": posts}
+    rx = {n: re.compile(r"(?<![\w])(" + "|".join(re.escape(v) for v in sorted(vs, key=len, reverse=True)) + r")(?![\w])", re.I) for _, n, vs in who}
+    pool = {}
+    for _, n, _ in who:
+        for x in (beef_cache.get(n.lower()) or {}).get("posts") or []:
+            pool[x["url"]] = x
+    for x in tg_cache.values():  # и свежие посты ленты
+        if isinstance(x, dict) and x.get("url") and x.get("text"):
+            pool.setdefault(x["url"], {"url": x["url"], "date": str(x.get("date") or "")[:10], "text": x["text"]})
+    out, seen = [], []
+    for x in sorted(pool.values(), key=lambda x: x.get("date") or "", reverse=True):
+        txt = x.get("text") or ""
+        if not BEEF_RX.search(txt):
+            continue
+        a = [n for i, n, _ in who if i == 0 and rx[n].search(txt)]
+        b = [n for i, n, _ in who if i == 1 and rx[n].search(txt)]
+        if not a or not b:
+            continue
+        tok = title_tokens(txt[:400])
+        if any(len(tok & o) / max(1, len(tok | o)) >= 0.5 for o in seen):
+            continue  # та же история из другого канала
+        seen.append(tok)
+        lines = [l.strip() for l in txt.split("\n") if l.strip()]
+        head = lines[0] if lines else txt
+        body = " ".join(lines[1:])
+        out.append({"tag": "Конфликт", "kind": "beef", "who": f"{', '.join(a)} ({teams[0]['name']}) — {', '.join(b)} ({teams[1]['name']})",
+                    "text": head[:220], "more": body[:600] or None, "date": x.get("date"), "url": x["url"]})
+        if len(out) >= 6:
+            break
+    return out
+
+
 def player_links(d: dict) -> list[dict]:
     """Связи игроков для эфира (Liquipedia, история команд): кто с кем играл вместе и когда, кто играл за соперника."""
     teams = [t for t in d.get("teams") or [] if not t.get("tbd")]
@@ -6630,6 +6730,12 @@ def build_detail(m: dict, prev: dict | None) -> dict:
         detail["facts"] = player_links(detail) or None
     except Exception as e:
         warn(f"Связи игроков: {e!r}")
+    try:
+        bf = player_beef(detail)
+        if bf:
+            detail["facts"] = bf + (detail.get("facts") or [])
+    except Exception as e:
+        warn(f"Конфликты игроков: {e!r}")
     return detail
 
 
@@ -7299,6 +7405,7 @@ def main() -> int:
     save_json(TR_CACHE_F, tr_cache)
     save_json(ROSTER_CACHE_F, roster_cache)
     save_json(PHIST_F, phist_cache)
+    save_json(BEEF_F, beef_cache)
     for k in [k for k, v in art_cache.items() if (v.get("t") or "") < iso(NOW - timedelta(days=NEWS_DAYS + 7))]:
         del art_cache[k]
     save_json(ART_CACHE_F, art_cache)
