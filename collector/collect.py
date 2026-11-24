@@ -603,14 +603,16 @@ def lp_prize_slots(name: str) -> list[float]:
     words = re.findall(r"[A-Za-z0-9]+", name)
     nn = tour_norm(name)
     best = None
-    for q in dict.fromkeys([" ".join(words[:2]), words[0] if words else ""]):
+    nums = set(re.findall(r"\d+", name))  # номера должны совпасть: Episode 6 ≠ Episode 5, Series 13 ≠ Series 2
+    yr = next((x for x in nums if len(x) == 4), "")
+    for q in dict.fromkeys([" ".join(words[:2]), (words[0] + "/" + yr) if words and yr else "", words[0] if words else ""]):
         if not q:
             continue
         for t in lp_opensearch(q):
-            if re.search(r"(?i)qualifier|/open|/closed", t):
+            if re.search(r"(?i)qualifier|/open|/closed", t) or set(re.findall(r"\d+", t)) != nums:
                 continue
             tn = tour_norm(t.replace("/", " "))
-            if tour_same(t.replace("/", " "), nn) or tour_same(name, tn):
+            if tour_same(t.replace("/", " "), nn) or tour_same(name, tn) or len(nums) >= 1:
                 best = t
                 break
         if best:
