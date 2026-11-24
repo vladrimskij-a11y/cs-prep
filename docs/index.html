@@ -2686,22 +2686,22 @@ a.ni { text-decoration: none; color: inherit; }
     return name;
   }
   // трофеи игрока (HLTV, все годы) — как мейджоры и MVP: турнир с годом выделен, ниже команда (владелец 24.11)
+  // только турниры тир-1 (владелец 24.11): мейджоры, IEM, ESL Pro League/One, BLAST, PGL, DreamHack Masters, StarSeries, ECS…
+  var TIER1_RX = /major|\biem\b|intel extreme masters|esl pro league|esl esea pro league|esl one|\bepl\b|blast|\bpgl\b(?!.*national)|dreamhack masters|dreamhack winter 201[34]|ecs season \d+ finals|eleague|epicenter|starseries|faceit league|esports world cup|gamers8|thunderpick world championship|fissure playground|esl grand slam|cluj-napoca 2015|columbus 2016|ems one katowice|esl katowice/i;
   function cupBadge(p) {
-    // ряд трофеев HLTV + первые места из таблицы достижений (победы на замене: jks — IEM Katowice 2022 за FaZe)
+    // ряд трофеев HLTV + первые места из таблицы достижений (победы на замене: jks — IEM Katowice 2022 за FaZe);
+    // всегда кубок, только первые места и только тир-1, по порядку лет (владелец 24.11)
     var seen = {}, T = (p.trophies || []).concat(p.event_wins || []).filter(function (x) {
       var k = String(x || "").toLowerCase().replace(/^winner of\s+/, "").replace(/[^a-z0-9]+/g, "");
-      if (!k || seen[k]) return false; seen[k] = 1; return true;
+      if (!k || seen[k] || !TIER1_RX.test(String(x))) return false; seen[k] = 1; return true;
     });
-    // вторые места (владелец 24.11) — серебро под трофеями
-    var S = (p.event_seconds || []).filter(function (x) {
-      var k = String(x || "").toLowerCase().replace(/[^a-z0-9]+/g, "");
-      if (!k || seen[k]) return false; seen[k] = 1; return true;
-    });
-    if (!T.length && !S.length) return "";
-    var l = T.map(function (x) { var e = evYear(String(x).replace(/^Winner of\s+/i, "")); return { e: e, p: "", tm: teamInYear(p, e), w: true }; });
-    if (S.length) l = l.concat(["§🥈 Вторые места: " + S.length], S.map(function (x) { var e = evYear(x); return { e: e, p: "", tm: teamInYear(p, e), s: true }; }));
-    var tt = (T.length ? "🏆 Трофеи: " + T.length : "") + (S.length ? (T.length ? " · " : "") + "🥈 " + S.length : "");
-    return '<span role="button" class="medal cup pcup" data-pop="' + esc(JSON.stringify({ t: tt, l: l })) + '">' + (T.length ? '🏆<b>' + T.length + '</b>' : '🥈<b>' + S.length + '</b>') + '</span>';
+    if (!T.length) return "";
+    var l = T.map(function (x, i) {
+      var e = evYear(String(x).replace(/^Winner of\s+/i, "")), y = (e.match(/\b(19|20)\d\d\b/g) || []).pop();
+      return { e: e, p: "", tm: teamInYear(p, e), w: true, y: +y || 9999, i: i };
+    }).sort(function (a, b) { return a.y - b.y || b.i - a.i; })  // HLTV пишет новые первыми — внутри года наоборот
+      .map(function (x) { return { e: x.e, p: "", tm: x.tm, w: true }; });
+    return '<span role="button" class="medal cup pcup" data-pop="' + esc(JSON.stringify({ t: "🏆 Трофеи: " + l.length, l: l })) + '">🏆<b>' + l.length + '</b></span>';
   }
   function mvpBadge(p) {
     if (!p.mvp) return "";
