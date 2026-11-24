@@ -2266,6 +2266,17 @@ def _fill_top_places(places: list, tn: str) -> list:
 
 
 VRS_WARM_TOP = int(os.environ.get("VRS_WARM_TOP", "150"))
+# Стадии мейджора у Valve — отдельные «события» со своим весом: в данных снимка 02.11 у IEM Cologne Major 2026
+# Stage 1 (2–5 июня) вес 0.624, Stage 2 (6–9 июня) 0.809, Stage 3 и плей-офф 1.0. Гарантированных призовых
+# в Stage 1/2 нет (24.11: мы давали $20k за 9–16 место — прогноз Stage 1 был вдвое выше HLTV: CW +77 против +30).
+MAJOR_STAGE_EW = {1: 0.624, 2: 0.809}
+
+
+def major_stage(tn: str, stage_text: str | None) -> int | None:
+    if not re.search(r"(?i)major", tn or ""):
+        return None
+    m = re.search(r"(?i)(?:stage|стадия)\s*(\d)", stage_text or "")
+    return int(m.group(1)) if m else None
 
 
 def vrs_live():
@@ -2294,6 +2305,7 @@ def vrs_live():
     L = VM.Live(ds)
     played: dict = {}
     last: dict = {}
+    mstage: dict = {}  # (турнир, команда) → дальняя стадия мейджора, до которой дошла
     for f in sorted((OUT / "results").glob("*.json")):
         r = load_json(f, {}) or {}
         tn = r.get("tournament") or ""
@@ -2306,9 +2318,15 @@ def vrs_live():
                 continue
             last[tn] = max(last.get(tn, 0), t)
             ew = VM.curve(min(pool, 1e6) / 1e6) if pool else 1.0
+            ms = major_stage(tn, m.get("stage"))
+            if ms in MAJOR_STAGE_EW:
+                ew = MAJOR_STAGE_EW[ms]
             L.add_match(t, tm[0].get("name"), tm[1].get("name"), m["winner"] == 0, ew, True)
             for x in tm:
                 played.setdefault(tn, set()).add(L.key(x.get("name")))
+                if ms:
+                    k_ = (tn, L.key(x.get("name")))
+                    mstage[k_] = max(mstage.get(k_, 0), ms)
     for hist in list(_bo3_hist.values()):
         for m in hist:
             t, w = _days(m.get("start_date")), m.get("winner_team_id")
@@ -2340,7 +2358,7 @@ def vrs_live():
                 done.add(L.key(n))
         g = VM.worst_open(places)
         for k in keys - done:
-            if not k.startswith("~"):
+            if not k.startswith("~") and mstage.get((tn, k), 3) >= 3:  # в Stage 1/2 мейджора призовых ещё нет
                 L.prizes.setdefault(k, []).append((now, g))
     L.played = played
     L.base = L.compute(now)["rating"]
@@ -2374,6 +2392,9 @@ def vrs_outcomes_live(a: dict, b: dict, table: list[dict], brief: dict, lan: boo
     ew = VM.curve(min(max(pool, 1.0), 1e6) / 1e6) if pool else 0.5
     places = ex.get("places")
     both, win = (0.0, 0.0), (0.0, 0.0)
+    ms = major_stage(tn, brief.get("stage"))
+    if ms in MAJOR_STAGE_EW:
+        ew, places = MAJOR_STAGE_EW[ms], None  # Stage 1/2 мейджора: свой вес, без гарантированных призовых
     if places:
         g = VM.worst_open(places)
         pl = L.played.get(tn) or set()
