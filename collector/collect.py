@@ -1259,14 +1259,34 @@ def bo3_team_id(t: dict) -> int | None:
 _bo3_hist: dict[int, list] = {}
 
 
+def bo3_team_matches(bid, params: dict) -> list[dict]:
+    """Матчи команды bo3 с фильтром статуса. 24.11: фильтр team_ids[overlap] не видел новые матчи мейджора
+    (Liquid–Wildcard есть по team1_id, но не по overlap) — коэффициенты не подтягивались, шанс шёл от VRS.
+    Спрашиваем все три фильтра и сливаем."""
+    seen, out = set(), []
+    sts = (params.get("filter[matches.status][in]") or "").split(",") or [""]
+    for f in ("filter[matches.team_ids][overlap]", "filter[matches.team1_id][eq]", "filter[matches.team2_id][eq]"):
+      for st in sts:  # статусы по одному: перечисление через запятую bo3 вместе с фильтром команды отдаёт пусто
+        pr = {**params, f: bid}
+        if st:
+            pr["filter[matches.status][in]"] = st
+        try:
+            res = bo3("/matches", pr).get("results") or []
+        except Exception as e:
+            warn(f"bo3 матчи {bid}: {e!r}")
+            continue
+        for m in res:
+            if m.get("id") not in seen:
+                seen.add(m.get("id"))
+                out.append(m)
+    out.sort(key=lambda m: m.get("start_date") or "")
+    return out
+
+
 def bo3_upcoming(bid: int, limit: int = 10) -> list[dict]:
     """Ближайшие матчи команды (bo3.gg): дата, соперник, турнир, формат — для страницы команды."""
-    try:
-        j = bo3("/matches", {"page[limit]": limit, "sort": "start_date", "filter[matches.status][in]": "upcoming,current",
-                             "filter[matches.team_ids][overlap]": bid, "with": "teams,tournament"})
-    except Exception as e:
-        warn(f"bo3 ближайшие {bid}: {e}")
-        return []
+    j = {"results": bo3_team_matches(bid, {"page[limit]": limit, "sort": "start_date", "filter[matches.status][in]": "upcoming,current",
+                                           "with": "teams,tournament"})[:limit]}
     out = []
     for m in j.get("results") or []:
         me1 = m.get("team1_id") == bid
@@ -6281,12 +6301,7 @@ def bo3_odds(bids: list) -> dict | None:
     """Коэффициенты букмекеров на ближайший матч двух команд (bo3.gg) → вероятности победы и точного счёта."""
     if len(bids) != 2 or not all(bids):
         return None
-    try:
-        res = bo3("/matches", {"page[limit]": 20, "sort": "start_date", "filter[matches.status][in]": "upcoming,current",
-                               "filter[matches.team_ids][overlap]": bids[0]}).get("results") or []
-    except Exception as e:
-        warn(f"bo3 коэффициенты: {e!r}")
-        return None
+    res = bo3_team_matches(bids[0], {"page[limit]": 20, "sort": "start_date", "filter[matches.status][in]": "upcoming,current"})
     m = next((x for x in res if {x.get("team1_id"), x.get("team2_id")} == set(bids)), None)
     if m:  # вето обычно начинает вторая команда в паре bo3.gg (так в ~72% из 357 серий BO3)
         _bo3_starter[tuple(bids)] = bids.index(m.get("team2_id")) if m.get("team2_id") in bids else 0
