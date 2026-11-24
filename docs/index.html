@@ -589,8 +589,8 @@ html { overflow-anchor: none; }
 .pop-in li.pback { color: var(--muted); cursor: pointer; font-weight: 600; list-style: none; margin-left: -1em; }
 .pop-in li.mj .mj-t { display: block; color: var(--ct); font-weight: 600; font-size: .92em; }
 .pop-in li.mj .mj-t small { color: var(--muted); font-weight: 400; font-size: 1em; }
-.nickline .medal ~ .medal { margin-left: 10px; position: relative; z-index: 2; }  /* зоны нажатия соседних кнопок не перекрывают друг друга */
-.medal.mvp, .medal.pcup, .medal.tms { background: var(--t-soft); color: var(--t); }  /* кубки, MVP, составы — подсвечены одинаково */
+.nickline .medal ~ .medal { margin-left: 4px; position: relative; z-index: 2; }  /* кнопки рядом; зона нажатия следующей поверх предыдущей */
+.medal.mvp { font-size: 13px; font-weight: 400; color: inherit; background: var(--sunk); padding: 1px 6px; border-radius: 6px; }  /* MVP — как остальные кнопки, без жёлтого */
 .roster .hd .medals { justify-self: end; }
 .medal { cursor: pointer; }
 /* зона нажатия на награды больше самой плашки: палец попадает с первого раза */
