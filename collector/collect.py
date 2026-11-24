@@ -5861,8 +5861,10 @@ def hltv_player_info(nick: str, force: bool = False, coach: bool = False) -> dic
         return None
     key = f"{kp}:{pl['id']}"
     c = hltv_cache.get(key)
-    if c and (not force or _mvp_new[0] >= MVP_PER_RUN) and (parse_iso(c.get("t")) or NOW) > NOW - timedelta(days=PINFO_TTL_DAYS):
+    no_ev = c and (c.get("data") or {}).get("mvp") and not (c.get("data") or {}).get("mvp_events") and not c.get("mvfix")
+    if c and not no_ev and (not force or _mvp_new[0] >= MVP_PER_RUN) and (parse_iso(c.get("t")) or NOW) > NOW - timedelta(days=PINFO_TTL_DAYS):
         return c["data"]  # свежее — из кэша; очередь (force) перечитывает тех, чья команда доиграла турнир
+    # 24.11: у тренеров (Xizt — 2 MVP) был счётчик без списка: на странице тренера MVP только в подсказке значка — перечитать один раз
     if kp == "pinfo5":
         c = c or hltv_cache.get(f"pinfo4:{pl['id']}") or hltv_cache.get(f"pinfo3:{pl['id']}") or hltv_cache.get(f"pinfo2:{pl['id']}") or hltv_cache.get(f"pinfo:{pl['id']}")  # старая запись (без названий мейджоров) — пока не перечитали
     path = f"{pp}/{pl['id']}/{pl['slug']}"
@@ -5891,6 +5893,13 @@ def hltv_player_info(nick: str, force: bool = False, coach: bool = False) -> dic
             e = _html.unescape(e).strip()
             if e and e not in ev:
                 ev.append(e)
+    if not ev:  # страница тренера: списка нет, турниры — в подсказке значка «MVP winner at: A, B»
+        tt = re.search(r'title="MVP winner at:\s*([^"]+)"', b)
+        if tt:
+            for e in re.split(r"\s*(?:,|<br\s*/?>|&lt;br&gt;|\n)\s*(?=[A-Z0-9])", _html.unescape(tt.group(1))):
+                e = e.strip(" ,")
+                if e and e not in ev:
+                    ev.append(e)
     if ev:
         mvp = max(mvp, len(ev))
     pm = re.search(r'<div class="stat">(\d+)</div><div class="description">Majors? played', b)
@@ -5934,7 +5943,7 @@ def hltv_player_info(nick: str, force: bool = False, coach: bool = False) -> dic
     d = {"mvp": mvp, "mvp_events": ev, "majors": int(pm.group(1)) if pm else 0, "major_wins": int(wm.group(1)) if wm else 0,
          "major_events": mj, "trophies": tro[:40], "event_wins": wins[:40]}
     d["mvp_events"] = [str(x) for x in d["mvp_events"]] if isinstance(d["mvp_events"], list) else []
-    hltv_cache[key] = {"t": iso(NOW), "data": d, "fix": 1}  # fix=1 — разобрано с полным списком мейджоров (MAJOR_RX)
+    hltv_cache[key] = {"t": iso(NOW), "data": d, "fix": 1, "mvfix": 1}  # fix=1 — разобрано с полным списком мейджоров (MAJOR_RX)
     return d
 
 
