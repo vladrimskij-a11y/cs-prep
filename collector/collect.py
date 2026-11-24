@@ -2413,7 +2413,7 @@ def vrs_live():
             if t is not None and nm_ and t >= ds["end"] - VRS_FORM_DAYS:
                 recent_t[nm_] = max(recent_t.get(nm_, 0), t)
     for nm_ in sorted(recent_t, key=lambda x: -recent_t[x]):
-        if nm_ not in lp_prize_cache and not re.search(r"(?i)qualifier|open qual", nm_):
+        if "lan" not in (lp_prize_cache.get(nm_) or {}) and not re.search(r"(?i)qualifier|open qual", nm_):
             try:
                 lp_prize_slots(nm_)
             except Exception as e:
