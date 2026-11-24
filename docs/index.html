@@ -1122,7 +1122,10 @@ a.ni { text-decoration: none; color: inherit; }
   function nkeyG(n) { return nkey(n); }
   function nkey(n) { return String(n || "").toLowerCase().replace(/^(the|team)\s+|\s+(team|esports|gaming)$/g, "").replace(/[^a-z0-9а-я]/g, ""); }
   function rememberLogo(name, url) { if (name && url) LOGOS[nkey(name)] = LOGOS[nkey(name)] || url; }
-  function logo(name, url) { var k = nkey(name), u = PRIMARY[k] || url || LOGOS[k]; return u ? '<img class="lg" src="' + esc(u) + '" alt="" loading="lazy" decoding="async" onerror="this.remove()">' : ''; }
+  function logo(name, url) {
+    var k = nkey(name), u = PRIMARY[k] || url || LOGOS[k];
+    if (!u && typeof TEAM_ALT !== "undefined" && TEAM_ALT[tnorm(name)]) { var r = nkey(TEAM_ALT[tnorm(name)]); u = PRIMARY[r] || LOGOS[r]; }  // логотипа мейджора (THE ONE) нет — настоящий
+    return u ? '<img class="lg" src="' + esc(u) + '" alt="" loading="lazy" decoding="async" onerror="this.remove()">' : ''; }
   function matchRow(m, showTour) {
     m = withOpp(m);
     var a = m.teams[0], b = m.teams[1], on = mine.has(String(m.id));
@@ -1690,12 +1693,34 @@ a.ni { text-decoration: none; color: inherit; }
     renderShell({ id: "team:" + slug, back: "Рейтинг", title: esc(T ? T.name : "Команда"), tabs: [{ key: "main", label: "" }], pane: function () { return teamPane(T); } });
   }
 
+  // временные названия на турнире (беттинг-спонсоров на мейджоре нельзя): в обзоре, сетке, участниках и матчах турнира —
+  // как на самом мейджоре, с их логотипами (владелец 24.11); страница команды открывается настоящая (TEAM_ALT)
+  var TOUR_TEMP = [[/PGL Major Singapore 2026/i, { "bcgame": "GOSH", "1win": "THE ONE", "betboom": "BB Team", "parivision": "PVISION" }]];
+  function tempMap(tn) { var x = TOUR_TEMP.find(function (r) { return r[0].test(tn || ""); }); return x ? x[1] : null; }
+  function applyTemp(obj, tn) {
+    var M = tempMap(tn);
+    if (!M || !obj || obj.__temp) return obj;
+    var has = function (n) { var k = nkey(n); return PRIMARY[k] || LOGOS[k]; };
+    (function walk(o) {
+      if (Array.isArray(o)) { o.forEach(walk); return; }
+      if (!o || typeof o !== "object") return;
+      ["name", "a", "b", "team"].forEach(function (k) {
+        var v = o[k], t = typeof v === "string" && M[tnorm(v)];
+        if (!t) return;
+        o[k] = t;
+        if (has(t)) { if (k === "a") o.la = null; else if (k === "b") o.lb = null; else { o.logo = null; o.image = null; } }  // логотип мейджора, если он у нас есть
+      });
+      Object.keys(o).forEach(function (k) { if (o[k] && typeof o[k] === "object") walk(o[k]); });
+    })(obj);
+    try { Object.defineProperty(obj, "__temp", { value: true }); } catch (e) {}
+    return obj;
+  }
   function getResults(id) {
     state.results = state.results || {};
     if (state.results[id]) return Promise.resolve(state.results[id]);
     if (DEMO) return Promise.resolve((DEMO.results || {})[id] || null);
     return dfetch("data/results/" + String(id).replace(/[^\w-]/g, "-") + ".json" + bust()).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
-      .then(function (j) { state.results[id] = j; (j.matches || []).forEach(function (x) { (x.teams || []).forEach(function (t) { rememberLogo(t.name, t.logo); }); }); (j.stages || []).forEach(function (st) { st.rounds.forEach(function (rd) { rd.matches.forEach(function (x) { rememberLogo(x.a, x.la); rememberLogo(x.b, x.lb); }); }); }); return j; });
+      .then(function (j) { applyTemp(j, j.tournament); state.results[id] = j; (j.matches || []).forEach(function (x) { (x.teams || []).forEach(function (t) { rememberLogo(t.name, t.logo); }); }); (j.stages || []).forEach(function (st) { st.rounds.forEach(function (rd) { rd.matches.forEach(function (x) { rememberLogo(x.a, x.la); rememberLogo(x.b, x.lb); }); }); }); return j; });
   }
 
   function resultRow(x) {
@@ -1986,6 +2011,7 @@ a.ni { text-decoration: none; color: inherit; }
   window.addEventListener("resize", function () { if (q(".brk-row, .swg")) drawBrackets(); });
   function showTour(id) {
     var L = state.list, t = findTour(id);
+    if (t) { applyTemp(t.major, t.name); applyTemp(t.hltv, t.name); applyTemp(t.bracket, t.name); if (state.results && state.results[id]) applyTemp(state.results[id], t.name); }
     var ms = (L.matches || []).filter(function (m) { return tourOf(m) === String(id); });
     var tabs = [];
     var fin = t && t.finished;
