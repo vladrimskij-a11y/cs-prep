@@ -2306,6 +2306,7 @@ def vrs_live():
     played: dict = {}
     last: dict = {}
     mstage: dict = {}  # (турнир, команда) → дальняя стадия мейджора, до которой дошла
+    side_t: dict = {}  # турниры bo3 вне нашего списка, доигранные после снимка: slug → {T, ids, t}
     for f in sorted((OUT / "results").glob("*.json")):
         r = load_json(f, {}) or {}
         tn = r.get("tournament") or ""
@@ -2333,8 +2334,34 @@ def vrs_live():
             a, b = (m.get("team1") or {}).get("name"), (m.get("team2") or {}).get("name")
             if t is None or not w or not a or not b or t < ds["end"] - VRS_FORM_DAYS:
                 continue
-            s_ = ((m.get("tournament") or {}).get("tier") or m.get("tier") or "").lower() == "s"
+            T_ = m.get("tournament") or {}
+            s_ = (T_.get("tier") or m.get("tier") or "").lower() == "s"
             L.add_match(t, a, b, w == m.get("team1_id"), 1.0 if s_ else 0.5, s_)
+            if t > ds["end"] and T_.get("slug") and T_.get("status") == "finished" and float(T_.get("prize_pool") or 0) > 0:
+                x_ = side_t.setdefault(T_["slug"], {"T": T_, "ids": {}, "t": 0})
+                x_["ids"][str(m.get("team1_id"))], x_["ids"][str(m.get("team2_id"))] = a, b
+                x_["t"] = max(x_["t"], t)
+    # 24.11: призовые турниров вне нашего списка (Stake Ranked $100k: BIG, Luminosity, Sangal…) — без них у тир-2
+    # «предложенная награда» таяла, и очки были ниже HLTV на 25–47. Места 1–4 — по сетке bo3, доли — типичные
+    # (40/20/10/10 %, остальным участникам поровну 20 %): точных сумм по местам у bo3 нет.
+    for slug, x_ in side_t.items():
+        nm = x_["T"].get("name") or ""
+        if nm in played or any(tour_same(nm, tour_norm(p_)) for p_ in played):
+            continue
+        try:
+            pl = bo3_tour_places(slug)
+        except Exception as e:
+            warn(f"VRS: места {slug}: {e!r}")
+            continue
+        if not pl:
+            continue
+        P = float(x_["T"].get("prize_pool") or 0)
+        share = {"1st": .40, "2nd": .20, "3rd": .10, "3-4th": .10, "4th": .10}
+        rest = [i for i in x_["ids"] if i not in pl]
+        for i, n in x_["ids"].items():
+            usd = P * share.get(pl.get(i), 0) if i in pl else (P * .20 / len(rest) if rest else 0)
+            if usd > 0:
+                L.add_prize(n, usd, math.floor(x_["t"]))
     for f in (OUT / "team").glob("*.json"):
         tj = load_json(f, {}) or {}
         for x in tj.get("form") or []:
