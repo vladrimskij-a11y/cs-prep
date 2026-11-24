@@ -2265,6 +2265,17 @@ def _fill_top_places(places: list, tn: str) -> list:
     return out
 
 
+def _tprize(T: dict) -> float:
+    for k in ("teams_prize", "prize", "prize_pool"):
+        try:
+            v = float(str(T.get(k) or 0).replace(",", "").replace("$", ""))
+        except ValueError:
+            v = 0.0
+        if v > 0:
+            return v
+    return 0.0
+
+
 VRS_WARM_TOP = int(os.environ.get("VRS_WARM_TOP", "150"))
 # Стадии мейджора у Valve — отдельные «события» со своим весом: в данных снимка 02.11 у IEM Cologne Major 2026
 # Stage 1 (2–5 июня) вес 0.624, Stage 2 (6–9 июня) 0.809, Stage 3 и плей-офф 1.0. Гарантированных призовых
@@ -2337,7 +2348,7 @@ def vrs_live():
             T_ = m.get("tournament") or {}
             s_ = (T_.get("tier") or m.get("tier") or "").lower() == "s"
             L.add_match(t, a, b, w == m.get("team1_id"), 1.0 if s_ else 0.5, s_)
-            if t > ds["end"] and T_.get("slug") and T_.get("status") == "finished" and float(T_.get("prize_pool") or 0) > 0:
+            if t > ds["end"] and T_.get("slug") and T_.get("status") == "finished" and _tprize(T_) > 0:
                 x_ = side_t.setdefault(T_["slug"], {"T": T_, "ids": {}, "t": 0})
                 x_["ids"][str(m.get("team1_id"))], x_["ids"][str(m.get("team2_id"))] = a, b
                 x_["t"] = max(x_["t"], t)
@@ -2355,7 +2366,7 @@ def vrs_live():
             continue
         if not pl:
             continue
-        P = float(x_["T"].get("prize_pool") or 0)
+        P = _tprize(x_["T"])
         share = {"1st": .40, "2nd": .20, "3rd": .10, "3-4th": .10, "4th": .10}
         rest = [i for i in x_["ids"] if i not in pl]
         for i, n in x_["ids"].items():
