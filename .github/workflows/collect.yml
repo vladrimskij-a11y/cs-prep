@@ -78,4 +78,10 @@ jobs:
           path: docs
 
       - uses: actions/deploy-pages@v4
+        id: d1
         continue-on-error: true   # если параллельно публикует другой сбор — сайт обновит следующий
+      - if: steps.d1.outcome == 'failure'
+        run: sleep 30
+      - uses: actions/deploy-pages@v4
+        if: steps.d1.outcome == 'failure'
+        continue-on-error: true   # 24.11: «No artifacts named github-pages» — повтор

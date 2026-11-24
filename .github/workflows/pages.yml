@@ -33,4 +33,17 @@ jobs:
         with:
           path: docs
       - uses: actions/deploy-pages@v4
+        id: d1
         continue-on-error: true   # если параллельно публикует другой сбор — сайт обновит следующий
+      # 24.11: GitHub иногда не видит только что загруженный архив («No artifacts named github-pages») — ждём и пробуем ещё раз
+      - if: steps.d1.outcome == 'failure'
+        run: sleep 20
+      - uses: actions/deploy-pages@v4
+        id: d2
+        if: steps.d1.outcome == 'failure'
+        continue-on-error: true
+      - if: steps.d2.outcome == 'failure'
+        run: sleep 45
+      - uses: actions/deploy-pages@v4
+        if: steps.d2.outcome == 'failure'
+        continue-on-error: true

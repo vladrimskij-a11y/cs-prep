@@ -18,6 +18,7 @@
 
 ## Устройство
 - Версия сайта: при публикации (pages.yml и collect.yml) `tools/stamp.sh` берёт свежие файлы приложения из main, пишет sha в `BUILD` и `docs/version.txt`; приложение сверяет (`checkVersion`) и само перезагружается на `?v=…` — против кэша Telegram.
+- Публикация Pages: deploy-pages иногда отвечает «No artifacts named github-pages» при успешной загрузке (24.11 три запуска подряд, правки сайта не дошли) — шаг повторяется после паузы (pages.yml дважды, collect.yml раз). Проверять в логе deploy «Reported success!», а не зелёный значок (continue-on-error).
 - `docs/index.html` — всё приложение (SPA, один файл). Данные читает из ветки `data`
   через raw.githubusercontent.com (`dfetch`), запасной вариант — `docs/data` в Pages.
 - `collector/collect.py` — сборщик. Режимы: полный (HLTV, Liquipedia, нейросеть), `STATS_ONLY=1`, `NEWS_ONLY=1`.
