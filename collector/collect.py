@@ -3791,7 +3791,9 @@ def _d2_teamkeys(name: str) -> set:
 
 def _d2_same(keys: set, x: str) -> bool:
     g = norm(x)
-    return bool(g) and any(k == g or (min(len(k), len(g)) >= 3 and (k in g or g in k)) for k in keys)
+    ws = re.findall(r"[A-Za-z0-9]+", x or "")
+    ini = norm("".join(w[0] for w in ws)) if len(ws) >= 2 else ""  # NIP = Ninjas in Pyjamas
+    return bool(g) and any(k == g or k == ini or (min(len(k), len(g)) >= 3 and (k in g or g in k)) for k in keys)
 
 
 def d2_find_stats(names: list, date: str | None):
@@ -4003,12 +4005,16 @@ def d2_upcoming() -> list[dict]:
 
 
 def d2_find(lst: list[dict], teams: list[dict], begin: str | None) -> dict | None:
+    # 24.11: у PandaScore «NIP» (короче 4 букв — только точное совпадение), у dust2 «Ninjas in Pyjamas» — вето NIP–M80 не нашлось.
+    # Сверяем и с другим названием команды (`_alt`), и с первыми буквами названия у dust2
     def keys(t):
-        return {k for k in (norm(t.get("name")), norm(t.get("acronym")), norm(re.sub(r"(?i)^team |\s+(team|esports|gaming|club)$", "", t.get("name") or ""))) if k}
+        return {k for x in (t.get("name"), t.get("_alt")) if x
+                for k in (norm(x), norm(re.sub(r"(?i)^team |\s+(team|esports|gaming|club)$", "", x)))} | ({norm(t["acronym"])} if t.get("acronym") else set()) - {""}
     want = [keys(t) for t in teams]
     bt = parse_iso(begin)
     for x in lst:
-        got = [norm(n) for n in x.get("teams") or []] + [norm(x.get("slug"))]
+        got = [norm(n) for n in x.get("teams") or []] + [norm(x.get("slug"))] + \
+              [norm("".join(w[0] for w in re.findall(r"[A-Za-z0-9]+", n))) for n in x.get("teams") or [] if len(re.findall(r"[A-Za-z0-9]+", n)) >= 2]
         ok = all(any(k == g or (len(k) >= 4 and k in g) or (len(g) >= 4 and g in k) for k in w for g in got) for w in want)
         if ok and len(want) == 1 and not x.get("ph"):
             ok = False  # у нас одна команда — ищем матч, где у dust2 тоже «победитель X/Y»
