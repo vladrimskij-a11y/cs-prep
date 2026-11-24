@@ -596,7 +596,7 @@ def lp_prize_slots(name: str) -> list[float]:
     Команд в слотах нет (их подставляет сетка) — места берём из сетки bo3. Владелец 24.11: «призовые — с Liquipedia».
     Найденное хранится навсегда, не найденное — повтор через 3 дня; до 8 новых турниров за сбор."""
     c = lp_prize_cache.get(name)
-    if c and ((c.get("slots") and "lan" in c) or (NOW - (parse_iso(c.get("t")) or NOW)) < timedelta(days=3)):
+    if c and "lan" in c and (c.get("slots") or (NOW - (parse_iso(c.get("t")) or NOW)) < timedelta(days=3)):
         return c.get("slots") or []
     if _lp_prize_new[0] >= LP_EVENT_NEW or _lp_blocked[0] or STATS or os.environ.get("NEWS_ONLY") == "1":
         return (c or {}).get("slots") or []  # Liquipedia — только в полном сборе
