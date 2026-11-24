@@ -6929,6 +6929,10 @@ def build_prediction(d: dict, bids: list) -> dict | None:
         if odds.get("scores"):
             res["outcomes"], res["source"] = odds["scores"], "букмекеры"
             res["provider"] = odds.get("provider")
+        elif odds.get("win"):  # 24.11: точного счёта у линии нет (BO1 мейджора) — исходы всё равно от линии, а не «по VRS»
+            if bo == 1:
+                res["outcomes"] = [{"score": "1:0", "p": odds["win"][0]}, {"score": "0:1", "p": odds["win"][1]}]
+            res["source"], res["provider"] = "букмекеры", odds.get("provider")
     if opl:
         if opl.get("scores") and len(opl["scores"]) >= 3:
             res["outcomes"], res["source"], res["provider"] = opl["scores"], "букмекеры", opl.get("win_src")
