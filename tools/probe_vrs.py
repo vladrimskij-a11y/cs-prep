@@ -13,3 +13,8 @@ for n, h in H.items():
     k = L.key(n); f = R["factors"][k]
     print("F", n, [round(400 * f[x] / mx) for x in ("lan", "network", "offered", "collected")], round(R["rating"][k] - R["seed"][k]), round(R["rating"][k]), "| HLTV", h)
 print("LP", {k: v.get("lan") for k, v in c.lp_prize_cache.items()})
+print("SR", c.lp_prize_cache.get("Stake Ranked Episode 6"))
+k = L.key("BIG")
+A = lambda t: c.VM.age(t, math.floor(c._days(c.NOW)))
+print("BIGW", sorted([(round(m["t"] - L.ds["end"], 1), L.name(m["l"]), m.get("lan"), round(m["ew"], 2)) for m in L.ds["matches"] + L.new if m.get("w") == k], reverse=True)[:14])
+print("NEWS", [m for m in L.new if k in (m.get("w"), m.get("l"))][:3])
