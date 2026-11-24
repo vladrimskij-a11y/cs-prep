@@ -605,7 +605,8 @@ html { overflow-anchor: none; }
 [data-tname] { cursor: pointer; } .tlink { text-decoration: none; }
 .toast { position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--fg); color: var(--bg); padding: 10px 16px; border-radius: 12px; font-size: 13px; z-index: 99; max-width: calc(100vw - 32px); transition: opacity .3s; }
 .toast.out { opacity: 0; }
-.vr-ar { font-style: normal; font-size: .62em; font-weight: 700; margin-right: 2px; vertical-align: 2px; letter-spacing: -.02em; } .vr-ar.up { color: var(--win); } .vr-ar.dn { color: var(--loss); }
+.vr-ar { font-style: normal; font-size: .62em; margin-right: 2px; vertical-align: 2px; }
+.vr-mv { margin-left: -2px; } .vr-mv.up { color: var(--win); } .vr-mv.dn { color: var(--loss); } .vr-ar.up { color: var(--win); } .vr-ar.dn { color: var(--loss); }
 .prz-g.vrs { display: flex; align-items: center; gap: 6px; color: var(--fg); font-weight: 700; }
 .vrs-b { font-size: 10px; font-weight: 700; letter-spacing: .04em; padding: 1px 5px; border-radius: 5px; background: var(--sunk); color: var(--muted); }
 .h2h .it.tap { display: block; width: 100%; text-align: left; } .h2h .it .go { color: var(--muted); font-weight: 700; margin-left: 4px; }
@@ -1656,9 +1657,20 @@ a.ni { text-decoration: none; color: inherit; }
   }
   // страница команды по названию из любого места (шапка матча, состав, стадии мажора, участники)
   function tnorm(x) { return String(x || "").toLowerCase().replace(/[^a-z0-9а-я]/g, ""); }
-  function teamSlugFor(name) {
+  // временные имена на мейджоре (беттинг-спонсоров нельзя) и другие названия той же команды — ведут на её страницу (владелец 24.11)
+  var TEAM_ALT = { gosh: "BC.Game", theone: "1win", bbteam: "BetBoom", pvision: "PARIVISION" };
+  function altName(name) {
+    var n = tnorm(name);
+    if (TEAM_ALT[n]) return TEAM_ALT[n];
+    var D = state.details || {}, hit = null;
+    Object.keys(D).some(function (k) { return ((D[k] || {}).teams || []).some(function (t) { if (t && t._alt && tnorm(t.name) === n) { hit = t._alt; return true; } }); });
+    return hit;
+  }
+  function teamSlugFor(name, noAlt) {
     var T = ((state.ranking || {}).vrs || {}).teams || [], n = tnorm(name), n2 = tnorm(String(name || "").replace(/^(the|team)\s+|\s+(team|esports|gaming|club)$/ig, ""));
     if (!n) return null;
+    var al = !noAlt && altName(name);
+    if (al) { var sa = teamSlugFor(al, true); if (sa) return sa; }
     var hit = T.find(function (t) { return t.page && (tnorm(t.name) === n || tnorm(t.name) === n2 || tnorm(t.slug) === n); })
       || T.find(function (t) { var k = tnorm(t.name); return t.page && k.length >= 3 && n.length >= 3 && (k.indexOf(n2 || n) >= 0 || (n2 || n).indexOf(k) >= 0); });
     return hit ? hit.slug : null;
@@ -2425,9 +2437,11 @@ a.ni { text-decoration: none; color: inherit; }
       return h0 + '</div></div>';
     }
     if (!O || !A.vrs || !B.vrs) return "";
-    function cell(x, cur) {  // место после матча: стрелка вверх зелёная, вниз красная
-      var mv = cur && x.rank !== cur ? (x.rank < cur ? '<i class="vr-ar up" aria-label="поднимется на ' + (cur - x.rank) + '">▲' + (cur - x.rank) + '</i>' : '<i class="vr-ar dn" aria-label="опустится на ' + (x.rank - cur) + '">▼' + (x.rank - cur) + '</i>') : '';
-      return '<span class="vr-c"><b class="num">' + mv + '#' + x.rank + '</b><small class="num ' + (x.delta > 0 ? "up" : x.delta < 0 ? "dn" : "") + '">' + (x.delta > 0 ? "+" : x.delta < 0 ? "−" : "±") + Math.abs(x.delta) + '</small></span>';
+    function cell(x, cur) {  // место после матча: стрелка вверх зелёная, вниз красная; рядом — на сколько мест (+2 / −1, как «#19 +2» у HLTV)
+      var up = cur && x.rank < cur, dn = cur && x.rank > cur;
+      var mv = up ? '<i class="vr-ar up" aria-label="поднимется">▲</i>' : dn ? '<i class="vr-ar dn" aria-label="опустится">▼</i>' : '';
+      var nm = up ? '<b class="num vr-mv up">+' + (cur - x.rank) + '</b>' : dn ? '<b class="num vr-mv dn">−' + (x.rank - cur) + '</b>' : '';
+      return '<span class="vr-c"><b class="num">' + mv + '#' + x.rank + '</b>' + nm + '<small class="num ' + (x.delta > 0 ? "up" : x.delta < 0 ? "dn" : "") + '">' + (x.delta > 0 ? "+" : x.delta < 0 ? "−" : "±") + Math.abs(x.delta) + '</small></span>';
     }
     var html = '<div class="sec"><h3>Рейтинг VRS <span>что будет после матча</span></h3><div class="box vrs">' +
       '<div class="vr-r vr-h"><span></span><span>Сейчас</span><span>Победа</span><span>Поражение</span></div>';

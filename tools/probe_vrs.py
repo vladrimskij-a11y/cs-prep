@@ -7,7 +7,11 @@ H = {  # HLTV 24.11: (a, b): aw, al, bw, bl
     ("Liquid", "BC.Game"): (9, -24, 29, -7), ("PARIVISION", "DENDELE"): (20, -21, 26, -9), ("FaZe", "Wildcard"): (12, -20, 25, -10)}
 table = c.vrs_table()
 L = c.vrs_live()
-print("TABLE", len(table), "L", bool(L))
+print("TABLE", len(table), "L", bool(L), "vrs3 t", (c.hltv_cache.get("vrs3") or {}).get("t"))
+ds = c.vrs_dataset()
+print("DS", ds.get("day"), ds.get("end"), "now", c._days(c.NOW))
+for r in table[:40]:
+    k = L.key(r["name"]); print("D", r["rank"], r["name"], r["points"], round(L.base.get(k, 0)), round(L.base.get(k, 0) - r["points"]), [(round(t, 1), round(u)) for t, u in L.prizes.get(k, [])][-4:])
 ex = (c.hltv_cache.get("event3:PGL Major Singapore 2026") or {}).get("data") or {}
 print("EV prize", ex.get("prize"), "places", json.dumps(ex.get("places"))[:900])
 for k in c.hltv_cache:
@@ -30,4 +34,4 @@ for f in glob.glob("docs/data/match/*.json"):
     d = json.load(open(f)); ts = tuple(t["name"] for t in d.get("teams") or [])
     key = next((k for k in H if all(any(x.lower()[:5] in (n or "").lower() or (n or "").lower()[:5] in x.lower() for n in ts) for x in k)), None)
     if not key: continue
-    print("M", ts, "HLTV", H[key], "cur", run(d), "both0", run(d, True), "ew1", run(d, True, 1.0), "ew.5", run(d, True, 0.5))
+    print("M", ts, "HLTV", H[key], "cur", run(d), "both0", run(d, True), "ew1", run(d, True, 1.0), "ew.5", run(d, True, 0.5), "ew.3", run(d, True, 0.3))
