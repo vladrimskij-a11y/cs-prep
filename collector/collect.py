@@ -3799,6 +3799,8 @@ def veto_names(t: dict, ht: dict | None = None) -> set:
     (FUT Esports → fut, NIP → ninjasinpyjamas) — dust2 пишет команды по-своему."""
     names = [t.get("name"), t.get("acronym"), (ht or {}).get("name"),
              re.sub(r"^(the|team)\s+|\s+(team|esports|esport|gaming|club|cs)$", "", t.get("name") or "", flags=re.IGNORECASE)]
+    alt = t.get("_alt")  # временное имя на мейджоре (GOSH = BC.Game): у dust2 команда под настоящим — 24.11 у GOSH не было вето
+    names += alt if isinstance(alt, list) else [alt]
     try:
         r = vrs_find(t, vrs_table())
         if r:
