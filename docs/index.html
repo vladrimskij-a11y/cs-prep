@@ -605,7 +605,7 @@ html { overflow-anchor: none; }
 [data-tname] { cursor: pointer; } .tlink { text-decoration: none; }
 .toast { position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--fg); color: var(--bg); padding: 10px 16px; border-radius: 12px; font-size: 13px; z-index: 99; max-width: calc(100vw - 32px); transition: opacity .3s; }
 .toast.out { opacity: 0; }
-.vr-ar { font-style: normal; font-size: .72em; margin-right: 3px; vertical-align: 1px; } .vr-ar.up { color: var(--win); } .vr-ar.dn { color: var(--loss); }
+.vr-ar { font-style: normal; font-size: .62em; font-weight: 700; margin-right: 2px; vertical-align: 2px; letter-spacing: -.02em; } .vr-ar.up { color: var(--win); } .vr-ar.dn { color: var(--loss); }
 .prz-g.vrs { display: flex; align-items: center; gap: 6px; color: var(--fg); font-weight: 700; }
 .vrs-b { font-size: 10px; font-weight: 700; letter-spacing: .04em; padding: 1px 5px; border-radius: 5px; background: var(--sunk); color: var(--muted); }
 .h2h .it.tap { display: block; width: 100%; text-align: left; } .h2h .it .go { color: var(--muted); font-weight: 700; margin-left: 4px; }
@@ -2426,7 +2426,7 @@ a.ni { text-decoration: none; color: inherit; }
     }
     if (!O || !A.vrs || !B.vrs) return "";
     function cell(x, cur) {  // место после матча: стрелка вверх зелёная, вниз красная
-      var mv = cur && x.rank !== cur ? (x.rank < cur ? '<i class="vr-ar up" aria-label="поднимется">▲</i>' : '<i class="vr-ar dn" aria-label="опустится">▼</i>') : '';
+      var mv = cur && x.rank !== cur ? (x.rank < cur ? '<i class="vr-ar up" aria-label="поднимется на ' + (cur - x.rank) + '">▲' + (cur - x.rank) + '</i>' : '<i class="vr-ar dn" aria-label="опустится на ' + (x.rank - cur) + '">▼' + (x.rank - cur) + '</i>') : '';
       return '<span class="vr-c"><b class="num">' + mv + '#' + x.rank + '</b><small class="num ' + (x.delta > 0 ? "up" : x.delta < 0 ? "dn" : "") + '">' + (x.delta > 0 ? "+" : x.delta < 0 ? "−" : "±") + Math.abs(x.delta) + '</small></span>';
     }
     var html = '<div class="sec"><h3>Рейтинг VRS <span>что будет после матча</span></h3><div class="box vrs">' +
