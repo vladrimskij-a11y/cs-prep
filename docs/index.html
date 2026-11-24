@@ -2672,7 +2672,11 @@ a.ni { text-decoration: none; color: inherit; }
   }
   // трофеи игрока (HLTV, все годы) — как мейджоры и MVP: турнир с годом выделен, ниже команда (владелец 24.11)
   function cupBadge(p) {
-    var T = (p.trophies || []).filter(function (x, i, a) { return x && a.indexOf(x) === i; });
+    // ряд трофеев HLTV + первые места из таблицы достижений (победы на замене: jks — IEM Katowice 2022 за FaZe)
+    var seen = {}, T = (p.trophies || []).concat(p.event_wins || []).filter(function (x) {
+      var k = String(x || "").toLowerCase().replace(/^winner of\s+/, "").replace(/[^a-z0-9]+/g, "");
+      if (!k || seen[k]) return false; seen[k] = 1; return true;
+    });
     if (!T.length) return "";
     var l = T.map(function (x) { var e = evYear(String(x).replace(/^Winner of\s+/i, "")); return { e: e, p: "", tm: teamInYear(p, e), w: true }; });
     return '<span role="button" class="medal cup pcup" data-pop="' + esc(JSON.stringify({ t: "🏆 Трофеи: " + T.length, l: l })) + '">🏆<b>' + T.length + '</b></span>';

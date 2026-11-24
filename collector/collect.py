@@ -5881,7 +5881,7 @@ def hltv_player_info(nick: str, force: bool = False, coach: bool = False) -> dic
         return None
     key = f"{kp}:{pl['id']}"
     c = hltv_cache.get(key)
-    no_ev = c and (c.get("data") or {}).get("mvp") and not (c.get("data") or {}).get("mvp_events") and not c.get("mvfix")
+    no_ev = c and ((c.get("data") or {}).get("mvp") and not (c.get("data") or {}).get("mvp_events") and not c.get("mvfix") or not c.get("wfix"))
     if c and not no_ev and (not force or _mvp_new[0] >= MVP_PER_RUN) and (parse_iso(c.get("t")) or NOW) > NOW - timedelta(days=PINFO_TTL_DAYS):
         return c["data"]  # свежее — из кэша; очередь (force) перечитывает тех, чья команда доиграла турнир
     # 24.11: у тренеров (Xizt — 2 MVP) был счётчик без списка: на странице тренера MVP только в подсказке значка — перечитать один раз
@@ -5927,9 +5927,11 @@ def hltv_player_info(nick: str, force: bool = False, coach: bool = False) -> dic
     # места на турнирах — таблица .achievement-table (так её разбирают gigobyte/HLTV и hltv-scraper-api):
     # строка .team, место в .achievement, турнир в .tournament-name-cell a
     mj, wins = [], []
-    k = b.find("achievement-table")
-    if k >= 0:
-        seg = b[k:k + 120000].split("</table>", 1)[0]
+    # 24.11: победы на замене (jks — IEM Katowice 2022 за FaZe) не попадают в ряд трофеев — первые места берём из ВСЕХ
+    # таблиц достижений (первая — мейджоры, дальше — остальные турниры); мейджоры по-прежнему из первой
+    ks = [m_.start() for m_ in re.finditer("achievement-table", b)]
+    for ti, k in enumerate(ks):
+        seg = b[k:k + 200000].split("</table>", 1)[0]
         for row in re.split(r'<tr[^>]*class="[^"]*\bteam\b', seg)[1:]:
             # место: <div class="text-ellipsis achievement "><i class="fa fa-trophy "></i>1/4 final</div> (разметка HLTV, 11.2026)
             m_pl = re.search(r'class="[^"]*\bachievement\b[^"]*"[^>]*>(?:\s*<i[^>]*>\s*</i>)?\s*([^<]+?)\s*<', row)
@@ -5937,11 +5939,11 @@ def hltv_player_info(nick: str, force: bool = False, coach: bool = False) -> dic
             if not m_ev:
                 continue
             name, place = _html.unescape(m_ev.group(1)).strip(), (m_pl.group(1).strip() if m_pl else "")
-            if MAJOR_RX.search(name):
+            if ti == 0 and MAJOR_RX.search(name):
                 lab = name + (f" — {place}" if place else "")
                 if lab not in mj:
                     mj.append(lab)
-            if re.match(r"1st$|winner", place, re.I) and name not in wins:
+            if re.match(r"1st$|winner", place, re.I) and name not in wins and not QUAL_RX.search(name):
                 wins.append(name)
     # трофеи игрока: ряд .trophy-row-trophy (название — в title картинки) и подписи span.trophyDescription
     tro = []
@@ -5963,7 +5965,7 @@ def hltv_player_info(nick: str, force: bool = False, coach: bool = False) -> dic
     d = {"mvp": mvp, "mvp_events": ev, "majors": int(pm.group(1)) if pm else 0, "major_wins": int(wm.group(1)) if wm else 0,
          "major_events": mj, "trophies": tro[:40], "event_wins": wins[:40]}
     d["mvp_events"] = [str(x) for x in d["mvp_events"]] if isinstance(d["mvp_events"], list) else []
-    hltv_cache[key] = {"t": iso(NOW), "data": d, "fix": 1, "mvfix": 1}  # fix=1 — разобрано с полным списком мейджоров (MAJOR_RX)
+    hltv_cache[key] = {"t": iso(NOW), "data": d, "fix": 1, "mvfix": 1, "wfix": 1}  # fix=1 — разобрано с полным списком мейджоров (MAJOR_RX)
     return d
 
 
