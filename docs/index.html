@@ -1828,7 +1828,7 @@ a.ni { text-decoration: none; color: inherit; }
   // швейцарка в формате «по счёту»: столбец — раунд, в нём матчи сгруппированы по счёту команд (2:0, 1:1, 0:2…);
   // вверху столбца — кто вышел (3:0, потом 3:1 и 3:2), внизу — кто вылетел (0:3, 1:3, 2:3)
   function swissHtml(st, si, box) {
-    var W = 3, rec = {}, logos = {}, cols = [];
+    var W = 3, rec = {}, logos = {}, cols = [], names = {};
     function key(n) { return nkey(n) || String(n || ""); }
     function r0(n) { return rec[key(n)] || (rec[key(n)] = { w: 0, l: 0 }); }
     function circ(n, cls) {
@@ -1838,7 +1838,7 @@ a.ni { text-decoration: none; color: inherit; }
     st.rounds.forEach(function (rd, ri) {
       var groups = {}, done = { q: [], out: [] };
       rd.matches.forEach(function (x) {
-        if (x.a) logos[key(x.a)] = logos[key(x.a)] || x.la; if (x.b) logos[key(x.b)] = logos[key(x.b)] || x.lb;
+        if (x.a) { logos[key(x.a)] = logos[key(x.a)] || x.la; names[key(x.a)] = x.a; } if (x.b) { logos[key(x.b)] = logos[key(x.b)] || x.lb; names[key(x.b)] = x.b; }
         var ra = r0(x.a), g = ra.w + ":" + ra.l;
         (groups[g] = groups[g] || []).push(x);
       });
@@ -1876,6 +1876,7 @@ a.ni { text-decoration: none; color: inherit; }
     }
     function tile(x) {
       if (x.ph) return '<div class="sw-m ph"><span class="sw-l">?</span><span class="sw-l">?</span></div>';
+      if (x.pend) return '<div class="sw-m">' + circ(x.a, "") + (x.b ? circ(x.b, "") : '<span class="sw-l ph">?</span>') + '</div>';
       var fin = x.st === "finished" && x.w != null;
       var attr = (box(x).match(/data-(rseries|open)="[^"]*"/) || [""])[0];
       var inner = circ(x.a, fin ? (x.w === 0 ? "w" : "l") : "") + circ(x.b, fin ? (x.w === 1 ? "w" : "l") : "");
@@ -1888,7 +1889,15 @@ a.ni { text-decoration: none; color: inherit; }
       var rdf = st.rounds[fr];  // раунда ещё нет или пары в нём без команд (мейджор до жеребьёвки) — пустые места по счёту
       if (rdf && rdf.matches.some(function (x) { return x.a || x.b; })) continue;
       var gph = {};
-      Object.keys(SW16[fr]).forEach(function (g) { gph[g] = []; for (var i = 0; i < SW16[fr][g]; i++) gph[g].push({ ph: true }); });
+      Object.keys(SW16[fr]).forEach(function (g) {
+        // кто уже сыграл прошлые раунды с этим счётом — сразу на свои места (как на HLTV: соперник «?», пока нет жеребьёвки; владелец 24.11)
+        var who = Object.keys(rec).filter(function (k) { var r = rec[k]; return r.w + r.l === fr && r.w + ":" + r.l === g; }).map(function (k) { return names[k] || k; });
+        gph[g] = [];
+        for (var i = 0; i < SW16[fr][g]; i++) {
+          var a = who[2 * i], b = who[2 * i + 1];
+          gph[g].push(a ? { a: a, b: b || null, la: logos[key(a)], lb: b ? logos[key(b)] : null, st: "upcoming", pend: true } : { ph: true });
+        }
+      });
       cols[fr] = { groups: gph, done: (cols[fr] || {}).done || { q: [], out: [] } };
     }
     var last = cols.length - 1;
