@@ -582,6 +582,7 @@ html { overflow-anchor: none; }
 .facts.beef .bf-src a { color: var(--ct); }
 .pop-in li.mj .mj-e { color: var(--fg); font-weight: 650; }
 .pop-in li.mj.win .mj-e { color: var(--t); }
+.pop-in li.mj.sec .mj-e { color: #c9ced6; }
 .pop-in li.mj .mj-p { color: var(--muted); }
 .pop-in li.mj .mj-t { display: block; color: var(--ct); font-weight: 600; font-size: .92em; }
 .pop-in li.mj .mj-t small { color: var(--muted); font-weight: 400; font-size: 1em; }
@@ -2677,9 +2678,16 @@ a.ni { text-decoration: none; color: inherit; }
       var k = String(x || "").toLowerCase().replace(/^winner of\s+/, "").replace(/[^a-z0-9]+/g, "");
       if (!k || seen[k]) return false; seen[k] = 1; return true;
     });
-    if (!T.length) return "";
+    // вторые места (владелец 24.11) — серебро под трофеями
+    var S = (p.event_seconds || []).filter(function (x) {
+      var k = String(x || "").toLowerCase().replace(/[^a-z0-9]+/g, "");
+      if (!k || seen[k]) return false; seen[k] = 1; return true;
+    });
+    if (!T.length && !S.length) return "";
     var l = T.map(function (x) { var e = evYear(String(x).replace(/^Winner of\s+/i, "")); return { e: e, p: "", tm: teamInYear(p, e), w: true }; });
-    return '<span role="button" class="medal cup pcup" data-pop="' + esc(JSON.stringify({ t: "🏆 Трофеи: " + T.length, l: l })) + '">🏆<b>' + T.length + '</b></span>';
+    if (S.length) l = l.concat(["§🥈 Вторые места: " + S.length], S.map(function (x) { var e = evYear(x); return { e: e, p: "", tm: teamInYear(p, e), s: true }; }));
+    var tt = (T.length ? "🏆 Трофеи: " + T.length : "") + (S.length ? (T.length ? " · " : "") + "🥈 " + S.length : "");
+    return '<span role="button" class="medal cup pcup" data-pop="' + esc(JSON.stringify({ t: tt, l: l })) + '">' + (T.length ? '🏆<b>' + T.length + '</b>' : '🥈<b>' + S.length + '</b>') + '</span>';
   }
   function mvpBadge(p) {
     if (!p.mvp) return "";
@@ -2689,7 +2697,7 @@ a.ni { text-decoration: none; color: inherit; }
     closePop();
     var d = JSON.parse(data), el = document.createElement("div");
     el.className = "pop";
-    el.innerHTML = '<div class="pop-in' + (d.c ? ' wide' : '') + '"><b>' + esc(d.t) + '</b>' + (d.c ? '<div class="pcols">' + d.c.map(function (c) { return '<div class="pcol"><div class="pci">' + c.i + ' <b>' + c.l.length + '</b></div>' + (c.l.length ? c.l.map(function (x) { return '<div class="pce">' + esc(x) + '</div>'; }).join("") : '<div class="pce none">—</div>') + '</div>'; }).join("") + '</div>' : (d.l || []).length ? '<ul>' + d.l.map(function (x) { if (x && typeof x === "object") { var tmm = String(x.tm || "").match(/^(.*?)( \(.*\))?$/); return '<li class="mj' + (x.w ? ' win' : '') + '"><span class="mj-e">' + (x.w ? '🏆 ' : '') + esc(x.e) + '</span>' + (x.p ? ' <span class="mj-p">— ' + esc(x.p) + '</span>' : '') + (x.tm ? '<span class="mj-t">' + esc(tmm[1]) + (tmm[2] ? '<small>' + esc(tmm[2]) + '</small>' : '') + '</span>' : '') + '</li>'; }
+    el.innerHTML = '<div class="pop-in' + (d.c ? ' wide' : '') + '"><b>' + esc(d.t) + '</b>' + (d.c ? '<div class="pcols">' + d.c.map(function (c) { return '<div class="pcol"><div class="pci">' + c.i + ' <b>' + c.l.length + '</b></div>' + (c.l.length ? c.l.map(function (x) { return '<div class="pce">' + esc(x) + '</div>'; }).join("") : '<div class="pce none">—</div>') + '</div>'; }).join("") + '</div>' : (d.l || []).length ? '<ul>' + d.l.map(function (x) { if (x && typeof x === "object") { var tmm = String(x.tm || "").match(/^(.*?)( \(.*\))?$/); return '<li class="mj' + (x.w ? ' win' : x.s ? ' sec' : '') + '"><span class="mj-e">' + (x.w ? '🏆 ' : x.s ? '🥈 ' : '') + esc(x.e) + '</span>' + (x.p ? ' <span class="mj-p">— ' + esc(x.p) + '</span>' : '') + (x.tm ? '<span class="mj-t">' + esc(tmm[1]) + (tmm[2] ? '<small>' + esc(tmm[2]) + '</small>' : '') + '</span>' : '') + '</li>'; }
       return String(x).charAt(0) === "§" ? '<li class="ph">' + esc(String(x).slice(1)) + '</li>' : '<li>' + esc(x) + '</li>'; }).join("") + '</ul>' : '<p>Список турниров появится после обновления данных.</p>') + '</div>';
     document.body.appendChild(el);
     var r = anchor.getBoundingClientRect(), box = el.firstChild, W = window.innerWidth;

@@ -5881,7 +5881,7 @@ def hltv_player_info(nick: str, force: bool = False, coach: bool = False) -> dic
         return None
     key = f"{kp}:{pl['id']}"
     c = hltv_cache.get(key)
-    no_ev = c and ((c.get("data") or {}).get("mvp") and not (c.get("data") or {}).get("mvp_events") and not c.get("mvfix") or not c.get("wfix"))
+    no_ev = c and ((c.get("data") or {}).get("mvp") and not (c.get("data") or {}).get("mvp_events") and not c.get("mvfix") or not c.get("wfix2"))
     if c and not no_ev and (not force or _mvp_new[0] >= MVP_PER_RUN) and (parse_iso(c.get("t")) or NOW) > NOW - timedelta(days=PINFO_TTL_DAYS):
         return c["data"]  # свежее — из кэша; очередь (force) перечитывает тех, чья команда доиграла турнир
     # 24.11: у тренеров (Xizt — 2 MVP) был счётчик без списка: на странице тренера MVP только в подсказке значка — перечитать один раз
@@ -5926,7 +5926,7 @@ def hltv_player_info(nick: str, force: bool = False, coach: bool = False) -> dic
     wm = re.search(r'<div class="stat">(\d+)</div><div class="description">Majors? won', b)
     # места на турнирах — таблица .achievement-table (так её разбирают gigobyte/HLTV и hltv-scraper-api):
     # строка .team, место в .achievement, турнир в .tournament-name-cell a
-    mj, wins = [], []
+    mj, wins, seconds = [], [], []
     # 24.11: победы на замене (jks — IEM Katowice 2022 за FaZe) не попадают в ряд трофеев — первые места берём из ВСЕХ
     # таблиц достижений (первая — мейджоры, дальше — остальные турниры); мейджоры по-прежнему из первой
     ks = [m_.start() for m_ in re.finditer("achievement-table", b)]
@@ -5945,6 +5945,8 @@ def hltv_player_info(nick: str, force: bool = False, coach: bool = False) -> dic
                     mj.append(lab)
             if re.match(r"1st$|winner", place, re.I) and name not in wins and not QUAL_RX.search(name):
                 wins.append(name)
+            elif re.match(r"2nd$|runner", place, re.I) and name not in seconds and not QUAL_RX.search(name):
+                seconds.append(name)  # вторые места — владелец 24.11
     # трофеи игрока: ряд .trophy-row-trophy (название — в title картинки) и подписи span.trophyDescription
     tro = []
     # класс ячейки бывает с добавками (у трофеев, выигранных на замене, — свой класс): 24.11 у jks на HLTV 5 трофеев, у нас было 4
@@ -5964,9 +5966,9 @@ def hltv_player_info(nick: str, force: bool = False, coach: bool = False) -> dic
     if not mj and old.get("major_events"):  # новый разбор ничего не нашёл — старый список мажоров не теряем
         mj = list(old["major_events"])
     d = {"mvp": mvp, "mvp_events": ev, "majors": int(pm.group(1)) if pm else 0, "major_wins": int(wm.group(1)) if wm else 0,
-         "major_events": mj, "trophies": tro[:40], "event_wins": wins[:40]}
+         "major_events": mj, "trophies": tro[:40], "event_wins": wins[:40], "event_seconds": seconds[:40]}
     d["mvp_events"] = [str(x) for x in d["mvp_events"]] if isinstance(d["mvp_events"], list) else []
-    hltv_cache[key] = {"t": iso(NOW), "data": d, "fix": 1, "mvfix": 1, "wfix": 1}  # fix=1 — разобрано с полным списком мейджоров (MAJOR_RX)
+    hltv_cache[key] = {"t": iso(NOW), "data": d, "fix": 1, "mvfix": 1, "wfix2": 1}  # fix=1 — разобрано с полным списком мейджоров (MAJOR_RX)
     return d
 
 
@@ -7747,7 +7749,7 @@ def main() -> int:
         warn(f"Позиции ProRoles: {e!r}")
     # «Будущие игры» на страницах команд — на каждом сборе (страницы целиком пересобираются раз в 3–12 ч, а расписание меняется чаще)
     # и сверка со свежими карточками матчей: состав, трофеи, MVP и мажоры у команды должны совпадать с тем, что в матче
-    PFIELDS = ("mvp", "mvp_events", "majors", "major_wins", "major_events", "trophies", "event_wins", "name_ru", "tags")
+    PFIELDS = ("mvp", "mvp_events", "majors", "major_wins", "major_events", "trophies", "event_wins", "event_seconds", "name_ru", "tags")
     by_team: dict = {}
     for mf in (OUT / "match").glob("*.json"):
         md = load_json(mf, {}) or {}
