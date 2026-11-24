@@ -1253,7 +1253,7 @@ a.ni { text-decoration: none; color: inherit; }
     var dates = b ? dm(b) + (e && dayKey(e) !== dayKey(b) ? " – " + dm(e) : "") : "";
     var live = !t.finished && (t.live || (b && e && new Date(b) <= new Date() && new Date(e) >= new Date()));
     var next = t.finished ? (t.results ? t.results + ' ' + plural(t.results, "матч", "матча", "матчей") : '')
-      : t.live ? '<span class="live">● LIVE ' + t.live + '</span>'
+      : t.live ? '<span class="live">● LIVE</span>'
       : ms.length ? (t.next ? 'ближайший <b>' + esc(dayKey(t.next) === today ? "сегодня " + hm(t.next) : dm(t.next) + " " + hm(t.next)) + '</b>' : '')
       : '<span class="muted">расписание пока не опубликовано</span>';
     return '<button class="tour-card' + (todayN ? " today" : "") + (t.tier !== "s" ? " t2" : "") + (t.bg ? ' tbg' + (bgWide(t.bg) ? ' wide' : bgLogo(t.bg) ? ' logo' : '') + '" style="--tb:url(' + esc(t.bg) + ')' : '') + '" data-tour="' + esc(t.id) + '">' +
