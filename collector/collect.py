@@ -784,7 +784,8 @@ def lp_names(t: dict) -> list[str]:
     names = []
     base = re.sub(r"\s+(esports|e-sports|gaming|team|clan|club|cs2?|counter-strike)$", "", t.get("name") or "", flags=re.IGNORECASE).strip()
     for nm in (t.get("name"), re.sub(r"(?<=[a-z])(?=[A-Z])", " ", t.get("name") or ""), t.get("acronym"), base or None,  # «DENDELE CS» → DENDELE
-               "Team " + base if base else None, base + " Esports" if base else None):  # на Liquipedia: «Team Spirit», «FUT Esports»
+               "Team " + base if base else None, base + " Esports" if base else None,  # на Liquipedia: «Team Spirit», «FUT Esports»
+               base + " Gaming" if base else None):  # 24.11: «Aurora Gaming», «paiN Gaming», «Nexus Gaming» — у них не было тренера
         if nm and nm not in names:
             names.append(nm)
     return names
@@ -1004,6 +1005,15 @@ def lp_roster(t: dict) -> dict | None:
     try:
         pages = lp_pages(names)
         text = next((pages[n] for n in names if n in pages and "Squad|status=active" in pages[n]), None)
+        if text is None:  # страница игрока/разводящая: «{{for|the Serbian organization|Aurora Gaming}}», «* [[Nexus Gaming]], a … organization»
+            alt = []
+            for v in pages.values():
+                alt += re.findall(r"\{\{for\|[^|}]*organi[sz]ation[^|}]*\|([^|}]+)\}\}", v or "", re.I)
+                alt += re.findall(r"\*\s*\[\[([^\]|]+)\]\][^\n]*(?:Counter-Strike 2|CS2)[^\n]*organi[sz]ation", v or "", re.I)
+            alt = [a.strip() for a in dict.fromkeys(alt) if a.strip() not in pages][:3]
+            if alt:
+                more = lp_pages(alt)
+                text = next((more[n] for n in alt if n in more and "Squad|status=active" in more[n]), None)
         if text is None:
             found = lp_search(re.sub(r"(?<=[a-z])(?=[A-Z])", " ", t.get("name") or ""))
             if found:
