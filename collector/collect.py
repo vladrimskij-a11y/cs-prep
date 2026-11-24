@@ -5249,8 +5249,8 @@ BEEF_F = CACHE / "beef_search.json"
 beef_cache: dict = load_json(BEEF_F, {})      # ник → {"t": когда искали, "posts": [{url, date, text}]}
 BEEF_REQ = [int(os.environ.get("BEEF_REQ", "150"))]  # запросов к t.me за сбор (ник × канал)
 BEEF_TTL_DAYS = 7
-BEEF_RX = re.compile(r"конфликт|скандал|тр[эе]ш.?ток|оскорб|ссор|вражд|обвин|наехал|токсич|драм[аы]|измен|девушк|отношени|"
-                     r"извин|посвят|хейт|тролл|подкол|разборк|перепалк|высмеял|унизил|провокац|не здоровал|не пожал|руку не|"
+BEEF_RX = re.compile(r"конфликт|скандал|тр[эе]ш.?ток|оскорб|ссор|вражд|обвин|наехал|токсич|драм[аы]|измен[аи]л|девушк|"
+                     r"извин|прощени|посвят|хейт|тролл|подкол|разборк|перепалк|высмеял|унизил|провокац|не здоровал|не пожал|руку не|"
                      r"беф|beef|drama|trash.?talk|чит[еа]р|обман|предал|предательств|кинул|слил|ненавид|злост|публично ответил|ответил на слова",
                      re.I)
 
@@ -5322,11 +5322,13 @@ def player_beef(d: dict) -> list[dict]:
     out, seen = [], []
     for x in sorted(pool.values(), key=lambda x: x.get("date") or "", reverse=True):
         txt = x.get("text") or ""
-        if not BEEF_RX.search(txt):
-            continue
+        if not BEEF_RX.search(txt) or re.search(r"дайджест", txt, re.I) or len(re.findall(r"^\s*[—•▪️-]", txt, re.M)) >= 4:
+            continue  # дайджесты и списки новостей — не история про двоих
+        kw = [k.start() for k in BEEF_RX.finditer(txt)]
+        near = lambda r: any(abs(m.start() - k) <= 350 for m in r.finditer(txt) for k in kw)
         a = [n for i, n, _ in who if i == 0 and rx[n].search(txt)]
         b = [n for i, n, _ in who if i == 1 and rx[n].search(txt)]
-        if not a or not b:
+        if not a or not b or not any(near(rx[n]) for n in a + b):
             continue
         tok = title_tokens(txt[:400])
         if any(len(tok & o) / max(1, len(tok | o)) >= 0.5 for o in seen):

@@ -572,6 +572,12 @@ html { overflow-anchor: none; }
 .pop-in li.ph { list-style: none; margin: 8px 0 2px -14px; font-size: 11px; font-weight: 700; letter-spacing: .06em; color: var(--muted); }
 .pop-in li.ph:first-child { margin-top: 0; }
 .pop-in li.mj { margin-bottom: 7px; line-height: 1.3; }
+.facts.beef .fact { display: flex; flex-direction: column; gap: 4px; }
+.facts.beef .bf-who { font-size: 12px; font-weight: 700; color: var(--onair); }
+.facts.beef .bf-t { font-weight: 600; }
+.facts.beef .bf-m { color: var(--muted); font-size: 13px; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+.facts.beef .bf-src { font-size: 12px; color: var(--muted); }
+.facts.beef .bf-src a { color: var(--ct); }
 .pop-in li.mj .mj-e { color: var(--fg); font-weight: 650; }
 .pop-in li.mj.win .mj-e { color: var(--t); }
 .pop-in li.mj .mj-p { color: var(--muted); }
@@ -2143,9 +2149,16 @@ a.ni { text-decoration: none; color: inherit; }
   function factsBlock(m) {
     // факты для эфира — связи игроков: кто с кем играл вместе и когда, кто играл за соперника (Liquipedia)
     var F = (m.facts || []).filter(function (f) { return f.kind === "link"; });
-    if (!F.length) return "";
+    // конфликты и громкие истории между людьми из двух команд — посты Telegram-каналов со ссылкой (владелец 24.11)
+    var B = (m.facts || []).filter(function (f) { return f.kind === "beef"; });
+    var bh = !B.length ? "" : '<div class="sec"><h3>Конфликты и истории <span>из новостей · знать, не цитировать</span></h3><div class="box facts beef">' +
+      B.map(function (f) {
+        return '<div class="fact"><span class="bf-who">' + esc(f.who) + '</span><span class="bf-t">' + esc(f.text) + '</span>' + (f.more ? '<span class="bf-m">' + esc(f.more) + '</span>' : '') +
+          '<span class="bf-src">' + (f.date ? esc(fmt(new Date(f.date + "T12:00:00Z"), { day: "numeric", month: "long", year: "numeric" })) + ' · ' : '') + '<a href="' + esc(f.url) + '" data-tg="' + esc(f.url) + '" target="_blank" rel="noopener">источник</a></span></div>';
+      }).join("") + '</div></div>';
+    if (!F.length) return bh;
     var shown = state.factsAll ? F : F.slice(0, 10);
-    var html = '<div class="sec"><h3>Связи игроков <span>по истории команд · Liquipedia</span></h3><div class="box facts">';
+    var html = bh + '<div class="sec"><h3>Связи игроков <span>по истории команд · Liquipedia</span></h3><div class="box facts">';
     shown.forEach(function (f) { html += '<div class="fact"><span>' + esc(f.text) + '</span></div>'; });
     if (F.length > 10) html += '<button class="fmore" id="facts-more">' + (state.factsAll ? "Свернуть" : "Показать ещё " + (F.length - 10)) + '</button>';
     return html + '</div></div>';
