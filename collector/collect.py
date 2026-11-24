@@ -2360,7 +2360,7 @@ def vrs_live():
         if nm in played or any(tour_same(nm, tour_norm(p_)) for p_ in played):
             continue
         try:
-            pl = bo3_tour_places(slug)
+            pl = bo3_tour_places(slug, any_tier=True)  # и тир-b (RUSH, CCT, NODWIN — у Valve их призовые тоже идут)
         except Exception as e:
             warn(f"VRS: места {slug}: {e!r}")
             continue
@@ -2494,20 +2494,21 @@ BO3_PLACES_NEW = [0]
 BO3_PLACES_NEW_LIMIT = 300  # новых турниров за сбор (bo3 не блокирует)
 
 
-def bo3_tour_places(slug: str) -> dict:
+def bo3_tour_places(slug: str, any_tier: bool = False) -> dict:
     """Места 1–4 доигранного турнира bo3.gg по сетке: финал — 1-е и 2-е; матч за 3-е — 3-е;
     иначе проигравшие финалистам в их предыдущем матче: один и тот же (двойная сетка) — 3-е, двое — 3–4-е."""
     c = bo3_places_cache.get(slug)
-    if c and (c.get("done") or (NOW - (parse_iso(c.get("t")) or NOW)) < timedelta(hours=12)):
-        return c.get("places") or {}
+    ok = lambda c: any_tier or not c.get("tier") or c["tier"] in TIERS  # тир-b — только для VRS, не в трофеи
+    if c and (c.get("done") or (NOW - (parse_iso(c.get("t")) or NOW)) < timedelta(hours=12)) and ("tier" in c or not any_tier or c.get("places")):
+        return (c.get("places") or {}) if ok(c) else {}
     if BO3_PLACES_NEW[0] >= BO3_PLACES_NEW_LIMIT:
-        return (c or {}).get("places") or {}
+        return ((c or {}).get("places") or {}) if c and ok(c) else {}
     BO3_PLACES_NEW[0] += 1
     T = bo3(f"/tournaments/{slug}")
     tier = str(T.get("tier") or "").lower()
     done = T.get("status") == "finished"
     places: dict = {}
-    if done and (not tier or tier in TIERS):
+    if done and (any_tier or not tier or tier in TIERS):
         ms, third = [], []
         for st in T.get("stages") or []:
             for rd in st.get("rounds") or []:
@@ -2535,7 +2536,9 @@ def bo3_tour_places(slug: str) -> dict:
                 semi -= {w, l}
                 for tid in semi:
                     places.setdefault(str(tid), "3rd" if len(semi) == 1 else "3-4th")
-    bo3_places_cache[slug] = {"t": iso(NOW), "done": done, "places": places}
+    bo3_places_cache[slug] = {"t": iso(NOW), "done": done, "places": places, "tier": tier}
+    if not (any_tier or not tier or tier in TIERS):
+        return {}
     return places
 
 
