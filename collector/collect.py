@@ -571,6 +571,7 @@ def lp_search(name: str) -> str | None:
 LP_PRIZE_F = CACHE / "lp_prize.json"
 lp_prize_cache: dict = load_json(LP_PRIZE_F, {})  # турнир (название bo3) → {"t", "title", "slots": [$ по местам]}
 _lp_prize_new = [0]
+LP_EVENT_NEW = int(os.environ.get("LP_EVENT_NEW", "20"))  # новых турниров с Liquipedia за полный сбор (≈2 запроса на турнир)
 
 
 def lp_opensearch(q: str) -> list[str]:
@@ -595,9 +596,9 @@ def lp_prize_slots(name: str) -> list[float]:
     Команд в слотах нет (их подставляет сетка) — места берём из сетки bo3. Владелец 24.11: «призовые — с Liquipedia».
     Найденное хранится навсегда, не найденное — повтор через 3 дня; до 8 новых турниров за сбор."""
     c = lp_prize_cache.get(name)
-    if c and (c.get("slots") or (NOW - (parse_iso(c.get("t")) or NOW)) < timedelta(days=3)):
+    if c and ((c.get("slots") and "lan" in c) or (NOW - (parse_iso(c.get("t")) or NOW)) < timedelta(days=3)):
         return c.get("slots") or []
-    if _lp_prize_new[0] >= 8 or _lp_blocked[0] or STATS or os.environ.get("NEWS_ONLY") == "1":
+    if _lp_prize_new[0] >= LP_EVENT_NEW or _lp_blocked[0] or STATS or os.environ.get("NEWS_ONLY") == "1":
         return (c or {}).get("slots") or []  # Liquipedia — только в полном сборе
     _lp_prize_new[0] += 1
     words = re.findall(r"[A-Za-z0-9]+", name)
@@ -618,13 +619,16 @@ def lp_prize_slots(name: str) -> list[float]:
         if best:
             break
     slots: list[float] = []
+    lan = None
     if best:
         pg = lp_pages([best]).get(best, "")
+        ty = re.search(r"^\|\s*type\s*=\s*(\w+)", pg or "", re.M | re.I)  # Offline / Online — для «побед на LAN» VRS
+        lan = (ty.group(1).lower() == "offline") if ty else None
         blk = pg[pg.find("PrizePool"):] if "PrizePool" in pg else ""
         blk = blk[:blk.find("==") if "==" in blk else len(blk)]
         for usd, cnt in re.findall(r"\{\{Slot\|usdprize=([\d,.]+)(?:\|count=(\d+))?", blk):
             slots += [float(usd.replace(",", ""))] * int(cnt or 1)
-    lp_prize_cache[name] = {"t": iso(NOW), "title": best, "slots": slots}
+    lp_prize_cache[name] = {"t": iso(NOW), "title": best, "slots": slots, "lan": lan}
     return slots
 
 
@@ -2399,6 +2403,26 @@ def vrs_live():
                 if ms:
                     k_ = (tn, L.key(x.get("name")))
                     mstage[k_] = max(mstage.get(k_, 0), ms)
+    # 24.11 (разбор HLTV по составляющим): у BIG «победы на LAN» 382 против наших 311, у Luminosity 404/354 — Stake Ranked
+    # (оффлайн, тир-a) мы считали онлайном. Оффлайн/онлайн — из инфобокса Liquipedia (|type=Offline), иначе: тир-s — LAN.
+    recent_t = {}
+    for hist in list(_bo3_hist.values()):
+        for m in hist:
+            t = _days(m.get("start_date"))
+            nm_ = (m.get("tournament") or {}).get("name")
+            if t is not None and nm_ and t >= ds["end"] - VRS_FORM_DAYS:
+                recent_t[nm_] = max(recent_t.get(nm_, 0), t)
+    for nm_ in sorted(recent_t, key=lambda x: -recent_t[x]):
+        if nm_ not in lp_prize_cache and not re.search(r"(?i)qualifier|open qual", nm_):
+            try:
+                lp_prize_slots(nm_)
+            except Exception as e:
+                warn(f"VRS: Liquipedia {nm_}: {e!r}")
+    def is_lan(T_, s_):
+        v = (lp_prize_cache.get(T_.get("name") or "") or {}).get("lan")
+        if v is not None:
+            return v
+        return s_ and not re.search(r"(?i)qualifier", T_.get("name") or "")
     for hist in list(_bo3_hist.values()):
         for m in hist:
             t, w = _days(m.get("start_date")), m.get("winner_team_id")
@@ -2407,7 +2431,8 @@ def vrs_live():
                 continue
             T_ = m.get("tournament") or {}
             s_ = (T_.get("tier") or m.get("tier") or "").lower() == "s"
-            L.add_match(t, a, b, w == m.get("team1_id"), 1.0 if s_ else 0.5, s_)
+            P_ = _tprize(T_)  # вес турнира у Valve — от призового фонда (как в данных снимка: $25k → 0.38, $100k → 0.5)
+            L.add_match(t, a, b, w == m.get("team1_id"), VM.curve(min(P_, 1e6) / 1e6) if P_ else (1.0 if s_ else 0.5), is_lan(T_, s_))
             if t > ds["end"] and T_.get("slug") and T_.get("status") == "finished" and _tprize(T_) > 0:
                 x_ = side_t.setdefault(T_["slug"], {"T": T_, "ids": {}, "t": 0})
                 x_["ids"][str(m.get("team1_id"))], x_["ids"][str(m.get("team2_id"))] = a, b
