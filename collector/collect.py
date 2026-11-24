@@ -5997,7 +5997,7 @@ def hltv_players_warm() -> None:
         short = bool(cd.get("majors")) and len(cd.get("major_events") or []) < cd["majors"]  # список мейджоров неполный
         if short and (c.get("fix") or 0) < 1:
             rank = 1
-        if c and not c.get("wfix2"):  # 24.11: первые/вторые места из всех таблиц достижений — перечитать всех
+        if c and (not c.get("wfix2") or kp == "cinfo1" and not c.get("pref")):  # 25.11: тренерам — ссылка на страницу игрока; 24.11: первые/вторые места из всех таблиц достижений — перечитать всех
             rank = 1
         # MVP и мейджоры меняются только по итогам турниров: страницу перечитываем, когда команда доиграла турнир
         # после прошлой проверки, а без этого — раз в 3 недели (раньше — каждую неделю всех подряд)
@@ -6027,6 +6027,28 @@ MAJOR_RX = re.compile(r"(?i)major|dreamhack winter 201[34]|ems one katowice 2014
 
 
 def hltv_player_info(nick: str, force: bool = False, coach: bool = False) -> dict | None:
+    """Тренер, который раньше играл (TaZ, Xizt, zonic): к трофеям/мейджорам/MVP со страницы тренера добавляются
+    его трофеи игроком (владелец 25.11: «у TaZ не 3 трофея — он же играл»)."""
+    d = _hltv_person_info(nick, force, coach)
+    if not (coach and d and d.get("pref")):
+        return d
+    k = norm(nick)
+    if k not in hltv_player_ids:
+        hltv_player_ids[k] = d["pref"]
+    pd = _hltv_person_info(nick, force, False) or {}
+    if not pd:
+        return d
+    u = lambda a, b: list(dict.fromkeys((a or []) + (b or [])))
+    m = dict(d)
+    for f in ("trophies", "event_wins", "event_seconds", "major_events", "mvp_events"):
+        m[f] = u(pd.get(f), d.get(f))
+    m["mvp"] = max(d.get("mvp") or 0, pd.get("mvp") or 0, len(m["mvp_events"]))
+    m["majors"] = (d.get("majors") or 0) + (pd.get("majors") or 0)
+    m["major_wins"] = (d.get("major_wins") or 0) + (pd.get("major_wins") or 0)
+    return m
+
+
+def _hltv_person_info(nick: str, force: bool = False, coach: bool = False) -> dict | None:
     """Со страницы игрока HLTV: медали MVP, сколько мейджоров сыграл и выиграл. Кэш на 3 недели, до MVP_PER_RUN новых
     страниц за запуск. Тренер (coach=True) — со страницы тренера: мейджоры, места и трофеи его команд как тренера
     (разметка та же: «Majors played/won», achievement-table, trophy-row-trophy — сверено 06.11 на /coach/1084/fierce)."""
@@ -6035,7 +6057,8 @@ def hltv_player_info(nick: str, force: bool = False, coach: bool = False) -> dic
         return None
     key = f"{kp}:{pl['id']}"
     c = hltv_cache.get(key)
-    no_ev = c and ((c.get("data") or {}).get("mvp") and not (c.get("data") or {}).get("mvp_events") and not c.get("mvfix") or not c.get("wfix2"))
+    no_ev = c and ((c.get("data") or {}).get("mvp") and not (c.get("data") or {}).get("mvp_events") and not c.get("mvfix") or not c.get("wfix2")
+                   or kp == "cinfo1" and not c.get("pref"))
     if c and not no_ev and (not force or _mvp_new[0] >= MVP_PER_RUN) and (parse_iso(c.get("t")) or NOW) > NOW - timedelta(days=PINFO_TTL_DAYS):
         return c["data"]  # свежее — из кэша; очередь (force) перечитывает тех, чья команда доиграла турнир
     # 24.11: у тренеров (Xizt — 2 MVP) был счётчик без списка: на странице тренера MVP только в подсказке значка — перечитать один раз
@@ -6122,7 +6145,13 @@ def hltv_player_info(nick: str, force: bool = False, coach: bool = False) -> dic
     d = {"mvp": mvp, "mvp_events": ev, "majors": int(pm.group(1)) if pm else 0, "major_wins": int(wm.group(1)) if wm else 0,
          "major_events": mj, "trophies": tro[:40], "event_wins": wins[:40], "event_seconds": seconds[:40]}
     d["mvp_events"] = [str(x) for x in d["mvp_events"]] if isinstance(d["mvp_events"], list) else []
-    hltv_cache[key] = {"t": iso(NOW), "data": d, "fix": 1, "mvfix": 1, "wfix2": 1}  # fix=1 — разобрано с полным списком мейджоров (MAJOR_RX)
+    if kp == "cinfo1":  # 25.11: у тренера-бывшего игрока (TaZ) на странице тренера ссылка на его страницу игрока
+        sl = leet(norm(nick))
+        for pid, slug in re.findall(r'href="/player/(\d+)/([\w.-]+)"', b):
+            if leet(norm(slug)) == sl:
+                d["pref"] = {"id": int(pid), "slug": slug}
+                break
+    hltv_cache[key] = {"t": iso(NOW), "data": d, "fix": 1, "mvfix": 1, "wfix2": 1, "pref": 1}  # fix=1 — разобрано с полным списком мейджоров (MAJOR_RX)
     return d
 
 
