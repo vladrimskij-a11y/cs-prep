@@ -20,3 +20,11 @@ for n in ("BIG", "Luminosity", "Sangal", "HEROIC", "SINNERS", "GamerLegion", "En
 
 for n in ("BIG","Luminosity","Sangal"):
     k=L.key(n); print("LP", n, [(round(t-L.ds["end"]), round(u)) for t,u in L.prizes.get(k,[])])
+for hist in c._bo3_hist.values():
+    for m in hist:
+        T = m.get("tournament") or {}
+        if "Stake Ranked" in (T.get("name") or ""):
+            print("TK", sorted(T.keys())[:40]); print("TV", {k: T.get(k) for k in ("slug", "status", "prize_pool", "tier", "end_date")})
+            try: print("PL", c.bo3_tour_places(T.get("slug")))
+            except Exception as e: print("PLERR", e)
+            print("TIERS", c.TIERS); raise SystemExit
