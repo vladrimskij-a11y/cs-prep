@@ -584,6 +584,7 @@ html { overflow-anchor: none; }
 .pop-in li.mj.win .mj-e { color: var(--t); }
 .pop-in li.mj.sec .mj-e { color: #c9ced6; }
 .pop-in li.mj .mj-p { color: var(--muted); }
+.mv-r .mv-t { cursor: pointer; text-decoration: underline; text-decoration-color: rgba(127,127,127,.45); text-underline-offset: 3px; }
 .pop-in li.psub { color: var(--t); cursor: pointer; }
 .pop-in li.psub i { font-style: normal; color: var(--muted); float: right; margin-left: 10px; }
 .pop-in li.pback { color: var(--muted); cursor: pointer; font-weight: 600; list-style: none; margin-left: -1em; }
@@ -1585,9 +1586,12 @@ a.ni { text-decoration: none; color: inherit; }
       var y = String(x.d).slice(0, 4);
       if (y !== y0) { html += '<div class="mv-y">' + y + '</div>'; y0 = y; }
       var r = x.role && (ROLE[x.role] || x.role), ic = x.k === "in" ? '<i class="mv-i in">+</i>' : x.k === "out" ? '<i class="mv-i out">−</i>' : '<i class="mv-i ia">⏸</i>';
-      var what = x.k === "in" ? (x.from === "—" ? "дебют в профи" : "пришёл" + (x.from ? " из " + esc(x.from) : ""))
-        : x.k === "out" ? "ушёл" + (x.to ? " → " + esc(x.to) : "") : "на скамейку";
-      html += '<div class="mv-r"><span class="d">' + esc(dm(x.d)) + '</span>' + ic + '<span><b>' + esc(x.nick) + '</b>' + (r ? ' <small>' + esc(r) + '</small>' : '') + ' <span class="muted">' + what + '</span></span></div>';
+      // ник — на страницу его нынешней команды, команды «откуда/куда» — на их страницы (владелец 24.11)
+      var tl = function (n) { var t = String(n).replace(/\s*\(тренер\)$/, ""); return '<a class="mv-t" data-tname="' + esc(t) + '">' + esc(n) + '</a>'; };
+      var what = x.k === "in" ? (x.from === "—" ? "дебют в профи" : "пришёл" + (x.from ? " из " + tl(x.from) : ""))
+        : x.k === "out" ? "ушёл" + (x.to ? " → " + tl(x.to) : "") : "на скамейку";
+      var nk = x.now ? '<b class="mv-t" data-tname="' + esc(x.now) + '">' + esc(x.nick) + '</b>' : '<b>' + esc(x.nick) + '</b>';
+      html += '<div class="mv-r"><span class="d">' + esc(dm(x.d)) + '</span>' + ic + '<span>' + nk + (r ? ' <small>' + esc(r) + '</small>' : '') + ' <span class="muted">' + what + '</span></span></div>';
     });
     if (M.length > 12) html += '<button class="fmore" data-moves="' + esc(T.name) + '">' + (all ? "Свернуть" : "Показать все " + M.length) + '</button>';
     return html + '</div></div>';

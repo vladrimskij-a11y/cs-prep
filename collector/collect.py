@@ -1081,6 +1081,43 @@ def squads_enrich(files: list) -> None:
     print(f"Тиммейты: обновлено файлов {n_doc}, страниц команд в кэше {len(squad_cache)}, не хватает {len([k for k in need if k not in squad_cache])}")
 
 
+def moves_now(files: list) -> None:
+    """Изменения состава: где игрок сейчас (`now`) — по нынешним составам наших страниц команд, иначе по истории
+    Liquipedia (кэш). На сайте ник ведёт на страницу этой команды (владелец 24.11)."""
+    idx = {}
+    for f in files:
+        d = load_json(f, None) or {}
+        for p in (d.get("roster") or []) + (d.get("coach") or []):
+            if isinstance(p, dict) and p.get("nick") and d.get("name"):
+                for k in nick_keys(p["nick"]):
+                    idx.setdefault(k, d["name"])
+    n = 0
+    for f in files:
+        d = load_json(f, None) or {}
+        mv = d.get("moves") or []
+        if not mv:
+            continue
+        ch = False
+        for m in mv:
+            now = next((idx[k] for k in nick_keys(m.get("nick") or "") if k in idx), None)
+            if not now:
+                h = [e for e in (phist_cache.get(m.get("page") or m.get("nick")) or {}).get("h") or []
+                     if not e.get("to") and "inactive" not in (e.get("note") or "")]
+                now = max(h, key=lambda e: e.get("from") or "")["team"] if h else None
+            if now and norm(now) == norm(d.get("name")):
+                now = None  # сейчас в этой же команде — ссылка не нужна
+            if m.get("now") != now:
+                if now:
+                    m["now"] = now
+                else:
+                    m.pop("now", None)
+                ch = True
+        if ch:
+            save_json(f, d)
+            n += 1
+    print(f"Изменения состава: где игроки сейчас — обновлено страниц {n}")
+
+
 def lp_roster(t: dict) -> dict | None:
     """Активный состав с Liquipedia: тренер, капитан, роли. Кэш (см. lp_fresh)."""
     key = str(t["id"])
@@ -7777,6 +7814,10 @@ def main() -> int:
     except Exception as e:
         warn(f"Тиммейты: {e!r}")
     save_json(SQUAD_F, squad_cache)
+    try:
+        moves_now(sorted((OUT / "team").glob("*.json")))
+    except Exception as e:
+        warn(f"Где игроки сейчас: {e!r}")
     for k in [k for k, v in tg_cache.items() if (v.get("t") or "") < iso(NOW - timedelta(days=NEWS_DAYS + 3))]:
         del tg_cache[k]
     save_json(TG_CACHE_F, tg_cache)
