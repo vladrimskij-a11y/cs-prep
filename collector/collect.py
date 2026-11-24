@@ -5845,6 +5845,8 @@ def hltv_players_warm() -> None:
         short = bool(cd.get("majors")) and len(cd.get("major_events") or []) < cd["majors"]  # список мейджоров неполный
         if short and (c.get("fix") or 0) < 1:
             rank = 1
+        if c and not c.get("wfix2"):  # 24.11: первые/вторые места из всех таблиц достижений — перечитать всех
+            rank = 1
         # MVP и мейджоры меняются только по итогам турниров: страницу перечитываем, когда команда доиграла турнир
         # после прошлой проверки, а без этого — раз в 3 недели (раньше — каждую неделю всех подряд)
         if (c and (parse_iso(c.get("t")) or NOW) > NOW - timedelta(days=PINFO_TTL_DAYS) and not event_ended_since(n, c.get("t") or "")

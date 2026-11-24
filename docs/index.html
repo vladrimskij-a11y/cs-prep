@@ -2661,14 +2661,28 @@ a.ni { text-decoration: none; color: inherit; }
   }
   // турниры без года в названии (HLTV пишет «cs_summit 5») — год по известной серии
   var EV_YEAR = { "cs_summit 1": 2017, "cs_summit 2": 2018, "cs_summit 3": 2018, "cs_summit 4": 2019, "cs_summit 5": 2019, "cs_summit 6": 2020, "cs_summit 7": 2020, "cs_summit 8": 2021 };
+  var EV_YEAR_RX = [
+    [/ESL Grand Slam Season 1\b/i, 2018], [/ESL Grand Slam Season 2\b/i, 2019], [/ESL Grand Slam Season 3\b/i, 2021],
+    [/ESL Grand Slam Season 4\b/i, 2023], [/ESL Grand Slam Season 5\b/i, 2025], [/ESL Grand Slam Season 6\b/i, 2026],
+    [/FISSURE Playground #?[12]\b/i, 2025], [/FISSURE Playground #?3\b/i, 2026], [/FISSURE Playground #?[45]\b/i, 2026],
+    [/BetBoom Dacha Belgrade Season 2/i, 2024], [/CCS Kick-off/i, 2015], [/ELEAGUE Season 1\b/i, 2016], [/ELEAGUE Season 2\b/i, 2016],
+    [/EPICENTER:? Moscow/i, 2016], [/ESEA Invite Season 17/i, 2014], [/ESL Barcelona CS:GO Invitational/i, 2016],
+    [/Road to Rio/i, 2020], [/^Flashpoint 1\b/i, 2020], [/^Flashpoint 2\b/i, 2020], [/^Flashpoint 3\b/i, 2021],
+    [/FACEIT League Season 2/i, 2014], [/Fragbite Masters Season 3/i, 2014], [/Fragbite Masters Season [45]\b/i, 2015],
+    [/Pantamera Challenge/i, 2015], [/PGL Season 1\b/i, 2015], [/StarSeries Season 3\b/i, 2017], [/StarSeries XIV\b/i, 2016],
+    [/StarSeries X\b/i, 2014], [/StarSeries i-League Season [3]\b/i, 2017], [/StarSeries i-League Season [456]\b/i, 2018],
+    [/StarSeries i-League Season [78]\b/i, 2019], [/SuperNova CS:GO Malta/i, 2018]
+  ];
   function evYear(name) {
     name = String(name || "");
     if (/\b(19|20)\d\d\b/.test(name)) return name;
     var m = name.match(/^(cs_summit \d+)/i), y = m && EV_YEAR[m[1].toLowerCase()];
     if (y) return name.replace(/^cs_summit/i, "CS Summit") + " " + y;
     // сезоны без года в названии: ESL Pro League (S1 — 2015, по два сезона в год), ECS (S1 — 2016, по два в год)
-    var s = name.match(/ESL Pro League Season (\d+)/i) || name.match(/^ECS Season (\d+)/i);
+    var s = name.match(/ESL (?:ESEA )?Pro League Season (\d+)/i) || name.match(/^ECS Season (\d+)/i);
     if (s) { var base = /ECS/i.test(s[0]) ? 2016 : 2015; return name + " " + (base + Math.floor((+s[1] - 1) / 2)); }
+    // турниры HLTV без года в названии (владелец 24.11: у всех событий в окнах — год)
+    for (var i = 0; i < EV_YEAR_RX.length; i++) if (EV_YEAR_RX[i][0].test(name)) return name + " " + EV_YEAR_RX[i][1];
     return name;
   }
   // трофеи игрока (HLTV, все годы) — как мейджоры и MVP: турнир с годом выделен, ниже команда (владелец 24.11)
