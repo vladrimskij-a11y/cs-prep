@@ -1969,7 +1969,7 @@ _why_new = [0]
 def round_why(r: str | None) -> str:
     """Как закончился раунд (bo3 end_reason): e — все убиты, b — бомба взорвана, d — разминирована, t — время вышло."""
     x = (r or "").lower()
-    return "b" if "bomb" in x else "d" if "defus" in x else "t" if "saved" in x or "time" in x else "e" if "win" in x else "?"
+    return "d" if "defus" in x else "b" if "bomb" in x else "t" if "saved" in x or "time" in x else "e" if "win" in x else "?"  # BombDefused — раньше «bomb»
 
 
 def map_rounds(det: dict | None, win: int | None) -> list | None:

@@ -3395,7 +3395,8 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
       var row = function (team, side) {
         return '<div class="rh-row">' + p[1].map(function (r) {
           if (!r || +r[0] !== team) return '<i class="rh-c"></i>';
-          return '<i class="rh-c ' + (r[1] === "C" ? "ct" : "t") + '">' + (RICON[r[2]] || '') + '</i>';
+          var why = r[1] === "C" && r[2] === "b" ? "d" : r[2];  // CT не взрывает бомбу: «BombDefused» у первых записей попал в «b»
+          return '<i class="rh-c ' + (r[1] === "C" ? "ct" : "t") + '">' + (RICON[why] || '') + '</i>';
         }).join("") + '</div>';
       };
       var sideLbl = function (s) { return s === "C" ? '<b class="ct">CT</b>' : s === "T" ? '<b class="t">T</b>' : ''; };
