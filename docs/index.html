@@ -2343,7 +2343,9 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
           if (cur) html += '</section>';
           return html + '<div class="upd" style="text-align:center;margin-top:14px">Нажми на матч — вето, карты, счёт и статистика игроков</div>';
         }
-        var mj = t && t.major ? majorBlock(t.major) : "", out = "";
+        // «Кто с какой стадии» — в «Обзоре» вместо плиток участников (владелец 25.11); здесь — только если «Обзора» нет
+        var hasOv = tabs.some(function (x) { return x.key === "overview"; });
+        var mj = t && t.major && !hasOv ? majorBlock(t.major) : "", out = "";
         if (ms.length) out += byDays(ms, false) + mj;
         else out += mj + (mj ? '<div class="note" style="padding:12px 0 0">Расписание матчей пока не опубликовано — появится здесь, как только организаторы его объявят.</div>'
           : '<div class="empty"><strong>Расписание пока не опубликовано</strong>Матчи появятся здесь, как только организаторы их объявят.</div>');
@@ -2376,9 +2378,10 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
 
   function placeRu(p) { return String(p || "").replace(/(st|nd|rd|th)$/i, "").replace(/-/, "–") + " место"; }
 
+  function partOrStages(h) { return h.major && (h.major.stages || []).length ? majorBlock(h.major) : participantsBlock(h.teams || [], h.major); }
   function prizeBlock(h) {
     var html = "";
-    if (!(h.places || []).length && !h.prize) return participantsBlock(h.teams || [], h.major);
+    if (!(h.places || []).length && !h.prize) return partOrStages(h);
     html += '<div class="sec"><h3>Призовые и слоты <span>' + esc(usd(h.prize)) + '</span></h3><div class="box prz">';
     if (h.player_share || h.club_share) html += '<div class="prz-share">клубам ' + esc(usd(h.club_share)) + ' · командам ' + esc(usd(h.player_share)) + '</div>';
     (h.places || []).forEach(function (p) {
@@ -2389,7 +2392,7 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
         ((p.teams || []).length ? '<span class="prz-team">' + esc(p.teams.join(", ")) + '</span>' : '') + '</div>';
     });
     html += '</div></div>';
-    html += participantsBlock(h.teams || [], h.major);
+    html += partOrStages(h);
     return html;
   }
   // как попали на турнир — по-русски: «VRS Мир», «VRS Северная Америка», «Закрытая квалификация Азии», «Приглашение»
