@@ -101,6 +101,12 @@ def merge(dst: Path) -> None:
             if ch:
                 b["matches"].sort(key=lambda m: m.get("begin_at") or "")
                 (dst / "matches.json").write_text(json.dumps(b, ensure_ascii=False, separators=(",", ":")), "utf-8")
+        for f in (OURS / "results").glob("*.json"):  # 25.11: сетки идущих турниров (быстрый проход, `stages_t`)
+            g = dst / "results" / f.name
+            a, b = load(f), load(g)
+            if a and b and a.get("stages_t") and (a.get("stages_t") or "") > (b.get("stages_t") or "") and a.get("stages") != b.get("stages"):
+                b["stages"], b["stages_t"] = a["stages"], a["stages_t"]
+                g.write_text(json.dumps(b, ensure_ascii=False, separators=(",", ":")), "utf-8")
         for f in (OURS / "match").glob("*.json"):
             g = dst / "match" / f.name
             a, b = load(f), load(g)

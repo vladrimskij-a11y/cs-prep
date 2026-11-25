@@ -2083,14 +2083,9 @@ def bo3_tournament_for(name: str) -> dict | None:
 _refill_n = [0]
 
 
-def build_results(tr: dict) -> dict | None:
-    """Сыгранные матчи турнира со статистикой — для вкладки «Завершённые»."""
-    T = bo3_tournament_for(tr["name"])
-    if not T:
-        return None
-    prev_res = load_json(OUT / "results" / (re.sub(r"[^\w-]", "-", str(tr["id"])) + ".json"), {}) or {}
-    prev_veto = {str(x.get("id")): x["veto"] for x in prev_res.get("matches") or [] if x.get("veto")}  # найденное вето не теряем
-    out, stages = [], []
+def results_stages(T: dict) -> list:
+    """Сетка/швейцарка турнира bo3 для «Обзора» (стадии → раунды → матчи со счётом)."""
+    stages = []
     for st in sorted(T.get("stages") or [], key=lambda x: x.get("sequence_number") or 0):
         stage = re.sub(re.escape(T.get("name") or "") + r"\s*", "", st.get("title") or "").strip() or None
         rounds = []
@@ -2104,6 +2099,42 @@ def build_results(tr: dict) -> dict | None:
                            "w": 0 if m.get("winner_team_id") and m.get("winner_team_id") == m.get("team1_id") else 1 if m.get("winner_team_id") and m.get("winner_team_id") == m.get("team2_id") else None})
             rounds.append({"name": round_ru(rd.get("name")), "bracket": rd.get("bracket_type"), "matches": ms})
         stages.append({"title": round_ru(stage) or "Стадия", "format": st.get("format_type"), "status": st.get("status"), "rounds": rounds})
+    return stages
+
+
+def quick_stages_sync(L: dict) -> None:
+    """Быстрый проход (раз в 5 мин): сетка/швейцарка идущих турниров тир-1 в «Обзоре» — счёт сыгранного матча
+    на сайте через 5–10 мин, а не со сбором статистики (владелец 25.11). Матчи со статистикой — по-прежнему stats/full."""
+    n = 0
+    for tr in L.get("tournaments") or []:
+        b, e = parse_iso(tr.get("begin")), parse_iso(tr.get("end"))
+        if tr.get("tier") != "s" or not b or not (b - timedelta(hours=6) <= NOW <= (e or b) + timedelta(hours=12)):
+            continue
+        path = OUT / "results" / (re.sub(r"[^\w-]", "-", str(tr["id"])) + ".json")
+        rj = load_json(path, None)
+        if rj is None:
+            continue
+        try:
+            T = bo3_tournament_for(tr["name"])
+            st = results_stages(T) if T else []
+        except Exception as ex:
+            warn(f"Сетка быстро {tr['name']}: {ex!r}")
+            continue
+        if st and json.dumps(st, sort_keys=True) != json.dumps(rj.get("stages"), sort_keys=True):
+            rj["stages"], rj["stages_t"] = st, iso(NOW)
+            save_json(path, rj)
+            n += 1
+    print(f"Сетки идущих турниров: обновлено {n}")
+
+
+def build_results(tr: dict) -> dict | None:
+    """Сыгранные матчи турнира со статистикой — для вкладки «Завершённые»."""
+    T = bo3_tournament_for(tr["name"])
+    if not T:
+        return None
+    prev_res = load_json(OUT / "results" / (re.sub(r"[^\w-]", "-", str(tr["id"])) + ".json"), {}) or {}
+    prev_veto = {str(x.get("id")): x["veto"] for x in prev_res.get("matches") or [] if x.get("veto")}  # найденное вето не теряем
+    out, stages = [], results_stages(T)
     for st in T.get("stages") or []:
         stage = re.sub(re.escape(T.get("name") or "") + r"\s*", "", st.get("title") or "").strip() or None
         for rd in st.get("rounds") or []:
@@ -8096,6 +8127,10 @@ def news_main() -> int:
         live_series_sync()  # и сыгранные карты идущих матчей со статистикой
     except Exception as e:
         warn(f"Идущие матчи: {e!r}")
+    try:
+        quick_stages_sync(L)  # сетки идущих тир-1 турниров — раз в 5 минут
+    except Exception as e:
+        warn(f"Сетки: {e!r}")
     save_json(TG_CACHE_F, tg_cache)
     save_json(GIGA_USAGE_F, giga_usage)
     save_json(DEDUP_CACHE_F, dedup_cache)

@@ -3,6 +3,7 @@ name: Обновить данные (полный сбор)
 on:
   schedule:
     - cron: "17 * * * *"  # раз в час (владелец 06.11): свежие VRS и прогнозы; тяжёлое к HLTV — по своим срокам
+    - cron: "47 * * * *"  # 25.11: запасной запуск — GitHub опаздывает с расписанием; если прошлый сбор был < 45 мин назад, выходит сразу
   workflow_dispatch:
 
 permissions:
@@ -15,7 +16,31 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  gate:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+    outputs:
+      go: ${{ steps.g.outputs.go }}
+    steps:
+      - id: g
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          go=1
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            last=$(gh api "repos/${{ github.repository }}/actions/workflows/collect.yml/runs?per_page=10" \
+              --jq '[.workflow_runs[] | select(.id != ${{ github.run_id }}) | select(.conclusion == "success" or .status == "in_progress" or .status == "queued") | .run_started_at][0]')
+            if [ -n "$last" ] && [ "$last" != "null" ]; then
+              age=$(( $(date +%s) - $(date -d "$last" +%s) ))
+              echo "Прошлый полный сбор начат $((age / 60)) мин назад"
+              [ $age -lt 2700 ] && go=0
+            fi
+          fi
+          echo "go=$go" >> "$GITHUB_OUTPUT"
   run:
+    needs: gate
+    if: needs.gate.outputs.go == '1'
     runs-on: ubuntu-latest
     timeout-minutes: 90
     environment:

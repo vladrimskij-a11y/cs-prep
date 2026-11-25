@@ -4,6 +4,7 @@ on:
   schedule:
     - cron: "0,40 */2 * * *"
     - cron: "20 1-23/2 * * *"
+    - cron: "7-59/15 * * * *"  # 25.11: в дни тир-1 — раз в 15 мин (в остальные дни такие запуски сразу выходят)
   workflow_dispatch:
 
 permissions:
@@ -29,7 +30,27 @@ jobs:
           mkdir -p docs/data
           if git fetch -q --depth 1 origin data; then git archive FETCH_HEAD | tar -x -C docs/data; fi
 
+      - name: Нужен ли сбор (частые запуски — только в дни тир-1)
+        if: github.event_name == 'schedule' && github.event.schedule == '7-59/15 * * * *'
+        run: |
+          python - <<'PY'
+          import json, os, datetime as dt
+          now = dt.datetime.now(dt.timezone.utc)
+          try:
+              L = json.load(open("docs/data/matches.json"))
+          except Exception:
+              L = {}
+          def t(x):
+              try: return dt.datetime.fromisoformat((x or "").replace("Z", "+00:00"))
+              except Exception: return None
+          hot = any(m.get("tier") == "s" and t(m.get("begin_at")) and abs((t(m["begin_at"]) - now).total_seconds()) < 12 * 3600 for m in L.get("matches") or [])
+          if not hot:
+              open(os.environ["GITHUB_ENV"], "a").write("SKIP=1\n")
+              print("Тир-1 матчей рядом нет — частый запуск пропущен")
+          PY
+
       - name: Восстановить кэш сборщика
+        if: env.SKIP != '1'
         uses: actions/cache/restore@v4
         with:
           path: cache
@@ -37,6 +58,7 @@ jobs:
           restore-keys: collector-cache-
 
       - name: Восстановить кэш новостей
+        if: env.SKIP != '1'
         uses: actions/cache/restore@v4
         with:
           path: cache_news
@@ -44,9 +66,11 @@ jobs:
           restore-keys: news-cache-
 
       - name: Слить кэши
+        if: env.SKIP != '1'
         run: python tools/merge_cache.py cache cache_news
 
       - name: Сбор
+        if: env.SKIP != '1'
         env:
           PANDASCORE_TOKEN: ${{ secrets.PANDASCORE_TOKEN }}
           ODDSPAPI_KEY: ${{ secrets.ODDSPAPI_KEY }}
@@ -54,11 +78,12 @@ jobs:
         run: python collector/collect.py
 
       - name: Сохранить кэш сборщика
-        if: always()
+        if: always() && env.SKIP != '1'
         uses: actions/cache/save@v4
         with:
           path: cache
           key: collector-cache-${{ github.run_id }}
 
       - name: Сохранить данные (ветка data, слияние с параллельными сборами)
+        if: env.SKIP != '1'
         run: python collector/save_data.py stats "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
