@@ -2787,7 +2787,7 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
     var cards = play.map(function (k, i) {
       var x = Vn.info[k], by = x.act === "decider" ? null : side(x.who);
       if (playedMap(m, x.map)) anyPlayed = true;
-      return ppCard(m, i, x.map, x.act === "decider" ? "десайдер" : x.who, by);
+      return ppCard(m, i, x.map, x.act === "decider" ? "" : x.who, by);  // третья карта — просто «Карта 3» (владелец 25.11)
     }).join("");
     var bans = bansLine(Vn.order.filter(function (k) { return Vn.info[k].act === "ban"; }).map(function (k) { return { who: side(Vn.info[k].who), map: Vn.info[k].map }; }).filter(function (x) { return x.who != null; }), A, B);
     return '<div class="sec" data-nav><h3>Вето <span>' + (anyPlayed ? 'нажми на сыгранную карту' : 'dust2') + '</span></h3><div class="box ppick"><div class="pp-maps">' + cards + '</div>' +
@@ -2800,7 +2800,7 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
     if (!P || !(P.maps || []).length) return act;
     var bans = bansLine((P.steps || []).filter(function (x) { return x.act === "ban" && (x.team === 0 || x.team === 1); }).map(function (x) { return { who: x.team, map: x.map }; }), A, B);
     var html = '<div class="sec" data-nav><h3>Вероятный пик <span>по вето за 3 мес.</span></h3><div class="box ppick"><div class="pp-maps">' + P.maps.map(function (x, i) {
-      var who = x.by === 0 ? abbr(A) : x.by === 1 ? abbr(B) : "десайдер";  // кто пикает карту
+      var who = x.by === 0 ? abbr(A) : x.by === 1 ? abbr(B) : "";  // кто пикает карту; десайдер — просто «Карта 3» (владелец 25.11)
       return ppCard(m, i, x.map, who, x.by);
     }).join("") + '</div>' + (bans ? '<div class="note" style="padding:10px 4px 2px">Баны: ' + bans + '</div>' : '') + '</div></div>';
     return html + act;
