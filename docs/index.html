@@ -1738,7 +1738,7 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
         '<span class="src"><span><b class="chn">' + esc(n.channel_title) + '</b> · ' + esc(hm(n.date)) + '</span>' +
         ((n.also || []).length ? '<span>ещё в ' + n.also.length + ' ' + (n.also.length === 1 ? "канале" : "каналах") + '</span>' : '') + '</span>' +
         '<span class="fi-body">' + (n.photo ? '<span class="thumb"><img src="' + esc(n.photo) + '" alt="" loading="lazy" decoding="async" onerror="this.parentNode.remove()">' + (n.video ? '<i class="play" aria-label="видео">▶</i>' : '') + '</span>' : '') +
-        '<span><h4>' + esc(n.title) + '</h4>' + (n.text && n.text !== n.title ? '<p>' + esc(n.text) + '</p>' : '') + '</span></span></button>';
+        '<span><h4>' + esc(n.title) + '</h4>' + (function (b) { return b ? '<p>' + esc(b) + '</p>' : ''; })(bodyNoTitle(n.title, n.text)) + '</span></span></button>';
     });
     return html + '</div>';
   }
@@ -2386,6 +2386,17 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
     return html + '</div>';
   }
 
+  // текст поста без первой строки, если она уже стоит заголовком (25.11: в ленте заголовок повторялся дважды)
+  function bodyNoTitle(title, text) {
+    var t = String(title || "").replace(/\s+/g, " ").trim(), x = String(text || "").trim();
+    if (!t) return x;
+    if (x.replace(/\s+/g, " ").indexOf(t) === 0) {
+      var i = 0, k = 0;  // пропускаем столько символов текста, сколько занимает заголовок (с учётом лишних пробелов)
+      while (i < x.length && k < t.length) { if (/\s/.test(x[i]) && (k === 0 || t[k] !== " ")) { i++; continue; } if (/\s/.test(x[i])) { while (i < x.length && /\s/.test(x[i])) i++; k++; continue; } i++; k++; }
+      return x.slice(i).trim();
+    }
+    return x;
+  }
   function placeRu(p) { return String(p || "").replace(/(st|nd|rd|th)$/i, "").replace(/-/, "–") + " место"; }
 
   function partOrStages(h) { return h.major && (h.major.stages || []).length ? majorBlock(h.major) : participantsBlock(h.teams || [], h.major); }
