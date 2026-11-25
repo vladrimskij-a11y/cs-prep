@@ -1824,8 +1824,8 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
     if (v.region && v.reg_rank) tiles.push('<div class="th-t"><b class="num">#' + esc(v.reg_rank) + '</b><span>' + esc(REG_RU[v.region] || v.region) + '</span></div>');
     if (v.points) tiles.push('<div class="th-t"><b class="num">' + esc(v.points) + '</b><span>очков</span></div>');
     if (cups.length) tiles.push('<div class="th-t cupt" role="button" data-pop="' + esc(JSON.stringify({ t: "🏆 Трофеи с 1 января: " + cups.length, c: cols })) + '"><b class="num">🏆 ' + cups.length + '</b><span>трофеи</span></div>');
-    var hq = logoHq(T.name), lg = hq ? '<img class="tlogo" src="' + esc(hq) + '" alt="" decoding="async" onerror="this.remove()">' : logo(T.name, T.logo).replace('class="lg"', 'class="tlogo"');
-    var html = '<section class="hero thero">' + logoBg(T.name, T.logo, "t") + (lg ? '<div class="th-logo">' + lg + '</div>' : '') +
+    var lg = logo(T.name, T.logo).replace('class="lg"', 'class="tlogo"');
+    var html = '<section class="hero thero">' + (lg ? '<div class="th-logo">' + lg + '</div>' : '') +
       (tiles.length ? '<div class="th-tiles" style="--n:' + tiles.length + '">' + tiles.join("") + '</div>' : '<div class="note">Команды нет в рейтинге Valve</div>') + '</section>';
     if ((T.roster || []).length) html += '<div class="sec"><div class="box roster a"><div class="hd"><span class="tn">Состав</span></div>' + rosterRows(T.roster, T.coach, { stats: T.stats || [] }, false) + '</div></div>';
     else if ((T.players || []).length) html += '<div class="sec"><div class="box"><div class="tm-pl" style="padding:12px">' + T.players.map(function (p) { return '<span>' + esc(typeof p === "string" ? p : p.nick) + '</span>'; }).join("") + '</div></div></div>';
