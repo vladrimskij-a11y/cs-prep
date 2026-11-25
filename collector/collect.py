@@ -4119,7 +4119,10 @@ def d2_stats_sync() -> None:
     n = 0
     for mt in d2_recent_matches():
         e = d2_stats.get(str(mt["id"]))
-        if e and (e.get("done") or (parse_iso(e.get("t")) or NOW) > NOW - timedelta(hours=6)):
+        # недоигранный в архиве: свежий матч (сутки) — повтор через 20 мин, иначе через 6 ч
+        # (25.11: BC.Game–CW и NIP–Liquid записались по ходу матча, и итоги 6 часов показывали статистику bo3)
+        fresh = (parse_iso(mt.get("date")) or NOW) > NOW - timedelta(hours=24)
+        if e and (e.get("done") or (parse_iso(e.get("t")) or NOW) > NOW - timedelta(minutes=20 if fresh else 360)):
             continue
         if _d2s_new[0] >= D2_STATS_NEW or _d2_blocked[0]:
             break
