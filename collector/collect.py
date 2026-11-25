@@ -7678,6 +7678,36 @@ def build_hq_logos() -> None:
 TOUR_HQ_NEW = 10   # новых логотипов турниров за полный сбор
 
 
+
+def lp_tour_page(name: str) -> str | None:
+    """Страница турнира на Liquipedia: у них адреса вида «PGL/2026/Singapore», «Intel Extreme Masters/2027/Kraków/Stage 1»,
+    по полному названию поиск ничего не находит (проверено 25.11). Ищем «Бренд/год» и берём страницу, где есть
+    «особые» слова названия (город, сезон), без отборочных."""
+    import unicodedata
+    def plain(x):
+        return "".join(c for c in unicodedata.normalize("NFKD", x.lower()) if not unicodedata.combining(c))
+    words = re.findall(r"[A-Za-zÀ-ž0-9]+", name)
+    yr = next((w for w in words if re.fullmatch(r"(19|20)\d\d", w)), "")
+    if not words or not yr:
+        return None
+    brand = {"iem": "Intel Extreme Masters", "epl": "ESL Pro League", "cct": "CCT"}.get(words[0].lower(), words[0])
+    stop = {"major", "stage", "season", "masters", "series", "championship", "cup", "open", "global", "finals", "final", yr}
+    special = [plain(w) for w in words[1:] if len(w) >= 3 and plain(w) not in stop and plain(w) != plain(brand)]
+    pref = [f"{brand}/{yr}"] + ([f"{brand}/{words[1]}/{yr}"] if len(words) > 2 else [])
+    best = None
+    for q in pref:
+        for t in lp_opensearch(q):
+            pt = plain(t)
+            if re.search(r"(?i)qualifier|/open|/closed|/europe|/asia|/americas|/oceania", t) or yr not in t:
+                continue
+            if special and not all(w in pt for w in special if not w.isdigit()):
+                continue
+            if not best or len(t) < len(best):
+                best = t
+        if best:
+            break
+    return best
+
 def build_tour_hq() -> None:
     """Логотип турнира в хорошем качестве для шапки турнира (владелец 25.11: баннер bo3 маленький, при растяжении мылится).
     Страница турнира на Liquipedia — та же, что для призовых (`lp_prize_slots` → `lp_prize_cache[...]["title"]`),
@@ -7685,7 +7715,7 @@ def build_tour_hq() -> None:
     Берём идущие и ближайшие (3 мес.) тир-1 турниры; найденное держим, пока турнир в списке; промах — повтор через 3 дня."""
     path = OUT / "tour_hq.json"
     H = load_json(path, {}) or {}
-    have, miss = H.get("tours") or {}, H.get("miss") or {}
+    have, miss = H.get("tours") or {}, H.get("miss2") or {}  # miss2: 25.11 поиск страниц переделан — старые промахи не в счёт
     lst = load_json(OUT / "matches.json", {}) or {}
     todo = []
     for t in lst.get("tournaments") or []:
@@ -7707,17 +7737,7 @@ def build_tour_hq() -> None:
         return
     files = {}
     for tid, nm in todo:
-        try:
-            lp_prize_slots(nm)
-        except Exception as e:
-            warn(f"Логотип турнира {nm}: {e!r}")
-            continue
-        title = (lp_prize_cache.get(nm) or {}).get("title")
-        # страница должна быть именно этого турнира: хотя бы одно «особое» слово названия (город, сезон) есть в заголовке
-        # (поиск призовых допускает любую страницу бренда с тем же годом: PGL/2026/Bucharest вместо Singapore)
-        sw = [w for w in re.findall(r"[a-z]{4,}", nm.lower())[1:] if w not in ("major", "season", "stage", "masters", "series", "championship", "cup", "open")]
-        if title and sw and not any(w in title.lower() for w in sw):
-            title = None
+        title = lp_tour_page(nm)
         txt = lp_pages([title]).get(title, "") if title else ""
         ib = infobox(txt) or txt
         f = lp_param(ib, "imagedark") or lp_param(ib, "image")
@@ -7774,7 +7794,7 @@ def build_tour_hq() -> None:
         miss.pop(tid, None)
         got += 1
     print(f"Логотипы турниров (Liquipedia): новых {got}, всего {len(have)}")
-    save_json(path, {"updated": iso(NOW), "tours": have, "miss": miss})
+    save_json(path, {"updated": iso(NOW), "tours": have, "miss2": miss})
 
 
 def withyear_name(nm: str, t: dict) -> str:
