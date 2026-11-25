@@ -3584,7 +3584,27 @@ def hltv_future_tournaments() -> list[dict]:
         out.append({"id": "hltv-" + e["href"].split("/")[2], "name": e["name"].replace("Intel Extreme Masters", "IEM"), "tier": "s",
                     "image": None, "bg": e.get("bg"), "begin": e["begin"], "end": e["end"], "prize": None, "prize_usd": e.get("prize_usd"),
                     "matches": 0, "next": None, "live": 0})
-    return out
+    # HLTV ведёт стадии отдельными событиями («IEM Kraków 2027 Stage 1» — отборочная часть, $30 000): одна карточка на турнир
+    # с общими датами; призовые стадии не выдаём за призовые турнира (владелец 25.11)
+    by: dict = {}
+    for t in out:
+        base = re.sub(r"\s+Stage\s+\d+$", "", t["name"], flags=re.I)
+        by.setdefault(base, []).append(t)
+    res = []
+    for base, grp in by.items():
+        main = next((t for t in grp if t["name"] == base), None)
+        if len(grp) == 1 and main:
+            res.append(main)
+            continue
+        m = dict(main or sorted(grp, key=lambda x: x["begin"])[0])
+        m["name"] = base
+        m["begin"] = min(t["begin"] for t in grp)
+        m["end"] = max(t["end"] for t in grp)
+        if not main:
+            m["prize_usd"] = None
+        m["stages"] = sorted(t["name"] for t in grp if t is not main)
+        res.append(m)
+    return res
 
 
 def hltv_events() -> dict:

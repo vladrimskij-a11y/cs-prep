@@ -1119,6 +1119,14 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
    а всё, что больше (подсветка, баннер), — размытием, где пикселей не видно */
 .mcard.ill { isolation: isolate; color: #fff; border-color: rgba(255,255,255,.07);
   background: radial-gradient(90% 150% at 100% 50%, color-mix(in srgb, var(--ac) 26%, #0f1013) 0%, #0f1013 65%); }
+.mchips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.mch { display: inline-flex; align-items: center; gap: 7px; padding: 5px 10px 5px 8px; border-radius: 9px; background: var(--sunk); font-size: 13px; line-height: 1.2; }
+.mch::before { content: ""; width: 3px; height: 14px; border-radius: 2px; background: var(--line); flex: none; }  /* цвет победителя карты — ровная черта, не по скруглению */
+.mch.a::before { background: var(--ct); } .mch.b::before { background: var(--t); }
+.mch b { font-weight: 650; color: var(--fg); }
+.mch .num { font-weight: 700; color: var(--muted); } .mch i { font-style: normal; }
+.mch.a i.w { color: var(--ct); } .mch.b i.w { color: var(--t); }
+.match.res .time { align-self: start; padding-top: 3px; }
 .mcard.ill { background-origin: border-box; background-repeat: no-repeat; }  /* иначе цветной край фона повторялся в рамке слева — «полоска свечения» */
 .mcard.ill::before { content: ""; position: absolute; top: 0; bottom: 0; right: 0; width: 64%; z-index: -1; background: var(--ill) right center / contain no-repeat; }
 .mcard.ill .mc-s { color: rgba(255,255,255,.72); max-width: 58%; }
@@ -1142,7 +1150,7 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
 .shead.shbg::before { content: ""; position: absolute; inset: -40px; z-index: -1; background: var(--tb) center / cover no-repeat; filter: blur(22px) saturate(1.5); opacity: .7; }
 .shead.shbg.lgo::before { background-size: cover; }
 /* логотип турнира в хорошем качестве (Liquipedia, tour_hq): чётко, без размытия, справа за названием (владелец 25.11) */
-.shead.shbg.hq::before { inset: 0; filter: none; opacity: .32; background: var(--tb) right 14px center / auto 86% no-repeat; }
+.shead.shbg.hq::before { inset: 0; filter: none; opacity: .24; background: var(--tb) right 14px center / auto 86% no-repeat; }
 .shead.shbg.hq::after { background: linear-gradient(90deg, var(--bg) 0%, color-mix(in srgb, var(--bg) 55%, transparent) 60%, transparent 100%), linear-gradient(180deg, transparent 55%, var(--bg) 100%); }
 .shead.shbg::after { content: ""; position: absolute; inset: 0; z-index: -1; background: linear-gradient(180deg, color-mix(in srgb, var(--bg) 30%, transparent) 0%, color-mix(in srgb, var(--bg) 72%, transparent) 60%, var(--bg) 100%); }
 </style>
@@ -1960,6 +1968,11 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
       (small ? '' : '<span class="pp-n">Карта ' + (i + 1) + '</span>') + '<b>' + esc(g.map || "?") + '</b>' +
       '<span class="num pp-s"><span class="a">' + esc(g.score ? g.score[0] : "–") + '</span>:<span class="b">' + esc(g.score ? g.score[1] : "–") + '</span></span>' + side + '</div>';
   }
+  // карта в списке завершённых — компактная плашка без картинки (владелец 25.11: квадраты с картинками в списке пестрят)
+  function mapChip(g) {
+    var w = g.winner === 0 ? "a" : g.winner === 1 ? "b" : "n", sc = g.score || ["–", "–"];
+    return '<span class="mch ' + w + '"><b>' + esc(g.map || "?") + '</b><span class="num"><i class="' + (g.winner === 0 ? "w" : "") + '">' + esc(sc[0]) + '</i>:<i class="' + (g.winner === 1 ? "w" : "") + '">' + esc(sc[1]) + '</i></span></span>';
+  }
   var MAP_IMG = { ancient: 1, anubis: 1, cache: 1, dust2: 1, inferno: 1, mirage: 1, nuke: 1, overpass: 1, train: 1, vertigo: 1 };
   function mapBg(name) {  // картинка карты фоном квадрата; текст остаётся читаемым за счёт затемнения
     var k = String(name || "").toLowerCase().replace(/^de_/, "").replace(/dust\s*ii/, "dust2").replace(/[^a-z0-9]/g, "");
@@ -2038,7 +2051,7 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
       '<div class="vs"><div class="row"><span class="dot a"></span>' + logo(A.name, A.logo) + '<span class="tname' + (x.winner === 0 ? ' won' : '') + '">' + esc(A.name || "?") + '</span><b class="rs num a' + (x.winner === 0 ? ' won' : '') + '">' + esc(A.score) + '</b></div>' +
       '<div class="row"><span class="dot b"></span>' + logo(B.name, B.logo) + '<span class="tname' + (x.winner === 1 ? ' won' : '') + '">' + esc(B.name || "?") + '</span><b class="rs num b' + (x.winner === 1 ? ' won' : '') + '">' + esc(B.score) + '</b></div>' +
       (sub ? '<div class="tour">' + esc(sub) + '</div>' : '') +
-      ((x.maps || []).length ? '<div class="pp-maps sm">' + x.maps.map(function (g, i) { return mapSquare(g, i, A, B, true); }).join("") + '</div>' : '') + '</div>' +
+      ((x.maps || []).length ? '<div class="mchips">' + x.maps.map(mapChip).join("") + '</div>' : '') + '</div>' +
       '</button>';
   }
 
