@@ -8104,11 +8104,7 @@ def main() -> int:
         build_logos()
     except Exception as e:
         warn(f"Логотипы: {e!r}")
-    if not STATS:
-        try:
-            build_hq_logos()
-        except Exception as e:
-            warn(f"Логотипы в хорошем качестве: {e!r}")
+    # build_hq_logos() — отключено 25.11: владелец убрал логотипы из шапки матча (функция осталась, файлы logos_hq в ветке data)
     try:
         build_positions()
     except Exception as e:

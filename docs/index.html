@@ -3431,7 +3431,7 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
     var opts = newsSteps().map(function (f) { return [f, f === "all" ? "Все" : f]; });
     return '<div class="hbar">' + backBtn(m.tournament || "Назад") + '</div>' +
       '<div class="fold mini-wrap"><div class="fi"><div class="mini"><span class="ma"' + tnAttr(A) + '>' + esc(abbr(A)) + miniVrs(A) + '</span><span class="mm">BO' + esc(m.bo) + miniOutc(m) + '</span><span class="mb"' + tnAttr(B) + '>' + esc(abbr(B)) + miniVrs(B) + '</span></div></div></div>' +
-      '<div class="fold hero-wrap"><div class="fi"><section class="hero">' + (A.tbd ? '' : logoBg(A.name, A.image, "a")) + (B.tbd ? '' : logoBg(B.name, B.image, "b")) + '<div class="meta"><span class="pill ' + esc(m.tier) + '">' + esc((m.tier || "").toUpperCase()) + '</span><span>' + esc(withYear(m.tournament, (m.serie || {}).begin || m.begin_at)) + (m.stage ? " · " + esc(m.stage) : "") + '</span></div>' +
+      '<div class="fold hero-wrap"><div class="fi"><section class="hero"><div class="meta"><span class="pill ' + esc(m.tier) + '">' + esc((m.tier || "").toUpperCase()) + '</span><span>' + esc(withYear(m.tournament, (m.serie || {}).begin || m.begin_at)) + (m.stage ? " · " + esc(m.stage) : "") + '</span></div>' +
       '<div class="face"><div class="tm a"' + tnAttr(A) + '>' + heroSide(A, winPct(m, 0)) + '</div>' +
       '<div class="mid"><b>' + esc(hm(m.begin_at)) + '</b>' + esc(dm(m.begin_at)) + ' · BO' + esc(m.bo) + '</div>' +
       '<div class="tm b"' + tnAttr(B) + '>' + heroSide(B, winPct(m, 1)) + '</div></div>' +
