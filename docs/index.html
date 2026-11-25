@@ -1125,7 +1125,8 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
 .rh-grid { display: grid; grid-template-columns: 52px 1fr; row-gap: 3px; align-items: center; }
 .rh-tn { font-weight: 800; font-size: 12.5px; display: flex; flex-direction: column; line-height: 1.15; }
 .rh-tn.a { color: var(--ct); } .rh-tn.b { color: var(--t); }
-.rh-tn b { font-size: 10px; font-weight: 700; }
+.rh-tn b { font-size: 10.5px; font-weight: 700; white-space: nowrap; }
+.rh-tn b i { font-style: normal; color: var(--fg); font-weight: 800; margin-left: 2px; }
 .rh-tn b.ct { color: #5fb4ff; } .rh-tn b.t { color: #ffad42; }
 .rh-row { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 3px; }
 .rh-c { aspect-ratio: 1; border-radius: 5px; background: var(--sunk); display: grid; place-items: center; font-style: normal; max-height: 26px; }
@@ -3399,11 +3400,13 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
           return '<i class="rh-c ' + (r[1] === "C" ? "ct" : "t") + '">' + (RICON[why] || '') + '</i>';
         }).join("") + '</div>';
       };
-      var sideLbl = function (s) { return s === "C" ? '<b class="ct">CT</b>' : s === "T" ? '<b class="t">T</b>' : ''; };
+      // сторона и сколько раундов взято за неё в этой половине (владелец 25.11)
+      var won = function (team) { return p[1].filter(function (r) { return r && +r[0] === team; }).length; };
+      var sideLbl = function (s, team) { return s === "C" ? '<b class="ct">CT <i>' + won(team) + '</i></b>' : s === "T" ? '<b class="t">T <i>' + won(team) + '</i></b>' : ''; };
       return '<div class="rh-part"><div class="rh-h">' + title + '</div>' +
-        '<div class="rh-grid" style="--n:' + p[1].length + '"><span class="rh-tn a">' + esc(abbr(A)) + sideLbl(sa) + '</span>' + row(0) +
+        '<div class="rh-grid" style="--n:' + p[1].length + '"><span class="rh-tn a">' + esc(abbr(A)) + sideLbl(sa, 0) + '</span>' + row(0) +
         '<span></span><div class="rh-row rh-num">' + p[1].map(function (_, k) { return '<i>' + (p[0] + k + 1) + '</i>'; }).join("") + '</div>' +
-        '<span class="rh-tn b">' + esc(abbr(B)) + sideLbl(sb) + '</span>' + row(1) + '</div></div>';
+        '<span class="rh-tn b">' + esc(abbr(B)) + sideLbl(sb, 1) + '</span>' + row(1) + '</div></div>';
     }).join("");
     return '<div class="sec"><h3>История раундов <span>' + esc(g.map || "") + (g.score ? ' · ' + g.score[0] + ':' + g.score[1] : '') + '</span></h3><div class="box rh">' + html +
       '<div class="rh-leg"><span>' + RICON.e + 'все убиты</span><span>' + RICON.b + 'взрыв</span><span>' + RICON.d + 'разминирование</span><span>' + RICON.t + 'время</span></div></div></div>';
