@@ -1501,14 +1501,14 @@ def bo3_games(m: dict) -> list[dict]:
     return res
 
 
-def game_detail(gid: int | None) -> dict | None:
+def game_detail(gid: int | None, prio: bool = False) -> dict | None:
     """Раунды (кто выиграл, за какую сторону) и статистика игроков на карте. Кэш навсегда."""
     if not gid:
         return None
     key = str(gid)
     c = details_cache.get(key)
     if c is not None and (c.get("players") or c.get("final")):
-        if c.get("rounds") and "why" not in c and _why_new[0] < WHY_NEW_LIMIT:
+        if c.get("rounds") and "why" not in c and (prio or _why_new[0] < WHY_NEW_LIMIT):  # prio — карты серий в итогах турниров
             _why_new[0] += 1  # 25.11: история раундов — как закончился раунд (у старых записей кэша её нет, дочитываем понемногу)
             try:
                 g = bo3(f"/games/{gid}")
@@ -2011,7 +2011,7 @@ def series_detail(m: dict) -> dict | None:
     names.update(_bo3_team_players.get(t2) or {})
     maps, every = [], []
     for g in games:
-        det = game_detail(g.get("id")) or {}
+        det = game_detail(g.get("id"), prio=True) or {}
         win = 0 if det.get("wt") == t1 else 1 if det.get("wt") == t2 else None
         ws, ls = g.get("ws"), g.get("ls")
         score = ([ws, ls] if win == 0 else [ls, ws]) if win is not None and ws is not None and ls is not None else None
