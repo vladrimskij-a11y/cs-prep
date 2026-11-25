@@ -7556,6 +7556,124 @@ def build_positions() -> None:
     print(f"Позиции ProRoles: команд {len(teams)}, карт {len(out['maps'])}")
 
 
+
+LOGO_HQ_NEW = 40          # новых логотипов в хорошем качестве за полный сбор
+LOGO_HQ_W = 360           # ширина картинки (px): в шапке матча логотип ~112 px, на телефоне ×3 — без пикселей
+
+
+def build_hq_logos() -> None:
+    """Логотипы команд в хорошем качестве — с Liquipedia (инфобокс команды: imagedark, иначе image).
+    У bo3/PandaScore/HLTV логотипы маленькие (HLTV — 50 px), а в шапке матча они крупные — были «пиксельными» (владелец 25.11).
+    SVG берём как есть (вектор), PNG — уменьшенной копией шириной LOGO_HQ_W. Файлы — в ветке data (logos_hq/), список — logos_hq.json.
+    Скачанное держим 60 дней; не нашли — пробуем снова через 14 дней."""
+    path = OUT / "logos_hq.json"
+    H = load_json(path, {}) or {}
+    have = H.get("logos") or {}
+    miss = H.get("miss") or {}
+    names = []
+    for t in (((load_json(OUT / "ranking.json", {}) or {}).get("vrs") or {}).get("teams") or []):
+        names.append(t.get("name"))
+    for m in (load_json(OUT / "matches.json", {}) or {}).get("matches") or []:
+        for t in m.get("teams") or []:
+            if not t.get("tbd"):
+                names.append(t.get("name"))
+    todo = []
+    for nm in dict.fromkeys(n for n in names if n):
+        k = logo_key(nm)
+        if not k or k in [logo_key(x[0]) for x in todo]:
+            continue
+        h = have.get(k)
+        if h and (OUT / h["f"]).exists() and (parse_iso(h.get("t")) or NOW) > NOW - timedelta(days=60):
+            continue
+        if (parse_iso(miss.get(k)) or NOW - timedelta(days=30)) > NOW - timedelta(days=14):
+            continue
+        real = TEAM_TEMP_NAMES.get(k)  # временное имя на мейджоре → настоящее
+        todo.append((nm, real or nm))
+        if len(todo) >= LOGO_HQ_NEW:
+            break
+    if not todo:
+        return
+    # 1) страницы команд пачками (те же, что для составов) → имя файла логотипа из инфобокса
+    cands = {nm: lp_names({"name": real}) for nm, real in todo}
+    pages = lp_pages([c for cs in cands.values() for c in cs])
+    files = {}
+    for nm, _ in todo:
+        for c in cands[nm]:
+            txt = pages.get(c) or ""
+            if "{{Infobox team" not in txt:
+                continue
+            ib = infobox(txt) or txt
+            f = lp_param(ib, "imagedark") or lp_param(ib, "image")
+            if f:
+                f = f.strip()
+                # «… full darkmode.png» — со словом-названием (широкий); рядом обычно лежит знак без надписи — он лучше
+                nf = re.sub(r"(?i)[ _]full(?=[ _])", "", f)
+                files[nm] = [nf, f] if nf != f else [f]
+            break
+    # 2) адреса картинок одним запросом на 50 файлов
+    info = {}
+    fl = sorted(set(x for v in files.values() for x in v))
+    for i in range(0, len(fl), 50):
+        part = fl[i:i + 50]
+        url = LP_API + "?" + urllib.parse.urlencode({"action": "query", "prop": "imageinfo", "iiprop": "url|size|mime",
+                                                     "iiurlwidth": LOGO_HQ_W, "titles": "|".join("File:" + x for x in part), "format": "json"})
+        wait = 4.0 - (time.time() - _lp_last[0])
+        if wait > 0:
+            time.sleep(wait)
+        _lp_last[0] = time.time()
+        stats["liquipedia_requests"] += 1
+        try:
+            q = json.loads(http_get(url, {"User-Agent": LP_UA, "Accept": "application/json"}, retry429=False)).get("query") or {}
+        except Exception as e:
+            warn(f"Логотипы Liquipedia: {e!r}")
+            break
+        norm_ = {r["to"]: r["from"] for r in q.get("normalized") or []}
+        for pg in (q.get("pages") or {}).values():
+            ii = (pg.get("imageinfo") or [None])[0]
+            if ii:
+                t = norm_.get(pg["title"], pg["title"])
+                info[t.split(":", 1)[1]] = ii
+    # 3) скачиваем: не чаще раза в 2 с
+    (OUT / "logos_hq").mkdir(exist_ok=True)
+    got = 0
+    for nm, _ in todo:
+        k = logo_key(nm)
+        ii = f = None
+        for f in files.get(nm) or []:
+            ii = info.get(f) or info.get(f.replace("_", " ")) or next((v for kk, v in info.items() if kk.replace("_", " ") == f.replace("_", " ")), None)
+            if ii:
+                break
+        if not ii:
+            miss[k] = iso(NOW)
+            continue
+        svg = "svg" in (ii.get("mime") or "")
+        src = ii.get("url") if svg or (ii.get("width") or 0) <= LOGO_HQ_W else (ii.get("thumburl") or ii.get("url"))
+        ext = "svg" if svg else ((src or "").rsplit(".", 1)[-1].split("?")[0].lower() or "png")
+        if ext not in ("svg", "png", "webp", "jpg", "jpeg"):
+            ext = "png"
+        wait = 2.0 - (time.time() - _lp_last[0])
+        if wait > 0:
+            time.sleep(wait)
+        _lp_last[0] = time.time()
+        try:
+            body = http_get(src, {"User-Agent": LP_UA}, retry429=False)
+        except Exception as e:
+            warn(f"Логотип {nm}: {e!r}")
+            miss[k] = iso(NOW)
+            continue
+        if len(body) < 200 or len(body) > 400_000:
+            miss[k] = iso(NOW)
+            continue
+        fn = f"logos_hq/{k}.{ext}"
+        for old in (OUT / "logos_hq").glob(k + ".*"):
+            old.unlink()
+        (OUT / fn).write_bytes(body)
+        have[k] = {"f": fn, "t": iso(NOW), "file": f}
+        miss.pop(k, None)
+        got += 1
+    print(f"Логотипы в хорошем качестве (Liquipedia): новых {got}, всего {len(have)}")
+    save_json(path, {"updated": iso(NOW), "logos": have, "miss": miss})
+
 def build_logos() -> None:
     """data/logos.json: название команды → лучший (цветной) логотип. Недостающие ищем на bo3.gg."""
     path = OUT / "logos.json"
@@ -7986,6 +8104,11 @@ def main() -> int:
         build_logos()
     except Exception as e:
         warn(f"Логотипы: {e!r}")
+    if not STATS:
+        try:
+            build_hq_logos()
+        except Exception as e:
+            warn(f"Логотипы в хорошем качестве: {e!r}")
     try:
         build_positions()
     except Exception as e:

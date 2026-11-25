@@ -1129,15 +1129,11 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
 .mcard.i-rating { --ac: #63a4ff; --ill: url(img/home/rating.svg); }
 .mcard.i-major { --ac: #ff9f0a; --ill: url(img/home/major.svg); }
 .hero { position: relative; isolation: isolate; overflow: hidden; }
-.hbg { position: absolute; z-index: -1; pointer-events: none; }
-.hbg::before, .hbg::after { content: ""; position: absolute; inset: 0; background: var(--lg) center / contain no-repeat; }
-.hbg::before { transform: scale(1.7); filter: blur(28px) saturate(1.8); opacity: .55; }  /* цветная подсветка — размытая, без пикселей */
-.hbg::after { opacity: .16; }  /* сам логотип — в родном размере, чётко */
-.hero .hbg.a, .hero .hbg.b { top: 46%; width: 112px; height: 112px; transform: translateY(-50%); }
-.hero .hbg.a { left: -30px; } .hero .hbg.b { right: -30px; }
-.hero.thero .hbg.t { inset: 0; }
-.hero.thero .hbg.t::before { inset: -30%; background-size: 50%; transform: none; filter: blur(42px) saturate(1.9); opacity: .6; }
-.hero.thero .hbg.t::after { display: none; }
+/* логотипы за шапкой матча — только в хорошем качестве (Liquipedia, logos_hq), без свечения (владелец 25.11) */
+.hbg { position: absolute; z-index: -1; pointer-events: none; background: var(--lg) center / contain no-repeat; }
+.hero .hbg.a, .hero .hbg.b { top: 50%; width: 52%; aspect-ratio: 1; transform: translateY(-50%); opacity: .11; }
+.hero .hbg.a { left: -16%; } .hero .hbg.b { right: -16%; }
+.hero.thero .hbg.t { top: 50%; right: -8%; width: 46%; aspect-ratio: 1; transform: translateY(-50%); opacity: .08; }
 .hero.thero { background: var(--surface); }
 .th-t { background: color-mix(in srgb, var(--sunk) 78%, transparent); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
 .th-logo { background: color-mix(in srgb, var(--sunk) 70%, transparent); }
@@ -1350,7 +1346,16 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
   function getLogos() {
     if (DEMO) return Promise.resolve();
     return dfetch("data/logos.json" + bust()).then(function (r) { return r.ok ? r.json() : null; })
-      .then(function (j) { if (j && j.logos) PRIMARY = j.logos; }).catch(function () {});
+      .then(function (j) { if (j && j.logos) PRIMARY = j.logos; }).catch(function () {})
+      .then(function () {  // логотипы в хорошем качестве (Liquipedia) — для крупных мест: шапка матча и команды
+        return dfetch("data/logos_hq.json" + bust()).then(function (r) { return r.ok ? r.json() : null; }).then(function (j) { if (j && j.logos) HQ = j.logos; }).catch(function () {});
+      });
+  }
+  var HQ = {};
+  function logoHq(name) {
+    var h = HQ[nkey(name)];
+    if (!h && typeof TEAM_ALT !== "undefined" && TEAM_ALT[tnorm(name)]) h = HQ[nkey(TEAM_ALT[tnorm(name)])];
+    return h && h.f ? "data/" + h.f : "";  // с сайта (Pages): у raw.githubusercontent SVG не показывается как картинка
   }
   function getList() {
     if (DEMO) return Promise.resolve(DEMO.list);
@@ -1412,7 +1417,7 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
     return u || "";
   }
   // логотип фоном (редизайн 25.11): шапка матча и страница команды
-  function logoBg(name, url, cls) { var u = logoUrl(name, url); return u ? '<i class="hbg ' + cls + '" style="--lg:url(\'' + esc(u) + '\')" aria-hidden="true"></i>' : ''; }
+  function logoBg(name, url, cls) { var u = logoHq(name); return u ? '<i class="hbg ' + cls + '" style="--lg:url(\'' + esc(u) + '\')" aria-hidden="true"></i>' : ''; }
   function logo(name, url) {
     var u = logoUrl(name, url);
     return u ? '<img class="lg" src="' + esc(u) + '" alt="" loading="lazy" decoding="async" onerror="this.remove()">' : ''; }
@@ -1819,7 +1824,7 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
     if (v.region && v.reg_rank) tiles.push('<div class="th-t"><b class="num">#' + esc(v.reg_rank) + '</b><span>' + esc(REG_RU[v.region] || v.region) + '</span></div>');
     if (v.points) tiles.push('<div class="th-t"><b class="num">' + esc(v.points) + '</b><span>очков</span></div>');
     if (cups.length) tiles.push('<div class="th-t cupt" role="button" data-pop="' + esc(JSON.stringify({ t: "🏆 Трофеи с 1 января: " + cups.length, c: cols })) + '"><b class="num">🏆 ' + cups.length + '</b><span>трофеи</span></div>');
-    var lg = logo(T.name, T.logo).replace('class="lg"', 'class="tlogo"');
+    var hq = logoHq(T.name), lg = hq ? '<img class="tlogo" src="' + esc(hq) + '" alt="" decoding="async" onerror="this.remove()">' : logo(T.name, T.logo).replace('class="lg"', 'class="tlogo"');
     var html = '<section class="hero thero">' + logoBg(T.name, T.logo, "t") + (lg ? '<div class="th-logo">' + lg + '</div>' : '') +
       (tiles.length ? '<div class="th-tiles" style="--n:' + tiles.length + '">' + tiles.join("") + '</div>' : '<div class="note">Команды нет в рейтинге Valve</div>') + '</section>';
     if ((T.roster || []).length) html += '<div class="sec"><div class="box roster a"><div class="hd"><span class="tn">Состав</span></div>' + rosterRows(T.roster, T.coach, { stats: T.stats || [] }, false) + '</div></div>';
