@@ -2889,7 +2889,9 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
     [/Cologne Major 2026/i, "2026-06-21"], [/Singapore 2026/i, "2026-12-14"]];
   function teamInYear(p, ev) {
     ev = String(ev);
-    var md = MAJOR_DATES.find(function (x) { return x[0].test(ev); }), y = (ev.match(/\b(19|20)\d\d\b/) || [])[0];
+    // «StarLadder Budapest Major 2025» — слово Major между городом и годом (25.11: jcobbb на мейджоре оказывался в Betclic, а не в FaZe)
+    var ev2 = ev.replace(/\s+Major\b/gi, "");
+    var md = MAJOR_DATES.find(function (x) { return x[0].test(ev) || x[0].test(ev2); }), y = (ev.match(/\b(19|20)\d\d\b/) || [])[0];
     if (!(md || y) || !(p.hist || []).length) return "";
     // точная дата (мейджоры) — команда на эту дату; только год (MVP) — команда, где провёл в том году больше всего времени
     // сезон в названии — примерная дата (DreamHack Winter 2018 — декабрь, BLAST Spring — апрель)
