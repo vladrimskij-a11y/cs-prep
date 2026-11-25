@@ -7,14 +7,14 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="theme-color" content="#0d1017">
+<meta name="theme-color" content="#060708">
 <meta name="claude:viewport-fit-sides" content="cover">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta charset="utf-8">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="preconnect" href="https://raw.githubusercontent.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&family=Unbounded:wght@600;800&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400..800&family=Golos+Text:wght@400;500;600;700&family=Unbounded:wght@800&display=swap">
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <style>
 /* Layout: одна колонка «листа подготовки» — список эфиров по дням, карточка матча с вкладками.
@@ -872,6 +872,248 @@ a.ni { text-decoration: none; color: inherit; }
 .fact.link .fsrc { opacity: .8; }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
+<style id="redesign">
+/* ===== Редизайн 25.11. Весь новый вид — в этом блоке (+ шрифт Inter в <link>, theme-color и цвет шапки Telegram).
+   Откат: вернуть docs/index.html из коммита до редизайна (в CLAUDE.md). ===== */
+:root {
+  --bg: #f2f2f7; --surface: #ffffff; --sunk: #e9e9ef; --raise: #ffffff; --pop: #ffffff; --line: #e2e2e8;
+  --fg: #0b0b0f; --muted: #686872;
+  --ct: #2a6ae0; --ct-soft: #e2ebfc; --t: #b87400; --t-soft: #fbeed4;
+  --onair: #ff3b30; --onair-soft: #ffe3e1; --win: #1a9e4f; --loss: #e2372c;
+  --g: #1a9e4f; --y: #c9a400; --o: #e07b00; --r0: #e2372c;
+  --display: "Inter", "Golos Text", system-ui, -apple-system, sans-serif;
+  --body: "Inter", "Golos Text", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "Inter", "Golos Text", system-ui, sans-serif;
+  --brand: "Unbounded", "Inter", system-ui, sans-serif;
+  --r: 18px; --r-s: 12px;
+  --shadow: 0 1px 2px rgba(0,0,0,.04), 0 6px 18px rgba(0,0,0,.05);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #060708; --surface: #131417; --sunk: #1d1e22; --raise: #2c2d32; --pop: #1b1c20; --line: #222327;
+    --fg: #f4f4f6; --muted: #9a9aa3;
+    --ct: #63a4ff; --ct-soft: #122340; --t: #ffb547; --t-soft: #33240b;
+    --onair: #ff453a; --onair-soft: #3b1311; --win: #34d266; --loss: #ff5b51;
+    --g: #34d266; --y: #ffd426; --o: #ff9f0a; --r0: #ff5b51;
+    --shadow: none; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #060708; --surface: #131417; --sunk: #1d1e22; --raise: #2c2d32; --pop: #1b1c20; --line: #222327;
+  --fg: #f4f4f6; --muted: #9a9aa3;
+  --ct: #63a4ff; --ct-soft: #122340; --t: #ffb547; --t-soft: #33240b;
+  --onair: #ff453a; --onair-soft: #3b1311; --win: #34d266; --loss: #ff5b51;
+  --g: #34d266; --y: #ffd426; --o: #ff9f0a; --r0: #ff5b51;
+  --shadow: none; color-scheme: dark;
+}
+
+/* шрифт: Inter, цифры одной ширины везде — столбцы стоят ровно */
+body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1, "cv05" 1; }
+.num, .mono, b, .pct, .wl, .sc, .rs, .rscore, .tcount { font-variant-numeric: tabular-nums; }
+.home-brand h1, .brand h1 { font-family: var(--brand); letter-spacing: 0; }
+
+/* поверхности */
+.box, .hero, .match, .tour-card, .mcard, .rk, .ptile { border-color: var(--line); box-shadow: var(--shadow); }
+.box, .match, .tour-card { border-radius: var(--r); }
+
+/* заголовки разделов: крупно и белым — видно, где начинается блок */
+.sec > h3, .mzh, .sect-title, .day h2 {
+  font-size: 17px; font-weight: 750; letter-spacing: -.018em; text-transform: none; color: var(--fg); line-height: 1.25; align-items: baseline;
+}
+.sec > h3 span, .mzh span { font-size: 12.5px; font-weight: 500; letter-spacing: 0; color: var(--muted); text-align: right; }
+.sect-title { margin-top: 24px; }
+.sect-title.month { font-size: 15px; margin-top: 26px; }
+.sec { margin-top: 26px; gap: 10px; }
+.mzbody { gap: 22px; }
+.sec > h3 { margin: 0 4px; }
+
+/* вкладки: сегментный переключатель */
+.tabs, .mhead .tabs, .shead .tabs, .hometabs { background: var(--sunk); padding: 3px !important; border-radius: 14px; gap: 2px; }
+.mhead .tabs { margin: 10px 0 10px; }
+.shead .tabs { margin: 2px 0 0; }
+.tab { background: transparent; color: var(--muted); border-radius: 11px; padding: 8px 4px; font-weight: 650; font-size: 14px; letter-spacing: -.01em; }
+.tab[aria-selected="true"] { background: var(--raise); color: var(--fg); box-shadow: 0 1px 2px rgba(0,0,0,.18), 0 2px 8px rgba(0,0,0,.12); }
+.tab .c { font-family: var(--body); font-weight: 600; font-size: 11.5px; margin-left: 4px; opacity: .6; }
+
+/* фильтры-плашки */
+.chip { background: var(--sunk); border-color: transparent; color: var(--fg); padding: 7px 13px; font-weight: 600; font-size: 13.5px; letter-spacing: -.01em; }
+.chip .c { font-weight: 600; opacity: .55; color: inherit; margin-left: 5px; }
+.chip[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+.mhead .nfilt, .mhead .tfilt { padding-block: 0 10px; }
+.filt { gap: 6px; }
+
+/* назад */
+.back { color: var(--fg); font-weight: 600; font-size: 15px; opacity: .9; }
+.back svg { color: var(--onair); }
+
+/* шапка матча: стороны тонированы в цвета команд */
+.hero { border-radius: 22px; padding: 16px 16px 14px; gap: 14px;
+  background: linear-gradient(105deg, color-mix(in srgb, var(--ct) 13%, var(--surface)) 0%, var(--surface) 42%, var(--surface) 58%, color-mix(in srgb, var(--t) 13%, var(--surface)) 100%); }
+.hero .meta { font-size: 12.5px; font-weight: 500; }
+.pill { font-family: var(--body); font-size: 10.5px; font-weight: 800; padding: 2px 6px; border-radius: 6px; letter-spacing: .02em; }
+.face { gap: 8px; }
+.face .acr { font-weight: 850; font-size: 30px; letter-spacing: -.035em; line-height: .95; }
+.face .acr.sm { font-size: 20px; letter-spacing: -.02em; }
+.face .full { font-size: 13px; font-weight: 500; }
+.face .tvrs { font-size: 11.5px; }
+.face .mid { font-family: var(--body); font-weight: 500; font-size: 12px; line-height: 1.3; }
+.face .mid b { font-size: 28px; font-weight: 800; letter-spacing: -.04em; margin-bottom: 2px; }
+.hwin { display: inline-block; margin-top: 4px; font-size: 13px; font-weight: 750; padding: 3px 8px; border-radius: 8px; align-self: flex-start; }
+.face .tm.a .hwin { background: color-mix(in srgb, var(--ct) 18%, transparent); color: var(--ct); }
+.face .tm.b .hwin { background: color-mix(in srgb, var(--t) 18%, transparent); color: var(--t); align-self: flex-end; }
+
+/* исходы серии: спокойные плитки, цвет — в цифре, фон лишь подкрашен */
+.outc { gap: 6px; }
+.oc { border-radius: 12px; padding: 6px 10px 5px; min-width: 58px; background: var(--sunk); gap: 1px; }
+.oc b { font-size: 17px; font-weight: 800; letter-spacing: -.02em; }
+.oc small { font-size: 11.5px; font-weight: 600; }
+.oc.top { outline: 0; box-shadow: inset 0 0 0 1.5px currentColor; }
+.oc.pc-g { background: color-mix(in srgb, var(--g) 17%, var(--sunk)); color: var(--g); }
+.oc.pc-y { background: color-mix(in srgb, var(--y) 15%, var(--sunk)); color: var(--y); }
+.oc.pc-o { background: color-mix(in srgb, var(--o) 15%, var(--sunk)); color: var(--o); }
+.oc.pc-r { background: color-mix(in srgb, var(--r0) 15%, var(--sunk)); color: var(--r0); }
+.oc[class*="pc-"] b { color: inherit !important; }
+.oc[class*="pc-"] small { color: var(--muted) !important; }
+.oc-src { font-size: 11px; margin-top: 2px; }
+
+/* свёрнутая шапка */
+.mini { grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); padding: 8px 2px 2px; }
+.mini .ma, .mini .mb { font-family: var(--display); font-weight: 850; font-size: 19px; letter-spacing: -.03em; min-width: 0; overflow: hidden; }
+.mini small { font-family: var(--body); font-size: 10.5px; font-weight: 500; letter-spacing: 0; overflow: hidden; text-overflow: ellipsis; }
+.mini .mm { font-family: var(--body); font-weight: 700; font-size: 11.5px; }
+.mini .mo i { font-family: var(--body); font-weight: 700; font-size: 10px; padding: 1px 5px; border-radius: 5px; }
+.mo i.g { background: color-mix(in srgb, var(--g) 20%, var(--sunk)); color: var(--g); }
+.mo i.y { background: color-mix(in srgb, var(--y) 18%, var(--sunk)); color: var(--y); }
+.mo i.o { background: color-mix(in srgb, var(--o) 18%, var(--sunk)); color: var(--o); }
+.mo i.r { background: color-mix(in srgb, var(--r0) 18%, var(--sunk)); color: var(--r0); }
+
+/* шапки разделов (турнир, лента, рейтинг) */
+.shtitle { font-family: var(--display); font-weight: 800; font-size: 26px; letter-spacing: -.03em; line-height: 1.12; margin: 6px 0 12px; }
+.shtitle .shsub { font-size: 13px; font-weight: 500; letter-spacing: -.005em; color: var(--muted); }
+.subhead h1 { font-family: var(--display); font-weight: 800; letter-spacing: -.025em; }
+
+/* главная */
+.home-brand { padding: 0 4px 14px; }
+.home-brand h1 { font-size: 36px; }
+.menu { gap: 10px; }
+.mcard { border-radius: 22px; padding: 20px 20px; min-height: 104px; background: var(--surface); position: relative; overflow: hidden; }
+.mcard .mc-t { font-family: var(--display); font-weight: 850; font-size: 27px; letter-spacing: -.035em; }
+.mcard .mc-s { font-size: 13.5px; line-height: 1.4; }
+.mcard .chev2 { font-size: 22px; color: var(--muted); width: 36px; height: 36px; border-radius: 50%; background: var(--sunk); display: grid; place-items: center; }
+.mcard:active { background: var(--sunk); }
+
+/* список матчей и турниров */
+.match { padding: 13px 14px; gap: 12px; }
+.match .time { font-family: var(--body); font-weight: 800; font-size: 16px; letter-spacing: -.02em; }
+.match .time small { font-weight: 500; font-size: 11.5px; letter-spacing: 0; }
+.vs .tname { font-weight: 650; letter-spacing: -.01em; }
+.vs .tour { font-size: 12.5px; }
+.match.res .rs { font-weight: 800; font-size: 18px; }
+.tour-card { padding: 16px; border-radius: 20px; }
+.tour-card .tn { font-family: var(--display); font-weight: 750; font-size: 16.5px; letter-spacing: -.02em; }
+.tour-card .tm2 { font-size: 12.5px; }
+
+/* таблицы */
+.mtab { font-size: 13.5px; }
+.mtab th { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; padding: 12px 12px 6px; }
+.mtab td { padding: 9px 12px; }
+.mtab .mn { font-weight: 650; }
+.wr .pct { font-family: var(--body); font-weight: 750; min-width: 40px; }
+.wr .gp { font-family: var(--body); font-size: 11.5px; }
+.wr .track { height: 6px; border-radius: 3px; }
+.wr .track i { border-radius: 3px; }
+
+/* вероятный пик и карты */
+.pp-maps { gap: 8px; }
+.pp-m { border-radius: 14px; padding: 10px 11px; }
+.pp-m b { font-size: 16px; font-weight: 750; letter-spacing: -.02em; }
+.pp-n { font-size: 11px; font-weight: 600; }
+.pp-s { font-weight: 800; font-size: 17px; letter-spacing: -.02em; }
+.smap { border-radius: 12px; }
+
+/* VRS */
+.vr-r { padding: 10px 14px; }
+.vr-t { font-family: var(--display); font-weight: 800; font-size: 15px; letter-spacing: -.02em; }
+.vr-h { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; }
+
+/* «На кону» */
+.stake { padding: 4px 16px; }
+.stk { padding: 13px 0; font-size: 14.5px; }
+.stk i { background: var(--sunk); width: 32px; height: 32px; font-size: 14px; }
+.mc { border-radius: 10px; }
+.mc b { font-family: var(--body); font-weight: 750; }
+
+/* личные встречи, форма */
+.tally .n { font-family: var(--display); font-weight: 850; font-size: 34px; letter-spacing: -.04em; }
+.bar2 { height: 6px; }
+.h2h .sc { font-family: var(--body); font-weight: 800; font-size: 17px; }
+.sq { border-radius: 7px; font-family: var(--body); font-weight: 750; width: 28px; height: 28px; }
+.sq.w { background: color-mix(in srgb, var(--win) 85%, #000); } .sq.l { background: color-mix(in srgb, var(--loss) 85%, #000); }
+.wl { font-family: var(--body); font-weight: 750; }
+
+/* игроки */
+.pl { padding: 12px 14px; }
+.pl .nick { font-weight: 800; font-size: 17px; letter-spacing: -.02em; }
+.roster .hd, .recent2 .hd, .form .tmh, .st-h { font-size: 14px; font-weight: 750; letter-spacing: -.01em; }
+.rt { border-radius: 6px; font-size: 11px; font-weight: 700; padding: 2px 7px; }
+.rt.st { background: #000; color: #fff; box-shadow: inset 0 0 0 1px rgba(255,255,255,.2); }
+.medal { border-radius: 8px; padding: 2px 7px; }
+.medal.mvp { border-radius: 8px; padding: 2px 7px; }
+.pmaj.tap { padding: 3px 10px; }
+.ps { border-radius: 12px; padding: 9px 11px; }
+.ps-c b { font-family: var(--body); font-weight: 750; font-size: 14.5px; }
+.pstat b { font-family: var(--body); font-weight: 700; }
+.th-t { border-radius: 14px; }
+.th-t b { font-family: var(--display); font-weight: 850; letter-spacing: -.03em; }
+.th-logo { border-radius: 18px; }
+.tm-h .acr { font-family: var(--display); font-weight: 850; letter-spacing: -.03em; }
+
+/* новости: заголовок крупнее, текст спокойнее, воздух между карточками */
+.news { gap: 10px; }
+.ni { padding: 14px 16px; gap: 7px; border-radius: var(--r); }
+.ni h4 { font-size: 16px; line-height: 1.36; font-weight: 700; letter-spacing: -.015em; }
+.ni p { font-size: 14px; line-height: 1.48; color: var(--muted); }
+.ni .src { font-size: 12.5px; }
+.who, .fi .chn { font-size: 12.5px; font-weight: 700; }
+.kind { border-radius: 6px; font-size: 11px; }
+.fi-body img { width: 88px; height: 88px; border-radius: 12px; }
+.fact { padding: 13px 16px; font-size: 14.5px; line-height: 1.5; }
+.facts.beef .bf-t { font-weight: 700; letter-spacing: -.01em; }
+.facts.beef .bf-tag { border-radius: 6px; font-weight: 700; }
+.ftag { letter-spacing: .04em; }
+.rd h1 { font-family: var(--display); font-weight: 800; font-size: 24px; letter-spacing: -.03em; line-height: 1.2; }
+.rd p { font-size: 16.5px; line-height: 1.62; letter-spacing: -.01em; }
+.rd img, .vid { border-radius: 14px; }
+.readbtn, .vplay { border-radius: 12px; font-weight: 700; }
+
+/* рейтинг */
+.rk { padding: 12px 14px; }
+.rk-n { font-weight: 800; }
+.rk-t { font-weight: 650; }
+.rk-p { font-weight: 750; }
+
+/* сетка и швейцарка */
+.bm { border-radius: 10px; background: var(--sunk); border-color: transparent; }
+.swg { border-radius: var(--r); }
+.sw-m { border-radius: 10px; box-shadow: none; }
+
+/* окна наград и подсказки */
+.pop-in { background: var(--pop); border-radius: 16px; border-color: var(--line); box-shadow: 0 18px 50px rgba(0,0,0,.45), 0 2px 8px rgba(0,0,0,.2); padding: 12px 14px; font-size: 13.5px; }
+.pop-in.long > b { background: var(--pop); }
+.toast { border-radius: 14px; font-weight: 600; }
+.ptr { background: var(--pop); }
+
+/* пустые состояния */
+.empty strong { font-size: 17px; letter-spacing: -.015em; }
+
+/* правки после первой примерки */
+.match, .tour-card, .mine-bar, .mcard, .rk { box-sizing: border-box; }  /* карточки матчей вылезали за правый край на ширину отступов */
+.oc { flex: 1 1 0; min-width: 0; max-width: 88px; }  /* исходы — в одну строку */
+.mini .mo { gap: 2px; }
+.mini .mo i { font-size: 9.5px; padding: 1px 4px; letter-spacing: -.02em; }
+.mini .mo { display: grid; grid-template-columns: repeat(2, auto); gap: 2px; }  /* исходы в свёрнутой шапке — 2×2, чтобы VRS по бокам не обрезался */
+.pane .pin > .tabbody > .sec:first-child, .pane .pin > .sec:first-child { margin-top: 12px; }
+</style>
 
 <div class="wrap" id="app"></div>
 
@@ -882,8 +1124,12 @@ a.ni { text-decoration: none; color: inherit; }
   if (TG) {
     try {
       TG.ready(); TG.expand();
-      document.documentElement.setAttribute("data-theme", TG.colorScheme === "light" ? "light" : "dark");
-      TG.onEvent && TG.onEvent("themeChanged", function () { document.documentElement.setAttribute("data-theme", TG.colorScheme === "light" ? "light" : "dark"); });
+      var tgTheme = function () {  // шапка и фон Telegram — в цвет приложения (редизайн 25.11)
+        document.documentElement.setAttribute("data-theme", TG.colorScheme === "light" ? "light" : "dark");
+        try { var c = getComputedStyle(document.documentElement).getPropertyValue("--bg").trim(); if (c) { TG.setHeaderColor && TG.setHeaderColor(c); TG.setBackgroundColor && TG.setBackgroundColor(c); } } catch (e) {}
+      };
+      tgTheme();
+      TG.onEvent && TG.onEvent("themeChanged", tgTheme);
     } catch (e) {}
   }
   var $app = document.getElementById("app");
