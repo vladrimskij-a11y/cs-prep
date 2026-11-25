@@ -1113,6 +1113,26 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
 .mini .mo i { font-size: 9.5px; padding: 1px 4px; letter-spacing: -.02em; }
 .mini .mo { display: grid; grid-template-columns: repeat(2, auto); gap: 2px; }  /* исходы в свёрнутой шапке — 2×2, чтобы VRS по бокам не обрезался */
 .pane .pin > .tabbody > .sec:first-child, .pane .pin > .sec:first-child { margin-top: 12px; }
+
+/* ---- картинки (25.11, шаг 2): фоны плиток главной, логотипы за шапкой матча и команды, баннер турнира ---- */
+.mcard.mbg { isolation: isolate; border-color: transparent; color: #fff; background: #0d0e10; }
+.mcard.mbg::before { content: ""; position: absolute; inset: 0; z-index: -2; background: var(--mb) center / cover no-repeat; transform: scale(1.02); }
+.mcard.mbg::after { content: ""; position: absolute; inset: 0; z-index: -1; background: linear-gradient(90deg, rgba(6,7,8,.92) 0%, rgba(6,7,8,.72) 48%, rgba(6,7,8,.30) 100%); }
+.mcard.mbg .mc-s { color: rgba(255,255,255,.78); }
+.mcard.mbg .chev2 { background: rgba(255,255,255,.14); color: #fff; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+.mcard.mbg:active { background: #0d0e10; }
+.hero { position: relative; isolation: isolate; overflow: hidden; }
+.hbg { position: absolute; z-index: -1; pointer-events: none; background: var(--lg) center / contain no-repeat; }
+.hero .hbg.a, .hero .hbg.b { top: 50%; width: 58%; aspect-ratio: 1; transform: translateY(-50%); opacity: .12; filter: blur(1.5px) saturate(1.2); }
+.hero .hbg.a { left: -20%; } .hero .hbg.b { right: -20%; }
+.hero.thero .hbg.t { inset: -40%; background-size: 60%; opacity: .55; filter: blur(38px) saturate(1.8); }
+.hero.thero { background: var(--surface); }
+.th-t { background: color-mix(in srgb, var(--sunk) 78%, transparent); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
+.th-logo { background: color-mix(in srgb, var(--sunk) 70%, transparent); }
+.shead.shbg::before { content: ""; position: absolute; inset: 0 0 -1px; z-index: -1; background: var(--tb) center 30% / cover no-repeat; opacity: .55; }
+.shead.shbg.lgo::before { background-position: right 16px top calc(env(safe-area-inset-top, 0px) + 8px); background-size: auto 58%; opacity: .35; }
+.shead.shbg::after { content: ""; position: absolute; inset: 0 0 -1px; z-index: -1; background: linear-gradient(180deg, color-mix(in srgb, var(--bg) 35%, transparent) 0%, color-mix(in srgb, var(--bg) 80%, transparent) 55%, var(--bg) 100%); }
+.shead.shbg { isolation: isolate; }
 </style>
 
 <div class="wrap" id="app"></div>
@@ -1374,9 +1394,15 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
   function nkeyG(n) { return nkey(n); }
   function nkey(n) { return String(n || "").toLowerCase().replace(/^(the|team)\s+|\s+(team|esports|gaming)$/g, "").replace(/[^a-z0-9а-я]/g, ""); }
   function rememberLogo(name, url) { if (name && url) LOGOS[nkey(name)] = LOGOS[nkey(name)] || url; }
-  function logo(name, url) {
+  function logoUrl(name, url) {
     var k = nkey(name), u = PRIMARY[k] || url || LOGOS[k];
     if (!u && typeof TEAM_ALT !== "undefined" && TEAM_ALT[tnorm(name)]) { var r = nkey(TEAM_ALT[tnorm(name)]); u = PRIMARY[r] || LOGOS[r]; }  // логотипа мейджора (THE ONE) нет — настоящий
+    return u || "";
+  }
+  // логотип фоном (редизайн 25.11): шапка матча и страница команды
+  function logoBg(name, url, cls) { var u = logoUrl(name, url); return u ? '<i class="hbg ' + cls + '" style="--lg:url(\'' + esc(u) + '\')" aria-hidden="true"></i>' : ''; }
+  function logo(name, url) {
+    var u = logoUrl(name, url);
     return u ? '<img class="lg" src="' + esc(u) + '" alt="" loading="lazy" decoding="async" onerror="this.remove()">' : ''; }
   function matchRow(m, showTour) {
     m = withOpp(m);
@@ -1520,15 +1546,17 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
   // ---------- главная: три больших раздела
   function renderMenu() {
     var L = state.list, c = tourBuckets();
-    function card(h, t, sub) { return '<button class="mcard" data-goto="' + h + '"><span class="mc-t">' + t + '</span><span class="mc-s">' + esc(sub) + '</span><i class="chev2">›</i></button>'; }
+    // фон плитки: баннер идущего турнира (широкий) или картинка карты CS2 (редизайн 25.11)
+    function bgOf(u, map) { return u && !bgLogo(u) ? u : "img/maps/" + map + ".webp"; }
+    function card(h, t, sub, bg) { return '<button class="mcard' + (bg ? ' mbg" style="--mb:url(\'' + esc(bg) + '\')' : '') + '" data-goto="' + h + '"><span class="mc-t">' + t + '</span><span class="mc-s">' + esc(sub) + '</span><i class="chev2">›</i></button>'; }
     $app.innerHTML = '<div class="view home">' +
-      '<div class="menu"><div class="home-brand"><h1>RIM<b>·</b>CS</h1><span class="upd">обновлено ' + esc(ago(L.updated)) + '</span></div>' + card("feed", "Лента", "Новости Telegram-каналов без повторов и мусора") +
-      card("tours", "Турниры", c.live[0] ? "Идёт: " + c.live.map(function (t) { return t.name; }).slice(0, 2).join(", ") : c.up[0] ? "Скоро: " + c.up[0].name : "Тир-1 и тир-2") +
-      card("rating", "Рейтинг", "Топ-100 команд по VRS") + majorCard() + '</div></div>';
+      '<div class="menu"><div class="home-brand"><h1>RIM<b>·</b>CS</h1><span class="upd">обновлено ' + esc(ago(L.updated)) + '</span></div>' + card("feed", "Лента", "Новости Telegram-каналов без повторов и мусора", bgOf(null, "mirage")) +
+      card("tours", "Турниры", c.live[0] ? "Идёт: " + c.live.map(function (t) { return t.name; }).slice(0, 2).join(", ") : c.up[0] ? "Скоро: " + c.up[0].name : "Тир-1 и тир-2", bgOf((c.live[0] || c.up[0] || {}).bg, "inferno")) +
+      card("rating", "Рейтинг", "Топ-100 команд по VRS", bgOf(null, "ancient")) + majorCard() + '</div></div>';
     function majorCard() {
       var maj = (L.tournaments || []).find(function (t) { return /major/i.test(t.name) && t.major && t.major.final && !t.finished && new Date(t.end || t.begin) >= new Date(); });
-      if (maj) return card("t-" + maj.id, "Мейджор", maj.name + " · инвайты разосланы — кто с какой стадии");
-      if (L.major_next) return card("major", "Мейджор", "Кто попадёт на следующий мейджор и с какой стадии — прогноз по VRS");
+      if (maj) return card("t-" + maj.id, "Мейджор", maj.name + " · инвайты разосланы — кто с какой стадии", bgOf(maj.bg, "nuke"));
+      if (L.major_next) return card("major", "Мейджор", "Кто попадёт на следующий мейджор и с какой стадии — прогноз по VRS", bgOf(null, "nuke"));
       return '<div class="mcard off"><span class="mc-t">Мейджор</span><span class="mc-s">Прогноз появится, когда HLTV опубликует расчёт инвайтов</span></div>';
     }
   }
@@ -1554,7 +1582,7 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
       var now = !lazy || t.key === key;
       if (!now) rest.push(t.key);
       return '<div class="pane" data-key="' + esc(t.key) + '"><div class="pin">' + (now ? cfg.pane(t.key) : '') + '</div></div>';
-    }).join("") + '</div></div><div class="shead"><div class="pin"><div class="hbar">' + backBtn(cfg.back || "Назад") + '</div><div class="shtitle">' + cfg.title + '</div>' + tabsHtml + '</div></div></div>';
+    }).join("") + '</div></div><div class="shead' + (cfg.bg ? ' shbg' + (bgLogo(cfg.bg) ? ' lgo' : '') + '" style="--tb:url(\'' + esc(cfg.bg) + '\')' : '') + '"><div class="pin"><div class="hbar">' + backBtn(cfg.back || "Назад") + '</div><div class="shtitle">' + cfg.title + '</div>' + tabsHtml + '</div></div></div>';
     var sh = q(".sshell");
     sh.style.setProperty("--shh", q(".shead").offsetHeight + "px");
     trackTo(keys.indexOf(key), false);
@@ -1781,7 +1809,7 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
     if (v.points) tiles.push('<div class="th-t"><b class="num">' + esc(v.points) + '</b><span>очков</span></div>');
     if (cups.length) tiles.push('<div class="th-t cupt" role="button" data-pop="' + esc(JSON.stringify({ t: "🏆 Трофеи с 1 января: " + cups.length, c: cols })) + '"><b class="num">🏆 ' + cups.length + '</b><span>трофеи</span></div>');
     var lg = logo(T.name, T.logo).replace('class="lg"', 'class="tlogo"');
-    var html = '<section class="hero thero">' + (lg ? '<div class="th-logo">' + lg + '</div>' : '') +
+    var html = '<section class="hero thero">' + logoBg(T.name, T.logo, "t") + (lg ? '<div class="th-logo">' + lg + '</div>' : '') +
       (tiles.length ? '<div class="th-tiles" style="--n:' + tiles.length + '">' + tiles.join("") + '</div>' : '<div class="note">Команды нет в рейтинге Valve</div>') + '</section>';
     if ((T.roster || []).length) html += '<div class="sec"><div class="box roster a"><div class="hd"><span class="tn">Состав</span></div>' + rosterRows(T.roster, T.coach, { stats: T.stats || [] }, false) + '</div></div>';
     else if ((T.players || []).length) html += '<div class="sec"><div class="box"><div class="tm-pl" style="padding:12px">' + T.players.map(function (p) { return '<span>' + esc(typeof p === "string" ? p : p.nick) + '</span>'; }).join("") + '</div></div></div>';
@@ -2276,7 +2304,7 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
     var sub = t ? '<span class="pill ' + esc(t.tier) + '">' + esc((t.tier || "?").toUpperCase()) + '</span>' + (t.begin ? esc(dm(t.begin) + (t.end ? " – " + dm(t.end) : "")) : "") + (t.prize_usd ? " · " + esc(usd(t.prize_usd)) : t.prize ? " · " + esc(prize(t.prize)) : "") : "";
     setTimeout(drawBrackets, 0);
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { if (q(".brk-row, .swg")) drawBrackets(); });
-    renderShell({ id: "tour:" + id, back: "Турниры", def: tabs.some(function (x) { return x.key === "matches"; }) ? "matches" : undefined, title: esc(t ? withYear(t.name, t.begin || t.next) : "Турнир") + '<span class="upd shsub">' + sub + '</span>', tabs: tabs,
+    renderShell({ id: "tour:" + id, back: "Турниры", bg: t && t.bg, def: tabs.some(function (x) { return x.key === "matches"; }) ? "matches" : undefined, title: esc(t ? withYear(t.name, t.begin || t.next) : "Турнир") + '<span class="upd shsub">' + sub + '</span>', tabs: tabs,
       pane: function (k) {
         if (k === "overview") {
           var R0 = (state.results || {})[id];
@@ -3385,7 +3413,7 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
     var opts = newsSteps().map(function (f) { return [f, f === "all" ? "Все" : f]; });
     return '<div class="hbar">' + backBtn(m.tournament || "Назад") + '</div>' +
       '<div class="fold mini-wrap"><div class="fi"><div class="mini"><span class="ma"' + tnAttr(A) + '>' + esc(abbr(A)) + miniVrs(A) + '</span><span class="mm">BO' + esc(m.bo) + miniOutc(m) + '</span><span class="mb"' + tnAttr(B) + '>' + esc(abbr(B)) + miniVrs(B) + '</span></div></div></div>' +
-      '<div class="fold hero-wrap"><div class="fi"><section class="hero"><div class="meta"><span class="pill ' + esc(m.tier) + '">' + esc((m.tier || "").toUpperCase()) + '</span><span>' + esc(withYear(m.tournament, (m.serie || {}).begin || m.begin_at)) + (m.stage ? " · " + esc(m.stage) : "") + '</span></div>' +
+      '<div class="fold hero-wrap"><div class="fi"><section class="hero">' + (A.tbd ? '' : logoBg(A.name, A.image, "a")) + (B.tbd ? '' : logoBg(B.name, B.image, "b")) + '<div class="meta"><span class="pill ' + esc(m.tier) + '">' + esc((m.tier || "").toUpperCase()) + '</span><span>' + esc(withYear(m.tournament, (m.serie || {}).begin || m.begin_at)) + (m.stage ? " · " + esc(m.stage) : "") + '</span></div>' +
       '<div class="face"><div class="tm a"' + tnAttr(A) + '>' + heroSide(A, winPct(m, 0)) + '</div>' +
       '<div class="mid"><b>' + esc(hm(m.begin_at)) + '</b>' + esc(dm(m.begin_at)) + ' · BO' + esc(m.bo) + '</div>' +
       '<div class="tm b"' + tnAttr(B) + '>' + heroSide(B, winPct(m, 1)) + '</div></div>' +
