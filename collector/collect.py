@@ -7674,6 +7674,116 @@ def build_hq_logos() -> None:
     print(f"Логотипы в хорошем качестве (Liquipedia): новых {got}, всего {len(have)}")
     save_json(path, {"updated": iso(NOW), "logos": have, "miss": miss})
 
+
+TOUR_HQ_NEW = 10   # новых логотипов турниров за полный сбор
+
+
+def build_tour_hq() -> None:
+    """Логотип турнира в хорошем качестве для шапки турнира (владелец 25.11: баннер bo3 маленький, при растяжении мылится).
+    Страница турнира на Liquipedia — та же, что для призовых (`lp_prize_slots` → `lp_prize_cache[...]["title"]`),
+    инфобокс `imagedark`/`image`, imageinfo шириной 1000 px (SVG — как есть). Файлы — tour_hq/<id>.<ext>, список — tour_hq.json.
+    Берём идущие и ближайшие (3 мес.) тир-1 турниры; найденное держим, пока турнир в списке; промах — повтор через 3 дня."""
+    path = OUT / "tour_hq.json"
+    H = load_json(path, {}) or {}
+    have, miss = H.get("tours") or {}, H.get("miss") or {}
+    lst = load_json(OUT / "matches.json", {}) or {}
+    todo = []
+    for t in lst.get("tournaments") or []:
+        tid, nm = str(t.get("id") or ""), t.get("name") or ""
+        if not tid or not nm or t.get("finished") or t.get("tier") != "s":
+            continue
+        b = parse_iso(t.get("begin") or t.get("next"))
+        if b and b > NOW + timedelta(days=92):
+            continue
+        h = have.get(tid)
+        if h and (OUT / h["f"]).exists():
+            continue
+        if (parse_iso(miss.get(tid)) or NOW - timedelta(days=30)) > NOW - timedelta(days=3):
+            continue
+        todo.append((tid, withyear_name(nm, t)))
+        if len(todo) >= TOUR_HQ_NEW:
+            break
+    if not todo:
+        return
+    files = {}
+    for tid, nm in todo:
+        try:
+            lp_prize_slots(nm)
+        except Exception as e:
+            warn(f"Логотип турнира {nm}: {e!r}")
+            continue
+        title = (lp_prize_cache.get(nm) or {}).get("title")
+        # страница должна быть именно этого турнира: хотя бы одно «особое» слово названия (город, сезон) есть в заголовке
+        # (поиск призовых допускает любую страницу бренда с тем же годом: PGL/2026/Bucharest вместо Singapore)
+        sw = [w for w in re.findall(r"[a-z]{4,}", nm.lower())[1:] if w not in ("major", "season", "stage", "masters", "series", "championship", "cup", "open")]
+        if title and sw and not any(w in title.lower() for w in sw):
+            title = None
+        txt = lp_pages([title]).get(title, "") if title else ""
+        ib = infobox(txt) or txt
+        f = lp_param(ib, "imagedark") or lp_param(ib, "image")
+        if f:
+            files[tid] = f.strip()
+        else:
+            miss[tid] = iso(NOW)
+    info = {}
+    fl = sorted(set(files.values()))
+    if fl:
+        url = LP_API + "?" + urllib.parse.urlencode({"action": "query", "prop": "imageinfo", "iiprop": "url|size|mime", "iiurlwidth": 1000,
+                                                     "titles": "|".join("File:" + x for x in fl), "format": "json"})
+        wait = 4.0 - (time.time() - _lp_last[0])
+        if wait > 0:
+            time.sleep(wait)
+        _lp_last[0] = time.time()
+        stats["liquipedia_requests"] += 1
+        q = json.loads(http_get(url, {"User-Agent": LP_UA, "Accept": "application/json"}, retry429=False)).get("query") or {}
+        nm_ = {r["to"]: r["from"] for r in q.get("normalized") or []}
+        for pg in (q.get("pages") or {}).values():
+            ii = (pg.get("imageinfo") or [None])[0]
+            if ii:
+                info[nm_.get(pg["title"], pg["title"]).split(":", 1)[1].replace("_", " ")] = ii
+    (OUT / "tour_hq").mkdir(exist_ok=True)
+    got = 0
+    for tid, f in files.items():
+        ii = info.get(f.replace("_", " "))
+        if not ii:
+            miss[tid] = iso(NOW)
+            continue
+        svg = "svg" in (ii.get("mime") or "")
+        src = ii.get("url") if svg or (ii.get("width") or 0) <= 1000 else (ii.get("thumburl") or ii.get("url"))
+        ext = "svg" if svg else ((src or "").rsplit(".", 1)[-1].split("?")[0].lower() or "png")
+        if ext not in ("svg", "png", "webp", "jpg", "jpeg"):
+            ext = "png"
+        wait = 2.0 - (time.time() - _lp_last[0])
+        if wait > 0:
+            time.sleep(wait)
+        _lp_last[0] = time.time()
+        try:
+            body = http_get(src, {"User-Agent": LP_UA}, retry429=False)
+        except Exception as e:
+            warn(f"Логотип турнира {tid}: {e!r}")
+            miss[tid] = iso(NOW)
+            continue
+        if len(body) < 200 or len(body) > 1_500_000:
+            miss[tid] = iso(NOW)
+            continue
+        fn = f"tour_hq/{tid}.{ext}"
+        for old in (OUT / "tour_hq").glob(tid + ".*"):
+            old.unlink()
+        (OUT / fn).write_bytes(body)
+        have[tid] = {"f": fn, "t": iso(NOW), "file": f, "w": ii.get("thumbwidth") or ii.get("width"), "h": ii.get("thumbheight") or ii.get("height")}
+        miss.pop(tid, None)
+        got += 1
+    print(f"Логотипы турниров (Liquipedia): новых {got}, всего {len(have)}")
+    save_json(path, {"updated": iso(NOW), "tours": have, "miss": miss})
+
+
+def withyear_name(nm: str, t: dict) -> str:
+    """Название с годом для поиска на Liquipedia (у PandaScore бывает без года)."""
+    if re.search(r"\b(19|20)\d\d\b", nm):
+        return nm
+    b = parse_iso(t.get("begin") or t.get("next"))
+    return f"{nm} {b.year}" if b else nm
+
 def build_logos() -> None:
     """data/logos.json: название команды → лучший (цветной) логотип. Недостающие ищем на bo3.gg."""
     path = OUT / "logos.json"
@@ -8104,6 +8214,11 @@ def main() -> int:
         build_logos()
     except Exception as e:
         warn(f"Логотипы: {e!r}")
+    if not STATS:
+        try:
+            build_tour_hq()
+        except Exception as e:
+            warn(f"Логотипы турниров: {e!r}")
     # build_hq_logos() — отключено 25.11: владелец убрал логотипы из шапки матча (функция осталась, файлы logos_hq в ветке data)
     try:
         build_positions()

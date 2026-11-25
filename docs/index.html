@@ -1141,6 +1141,9 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
 .shead.shbg { isolation: isolate; overflow: hidden; }
 .shead.shbg::before { content: ""; position: absolute; inset: -40px; z-index: -1; background: var(--tb) center / cover no-repeat; filter: blur(22px) saturate(1.5); opacity: .7; }
 .shead.shbg.lgo::before { background-size: cover; }
+/* логотип турнира в хорошем качестве (Liquipedia, tour_hq): чётко, без размытия, справа за названием (владелец 25.11) */
+.shead.shbg.hq::before { inset: 0; filter: none; opacity: .32; background: var(--tb) right -6% top 42% / auto 118% no-repeat; }
+.shead.shbg.hq::after { background: linear-gradient(90deg, var(--bg) 0%, color-mix(in srgb, var(--bg) 55%, transparent) 60%, transparent 100%), linear-gradient(180deg, transparent 55%, var(--bg) 100%); }
 .shead.shbg::after { content: ""; position: absolute; inset: 0; z-index: -1; background: linear-gradient(180deg, color-mix(in srgb, var(--bg) 30%, transparent) 0%, color-mix(in srgb, var(--bg) 72%, transparent) 60%, var(--bg) 100%); }
 </style>
 
@@ -1352,7 +1355,11 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
         return dfetch("data/logos_hq.json" + bust()).then(function (r) { return r.ok ? r.json() : null; }).then(function (j) { if (j && j.logos) HQ = j.logos; }).catch(function () {});
       });
   }
-  var HQ = {};
+  var HQ = {}, TOUR_HQ = {};
+  function getTourHq() {  // логотипы турниров в хорошем качестве (Liquipedia) — для шапки турнира
+    if (DEMO) return Promise.resolve();
+    return dfetch("data/tour_hq.json" + bust()).then(function (r) { return r.ok ? r.json() : null; }).then(function (j) { if (j && j.tours) TOUR_HQ = j.tours; }).catch(function () {});
+  }
   function logoHq(name) {
     var h = HQ[nkey(name)];
     if (!h && typeof TEAM_ALT !== "undefined" && TEAM_ALT[tnorm(name)]) h = HQ[nkey(TEAM_ALT[tnorm(name)])];
@@ -1599,7 +1606,7 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
       var now = !lazy || t.key === key;
       if (!now) rest.push(t.key);
       return '<div class="pane" data-key="' + esc(t.key) + '"><div class="pin">' + (now ? cfg.pane(t.key) : '') + '</div></div>';
-    }).join("") + '</div></div><div class="shead' + (cfg.bg ? ' shbg' + (bgLogo(cfg.bg) ? ' lgo' : '') + '" style="--tb:url(\'' + esc(cfg.bg) + '\')' : '') + '"><div class="pin"><div class="hbar">' + backBtn(cfg.back || "Назад") + '</div><div class="shtitle">' + cfg.title + '</div>' + tabsHtml + '</div></div></div>';
+    }).join("") + '</div></div><div class="shead' + (cfg.bg ? ' shbg' + (cfg.bgHq ? ' hq' : bgLogo(cfg.bg) ? ' lgo' : '') + '" style="--tb:url(\'' + esc(cfg.bg) + '\')' : '') + '"><div class="pin"><div class="hbar">' + backBtn(cfg.back || "Назад") + '</div><div class="shtitle">' + cfg.title + '</div>' + tabsHtml + '</div></div></div>';
     var sh = q(".sshell");
     sh.style.setProperty("--shh", q(".shead").offsetHeight + "px");
     trackTo(keys.indexOf(key), false);
@@ -2321,7 +2328,9 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
     var sub = t ? '<span class="pill ' + esc(t.tier) + '">' + esc((t.tier || "?").toUpperCase()) + '</span>' + (t.begin ? esc(dm(t.begin) + (t.end ? " – " + dm(t.end) : "")) : "") + (t.prize_usd ? " · " + esc(usd(t.prize_usd)) : t.prize ? " · " + esc(prize(t.prize)) : "") : "";
     setTimeout(drawBrackets, 0);
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { if (q(".brk-row, .swg")) drawBrackets(); });
-    renderShell({ id: "tour:" + id, back: "Турниры", bg: t && t.bg, def: tabs.some(function (x) { return x.key === "matches"; }) ? "matches" : undefined, title: esc(t ? withYear(t.name, t.begin || t.next) : "Турнир") + '<span class="upd shsub">' + sub + '</span>', tabs: tabs,
+    var thq = TOUR_HQ[String(id)];
+    if (!thq && !state.tourHqAsk) { state.tourHqAsk = 1; getTourHq().then(function () { if (TOUR_HQ[String(id)] && state.view === "tour:" + id) showTour(id); }); }
+    renderShell({ id: "tour:" + id, back: "Турниры", bg: thq ? "data/" + thq.f : t && t.bg, bgHq: !!thq, def: tabs.some(function (x) { return x.key === "matches"; }) ? "matches" : undefined, title: esc(t ? withYear(t.name, t.begin || t.next) : "Турнир") + '<span class="upd shsub">' + sub + '</span>', tabs: tabs,
       pane: function (k) {
         if (k === "overview") {
           var R0 = (state.results || {})[id];
