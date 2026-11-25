@@ -1119,6 +1119,7 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
    а всё, что больше (подсветка, баннер), — размытием, где пикселей не видно */
 .mcard.ill { isolation: isolate; color: #fff; border-color: rgba(255,255,255,.07);
   background: radial-gradient(90% 150% at 100% 50%, color-mix(in srgb, var(--ac) 26%, #0f1013) 0%, #0f1013 65%); }
+.mcard.ill { background-origin: border-box; background-repeat: no-repeat; }  /* иначе цветной край фона повторялся в рамке слева — «полоска свечения» */
 .mcard.ill::before { content: ""; position: absolute; top: 0; bottom: 0; right: 0; width: 64%; z-index: -1; background: var(--ill) right center / contain no-repeat; }
 .mcard.ill .mc-s { color: rgba(255,255,255,.72); max-width: 58%; }
 .mcard.ill .mc-t { text-shadow: 0 2px 12px rgba(0,0,0,.5); }
