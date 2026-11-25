@@ -1959,7 +1959,7 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
   // квадрат сыгранной карты: картинка карты, счёт цветом команд и раунды по сторонам (CT — голубой, T — золотой)
   function mapSquare(g, i, A, B, small, withSides) {
     var sd = g.sides, side = "";
-    if (sd && sd.length === 2 && (!small || withSides)) {  // в списке «Завершённых» стороны не показываем — только внутри матча и в личных встречах
+    if (false && sd && sd.length === 2 && (!small || withSides)) {  // раунды по сторонам у карт убраны (владелец 25.11) — вместо них история раундов  // в списке «Завершённых» стороны не показываем — только внутри матча и в личных встречах
       side = '<span class="sides">' + [A, B].map(function (t, k) {
         return '<span class="sd-r"><em>' + esc(abbr(t)) + '</em><i class="sct">' + sd[k][0] + '</i><i class="st">' + sd[k][1] + '</i></span>';
       }).join("") + '</span>';
