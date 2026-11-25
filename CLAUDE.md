@@ -26,6 +26,7 @@
 - Workflow: `collect.yml` (полный, каждый час с 06.11 — владелец, лимит 90 мин, публикует Pages; к HLTV тяжёлое — по своим срокам: события 6 ч, список событий 3 ч, игроки по очереди), `stats.yml` (~40 мин), `news.yml` (5 мин), `pages.yml` (при изменении docs/).
   GitHub запускает расписание с опозданием → в воркере есть `scheduled()`: по крону Cloudflare раз в 5 мин запускает news.yml, раз в 30 — stats.yml (нужны секрет GH_TOKEN и Cron Trigger в Cloudflare — делает владелец).
 - Новые пары после жеребьёвки (владелец 24.11): в дни тир-1 турнира (матч тир-s в ±24 ч) проход новостей раз в 5 мин делает 1 запрос к PandaScore (`sched_sync`) и добавляет новые матчи/команды в `matches.json` с меткой `t_sched` (`has_detail` false); `save_data.py news` переносит их в ветку; карточку собирает ближайший stats/full. В news.yml добавлен PANDASCORE_TOKEN.
+- LIVE в списке и шапке матча (`status` running) ставит и быстрый сбор: в `d2_sync` начало прошло ≥5 мин / есть вето полностью / есть счёт dust2 → running; `save_data.py news` переносит в карточку и `matches.json` (25.11: Wildcard–Lynn шли 1:4, а у нас ждали сбора статистики).
 - LIVE-блок убран полностью (владелец 06.11: bo3 на PRV–NAVI не передавал раунды). Воркер `tools/cloudflare-worker.js` остаётся — он же будильник news/stats.
 - Нейросеть: Gemini `gemini-flash-latest` (основная; при 503 ждёт и переходит на `gemini-flash-lite-latest`,
   она не принимает thinkingConfig; 2.5-flash-lite снята), GigaChat (запасная). Ключ GEMINI_KEY добавлен 04.11.

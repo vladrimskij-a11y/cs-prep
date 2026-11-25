@@ -106,6 +106,14 @@ def merge(dst: Path) -> None:
             a, b = load(f), load(g)
             if a is not None and b is not None and take_newer(a, b):
                 g.write_text(json.dumps(b, ensure_ascii=False, separators=(",", ":")), "utf-8")
+            if a is not None and b is not None and a.get("status") == "running" and b.get("status") in (None, "", "not_started"):
+                b["status"] = "running"  # 25.11: LIVE сразу после начала (быстрый сбор), а не со сбором статистики
+                g.write_text(json.dumps(b, ensure_ascii=False, separators=(",", ":")), "utf-8")
+                bl = load(dst / "matches.json")
+                for x in (bl or {}).get("matches") or []:
+                    if str(x.get("id")) == f.stem and x.get("status") in (None, "", "not_started"):
+                        x["status"] = "running"
+                        (dst / "matches.json").write_text(json.dumps(bl, ensure_ascii=False, separators=(",", ":")), "utf-8")
             if a is not None and b is not None and (newer(a.get("news"), b.get("news")) or a.get("veto_now") != b.get("veto_now") or a.get("begin_at") != b.get("begin_at") or a.get("opp") != b.get("opp")):
                 if newer(a.get("news"), b.get("news")):
                     b["news"] = a["news"]

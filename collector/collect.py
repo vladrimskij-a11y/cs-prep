@@ -4448,6 +4448,12 @@ def d2_sync(listing: list | None = None) -> None:
         need = int(d.get("bo") or 3)
         have = len([s0 for s0 in (d.get("veto_now") or {}).get("steps") or [] if s0.get("act") in ("pick", "decider")])
         R0 = d.get("d2_res") or {}
+        # 25.11: матч начался — LIVE сразу, а не со следующим сбором статистики (Wildcard–Lynn: уже 1:4, а у нас «09:00»)
+        if bt and bt <= NOW < bt + timedelta(hours=8) and d.get("status") in (None, "", "not_started") and len(d.get("teams") or []) == 2 \
+                and (have >= need or R0.get("maps") or NOW - bt > timedelta(minutes=5)):
+            d["status"] = "running"; ch = True
+            if str(d.get("id")) in by_id:
+                by_id[str(d.get("id"))]["status"] = "running"
         # пока матч идёт — каждый проход: счёт доигранных карт и статистика игроков по ним (dust2 даёт сразу после карты)
         live = (bt and NOW - timedelta(hours=8) < bt <= NOW and len(d["teams"]) == 2
                 and not (R0.get("maps") and all(m0.get("score") for m0 in R0["maps"][:need])
