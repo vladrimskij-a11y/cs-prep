@@ -1126,7 +1126,9 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
 .rh-n { text-align: right; font-weight: 800; font-size: 17px; font-variant-numeric: tabular-nums; }
 .rh-n.ct { color: #5fb4ff; } .rh-n.t { color: #ffad42; }
 .rh-tn { font-weight: 800; font-size: 12.5px; display: flex; flex-direction: column; line-height: 1.15; }
-.rh-tn.a { color: var(--ct); } .rh-tn.b { color: var(--t); }
+.rh-tn { align-items: flex-start; gap: 2px; }
+.rh-tn .rh-lg { width: 22px; height: 22px; margin: 0; vertical-align: 0; }
+.rh-ab { color: var(--fg); font-size: 12px; font-weight: 800; }
 .rh-tn b { font-size: 10.5px; font-weight: 700; white-space: nowrap; }
 .rh-tn b.ct { color: #5fb4ff; } .rh-tn b.t { color: #ffad42; }
 .rh-row { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 3px; }
@@ -3403,13 +3405,15 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
       };
       // сторона и сколько раундов взято за неё в этой половине (владелец 25.11)
       var won = function (team) { return p[1].filter(function (r) { return r && +r[0] === team; }).length; };
+      // команда — логотипом (цвет названия путался со сторонами, владелец 25.11); нет логотипа — название белым
+      var who = function (T) { var l = logo(T.name, T.logo); return l ? l.replace('class="lg"', 'class="lg rh-lg" title="' + esc(T.name || "") + '"') : '<span class="rh-ab">' + esc(abbr(T)) + '</span>'; };
       var sideLbl = function (s) { return s === "C" ? '<b class="ct">CT</b>' : s === "T" ? '<b class="t">T</b>' : ''; };
       // счёт половины — отдельным столбцом справа, цифры строго друг под другом (владелец 25.11)
       var cnt = function (s, team) { return '<span class="rh-n ' + (s === "C" ? "ct" : "t") + '">' + won(team) + '</span>'; };
       return '<div class="rh-part"><div class="rh-h">' + title + '</div>' +
-        '<div class="rh-grid" style="--n:' + p[1].length + '"><span class="rh-tn a">' + esc(abbr(A)) + sideLbl(sa) + '</span>' + row(0) + cnt(sa, 0) +
+        '<div class="rh-grid" style="--n:' + p[1].length + '"><span class="rh-tn">' + who(A) + sideLbl(sa) + '</span>' + row(0) + cnt(sa, 0) +
         '<span></span><div class="rh-row rh-num">' + p[1].map(function (_, k) { return '<i>' + (p[0] + k + 1) + '</i>'; }).join("") + '</div><span></span>' +
-        '<span class="rh-tn b">' + esc(abbr(B)) + sideLbl(sb) + '</span>' + row(1) + cnt(sb, 1) + '</div></div>';
+        '<span class="rh-tn">' + who(B) + sideLbl(sb) + '</span>' + row(1) + cnt(sb, 1) + '</div></div>';
     }).join("");
     return '<div class="sec"><h3>История раундов <span>' + esc(g.map || "") + (g.score ? ' · ' + g.score[0] + ':' + g.score[1] : '') + '</span></h3><div class="box rh">' + html +
       '<div class="rh-leg"><span>' + RICON.e + 'все убиты</span><span>' + RICON.b + 'взрыв</span><span>' + RICON.d + 'разминирование</span><span>' + RICON.t + 'время</span></div></div></div>';
