@@ -1119,6 +1119,23 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
    а всё, что больше (подсветка, баннер), — размытием, где пикселей не видно */
 .mcard.ill { isolation: isolate; color: #fff; border-color: rgba(255,255,255,.07);
   background: radial-gradient(90% 150% at 100% 50%, color-mix(in srgb, var(--ac) 26%, #0f1013) 0%, #0f1013 65%); }
+.rh { padding: 10px 12px 10px; }
+.rh-part + .rh-part { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); }
+.rh-h { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 6px; }
+.rh-grid { display: grid; grid-template-columns: 52px 1fr; row-gap: 3px; align-items: center; }
+.rh-tn { font-weight: 800; font-size: 12.5px; display: flex; flex-direction: column; line-height: 1.15; }
+.rh-tn.a { color: var(--ct); } .rh-tn.b { color: var(--t); }
+.rh-tn b { font-size: 10px; font-weight: 700; }
+.rh-tn b.ct { color: #5fb4ff; } .rh-tn b.t { color: #ffad42; }
+.rh-row { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 3px; }
+.rh-c { aspect-ratio: 1; border-radius: 5px; background: var(--sunk); display: grid; place-items: center; font-style: normal; max-height: 26px; }
+.rh-c.ct { background: #3a86d9; color: #fff; } .rh-c.t { background: #e48a1d; color: #fff; }
+.rh-c svg, .rh-leg svg { width: 64%; height: 64%; }
+.rh-num i { font-style: normal; text-align: center; font-size: 10px; font-weight: 600; color: var(--muted); }
+.rh-leg { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 10px; font-size: 11.5px; color: var(--muted); }
+.rh-leg span { display: inline-flex; align-items: center; gap: 4px; } .rh-leg svg { width: 13px; height: 13px; }
+.sres .pp-m[data-smap] { cursor: pointer; }
+.sres .pp-m[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--fg); }
 .mchips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .mch { display: inline-flex; align-items: center; gap: 7px; padding: 5px 10px 5px 8px; border-radius: 9px; background: var(--sunk); font-size: 13px; line-height: 1.2; }
 .mch::before { content: ""; width: 3px; height: 14px; border-radius: 2px; background: var(--line); flex: none; }  /* цвет победителя карты — ровная черта, не по скруглению */
@@ -3357,23 +3374,58 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
   }
 
   // подробности серии: карты, счёт, статистика игроков (вся серия или отдельная карта)
+  // история раундов карты (bo3: кто взял раунд, за какую сторону и как — все убиты / бомба / разминирование / время), владелец 25.11
+  var RICON = {
+    e: '<svg viewBox="0 0 12 12"><path d="M6 1.2C3.4 1.2 1.8 3 1.8 5.2c0 1.4.7 2.3 1.5 2.8v1.6h1.2V8.8h.9v.8h1.2v-.8h.9v.8h1.2V8c.8-.5 1.5-1.4 1.5-2.8C10.2 3 8.6 1.2 6 1.2Zm-1.9 5.1a1 1 0 1 1 0-2 1 1 0 0 1 0 2Zm3.8 0a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z" fill="currentColor"/></svg>',
+    b: '<svg viewBox="0 0 12 12"><circle cx="5.4" cy="7" r="3.6" fill="currentColor"/><path d="M7.6 4.2 9 2.8M9 2.8l1.2-.4M9 2.8l-.3-1.1" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" fill="none"/></svg>',
+    d: '<svg viewBox="0 0 12 12"><path d="M2 10 7 5M7 5l1-3 2 2-3 1Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" fill="currentColor"/></svg>',
+    t: '<svg viewBox="0 0 12 12"><circle cx="6" cy="6.4" r="4.3" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M6 4v2.6l1.6 1" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" fill="none"/></svg>',
+    "?": ''
+  };
+  function roundsBlock(g, A, B) {
+    var R = (g && g.rounds) || [];
+    if (!R.some(Boolean)) return '';
+    // половины: 12 + 12, овертаймы по 6 (MR12)
+    var parts = [], i = 0;
+    while (i < R.length) { var n = i < 24 ? 12 : 6; parts.push([i, R.slice(i, i + n)]); i += n; }
+    var sideOf = function (r, team) { if (!r) return null; var w = +r[0], s = r[1]; return w === team ? s : (s === "C" ? "T" : "C"); };
+    var html = parts.map(function (p, pi) {
+      var first = p[1].find(Boolean), sa = sideOf(first, 0), sb = sideOf(first, 1);
+      var title = pi === 0 ? "1-я половина" : pi === 1 ? "2-я половина" : "Овертайм " + Math.ceil((pi - 1) / 2) + (pi % 2 ? " · 1-я" : " · 2-я");
+      var row = function (team, side) {
+        return '<div class="rh-row">' + p[1].map(function (r) {
+          if (!r || +r[0] !== team) return '<i class="rh-c"></i>';
+          return '<i class="rh-c ' + (r[1] === "C" ? "ct" : "t") + '">' + (RICON[r[2]] || '') + '</i>';
+        }).join("") + '</div>';
+      };
+      var sideLbl = function (s) { return s === "C" ? '<b class="ct">CT</b>' : s === "T" ? '<b class="t">T</b>' : ''; };
+      return '<div class="rh-part"><div class="rh-h">' + title + '</div>' +
+        '<div class="rh-grid" style="--n:' + p[1].length + '"><span class="rh-tn a">' + esc(abbr(A)) + sideLbl(sa) + '</span>' + row(0) +
+        '<span></span><div class="rh-row rh-num">' + p[1].map(function (_, k) { return '<i>' + (p[0] + k + 1) + '</i>'; }).join("") + '</div>' +
+        '<span class="rh-tn b">' + esc(abbr(B)) + sideLbl(sb) + '</span>' + row(1) + '</div></div>';
+    }).join("");
+    return '<div class="sec"><h3>История раундов <span>' + esc(g.map || "") + (g.score ? ' · ' + g.score[0] + ':' + g.score[1] : '') + '</span></h3><div class="box rh">' + html +
+      '<div class="rh-leg"><span>' + RICON.e + 'все убиты</span><span>' + RICON.b + 'взрыв</span><span>' + RICON.d + 'разминирование</span><span>' + RICON.t + 'время</span></div></div></div>';
+  }
   function seriesView(S, backLabel) {
     var A = S.teams[0] || {}, B = S.teams[1] || {};
     var maps = S.maps || [];
     // несыгранные карты — все пики и десайдер из вето, которых нет среди сыгранных (BO5 3:0 → две карты)
     var playedM = maps.map(function (g) { return String(g.map || "").toLowerCase(); });
     var unplayed = maps.length < (S.bo || 3) ? (S.veto || []).filter(function (v) { return (v.act === "pick" || v.act === "decider") && playedM.indexOf(String(v.map || "").toLowerCase()) < 0; }).slice(0, (S.bo || 3) - maps.length) : [];
-    var keys = S.players ? [-1].concat(maps.map(function (g, i) { return g.players ? i : null; }).filter(function (x) { return x != null; })) : [];
+    var hasR = function (g) { return (g.rounds || []).some(Boolean); };
+    var keys = S.players || maps.some(hasR) ? [-1].concat(maps.map(function (g, i) { return g.players || hasR(g) ? i : null; }).filter(function (x) { return x != null; })) : [];
     var head = '<div class="ovtop">' + (TG ? '' : '<button class="back" data-close>' + ARROW + esc(backLabel) + '</button>') + '</div>' +
       '<div class="rd-meta">' + esc([withYear(S.tournament, S.date), S.stage, S.round].filter(Boolean).join(" · ")) + (S.date ? ' · ' + esc(dmy(S.date)) : '') + '</div>' +
       '<section class="hero sres"><div class="face"><div class="tm a" data-tname="' + esc(A.name) + '">' + logo(A.name, A.logo).replace('class="lg"', 'class="lg big"') + '<span class="acr' + ((A.acronym || A.name || "").length > 6 ? ' sm' : '') + '">' + esc(A.acronym || A.name) + '</span></div>' +
       '<div class="mid"><b class="num">' + esc(A.score) + ' : ' + esc(B.score) + '</b>BO' + esc(S.bo || "?") + '</div>' +
       '<div class="tm b" data-tname="' + esc(B.name) + '">' + logo(B.name, B.logo).replace('class="lg"', 'class="lg big"') + '<span class="acr' + ((B.acronym || B.name || "").length > 6 ? ' sm' : '') + '">' + esc(B.acronym || B.name) + '</span></div></div>' +
       (maps.length ? '<div class="pp-maps">' + maps.map(function (g, i) {
-        return mapSquare(g, i, A, B);
+        var j = keys.indexOf(i);  // нажатие на карту — её страница: история раундов и статистика
+        return j > 0 ? mapSquare(g, i, A, B).replace('<div class="pp-m', '<div role="button" data-smap="' + j + '" class="pp-m') : mapSquare(g, i, A, B);
       }).join("") + unplayed.map(function (v, j) {
         return '<div class="pp-m n left' + mapBg(v.map) + '"><span class="pp-n">Карта ' + (maps.length + j + 1) + '</span><b>' + esc(v.map) + '</b><small>не сыграна</small></div>';
-      }).join("") + '</div>' : '') + (maps.some(function (g) { return g.sides; }) ? SIDES_LEGEND : '') + '</section>' +
+      }).join("") + '</div>' : '') + (keys.length > 1 && maps.some(hasR) ? '<div class="sd-leg" style="text-align:center">Нажми на карту — история раундов</div>' : '') + '</section>' +
       (keys.length > 1 ? '<div class="filt sfilt" role="tablist">' + keys.map(function (k, j) { return '<button class="chip" data-smap="' + j + '" aria-pressed="' + (j === 0) + '">' + (k < 0 ? "Вся серия" : esc(maps[k].map || ("Карта " + (k + 1)))) + '</button>'; }).join("") + '</div>' : '');
     var vetoHtml = (S.veto || []).length ? '<div class="sec"><h3>Вето</h3><div class="box veto">' + S.veto.map(function (v, i) {
       var who = v.team ? ([A, B].findIndex(function (t) { return t && t.name && (t.name.toLowerCase().indexOf(v.team.toLowerCase()) >= 0 || v.team.toLowerCase().indexOf(String(t.name).toLowerCase()) >= 0); })) : -1;
@@ -3381,6 +3433,7 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
         '<span class="vt-a ' + esc(v.act) + '">' + (v.act === "ban" ? "бан" : v.act === "pick" ? "пик" : "осталась") + '</span><b>' + esc(v.map) + '</b></div>';
     }).join("") + '</div></div>' : '';
     function tables(rows) {
+      if (!rows) return '<div class="box note" style="margin-top:12px">Статистики игроков по этой карте пока нет.</div>';
       return [0, 1].map(function (i) {
         var t = S.teams[i] || {};
         return '<div class="sec"><div class="box"><div class="st-h ' + (i ? "b" : "a") + '">' + logo(t.name, t.logo) + esc(t.name) + '</div><table class="mtab ptab"><thead><tr><th>Игрок</th><th class="r">K–D</th><th class="r">ADR</th><th class="r">KAST</th><th class="r">Рейт.</th></tr></thead><tbody>' +
@@ -3391,7 +3444,7 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
           }).join("") + '</tbody></table></div></div>';
       }).join("") + '<div class="upd" style="text-align:center;margin-top:12px">' + (S.src === "dust2" ? "Статистика dust2.us · рейтинг HLTV 3.0" : (S.maps || []).some(function (g) { return g.src === "dust2"; }) ? "Статистика bo3.gg и dust2.us (HLTV)" : "Статистика bo3.gg · рейтинг bo3") + '</div>';
     }
-    var panes = keys.length ? keys.map(function (k) { return '<div class="opane"><div class="pin">' + (k < 0 ? vetoHtml : '') + tables(k < 0 ? S.players : maps[k].players) + '</div></div>'; }).join("")
+    var panes = keys.length ? keys.map(function (k) { return '<div class="opane"><div class="pin">' + (k < 0 ? vetoHtml : roundsBlock(maps[k], A, B)) + tables(k < 0 ? S.players : maps[k].players) + '</div></div>'; }).join("")
       : '<div class="opane"><div class="pin">' + vetoHtml + '<div class="box note" style="margin-top:12px">Статистики игроков по этому матчу пока нет.</div></div></div>';
     return '<div class="ov-head"><div class="pin">' + head + '</div></div><div class="ov-vp"><div class="ov-track">' + panes + '</div></div>';
   }

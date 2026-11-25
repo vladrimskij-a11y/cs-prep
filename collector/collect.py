@@ -1508,6 +1508,13 @@ def game_detail(gid: int | None) -> dict | None:
     key = str(gid)
     c = details_cache.get(key)
     if c is not None and (c.get("players") or c.get("final")):
+        if c.get("rounds") and "why" not in c and _why_new[0] < WHY_NEW_LIMIT:
+            _why_new[0] += 1  # 25.11: история раундов — как закончился раунд (у старых записей кэша её нет, дочитываем понемногу)
+            try:
+                g = bo3(f"/games/{gid}")
+                c["why"] = "".join(round_why(r.get("end_reason")) for r in sorted(g.get("game_rounds") or [], key=lambda r: r.get("round_number") or 0))
+            except Exception as e:
+                warn(f"bo3 раунды {gid}: {e!r}")
         return c
     if c is not None and (c.get("chk") or "") > iso(NOW - timedelta(minutes=20)):
         return c  # без статистики — перепроверяем не чаще раза в 20 минут
@@ -1536,7 +1543,8 @@ def game_detail(gid: int | None) -> dict | None:
             "kast": x.get("kast"), "r": x.get("player_rating"), "fk": x.get("first_kills"), "fd": x.get("first_death"),
             "cl": x.get("clutches"), "hs": x.get("headshots"),
         })
-    d = {"wt": wtc.get("team_id"), "lt": ltc.get("team_id"), "rounds": rounds, "players": players}
+    why = "".join(round_why(r.get("end_reason")) for r in sorted(g.get("game_rounds") or [], key=lambda r: r.get("round_number") or 0))
+    d = {"wt": wtc.get("team_id"), "lt": ltc.get("team_id"), "rounds": rounds, "why": why, "players": players}
     if g.get("status") == "finished":
         # статистика игроков у bo3 появляется позже итога карты: без неё — перепроверяем; через 3 дня считаем, что её не будет
         bg = parse_iso(g.get("begin_at") or "")
@@ -1954,6 +1962,31 @@ def series_players(rows: list[dict], tid, names: dict) -> list[list]:
     return out
 
 
+WHY_NEW_LIMIT = 400  # старых карт за сбор, у которых дочитываем, как закончились раунды
+_why_new = [0]
+
+
+def round_why(r: str | None) -> str:
+    """Как закончился раунд (bo3 end_reason): e — все убиты, b — бомба взорвана, d — разминирована, t — время вышло."""
+    x = (r or "").lower()
+    return "b" if "bomb" in x else "d" if "defus" in x else "t" if "saved" in x or "time" in x else "e" if "win" in x else "?"
+
+
+def map_rounds(det: dict | None, win: int | None) -> list | None:
+    """История раундов карты: ["0Tb", "1Ce", …] — кто взял раунд (0/1 — команда серии), за какую сторону, как."""
+    if not det or win not in (0, 1) or not det.get("rounds"):
+        return None
+    why = det.get("why") or ""
+    out = []
+    for j, (_, tid, side) in enumerate(det["rounds"]):
+        if tid is None or not side:
+            out.append("")
+            continue
+        i = win if tid == det.get("wt") else 1 - win
+        out.append(f"{i}{'C' if side.upper().startswith('CT') else 'T'}{why[j] if j < len(why) else '?'}")
+    return out
+
+
 def map_sides(det: dict | None, win: int | None) -> list | None:
     """Раунды по сторонам на карте: [[CT, T] команды 1, [CT, T] команды 2]. win — индекс победителя карты (0/1)."""
     if not det or win not in (0, 1) or not det.get("rounds"):
@@ -1984,7 +2017,7 @@ def series_detail(m: dict) -> dict | None:
         score = ([ws, ls] if win == 0 else [ls, ws]) if win is not None and ws is not None and ls is not None else None
         rows = det.get("players") or []
         every += rows
-        maps.append({"map": g.get("map"), "score": score, "winner": win, "sides": map_sides(det, win),
+        maps.append({"map": g.get("map"), "score": score, "winner": win, "sides": map_sides(det, win), "rounds": map_rounds(det, win),
                      "players": [series_players(rows, t1, names), series_players(rows, t2, names)] if rows else None})
     tm1, tm2 = m.get("team1") or {}, m.get("team2") or {}
     out = {
@@ -8072,6 +8105,11 @@ def main() -> int:
                         sdv = map_sides(details_cache.get(str(gs[i].get("id"))), mp.get("winner"))
                         if sdv:
                             mp["sides"] = sdv
+                            sides_added += 1
+                    if i < len(gs) and (mp.get("rounds") is None or any(x.endswith("?") for x in mp.get("rounds") or [])):
+                        rdv = map_rounds(details_cache.get(str(gs[i].get("id"))), mp.get("winner"))  # история раундов (25.11)
+                        if rdv and rdv != mp.get("rounds"):
+                            mp["rounds"] = rdv
                             sides_added += 1
             if sides_added:
                 save_json(path, rj)
