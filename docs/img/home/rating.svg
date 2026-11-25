@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 240">
+  <defs>
+    <linearGradient id="b1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8cc0ff"/><stop offset="1" stop-color="#2a5bb0" stop-opacity=".9"/></linearGradient>
+    <linearGradient id="b2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3a3d45"/><stop offset="1" stop-color="#1f2126"/></linearGradient>
+    <radialGradient id="h"><stop offset="0" stop-color="#63a4ff" stop-opacity=".45"/><stop offset="1" stop-color="#63a4ff" stop-opacity="0"/></radialGradient>
+  </defs>
+  <circle cx="300" cy="120" r="110" fill="url(#h)"/>
+  <polyline points="150,170 190,150 225,158 260,112 300,96 335,62 380,44" fill="none" stroke="#63a4ff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" stroke-opacity=".55"/>
+  <g fill="#63a4ff"><circle cx="260" cy="112" r="4"/><circle cx="335" cy="62" r="4"/><circle cx="380" cy="44" r="5"/></g>
+  <g stroke="#fff" stroke-opacity=".1">
+    <rect x="214" y="150" width="56" height="90" rx="8" fill="url(#b2)"/>
+    <rect x="274" y="110" width="56" height="130" rx="8" fill="url(#b1)"/>
+    <rect x="334" y="172" width="56" height="68" rx="8" fill="url(#b2)"/>
+  </g>
+  <g font-family="Inter, Arial, sans-serif" font-weight="800" text-anchor="middle" fill="#fff">
+    <text x="242" y="184" font-size="26" fill-opacity=".55">2</text>
+    <text x="302" y="148" font-size="32">1</text>
+    <text x="362" y="204" font-size="24" fill-opacity=".45">3</text>
+  </g>
+</svg>
