@@ -642,12 +642,13 @@ html { overflow-anchor: none; }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 body.nav #app > .view, body.nav #app > .sshell .pane, body.nav #app > .mshell .mviewport { animation: viewIn .28s cubic-bezier(.2,.8,.25,1) both; }
 /* переходы между страницами (владелец 26.11): вглубь — въезд справа, назад — слева, по сторонам — лёгкий подъём; только transform и opacity */
-@keyframes navFwd { from { transform: translate3d(22%, 0, 0); opacity: .55; } to { transform: none; opacity: 1; } }
-@keyframes navBack { from { transform: translate3d(-22%, 0, 0); opacity: .55; } to { transform: none; opacity: 1; } }
-@keyframes navSame { from { transform: translate3d(0, 18px, 0); opacity: .6; } to { transform: none; opacity: 1; } }
-body.nav-fwd #app > * { animation: navFwd .42s cubic-bezier(.22,1,.36,1) both !important; will-change: transform, opacity; }
-body.nav-back #app > * { animation: navBack .42s cubic-bezier(.22,1,.36,1) both !important; will-change: transform, opacity; }
-body.nav-same #app > * { animation: navSame .34s cubic-bezier(.22,1,.36,1) both !important; will-change: transform, opacity; }
+/* Переход: сначала страница рисуется уже в начальной точке (сдвинута, полупрозрачна), и только после первого кадра
+   включается плавный въезд — иначе в Safari тяжёлая отрисовка съедала почти всю анимацию (видео владельца 26.11: 1–2 кадра) */
+body.nav-fwd:not(.nav-go) #app > * { transform: translate3d(22%, 0, 0); opacity: .55; }
+body.nav-back:not(.nav-go) #app > * { transform: translate3d(-22%, 0, 0); opacity: .55; }
+body.nav-same:not(.nav-go) #app > * { transform: translate3d(0, 18px, 0); opacity: .6; }
+body.nav-go #app > * { transition: transform .42s cubic-bezier(.22,1,.36,1), opacity .42s cubic-bezier(.22,1,.36,1); }
+body.nav-fwd #app > *, body.nav-back #app > *, body.nav-same #app > * { animation: none !important; will-change: transform, opacity; }
 body.nav-fwd, body.nav-back { overflow-x: hidden; }
 body.nav-fwd #app > * .pane, body.nav-back #app > * .pane, body.nav-same #app > * .pane, body.nav-fwd #app > * .mviewport, body.nav-back #app > * .mviewport, body.nav-same #app > * .mviewport { animation: none !important; }
 .pop .pop-in { animation: popIn .18s cubic-bezier(.2,.8,.25,1) both; transform-origin: top center; }
@@ -656,7 +657,7 @@ body.nav-fwd #app > * .pane, body.nav-back #app > * .pane, body.nav-same #app > 
 .mcard, .ptile, button.rk { transition: transform .14s ease, opacity .14s ease; }
 .mcard:active, .ptile:active { transform: scale(.98); opacity: .9; }
 .mtrack, .ov-track { backface-visibility: hidden; }
-@media (prefers-reduced-motion: reduce) { body.nav #app > *, .pop .pop-in, .empty { animation: none !important; } }
+@media (prefers-reduced-motion: reduce) { body.nav #app > *, .pop .pop-in, .empty { animation: none !important; transition: none !important; transform: none !important; opacity: 1 !important; } }
 .stake { padding: 4px 14px; }
 .stk { display: grid; grid-template-columns: 22px 1fr; gap: 8px; padding: 10px 0; border-top: 1px solid var(--line); font-size: 14px; line-height: 1.4; }
 .stk:first-child { border-top: 0; }
@@ -4300,7 +4301,7 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
   var depth = 0;
   var navT = 0, navLvl = 0, navHash = null;
   // пока идёт анимация перехода, соседние вкладки и хвост ленты не дорисовываем — иначе кадры рвутся (владелец 26.11)
-  function navDelay() { return document.body.classList.contains("nav") ? 440 : 0; }
+  function navDelay() { return document.body.classList.contains("nav") ? 520 : 0; }
   function route() {
     closePop();  // переход на другую страницу (в т.ч. «назад» свайпом) — окно наград сворачивается
     saveShell();  // и место в списке (рейтинг, турниры) — чтобы вернуться туда же
@@ -4310,10 +4311,16 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
     var lvl = !h ? 0 : /^(m-|t-|r-)/.test(h) ? 2 : 1, dir = lvl > navLvl ? "fwd" : lvl < navLvl ? "back" : "same";
     var moved = h !== navHash;  // тихое обновление данных (та же страница) — без анимации
     navLvl = lvl; navHash = h;
-    document.body.classList.remove("nav", "nav-fwd", "nav-back", "nav-same");
-    if (moved) { void document.body.offsetWidth; document.body.classList.add("nav", "nav-" + dir); }
-    clearTimeout(navT);
-    navT = setTimeout(function () { document.body.classList.remove("nav", "nav-fwd", "nav-back", "nav-same"); }, 460);
+    var B = document.body.classList;
+    B.remove("nav", "nav-go", "nav-fwd", "nav-back", "nav-same"); clearTimeout(navT);
+    if (moved) {
+      B.add("nav", "nav-" + dir);  // новая страница отрисуется уже в начальной точке
+      // въезд — после первого кадра с новой страницей (два rAF), чтобы тяжёлая отрисовка не съела анимацию
+      requestAnimationFrame(function () { requestAnimationFrame(function () {
+        B.add("nav-go");
+        navT = setTimeout(function () { B.remove("nav", "nav-go", "nav-fwd", "nav-back", "nav-same"); }, 460);
+      }); });
+    }
     var mt = /^m-(\d+)$/.exec(h), tt = /^t-([\w-]+)$/.exec(h);
     closeOverlay(true);
     updateBackBtn();
