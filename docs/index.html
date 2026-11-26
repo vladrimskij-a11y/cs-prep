@@ -1204,6 +1204,13 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
 .pop-in ul > li:not(.ph):not(.pback) { padding-top: 8px; padding-bottom: 8px; margin: 0; }
 .pop-in ul > li:not(.ph):not(.pback) + li:not(.ph) { border-top: 1px solid color-mix(in srgb, var(--fg) 16%, transparent); }
 .pop-in li.ph { margin-top: 14px; margin-bottom: 2px; }
+/* вкладка «Игроки»: команды чётко разделены — рамка и шапка в цвет команды, отступ между блоками (владелец 26.11) */
+.box.roster.a, .box.roster.b { overflow: clip; }
+.box.roster.a { border: 1.5px solid color-mix(in srgb, var(--ct) 60%, transparent); }
+.box.roster.b { border: 1.5px solid color-mix(in srgb, var(--t) 60%, transparent); }
+.box.roster.a > .hd { background: color-mix(in srgb, var(--ct) 16%, transparent); }
+.box.roster.b > .hd { background: color-mix(in srgb, var(--t) 16%, transparent); }
+.sec:has(> .box.roster) + .sec:has(> .box.roster) { margin-top: 28px; }
 </style>
 
 <div class="wrap" id="app"></div>
