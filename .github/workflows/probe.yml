@@ -24,6 +24,14 @@ jobs:
           q = urllib.parse.urlencode({"query": "Singapore 2026", "appid": 730, "norender": 1, "count": 30, "sort_column": "quantity", "sort_dir": "desc"})
           st, body = get("https://steamcommunity.com/market/search/render/?" + q)
           print("поиск: HTTP", st)
+          if st == 429:
+              time.sleep(60)
+              st, body = get("https://steamcommunity.com/market/search/render/?" + q)
+              print("поиск через минуту: HTTP", st)
+          if st != 200:
+              time.sleep(5)
+              st2, b2 = get("https://steamcommunity.com/market/priceoverview/?appid=730&currency=5&market_hash_name=" + urllib.parse.quote("Austin 2025 Legends Sticker Capsule"))
+              print("цена одной капсулы (Остин, для сравнения): HTTP", st2, b2)
           items = (json.loads(body) if body else {}).get("results") or []
           print("найдено всего:", (json.loads(body) if body else {}).get("total_count"))
           for x in items[:30]:
