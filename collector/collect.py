@@ -3804,6 +3804,8 @@ _hltv_403 = [0]  # отказов подряд
 
 
 HLTV_BACKOFF_DAYS = [1, 3, 7]  # страница отказала 1-й, 2-й, 3-й+ раз — не просим её столько дней
+HLTV_KEY_PAGES = {"/valve-ranking/teams"}  # владелец 26.11: «эта страница чрезвычайно важна»
+HLTV_KEY_BACKOFF_H = [1, 2, 4, 6]
 
 
 def hltv_page_skip(path: str) -> bool:
@@ -3811,8 +3813,12 @@ def hltv_page_skip(path: str) -> bool:
     f = hltv_cache.get("hfail:" + path)
     if not f:
         return False
+    t = parse_iso(f.get("t")) or NOW - timedelta(days=30)
+    if path in HLTV_KEY_PAGES:  # живой рейтинг VRS важнее всего — после отказа пробуем снова через 1/2/4/6 ч (1 запрос)
+        hrs = HLTV_KEY_BACKOFF_H[min(f.get("n", 1), len(HLTV_KEY_BACKOFF_H)) - 1]
+        return t > NOW - timedelta(hours=hrs)
     days = HLTV_BACKOFF_DAYS[min(f.get("n", 1), len(HLTV_BACKOFF_DAYS)) - 1]
-    return (parse_iso(f.get("t")) or NOW - timedelta(days=30)) > NOW - timedelta(days=days)
+    return t > NOW - timedelta(days=days)
 
 
 def hltv_get(path: str) -> str | None:
