@@ -1943,11 +1943,12 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
     if (v.rank) tiles.push('<div class="th-t"><b class="num">#' + esc(v.rank) + '</b><span>Мир</span></div>');
     if (v.region && v.reg_rank) tiles.push('<div class="th-t"><b class="num">#' + esc(v.reg_rank) + '</b><span>' + esc(REG_RU[v.region] || v.region) + '</span></div>');
     if (v.points) tiles.push('<div class="th-t"><b class="num">' + esc(v.points) + '</b><span>очков</span></div>');
-    if (cups.length) tiles.push('<div class="th-t cupt" role="button" data-pop="' + esc(JSON.stringify({ t: "🏆 Трофеи с 1 января: " + cups.length, c: cols })) + '"><b class="num">🏆 ' + cups.length + '</b><span>трофеи</span></div>');
+    var noVrs = !tiles.length;
+    tiles.push('<div class="th-t cupt" role="button" data-pop="' + esc(JSON.stringify({ t: "🏆 Трофеи с 1 января: " + cups.length, c: cols })) + '"><b class="num">🏆 ' + cups.length + '</b><span>трофеи</span></div>');
     var lg = logo(T.name, T.logo).replace('class="lg"', 'class="tlogo"');
     var html = '<section class="hero thero">' + (lg ? '<div class="th-logo">' + lg + '</div>' : '') +
-      (tiles.length ? '<div class="th-tiles" style="--n:' + tiles.length + '">' + tiles.join("") + '</div>' : '<div class="note">Команды нет в рейтинге Valve</div>') + '</section>';
-    if ((T.roster || []).length) html += '<div class="sec"><div class="box roster a"><div class="hd"><span class="tn">Состав</span></div>' + rosterRows(T.roster, T.coach, { stats: T.stats || [] }, false) + '</div></div>';
+      '<div class="th-tiles" style="--n:' + tiles.length + '">' + tiles.join("") + '</div>' + (noVrs ? '<div class="note">Команды нет в рейтинге Valve</div>' : '') + '</section>';
+    if ((T.roster || []).length) html += '<div class="sec"><div class="box roster a"><div class="hd"><span class="tn">Состав</span>' + teamGalBtn(T.name, T.roster, T.coach) + '</div>' + rosterRows(T.roster, T.coach, { stats: T.stats || [] }, false) + '</div></div>';
     else if ((T.players || []).length) html += '<div class="sec"><div class="box"><div class="tm-pl" style="padding:12px">' + T.players.map(function (p) { return '<span>' + esc(typeof p === "string" ? p : p.nick) + '</span>'; }).join("") + '</div></div></div>';
     html += teamMovesBlock(T);
     // будущие игры — как в форме: по турнирам, дата, соперник, формат; если матч уже в расписании приложения — открывается карточка
@@ -3091,6 +3092,10 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
 
   // медали по столбцам: золото, серебро, бронза — под каждой турниры
   // медали компактно; нажатие — окошко со списком турниров
+  function teamGalBtn(name, pl, co) {  // кнопка «📷 Фото» и на странице команды (владелец 26.11)
+    var gal = (pl || []).map(function (p) { return { n: p.nick, u: p.image || "" }; }).concat((co || []).map(function (c) { return { n: c.nick, u: c.image || "", c: 1 }; })).filter(function (x) { return x.n; });
+    return gal.length ? '<span class="hdr-r"><span class="phbtn" role="button" data-photos="' + esc(JSON.stringify({ t: "📷 " + name, g: gal })) + '">📷 Фото</span></span>' : '';
+  }
   function medalsHtml(pr) {
     pr = (pr || []).filter(function (x) { return MEDAL[x.place]; });  // трофеев нет — кубок с нулём (владелец 26.11)
     var cols = [["🥇", ["1st"]], ["🥈", ["2nd"]], ["🥉", ["3rd", "3-4th"]]].map(function (c) {
