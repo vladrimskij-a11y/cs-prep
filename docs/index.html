@@ -372,7 +372,8 @@ html { overflow-anchor: none; }
 .roster .hd .tpr b { color: var(--fg); }
 .pl { grid-template-columns: 1fr auto; box-sizing: border-box; }
 .pl .nickline { grid-row: 1; grid-column: 1; }
-.pl .pflag { font-size: 16px; line-height: 1; }
+.pl .pflag { font-size: 16px; line-height: 1; cursor: pointer; position: relative; }
+.pl .pflag[data-cc]::after { content: ""; position: absolute; inset: -10px -6px; }  /* зона нажатия побольше */
 .pl .rcol { grid-row: 1 / span 2; grid-column: 2; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; align-self: start; }
 .pl .rn { grid-column: 1; grid-row: 2; }
 .pl .pstat { grid-column: 1 / -1; }
@@ -1529,6 +1530,22 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
     document.addEventListener("contextmenu", function (e) { if (vidAt(e)) e.preventDefault(); }, true);
   })();
   // видео: управление появляется только после нажатия на сам ролик
+  // нажатие на флаг — название страны по-русски (владелец 26.11)
+  var CC_RU = { "GB-ENG": "Англия", "GB-SCT": "Шотландия", "GB-WLS": "Уэльс", XK: "Косово" };
+  function countryRu(cc) {
+    cc = String(cc || "").toUpperCase();
+    if (CC_RU[cc]) return CC_RU[cc];
+    cc = CC_FIX[cc] || cc;
+    try { return new Intl.DisplayNames(["ru"], { type: "region" }).of(cc); } catch (e) { return ""; }
+  }
+  document.addEventListener("click", function (e) {
+    var f = e.target.closest && e.target.closest(".pflag[data-cc]");
+    if (!f) return;
+    var n = countryRu(f.getAttribute("data-cc"));
+    if (!n || n === f.getAttribute("data-cc").toUpperCase()) return;
+    e.preventDefault(); e.stopPropagation();
+    toast(f.textContent + " " + n);
+  }, true);
   document.addEventListener("click", function (e) {
     var v = e.target.tagName === "VIDEO" ? e.target : null;
     if (v && !v.controls && !v.paused) { v.controls = true; }
@@ -3009,7 +3026,7 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
     });
     var maj = !p.majors ? '' : '<span class="pmaj tap" role="button" data-pop="' + esc(JSON.stringify({ t: "🏟 Мейджоры: " + p.majors + (p.major_wins ? ", выиграл " + p.major_wins : ""),
       l: majList.length ? majList : ["Список турниров появится после ближайшего полного сбора"] })) + '">' + majTxt + ' ›</span>';
-    return '<' + (attrs ? 'button class="pl' + (corner ? ' hasrt' : '') + '"' + attrs : 'div class="pl' + (corner ? ' hasrt' : '') + '"') + '><span class="nickline"><span class="pflag">' + esc(flag(NICK_CC[String(p.nick || "").toLowerCase()] || p.nationality || p.flag)) + '</span><span class="nick">' + esc(p.nick) + '</span>' + cupBadge(p) + mvpBadge(p) + teamsBadge(p) + '</span>' +
+    return '<' + (attrs ? 'button class="pl' + (corner ? ' hasrt' : '') + '"' + attrs : 'div class="pl' + (corner ? ' hasrt' : '') + '"') + '><span class="nickline"><span class="pflag" data-cc="' + esc(NICK_CC[String(p.nick || "").toLowerCase()] || p.nationality || p.flag || "") + '">' + esc(flag(NICK_CC[String(p.nick || "").toLowerCase()] || p.nationality || p.flag)) + '</span><span class="nick">' + esc(p.nick) + '</span>' + cupBadge(p) + mvpBadge(p) + teamsBadge(p) + '</span>' +
       (roles.length ? '<span class="rcol">' + roles.map(function (r) { return '<span class="rt ' + r[1] + '">' + esc(r[0]) + '</span>'; }).join("") + '</span>' : '') +
       '<span class="rn">' + info.join("\u00a0· ") + '</span>' + maj + (statsHtml ? '<span class="ps">' + statsHtml + '</span>' : "") + (corner || "") + '</' + (attrs ? 'button' : 'div') + '>';
   }
