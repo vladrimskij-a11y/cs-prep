@@ -641,6 +641,14 @@ html { overflow-anchor: none; }
 @keyframes popIn { from { opacity: 0; transform: translate3d(0, 6px, 0) scale(.97); } to { opacity: 1; transform: none; } }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 body.nav #app > .view, body.nav #app > .sshell .pane, body.nav #app > .mshell .mviewport { animation: viewIn .28s cubic-bezier(.2,.8,.25,1) both; }
+/* переходы между страницами (владелец 26.11): вглубь — въезд справа, назад — слева, по сторонам — лёгкий подъём; только transform и opacity */
+@keyframes navFwd { from { transform: translate3d(42px, 0, 0); opacity: .35; } to { transform: none; opacity: 1; } }
+@keyframes navBack { from { transform: translate3d(-42px, 0, 0); opacity: .35; } to { transform: none; opacity: 1; } }
+@keyframes navSame { from { transform: translate3d(0, 10px, 0); opacity: .5; } to { transform: none; opacity: 1; } }
+body.nav-fwd #app > * { animation: navFwd .32s cubic-bezier(.2,.8,.25,1) both !important; }
+body.nav-back #app > * { animation: navBack .32s cubic-bezier(.2,.8,.25,1) both !important; }
+body.nav-same #app > * { animation: navSame .26s cubic-bezier(.2,.8,.25,1) both !important; }
+body.nav-fwd #app > * .pane, body.nav-back #app > * .pane, body.nav-same #app > * .pane, body.nav-fwd #app > * .mviewport, body.nav-back #app > * .mviewport, body.nav-same #app > * .mviewport { animation: none !important; }
 .pop .pop-in { animation: popIn .18s cubic-bezier(.2,.8,.25,1) both; transform-origin: top center; }
 .empty { animation: fadeIn .25s ease-out both; }
 .tab, .chip, .mcard, .match, .tour-card, .bm, .rk, .gbtn, .ptile, .pp-m, .fact.link, .ni { -webkit-tap-highlight-color: transparent; }
@@ -4289,13 +4297,20 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
 
   // ---------- роутинг: "" турниры, #t-ID турнир, #m-ID матч, #feed лента
   var depth = 0;
-  var navT = 0;
+  var navT = 0, navLvl = 0, navHash = null;
   function route() {
     closePop();  // переход на другую страницу (в т.ч. «назад» свайпом) — окно наград сворачивается
     saveShell();  // и место в списке (рейтинг, турниры) — чтобы вернуться туда же
     // плавное появление новой страницы — только при переходе, не при тихом обновлении данных
-    document.body.classList.add("nav"); clearTimeout(navT); navT = setTimeout(function () { document.body.classList.remove("nav"); }, 360);
     var h = location.hash.replace("#", "");
+    // направление: глубже (главная → раздел → турнир/матч/команда) — въезд справа, назад — слева (владелец 26.11)
+    var lvl = !h ? 0 : /^(m-|t-|r-)/.test(h) ? 2 : 1, dir = lvl > navLvl ? "fwd" : lvl < navLvl ? "back" : "same";
+    var moved = h !== navHash;  // тихое обновление данных (та же страница) — без анимации
+    navLvl = lvl; navHash = h;
+    document.body.classList.remove("nav", "nav-fwd", "nav-back", "nav-same");
+    if (moved) { void document.body.offsetWidth; document.body.classList.add("nav", "nav-" + dir); }
+    clearTimeout(navT);
+    navT = setTimeout(function () { document.body.classList.remove("nav", "nav-fwd", "nav-back", "nav-same"); }, 420);
     var mt = /^m-(\d+)$/.exec(h), tt = /^t-([\w-]+)$/.exec(h);
     closeOverlay(true);
     updateBackBtn();
