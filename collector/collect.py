@@ -4119,15 +4119,24 @@ hltv_player_ids: dict = {}   # norm(ник) → {"id","slug"}
 hltv_coach_ids: dict = {}    # norm(ник тренера) → {"id","slug"} — страницы /coach/ (со страниц турниров), кэш «cpl»
 
 
-def hltv_ref(nick: str, coach: bool = False):
+# Один ник — разные люди: ключ «ник~имя» (pimg_key) → нужная страница игрока HLTV (владелец 26.11: Brain из Betclic ≠ тренер brain из Nemesis)
+HLTV_ID_FIX = {"brain~oliwierdychus": {"id": 23294, "slug": "brain"}, "brain~oliwier": {"id": 23294, "slug": "brain"}}
+
+
+def hltv_ref(nick: str, coach: bool = False, who: str | None = None):
     """Страница HLTV человека: тренер — его страница тренера (если id известен), иначе страница игрока.
     → (запись id/slug, префикс кэша, путь)."""
+    if who and not coach and who in HLTV_ID_FIX:
+        return HLTV_ID_FIX[who], "pinfo5", "/player"
+    fixed = {v["id"] for w, v in HLTV_ID_FIX.items() if w.split("~")[0] == norm(nick) and w != who}
     # у HLTV ник в адресе бывает «без цифр» (dev1ce → device) или прежний/короткий (Techno4K → techno) — см. nick_find
     if coach:
         k = nick_find(nick, hltv_coach_ids)
         if k:
             return hltv_coach_ids[k], "cinfo1", "/coach"
     k = nick_find(nick, hltv_player_ids)
+    if k and hltv_player_ids[k].get("id") in fixed:
+        return None, None, None  # эта страница — другого человека с тем же ником
     return (hltv_player_ids[k], "pinfo5", "/player") if k else (None, None, None)
 
 
@@ -6689,10 +6698,10 @@ MAJOR_RX = re.compile(r"(?i)major|dreamhack winter 201[34]|ems one katowice 2014
                       r"|cluj-napoca 2015|columbus 2016|iem katowice 2019")
 
 
-def hltv_player_info(nick: str, force: bool = False, coach: bool = False) -> dict | None:
+def hltv_player_info(nick: str, force: bool = False, coach: bool = False, who: str | None = None) -> dict | None:
     """Тренер, который раньше играл (TaZ, Xizt, zonic): к трофеям/мейджорам/MVP со страницы тренера добавляются
     его трофеи игроком (владелец 25.11: «у TaZ не 3 трофея — он же играл»)."""
-    d = _hltv_person_info(nick, force, coach)
+    d = _hltv_person_info(nick, force, coach, who)
     if not (coach and d and d.get("pref")):
         return d
     k = norm(nick)
@@ -6713,11 +6722,11 @@ def hltv_player_info(nick: str, force: bool = False, coach: bool = False) -> dic
     return m
 
 
-def _hltv_person_info(nick: str, force: bool = False, coach: bool = False) -> dict | None:
+def _hltv_person_info(nick: str, force: bool = False, coach: bool = False, who: str | None = None) -> dict | None:
     """Со страницы игрока HLTV: медали MVP, сколько мейджоров сыграл и выиграл. Кэш на 3 недели, до MVP_PER_RUN новых
     страниц за запуск. Тренер (coach=True) — со страницы тренера: мейджоры, места и трофеи его команд как тренера
     (разметка та же: «Majors played/won», achievement-table, trophy-row-trophy — сверено 06.11 на /coach/1084/fierce)."""
-    pl, kp, pp = hltv_ref(nick, coach)
+    pl, kp, pp = hltv_ref(nick, coach, who)
     if not pl:
         return None
     key = f"{kp}:{pl['id']}"
@@ -7783,7 +7792,7 @@ def build_detail(m: dict, prev: dict | None) -> dict:
         t["stats"] = build_player_stats(t, bid, hist)
         for p, isc in [(x, False) for x in t.get("players") or []] + [(x, True) for x in t.get("coach") or []]:  # тренеры — со страницы тренера HLTV
             try:
-                info = hltv_player_info(p.get("nick") or "", coach=isc)
+                info = hltv_player_info(p.get("nick") or "", coach=isc, who=pimg_key(p.get("nick") or "", p.get("first_name") or p.get("name")))
             except Exception as e:
                 warn(f"Игрок HLTV {p.get('nick')}: {e!r}")
                 info = None
@@ -7984,7 +7993,7 @@ def build_team_page(r: dict) -> dict | None:
             roster, coach = merge_roster([], lpd)
             fix_names(roster)
             for p, isc in [(x, False) for x in roster] + [(x, True) for x in coach]:
-                info = hltv_player_info(p.get("nick") or "", coach=isc)
+                info = hltv_player_info(p.get("nick") or "", coach=isc, who=pimg_key(p.get("nick") or "", p.get("first_name") or p.get("name")))
                 if info:
                     p.update({k: v for k, v in info.items() if v}, hl=1)  # hl — данные HLTV есть (0 мейджоров — настоящий ноль)
             for p in roster:
@@ -9119,7 +9128,7 @@ def main() -> int:
             n_sync += 1
         # MVP и мажоры из памяти HLTV — без новых запросов
         for p, isc in [(x, False) for x in d.get("roster") or []] + [(x, True) for x in d.get("coach") or []]:
-            pl, kp, _ = hltv_ref(p.get("nick") or "", isc)
+            pl, kp, _ = hltv_ref(p.get("nick") or "", isc, pimg_key(p.get("nick") or "", p.get("first_name") or p.get("name")))
             c = pl and (hltv_cache.get(f"{kp}:{pl['id']}") or (kp == "pinfo5" and hltv_cache.get(f"pinfo4:{pl['id']}")))
             if c and c.get("data"):
                 for k, v in c["data"].items():
