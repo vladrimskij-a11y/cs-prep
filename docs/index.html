@@ -981,11 +981,6 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
 .mini .ma, .mini .mb { font-family: var(--display); font-weight: 850; font-size: 19px; letter-spacing: -.03em; min-width: 0; overflow: hidden; }
 .mini small { font-family: var(--body); font-size: 10.5px; font-weight: 500; letter-spacing: 0; overflow: hidden; text-overflow: ellipsis; }
 .mini .mm { font-family: var(--body); font-weight: 700; font-size: 11.5px; }
-.mini .mo i { font-family: var(--body); font-weight: 700; font-size: 10px; padding: 1px 5px; border-radius: 5px; }
-.mo i.g { background: color-mix(in srgb, var(--g) 20%, var(--sunk)); color: var(--g); }
-.mo i.y { background: color-mix(in srgb, var(--y) 18%, var(--sunk)); color: var(--y); }
-.mo i.o { background: color-mix(in srgb, var(--o) 18%, var(--sunk)); color: var(--o); }
-.mo i.r { background: color-mix(in srgb, var(--r0) 18%, var(--sunk)); color: var(--r0); }
 
 /* шапки разделов (турнир, лента, рейтинг) */
 .shtitle { font-family: var(--display); font-weight: 800; font-size: 26px; letter-spacing: -.03em; line-height: 1.12; margin: 6px 0 12px; }
@@ -1109,9 +1104,6 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
 /* правки после первой примерки */
 .match, .tour-card, .mine-bar, .mcard, .rk { box-sizing: border-box; }  /* карточки матчей вылезали за правый край на ширину отступов */
 .oc { flex: 1 1 0; min-width: 0; max-width: 88px; }  /* исходы — в одну строку */
-.mini .mo { gap: 2px; }
-.mini .mo i { font-size: 9.5px; padding: 1px 4px; letter-spacing: -.02em; }
-.mini .mo { display: grid; grid-template-columns: repeat(2, auto); gap: 2px; }  /* исходы в свёрнутой шапке — 2×2, чтобы VRS по бокам не обрезался */
 .pane .pin > .tabbody > .sec:first-child, .pane .pin > .sec:first-child { margin-top: 12px; }
 
 /* ---- картинки (25.11, шаг 2–3): плитки главной с рисунками разделов, логотипы за шапкой матча и команды, баннер турнира ----
@@ -1191,6 +1183,7 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
 .pl .prt b { font-size: 13px; font-weight: 800; color: var(--fg); font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
 .pl .prt b.hi { color: var(--win); } .pl .prt b.lo { color: var(--loss); }
 .pl .prt small { font-size: 10px; color: var(--muted); margin-top: 2px; white-space: nowrap; }
+.mini { gap: 6px; } .mini .mo { gap: 2px; } .mini .mo i { padding: 1px 3px; letter-spacing: -.03em; }  /* исходы в свёрнутой шапке — как до редизайна, одной строкой (владелец 26.11) */
 </style>
 
 <div class="wrap" id="app"></div>
