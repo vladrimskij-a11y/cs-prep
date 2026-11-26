@@ -1183,6 +1183,12 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
 /* 26.11 (владелец): имена игроков видно издалека — крупнее и светлее, русское произношение белым */
 .pl .rn { font-size: 14px; color: #c3c6cc; line-height: 1.35; }
 .pl .rn .pron { font-size: inherit; font-weight: 650; color: var(--fg); }
+.pl.hasrt { position: relative; }
+.pl.hasrt .rn { padding-right: 78px; }
+.pl .prt { position: absolute; right: 14px; bottom: 12px; display: flex; flex-direction: column; align-items: flex-end; line-height: 1.05; }
+.pl .prt b { font-size: 22px; font-weight: 800; color: var(--fg); font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+.pl .prt b.hi { color: var(--win); } .pl .prt b.lo { color: var(--loss); }
+.pl .prt small { font-size: 11px; color: var(--muted); margin-top: 2px; white-space: nowrap; }
 </style>
 
 <div class="wrap" id="app"></div>
@@ -2899,6 +2905,17 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
     var d = abs ? v - base : (v - base) / base;
     return d >= rel ? "hi" : d <= -rel ? "lo" : "";
   }
+  // 26.11 (владелец): во вкладке «Игроки» матча — рейтинг в правом нижнем углу строки, крупно (видно издалека)
+  function prCorner(t, nick) {
+    var key = String(nick || "").toLowerCase().replace(/[^a-z0-9а-я]/g, "");
+    var st = (t.stats || []).find(function (x) { return String(x.nick).toLowerCase().replace(/[^a-z0-9а-я]/g, "") === key; });
+    if (!st) return "";
+    var d2 = st.src === "dust2" && st.rating != null, v = d2 ? st.rating : st.kd;
+    if (v == null || isNaN(Number(v))) return "";
+    var mo = d2 ? Math.min(3, Math.max(1, Math.round((st.days || 30) / 30))) : 3;
+    var cls = d2 ? (v >= 1.1 ? "hi" : v <= 0.9 ? "lo" : "") : (v >= 1.15 ? "hi" : v <= 0.85 ? "lo" : "");
+    return '<span class="prt"><b class="' + cls + '">' + Number(v).toFixed(2) + '</b><small>' + (d2 ? "Rating" : "K/D") + ' · ' + mo + ' мес.</small></span>';
+  }
   function pstat(t, nick) {
     var key = String(nick || "").toLowerCase().replace(/[^a-z0-9а-я]/g, "");
     var st = (t.stats || []).find(function (x) { return String(x.nick).toLowerCase().replace(/[^a-z0-9а-я]/g, "") === key; });
@@ -2982,7 +2999,7 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
   }
   // ручные флаги: на Liquipedia у некоторых белый флаг/пусто (Maddened, тренер B8, — из России; владелец 22.11)
   var NICK_CC = { maddened: "RU" };
-  function personRow(p, roles, real, extra, statsHtml, attrs) {
+  function personRow(p, roles, real, extra, statsHtml, attrs, corner) {
     var info = [real ? esc(real) + (p.name_ru ? ' <span class="pron">[' + esc(plain(p.name_ru)) + ']</span>' : '') : (p.name_ru ? esc(plain(p.name_ru)) : ""),
       p.age ? esc(p.age) + " " + years(p.age) : ""].concat(extra || []).filter(Boolean);
     var majTxt = '🏟 Мейджоры <b>' + esc(p.majors) + '</b>' + (p.major_wins ? ' · 🏆 выиграл <b>' + esc(p.major_wins) + '</b>' : '');
@@ -2994,9 +3011,9 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
     });
     var maj = !p.majors ? '' : '<span class="pmaj tap" role="button" data-pop="' + esc(JSON.stringify({ t: "🏟 Мейджоры: " + p.majors + (p.major_wins ? ", выиграл " + p.major_wins : ""),
       l: majList.length ? majList : ["Список турниров появится после ближайшего полного сбора"] })) + '">' + majTxt + ' ›</span>';
-    return '<' + (attrs ? 'button class="pl"' + attrs : 'div class="pl"') + '><span class="nickline"><span class="pflag">' + esc(flag(NICK_CC[String(p.nick || "").toLowerCase()] || p.nationality || p.flag)) + '</span><span class="nick">' + esc(p.nick) + '</span>' + cupBadge(p) + mvpBadge(p) + teamsBadge(p) + '</span>' +
+    return '<' + (attrs ? 'button class="pl' + (corner ? ' hasrt' : '') + '"' + attrs : 'div class="pl' + (corner ? ' hasrt' : '') + '"') + '><span class="nickline"><span class="pflag">' + esc(flag(NICK_CC[String(p.nick || "").toLowerCase()] || p.nationality || p.flag)) + '</span><span class="nick">' + esc(p.nick) + '</span>' + cupBadge(p) + mvpBadge(p) + teamsBadge(p) + '</span>' +
       (roles.length ? '<span class="rcol">' + roles.map(function (r) { return '<span class="rt ' + r[1] + '">' + esc(r[0]) + '</span>'; }).join("") + '</span>' : '') +
-      '<span class="rn">' + info.join(" · ") + '</span>' + maj + (statsHtml ? '<span class="ps">' + statsHtml + '</span>' : "") + '</' + (attrs ? 'button' : 'div') + '>';
+      '<span class="rn">' + info.join(" · ") + '</span>' + maj + (statsHtml ? '<span class="ps">' + statsHtml + '</span>' : "") + (corner || "") + '</' + (attrs ? 'button' : 'div') + '>';
   }
 
   // медали по столбцам: золото, серебро, бронза — под каждой турниры
@@ -3164,7 +3181,7 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
         });
         var real = [p.first_name, p.last_name].filter(Boolean).join(" ");
         // во вкладке «Игроки» матча статистику не показываем (просьба владельца), на странице команды — оставляем
-        html += personRow(p, roles, real, extra, clickable ? "" : (statsTeam ? pstat(statsTeam, p.nick) : ""), "");
+        html += personRow(p, roles, real, extra, clickable ? "" : (statsTeam ? pstat(statsTeam, p.nick) : ""), "", clickable && statsTeam ? prCorner(statsTeam, p.nick) : "");
       });
     (coach || []).forEach(function (c) {
       html += personRow(Object.assign({}, c, { nationality: c.nationality || c.flag }), [["Тренер", ""]], c.name || "", [], "", "");  // у тренера тоже мажоры и MVP, если есть
