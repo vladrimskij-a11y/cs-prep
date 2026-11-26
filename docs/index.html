@@ -1183,9 +1183,11 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
 /* 26.11 (владелец): имена игроков видно издалека — крупнее и светлее, русское произношение белым */
 .pl .rn { font-size: 14px; color: #c3c6cc; line-height: 1.35; }
 .pl .rn .pron { font-size: inherit; font-weight: 650; color: var(--fg); }
-.pl.hasrt { position: relative; }
-.pl.hasrt .rn { padding-right: 70px; }
-.pl .prt { position: absolute; right: 14px; bottom: 12px; display: flex; flex-direction: column; align-items: flex-end; line-height: 1.05; }
+/* имя и русское произношение — на всю ширину строки, под ником и плашками ролей; рейтинг — внизу справа, рядом с «Мейджорами» */
+.pl.hasrt .rcol { grid-row: 1; }
+.pl.hasrt .rn { grid-column: 1 / -1; }
+.pl.hasrt .pmaj { grid-column: 1; grid-row: 3; }
+.pl .prt { grid-column: 2; grid-row: 3; justify-self: end; align-self: end; display: flex; flex-direction: column; align-items: flex-end; line-height: 1.05; }
 .pl .prt b { font-size: 13px; font-weight: 800; color: var(--fg); font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
 .pl .prt b.hi { color: var(--win); } .pl .prt b.lo { color: var(--loss); }
 .pl .prt small { font-size: 10px; color: var(--muted); margin-top: 2px; white-space: nowrap; }
@@ -3000,7 +3002,7 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
   // ручные флаги: на Liquipedia у некоторых белый флаг/пусто (Maddened, тренер B8, — из России; владелец 22.11)
   var NICK_CC = { maddened: "RU" };
   function personRow(p, roles, real, extra, statsHtml, attrs, corner) {
-    var info = [real ? esc(real) + (p.name_ru ? ' <span class="pron">[' + esc(plain(p.name_ru)) + ']</span>' : '') : (p.name_ru ? esc(plain(p.name_ru)) : ""),
+    var info = [real ? esc(real) + (p.name_ru ? '<br><span class="pron">[' + esc(plain(p.name_ru)) + ']</span>' : '') : (p.name_ru ? esc(plain(p.name_ru)) : ""),  // русское — отдельной строкой под оригиналом (владелец 26.11)
       p.age ? '<span style="white-space:nowrap">' + esc(p.age) + " " + years(p.age) + '</span>' : ""].concat(extra || []).filter(Boolean);  // «27 лет» не разрывается (владелец 26.11)
     var majTxt = '🏟 Мейджоры <b>' + esc(p.majors) + '</b>' + (p.major_wins ? ' · 🏆 выиграл <b>' + esc(p.major_wins) + '</b>' : '');
     // мажоры нажимаются всегда: есть список — показываем его (выигранные с 🏆, у остальных место), нет — говорим, что он ещё собирается
