@@ -3080,7 +3080,9 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
       var ln = majLine(x, p.event_wins), m = ln.match(/^(🏆 )?(.*?)(?: — (.+))?$/), tm = teamInYear(p, x);
       return { w: !!m[1], e: m[2], p: m[3] || "", tm: tm };
     });
-    var maj = !p.majors ? '' : '<span class="pmaj tap" role="button" data-pop="' + esc(JSON.stringify({ t: "🏟 Мейджоры: " + p.majors + (p.major_wins ? ", выиграл " + p.major_wins : ""),
+    // 26.11 (владелец): кто не играл мейджоры — кнопка всё равно есть, «Мейджоры 0»
+    var maj = !p.majors ? '<span class="pmaj tap" role="button" data-pop="' + esc(JSON.stringify({ t: "🏟 Мейджоры: 0", l: ["На мейджорах ещё не играл"] })) + '">🏟 Мейджоры <b>0</b> ›</span>' :
+      '<span class="pmaj tap" role="button" data-pop="' + esc(JSON.stringify({ t: "🏟 Мейджоры: " + p.majors + (p.major_wins ? ", выиграл " + p.major_wins : ""),
       l: majList.length ? majList : ["Список турниров появится после ближайшего полного сбора"] })) + '">' + majTxt + ' ›</span>';
     return '<' + (attrs ? 'button class="pl' + (corner ? ' hasrt' : '') + '"' + attrs : 'div class="pl' + (corner ? ' hasrt' : '') + '"') + '><span class="nickline"><span class="pflag" data-cc="' + esc(NICK_CC[String(p.nick || "").toLowerCase()] || p.nationality || p.flag || "") + '">' + esc(flag(NICK_CC[String(p.nick || "").toLowerCase()] || p.nationality || p.flag)) + '</span><span class="nick">' + esc(p.nick) + '</span>' + cupBadge(p) + mvpBadge(p) + teamsBadge(p) + '</span>' +
       (roles.length ? '<span class="rcol">' + roles.map(function (r) { return '<span class="rt ' + r[1] + '">' + esc(r[0]) + '</span>'; }).join("") + '</span>' : '') +
