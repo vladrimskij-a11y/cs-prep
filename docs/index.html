@@ -1199,6 +1199,11 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
 .pop-in li.ph { color: color-mix(in srgb, var(--fg) 62%, transparent); }
 .pop-in li.mj .mj-p, .pop-in li.psub i, .pop-in li.mj .mj-t small { color: color-mix(in srgb, var(--fg) 62%, transparent); }
 .pop-in li.pback { color: var(--fg); }
+/* строки окна (команды, мейджоры, трофеи) разделены чёткой линией (владелец 26.11) */
+.pop-in ul { gap: 0; }
+.pop-in ul > li:not(.ph):not(.pback) { padding-top: 8px; padding-bottom: 8px; margin: 0; }
+.pop-in ul > li:not(.ph):not(.pback) + li:not(.ph) { border-top: 1px solid color-mix(in srgb, var(--fg) 16%, transparent); }
+.pop-in li.ph { margin-top: 14px; margin-bottom: 2px; }
 </style>
 
 <div class="wrap" id="app"></div>
