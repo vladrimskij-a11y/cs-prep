@@ -3001,7 +3001,7 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
   var NICK_CC = { maddened: "RU" };
   function personRow(p, roles, real, extra, statsHtml, attrs, corner) {
     var info = [real ? esc(real) + (p.name_ru ? ' <span class="pron">[' + esc(plain(p.name_ru)) + ']</span>' : '') : (p.name_ru ? esc(plain(p.name_ru)) : ""),
-      p.age ? esc(p.age) + " " + years(p.age) : ""].concat(extra || []).filter(Boolean);
+      p.age ? '<span style="white-space:nowrap">' + esc(p.age) + " " + years(p.age) + '</span>' : ""].concat(extra || []).filter(Boolean);  // «27 лет» не разрывается (владелец 26.11)
     var majTxt = '🏟 Мейджоры <b>' + esc(p.majors) + '</b>' + (p.major_wins ? ' · 🏆 выиграл <b>' + esc(p.major_wins) + '</b>' : '');
     // мажоры нажимаются всегда: есть список — показываем его (выигранные с 🏆, у остальных место), нет — говорим, что он ещё собирается
     // строка мейджора — объект: турнир выделен, место приглушено, команда отдельной строкой цветом (владелец 18.11)
@@ -3013,7 +3013,7 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
       l: majList.length ? majList : ["Список турниров появится после ближайшего полного сбора"] })) + '">' + majTxt + ' ›</span>';
     return '<' + (attrs ? 'button class="pl' + (corner ? ' hasrt' : '') + '"' + attrs : 'div class="pl' + (corner ? ' hasrt' : '') + '"') + '><span class="nickline"><span class="pflag">' + esc(flag(NICK_CC[String(p.nick || "").toLowerCase()] || p.nationality || p.flag)) + '</span><span class="nick">' + esc(p.nick) + '</span>' + cupBadge(p) + mvpBadge(p) + teamsBadge(p) + '</span>' +
       (roles.length ? '<span class="rcol">' + roles.map(function (r) { return '<span class="rt ' + r[1] + '">' + esc(r[0]) + '</span>'; }).join("") + '</span>' : '') +
-      '<span class="rn">' + info.join(" · ") + '</span>' + maj + (statsHtml ? '<span class="ps">' + statsHtml + '</span>' : "") + (corner || "") + '</' + (attrs ? 'button' : 'div') + '>';
+      '<span class="rn">' + info.join("\u00a0· ") + '</span>' + maj + (statsHtml ? '<span class="ps">' + statsHtml + '</span>' : "") + (corner || "") + '</' + (attrs ? 'button' : 'div') + '>';
   }
 
   // медали по столбцам: золото, серебро, бронза — под каждой турниры
