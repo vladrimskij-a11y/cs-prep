@@ -1522,7 +1522,12 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
   }
   function galHtml(g) {  // окно «📷»: фото игроков с ником (владелец 26.11)
     return '<div class="pgal">' + g.map(function (x) {
-      var h = (PIMG || {})[String(x.n || "").toLowerCase().replace(/[^a-z0-9а-я]/g, "")], u = h && h.f ? "data/" + h.f : (x.u || "");
+      // ключ — ник + имя (один ник у разных людей: Brain в Betclic и тренер Brain в Nemesis); старая запись по нику —
+      // только если других людей с этим ником в списке нет
+      var k0 = String(x.n || "").toLowerCase().replace(/[^a-z0-9а-я]/g, ""), w = String(x.w || "").toLowerCase().replace(/[^a-z]/g, "").slice(0, 24);
+      var P = PIMG || {}, h = w && P[k0 + "~" + w];
+      if (!h && !Object.keys(P).some(function (q) { return q.indexOf(k0 + "~") === 0 && q !== k0 + "~" + w; })) h = P[k0];
+      var u = h && h.f ? "data/" + h.f : (x.u || "");
       var ini = esc(String(x.n || "?").charAt(0).toUpperCase());
       return '<figure class="pgf"><span class="pgx">' + ini + (u ? '<img src="' + esc(u) + '" alt="" loading="lazy" decoding="async" onerror="this.remove()">' : '') + '</span>' +
         '<figcaption>' + esc(x.n || "?") + (x.c ? '<small>тренер</small>' : '') + '</figcaption></figure>';
@@ -3211,7 +3216,7 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
   // медали по столбцам: золото, серебро, бронза — под каждой турниры
   // медали компактно; нажатие — окошко со списком турниров
   function teamGalBtn(name, pl, co) {  // кнопка «📷 Фото» и на странице команды (владелец 26.11)
-    var gal = (pl || []).map(function (p) { return { n: p.nick, u: p.image || "" }; }).concat((co || []).map(function (c) { return { n: c.nick, u: c.image || "", c: 1 }; })).filter(function (x) { return x.n; });
+    var gal = (pl || []).map(function (p) { return { n: p.nick, w: p.first_name || p.name || "", u: p.image || "" }; }).concat((co || []).map(function (c) { return { n: c.nick, w: c.first_name || c.name || "", u: c.image || "", c: 1 }; })).filter(function (x) { return x.n; });
     return gal.length ? '<span class="hdr-r"><span class="phbtn" role="button" data-photos="' + esc(JSON.stringify({ t: "📷 " + name, g: gal })) + '">📷 Фото</span></span>' : '';
   }
   function medalsHtml(pr) {
@@ -3404,7 +3409,7 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
           (cs.length ? oppWord(t) + ' матча ' + cs.map(function (c) { return '<span class="tlink" data-tname="' + esc(c.name) + '">' + esc(c.name) + '</span>'; }).join(" — ") + '. Состав появится, когда матч сыграют.' : 'Соперник ещё не определён.') + '</div></div></div>';
         return;
       }
-      var gal = (t.players || []).map(function (p) { return { n: p.nick, u: p.image || "" }; }).concat((t.coach || []).map(function (c) { return { n: c.nick, u: c.image || "", c: 1 }; }));
+      var gal = (t.players || []).map(function (p) { return { n: p.nick, w: p.first_name || p.name || "", u: p.image || "" }; }).concat((t.coach || []).map(function (c) { return { n: c.nick, w: c.first_name || c.name || "", u: c.image || "", c: 1 }; }));
       html += '<div class="sec"><div class="box roster ' + (i ? "b" : "a") + '"><div class="hd"><span class="tn tlink" data-tname="' + esc(t.name) + '">' + esc(t.name) + ' ›</span>' + trophyCount(t.prizes) +
         '<span class="hdr-r">' + (gal.length ? '<span class="phbtn" role="button" data-photos="' + esc(JSON.stringify({ t: "📷 " + t.name, g: gal })) + '">📷 Фото</span>' : '') + medalsHtml(t.prizes) + '</span></div>';
       if (!(t.players || []).length) html += '<div class="note">Состав не указан.</div>';

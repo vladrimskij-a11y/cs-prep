@@ -8346,6 +8346,12 @@ PIMG_D2_NEW = 150  # заглушек dust2 (100×100) за сбор — тот 
 PIMG_HLTV_NEW = 40  # новых фото с HLTV за полный сбор (по правилу HLTV — не чаще раза в 2.5 с)
 
 
+def pimg_key(nick: str, name: str | None) -> str:
+    """Ключ фото в pimg.json: ник + латинские буквы имени (так же считает сайт в galHtml)."""
+    w = re.sub(r"[^a-z]", "", (name or "").lower())[:24]
+    return norm(nick) + ("~" + w if w else "")
+
+
 def lp_photo_fresh(fname: str) -> bool:
     """Фото Liquipedia свежее, если в имени файла год этого или прошлого сезона («Torzsi at IEM Rio 2026.jpg»)."""
     ys = [int(y) for y in re.findall(r"(?<!\d)(20\d\d)(?!\d)", fname or "")]
@@ -8365,10 +8371,12 @@ def build_player_photos() -> None:
     def add(p):
         if not isinstance(p, dict) or not p.get("nick"):
             return
-        k = norm(p["nick"])
+        k0 = norm(p["nick"])
         hp, lf = p.get("photo"), p.get("lp_img") or p.get("img")
-        if not (hp or lf or k in d2_photos):
+        if not (hp or lf or k0 in d2_photos):
             return
+        # один ник — разные люди (Brain в Betclic и тренер Brain в Nemesis, 26.11): ключ фото — ник + имя
+        k = pimg_key(p["nick"], p.get("first_name") or p.get("name"))
         o = want.get(k)
         want[k] = (p["nick"], (o and o[1]) or hp, (o and o[2]) or lf) if o else (p["nick"], hp, lf)
 
@@ -8386,6 +8394,13 @@ def build_player_photos() -> None:
             add(p)
     todo_h, todo_l, todo_d = [], [], []
     for k, (nick, hp, lf) in want.items():
+        k0 = norm(nick)
+        if k != k0 and k not in have and have.get(k0):
+            # старая запись только по нику: переносим под новый ключ, если это фото этого же человека
+            o = have[k0]
+            if (o.get("src") == "lp" and lf and o.get("file") == lf) or (o.get("src") == "hltv" and hp and o.get("url") == hp) \
+                    or (o.get("src") == "d2" and not hp and not lf):
+                have[k] = dict(o)
         h = have.get(k) or {}
         ok = h.get("f") and (OUT / h["f"]).exists() and h.get("src") != "d2"  # заглушку dust2 меняем на любое настоящее фото
         m = miss.get(k) or {}
@@ -8404,7 +8419,7 @@ def build_player_photos() -> None:
                 todo_l.append((k, nick, lf))
             continue
         # ни HLTV, ни Liquipedia — маленький портрет из состава на странице матча dust2 (пока не придёт настоящее)
-        dp = (d2_photos.get(k) or {}).get("url")
+        dp = (d2_photos.get(k0) or {}).get("url")
         if dp and not ok and not (h.get("src") == "d2" and h.get("f") and (OUT / h["f"]).exists()) and not fresh_miss("td") \
                 and len(todo_d) < PIMG_D2_NEW:
             todo_d.append((k, nick, dp))
