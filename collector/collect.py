@@ -3414,7 +3414,7 @@ def tg_photo_hashes(posts: list[dict]) -> None:
         return
     n = 0
     for p in posts:
-        if not p.get("photo") or p.get("video") or (NOW - p["date"]) > timedelta(hours=48):
+        if not p.get("photo") or (NOW - p["date"]) > timedelta(hours=48):  # 26.11: и обложки видео — один «кружок» в 3 каналах
             continue
         key = "/".join(p["url"].split("t.me/")[1].split("/")[:2])
         info = tg_cache.setdefault(key, {"t": iso(NOW)})
@@ -3428,8 +3428,8 @@ def tg_photo_hashes(posts: list[dict]) -> None:
             p["ph"] = info["ph"]
 
 
-def _ph_close(a: str | None, b: str | None) -> bool:
-    return bool(a and b) and bin(int(a, 16) ^ int(b, 16)).count("1") <= 6
+def _ph_close(a: str | None, b: str | None, lim: int = 6) -> bool:
+    return bool(a and b) and bin(int(a, 16) ^ int(b, 16)).count("1") <= lim
 
 
 def tg_text_preview(text: str, limit: int = 420) -> str:
@@ -3523,6 +3523,15 @@ def dedupe_strict(items: list[dict]) -> list[list[dict]]:
             # (в одном канале одна картинка бывает у разных постов — превью влога, фото игрока: там не склеиваем, 06.11)
             if it.get("ph") and any(_ph_close(it["ph"], x.get("ph")) and not ((it.get("channel") or it.get("source")) and (it.get("channel") or it.get("source")) == (x.get("channel") or x.get("source"))) and abs((x["date"] - it["date"]).total_seconds()) <= 12 * 3600
                                     and len(tk & _toks((x.get("text") or "") + " " + (x.get("title") or ""))) >= 3 for x in cl):
+                hit = cl
+                break
+            # 26.11 (владелец): одно видео («кружок» donk, dastan) в разных каналах с разной подписью — общих слов 1–2,
+            # а у части каналов на обложке своя рамка. Видео + похожая обложка (до 14 бит) + ≥1 общее слово от 4 букв, ±12 ч
+            if it.get("video") and it.get("ph") and any(
+                    x.get("video") and _ph_close(it["ph"], x.get("ph"), 14)
+                    and (it.get("channel") or it.get("source")) != (x.get("channel") or x.get("source"))
+                    and abs((x["date"] - it["date"]).total_seconds()) <= 12 * 3600
+                    and any(len(w) >= 4 for w in tk & _toks((x.get("text") or "") + " " + (x.get("title") or ""))) for x in cl):
                 hit = cl
                 break
         if hit is None:
