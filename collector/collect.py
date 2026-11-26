@@ -5332,10 +5332,40 @@ GIGA_USAGE_F = CACHE / "giga_usage.json"
 giga_usage: dict = load_json(GIGA_USAGE_F, {})
 
 
+GIGA_YEAR_DAYS = 365  # пакет токенов Сбера — на год (владелец 26.11): делим остаток поровну на оставшиеся дни
+
+
+def giga_day_limit(kind: str) -> int:
+    """Сколько токенов можно потратить сегодня: остаток пакета (GET /balance, раз в 6 ч) ÷ дней до конца пакета —
+    так GigaChat хватает каждый день до конца года. Нет данных о пакете — прежние планки GIGA_DAY_LIMIT."""
+    b = giga_usage.get("_bal") or {}
+    if GIGA_KEY and not _giga["off"] and (parse_iso(b.get("t")) or NOW - timedelta(days=1)) < NOW - timedelta(hours=6) and not _giga.get("bal_try"):
+        _giga["bal_try"] = True
+        try:
+            req = urllib.request.Request("https://gigachat.devices.sberbank.ru/api/v1/balance",
+                                         headers={"Authorization": f"Bearer {giga_token()}", "Accept": "application/json"})
+            with _urlopen(req, timeout=30, context=giga_ctx()) as r:
+                v = {x.get("usage"): int(x.get("value") or 0) for x in json.loads(r.read()).get("balance") or []}
+            b = {"t": iso(NOW), "v": v, "start": b.get("start") or iso(NOW)}
+            giga_usage["_bal"] = b
+            print("GigaChat: остаток пакета " + ", ".join(f"{k} {n / 1e6:.1f} млн" for k, n in v.items()))
+        except Exception as e:
+            warn(f"GigaChat остаток: {e!r}")
+    v = b.get("v") or {}
+    name = {"lite": "GigaChat", "pro": "GigaChat-Pro", "max": "GigaChat-Max"}.get(kind)
+    if name in v and b.get("start"):
+        end = (parse_iso(b["start"]) or NOW) + timedelta(days=GIGA_YEAR_DAYS)
+        days = max(1.0, (end - NOW).total_seconds() / 86400)
+        return int(v[name] / days)
+    return GIGA_DAY_LIMIT[kind]
+
+
 def giga_budget_ok(kind: str) -> bool:
     day = NOW.strftime("%Y-%m-%d")
     used = (giga_usage.get(day) or {}).get(kind, 0)
-    return used < GIGA_DAY_LIMIT[kind]
+    if kind == "max" and GIGA_DAY_LIMIT["max"] >= 10_000_000:  # Max (имена) — без дневной планки (решение владельца 05.11)
+        return True
+    return used < giga_day_limit(kind)
 
 
 def giga_spend(kind: str, tokens: int) -> None:
@@ -5391,10 +5421,32 @@ GEMINI_LITE = os.environ.get("GEMINI_LITE", "gemini-flash-lite-latest")  # за�
 _gem = {"off": False, "last": 0.0, "fails": 0, "model": GEMINI_MODEL, "think": True, "busy": 0}
 
 
+# У каждой модели Google свой бесплатный дневной лимит (26.11: Gemini Flash кончался к 16:00 МСК, дальше — GigaChat).
+# Кончился у одной (429 «quota») — переходим к следующей и помним это до конца суток (по времени Google — до ~11:00 МСК).
+# Gemma (открытые модели Google) — тот же ключ, свой большой лимит; без system/JSON-режима — инструкцию кладём в текст.
+GEM_CHAIN = [m for m in dict.fromkeys([GEMINI_MODEL, "gemini-3.5-flash-lite", GEMINI_LITE, "gemini-3.1-flash-lite",
+                                       "gemini-3.5-flash", "gemini-2.5-flash", "gemma-4-26b-a4b-it", "gemma-4-31b-it"]) if m]
+
+
+def _gem_day() -> str:  # сутки квоты Google: сброс в полночь по Тихоокеанскому времени (~08:00 UTC)
+    return (NOW - timedelta(hours=8)).strftime("%Y-%m-%d")
+
+
+def _gem_spent() -> dict:
+    return giga_usage.setdefault("gq:" + _gem_day(), {})
+
+
+def _gem_pick() -> str | None:
+    gone = _gem_spent()
+    return next((m for m in GEM_CHAIN if not gone.get(m)), None)
+
+
 def gem_ok() -> bool:
     if not GEMINI_KEY or _gem["off"]:
         return False
-    return (giga_usage.get(NOW.strftime("%Y-%m-%d")) or {}).get("gemini", 0) < GEMINI_DAY_LIMIT
+    if (giga_usage.get(NOW.strftime("%Y-%m-%d")) or {}).get("gemini", 0) >= GEMINI_DAY_LIMIT:
+        return False
+    return _gem_pick() is not None
 
 
 def llm_ok() -> bool:
@@ -5404,20 +5456,31 @@ def llm_ok() -> bool:
 def gemini_call(system: str | None, parts: list, max_tokens: int = 900, json_mode: bool = True) -> str | None:
     if not gem_ok():
         return None
-    for attempt in range(5):
+    if _gem["model"] not in GEM_CHAIN or _gem_spent().get(_gem["model"]):
+        _gem["model"] = _gem_pick()
+    busy = 0
+    for attempt in range(12):
+        mdl = _gem["model"]
+        if not mdl:
+            _gem["off"] = True
+            return None
+        gemma = mdl.startswith("gemma")
         wait = 4.5 - (time.time() - _gem["last"])  # бесплатный уровень: ~15 запросов в минуту
         if wait > 0:
             time.sleep(wait)
         _gem["last"] = time.time()
         cfg = {"temperature": 0.3, "maxOutputTokens": max(1024, max_tokens * 2)}
-        if json_mode:
+        if json_mode and not gemma:
             cfg["responseMimeType"] = "application/json"
-        if _gem["think"]:
+        if _gem["think"] and not gemma and "lite" not in mdl:
             cfg["thinkingConfig"] = {"thinkingBudget": 0}
-        body = {"contents": [{"role": "user", "parts": parts}], "generationConfig": cfg}
-        if system:
+        pp = list(parts)
+        if gemma and system:
+            pp = [{"text": system + ("\nОтвет — только JSON, без пояснений." if json_mode else "") + "\n\n"}] + pp
+        body = {"contents": [{"role": "user", "parts": pp}], "generationConfig": cfg}
+        if system and not gemma:
             body["systemInstruction"] = {"parts": [{"text": system}]}
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{_gem['model']}:generateContent"
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{mdl}:generateContent"
         try:
             req = urllib.request.Request(url, data=json.dumps(body).encode(), method="POST",
                                          headers={"Content-Type": "application/json", "x-goog-api-key": GEMINI_KEY})
@@ -5426,43 +5489,46 @@ def gemini_call(system: str | None, parts: list, max_tokens: int = 900, json_mod
             day = NOW.strftime("%Y-%m-%d")
             giga_usage.setdefault(day, {})["gemini"] = (giga_usage.get(day) or {}).get("gemini", 0) + 1
             stats["gemini_calls"] = stats.get("gemini_calls", 0) + 1
-            _gem["fails"] = _gem["busy"] = 0
+            stats.setdefault("gemini_models", {})[mdl] = stats.setdefault("gemini_models", {}).get(mdl, 0) + 1
+            _gem["fails"] = 0
             cand = (j.get("candidates") or [{}])[0]
-            return "".join(p.get("text", "") for p in (cand.get("content") or {}).get("parts") or []) or None
+            txt = "".join(p.get("text", "") for p in (cand.get("content") or {}).get("parts") or [] if not p.get("thought")) or None
+            if txt and gemma and json_mode:  # у Gemma ответ бывает в ```json … ```
+                txt = re.sub(r"^\s*```(?:json)?\s*|\s*```\s*$", "", txt.strip())
+            return txt
         except urllib.error.HTTPError as e:
             msg = e.read()[:300].decode("utf-8", "replace")
-            if e.code == 400 and _gem["think"]:  # облегчённые модели не принимают thinkingConfig («invalid argument»)
+            if e.code == 400 and _gem["think"] and "thinking" in msg.lower():  # модель не принимает thinkingConfig
                 _gem["think"] = False
                 continue
-            if e.code == 404 and _gem["model"] == GEMINI_LITE and GEMINI_LITE != "gemini-3.1-flash-lite":
-                _gem["model"] = "gemini-3.1-flash-lite"
+            if e.code in (404, 400) and ("not found" in msg.lower() or "no longer available" in msg.lower() or "not supported" in msg.lower()):
+                _gem_spent()[mdl] = "нет"  # модели нет у этого ключа — пробуем следующую
+                _gem["model"] = _gem_pick()
                 continue
-            if e.code == 404 and _gem["model"] not in ("gemini-2.5-flash", "gemini-3.1-flash-lite"):
-                _gem["model"] = "gemini-2.5-flash"
+            if e.code == 429:
+                if "quota" in msg.lower() or attempt > 0:
+                    _gem_spent()[mdl] = iso(NOW)  # дневной лимит этой модели кончился — до сброса квоты Google
+                    nxt = _gem_pick()
+                    if nxt:
+                        warn(f"Gemini: лимит {mdl} на сегодня исчерпан — дальше {nxt}")
+                    _gem["model"] = nxt
+                    continue
+                time.sleep(25)  # минутный лимит — подождать
                 continue
-            if e.code in (500, 502, 503, 504):  # модель перегружена: подождать, потом перейти на облегчённую
-                if attempt == 0:
+            if e.code in (500, 502, 503, 504):  # перегружена — подождать, потом следующая модель (только на этот прогон)
+                busy += 1
+                if busy == 1:
                     time.sleep(8)
                     continue
-                if _gem["model"] not in (GEMINI_LITE, "gemini-3.1-flash-lite"):
-                    warn(f"Gemini {_gem['model']} перегружена — переключаюсь на {GEMINI_LITE}")
-                    _gem["model"] = GEMINI_LITE
+                rest = [m for m in GEM_CHAIN if m != mdl and not _gem_spent().get(m)]
+                if rest and busy <= 4:
+                    _gem["model"] = rest[0] if rest[0] != _gem.get("prev_busy") else (rest[1:] or rest)[0]
+                    _gem["prev_busy"] = mdl
                     continue
-                if attempt < 4:
-                    time.sleep(15)
-                    continue
-                _gem["busy"] += 1
-                if _gem["busy"] >= 4:
-                    _gem["off"] = True  # перегружены обе — до конца прогона работает GigaChat
-            if e.code == 429 and attempt == 0:
-                time.sleep(25)
-                continue
-            if e.code == 429 and _gem["model"] not in (GEMINI_LITE, "gemini-3.1-flash-lite"):
-                _gem["model"] = GEMINI_LITE  # у облегчённой модели свой дневной лимит
-                continue
-            if e.code in (401, 403, 429):
-                _gem["off"] = True  # ключ не подходит или кончился дневной лимит — до конца прогона работает GigaChat
-            warn(f"Gemini: HTTP {e.code} {msg[:120]}")
+                return None
+            if e.code in (401, 403):
+                _gem["off"] = True  # ключ не подходит — до конца прогона работает GigaChat
+            warn(f"Gemini {mdl}: HTTP {e.code} {msg[:120]}")
             return None
         except Exception as e:
             _gem["fails"] += 1
@@ -8724,7 +8790,7 @@ def main() -> int:
     save_json(VETO_CACHE_F, veto_cache)
     save_json(D2_STATS_F, d2_stats)
     save_json(D2_PHOTOS_F, d2_photos)
-    for k in [k for k in giga_usage if k < (NOW - timedelta(days=40)).strftime("%Y-%m-%d")]:
+    for k in [k for k in giga_usage if not k.startswith("_") and k.split(":")[-1] < (NOW - timedelta(days=40)).strftime("%Y-%m-%d")]:
         del giga_usage[k]
     save_json(GIGA_USAGE_F, giga_usage)
     save_json(HLTV_STATS_CACHE_F, hltv_stats_cache)
@@ -8864,6 +8930,9 @@ def main() -> int:
     print(time_report())
     print(f"Готово: {len(listing)} матчей, PandaScore: {stats['panda_requests']}, bo3: {stats['bo3_requests']}, "
           f"переводов: {stats['translations']}, предупреждений: {len(stats['warnings'])}")
+    if stats.get("gemini_models") or _gem_spent():
+        print("Нейросеть Google за прогон: " + (", ".join(f"{k} {v}" for k, v in (stats.get("gemini_models") or {}).items()) or "—")
+              + (" · исчерпаны на сегодня: " + ", ".join(k for k, v in _gem_spent().items() if v != "нет") if _gem_spent() else ""))
     return 0
 
 
