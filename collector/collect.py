@@ -890,6 +890,8 @@ def lp_history(text: str) -> list[dict]:
         fa, tb = fixd(a), (None if re.match(r"(?i)present", b) else fixd(b))
         if fa and tb and tb < fa:  # на Liquipedia бывает перепутан порядок
             fa, tb = tb, fa
+        if not team or team.lower() in ("undefined", "none", "null", "?", "unknown", "tbd", "-"):
+            continue  # 26.11: у gla1ve в истории была команда «undefined» (так записано на Liquipedia)
         out.append({"team": team, "from": fa, "to": tb, "note": (note or "").strip().lower() or None})
     return [x for x in out if x["from"]]
 

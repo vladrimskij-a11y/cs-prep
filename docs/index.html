@@ -3208,6 +3208,7 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
       "strategic coach": "тренер-стратег", "trial coach": "тренер на просмотре", "inactive coach": "тренер, неактивен",
       "stand-in coach": "временный тренер", "loaned coach": "тренер в аренде", analyst: "аналитик", "trial analyst": "аналитик на просмотре",
       manager: "менеджер", substitute: "запасной", backup: "запасной", trial: "на просмотре", "inactive loan": "аренда, неактивен", streamer: "стример" };
+    H = H.filter(function (h) { return h && h.team && !/^(undefined|null|none|\?)$/i.test(h.team); });  // мусор из Liquipedia
     H.sort(function (a, b) { return String(b.from).localeCompare(String(a.from)); });
     var yr = function (d) { return d ? String(d).slice(0, 4) : "н.в."; };
     // версия игры, как в истории на Liquipedia: шапка «CS2» / «CS:GO» / «CS 1.6» над командами (по дате прихода: CS:GO — с 21.08.2012, CS2 — с 27.09.2023)
