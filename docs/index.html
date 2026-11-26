@@ -1230,6 +1230,9 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
 .pl .medal { font-size: 12.5px; padding: 2px 7px; border-radius: 7px; gap: 3px; line-height: 1.25; } .pl .medal b { font-size: 12px; font-weight: 700; }  /* размер по просьбе владельца 26.11 (×1.5 от уменьшенного); зона нажатия — ::after */
 .pl .pmaj.tap { font-size: 12px; padding: 1px 7px; margin-top: 4px; border-radius: 6px; line-height: 1.35; } .pl .pmaj.tap b { font-size: 12px; }  /* тоньше, как плашки AWP/Капитан (владелец 26.11) */
 .sec.news-h { margin-top: 30px; margin-bottom: -6px; }
+/* плавность (26.11): невидимые за экраном строки длинных списков не рисуются, пока до них не долистали */
+.news.feed > .ni, .rk { content-visibility: auto; contain-intrinsic-size: auto 120px; }
+.rk { contain-intrinsic-size: auto 56px; }
 </style>
 
 <div class="wrap" id="app"></div>
@@ -1364,6 +1367,42 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
   // быстрая загрузка: что уже видели — показываем сразу из памяти устройства, а свежее тихо подкачиваем в фоне
   var DC = {}, DC_INFLIGHT = {};
   function dkey(u) { return String(u).split("?")[0]; }
+  // постоянная память без лимита 5 МБ (IndexedDB): все карточки, страницы команд и турниров переживают перезапуск —
+  // открываются мгновенно, свежее подкачивается в фоне (владелец 26.11: «без доп прогрузок при открытии»)
+  var IDB = null, IDB_READY = (function () {
+    try {
+      if (!window.indexedDB) return Promise.resolve();
+      return new Promise(function (res) {
+        var r = indexedDB.open("rimcs", 1), done = false, fin = function () { if (!done) { done = true; res(); } };
+        setTimeout(fin, 1500);  // не держим запуск, если память устройства тормозит
+        r.onupgradeneeded = function () { try { r.result.createObjectStore("dc"); } catch (e) {} };
+        r.onerror = fin;
+        r.onsuccess = function () {
+          IDB = r.result;
+          try {
+            var old = Date.now() - 14 * 864e5, st = IDB.transaction("dc", "readwrite").objectStore("dc"), cur = st.openCursor();
+            cur.onsuccess = function () {
+              var c = cur.result;
+              if (!c) return fin();
+              var v = c.value;
+              if (!v || v.t < old) c.delete();
+              else if (!DC[c.key] || DC[c.key].t < v.t) DC[c.key] = v;
+              c.continue();
+            };
+            cur.onerror = fin;
+          } catch (e) { fin(); }
+        };
+      });
+    } catch (e) { return Promise.resolve(); }
+  })();
+  function idbPut(k, v) { if (!IDB) return; try { IDB.transaction("dc", "readwrite").objectStore("dc").put(v, k); } catch (e) {} }
+  // уже есть в памяти — разбираем сразу, без «Загружаю…» и без лишнего кадра
+  function dcJSON(u) {
+    var k = dkey(u), c = DC[k];
+    if (!c || !c.body || state.refreshing) return null;
+    if (Date.now() - c.t > 20000) fromNet(u + bust(), k).catch(function () {});  // старше 20 с — свежее к следующему открытию
+    try { return JSON.parse(fixTxt(c.body)); } catch (e) { return null; }
+  }
   function dcGet(k) {
     if (DC[k]) return DC[k];
     try { var x = localStorage.getItem("dc:" + k); if (x) return (DC[k] = JSON.parse(x)); } catch (e) {}
@@ -1372,7 +1411,7 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
   function dcPut(k, txt) {
     var v = { t: Date.now(), body: txt }; DC[k] = v;
     // запись в память устройства — в простое, а не посреди отрисовки (JSON.stringify больших файлов тормозил открытие экранов)
-    var put = function () { try { if (txt.length < 600000) localStorage.setItem("dc:" + k, JSON.stringify(v)); } catch (e) { try { dcTrim(); } catch (e2) {} } };
+    var put = function () { idbPut(k, v); try { if (txt.length < 150000) localStorage.setItem("dc:" + k, JSON.stringify(v)); } catch (e) { try { dcTrim(); } catch (e2) {} } };
     if (window.requestIdleCallback) requestIdleCallback(put, { timeout: 2000 }); else setTimeout(put, 300);
   }
   function dcTrim() {  // память устройства переполнена — убираем самые старые записи
@@ -1422,13 +1461,26 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
   // в свободное время подкачиваем то, куда обычно идут дальше: рейтинг, ленту, сетки идущих турниров, ближайшие матчи
   function prefetchAll() {
     var idle = window.requestIdleCallback || function (f) { return setTimeout(f, 400); };
-    idle(function () {
-      var L = state.list || {}, list = ["data/ranking.json", "data/feed.json"];
-      (L.tournaments || []).filter(function (t) { return !t.finished && (t.results || t.bracket); }).slice(0, 4).forEach(function (t) { list.push("data/results/" + String(t.id).replace(/[^\w-]/g, "-") + ".json"); });
-      (L.matches || []).filter(function (m) { return m.has_detail; }).slice(0, 6).forEach(function (m) { list.push("data/match/" + m.id + ".json"); });
+    idle(function () { (state.ranking ? Promise.resolve() : getRanking()).catch(function () {}).then(go); });  // рейтинг нужен для адресов страниц команд
+    function go() {
+      var L = state.list || {}, list = [], add = function (u, age) { if (list.every(function (x) { return x[0] !== u; })) list.push([u, age]); };
+      var ms = (L.matches || []).filter(function (m) { return m.has_detail; });
+      // сначала то, куда идут чаще: все карточки ближайших матчей, рейтинг, лента, сетки идущих турниров
+      ms.forEach(function (m) { add("data/match/" + m.id + ".json", 60e3); });
+      ms.forEach(function (m) { if (m.serie && m.serie.id) add("data/results/" + String(m.serie.id).replace(/[^\w-]/g, "-") + ".json", 120e3); });  // «На кону» в карточке матча
+      add("data/ranking.json", 300e3); add("data/feed.json", 120e3); add("data/positions.json", 3600e3); add("data/pimg.json", 600e3); add("data/tour_hq.json", 3600e3);
+      (L.tournaments || []).filter(function (t) { return !t.finished && (t.results || t.bracket); }).forEach(function (t) { add("data/results/" + String(t.id).replace(/[^\w-]/g, "-") + ".json", 120e3); });
+      // страницы команд ближайших матчей, потом остальные доигранные турниры и топ-30 рейтинга (страницы команд меняются раз в 3–12 ч)
+      ms.forEach(function (m) { (m.teams || []).forEach(function (t) { var sl = t && t.name && teamSlugFor(t.name); if (sl) add("data/team/" + encodeURIComponent(sl) + ".json", 1800e3); }); });
+      (L.tournaments || []).filter(function (t) { return t.finished && t.results; }).slice(0, 8).forEach(function (t) { add("data/results/" + String(t.id).replace(/[^\w-]/g, "-") + ".json", 3600e3); });
+      (((state.ranking || {}).vrs || {}).teams || []).filter(function (t) { return t.page && t.slug; }).slice(0, 30).forEach(function (t) { add("data/team/" + encodeURIComponent(t.slug) + ".json", 3600e3); });
       var i = 0;
-      (function next() { if (i >= list.length) return; var u = list[i++]; if (!dcGet(dkey(u)) || Date.now() - dcGet(dkey(u)).t > 60000) fromNet(u, dkey(u)).catch(function () {}).then(function () { setTimeout(next, 120); }); else next(); })();
-    });
+      (function next() {
+        if (i >= list.length) return;
+        var it = list[i++], u = it[0], c = DC[dkey(u)];
+        if (!c || Date.now() - c.t > it[1]) fromNet(u, dkey(u)).catch(function () {}).then(function () { setTimeout(next, 150); }); else next();
+      })();
+    }
   }
   function bust() { return "?t=" + Math.floor(Date.now() / 60000); }
   var PRIMARY = {};  // цветные логотипы из справочника (bo3.gg → PandaScore → HLTV)
@@ -1470,6 +1522,7 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
       .then(function (L) { return lg.then(function () { return L; }); });
   }
   function getDetail(id) {
+    if (!state.details[id] && !DEMO) { var dj = dcJSON("data/match/" + id + ".json"); if (dj) { state.details[id] = withOpp(dj); state.detailAt = state.detailAt || {}; state.detailAt[id] = DC[dkey("data/match/" + id + ".json")].t; } }
     if (state.details[id]) return Promise.resolve(state.details[id]);
     var p = DEMO ? Promise.resolve(DEMO.details[id]) : dfetch("data/match/" + id + ".json" + bust()).then(function (r) { if (!r.ok) throw new Error(r.status); return r.text(); })
       .then(function (txt) { state.detailRaw = state.detailRaw || {}; state.detailRaw[id] = txt; return JSON.parse(txt); });
@@ -1552,6 +1605,7 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
 
   function getFeed() {
     if (DEMO) return Promise.resolve(DEMO.feed || { items: [] });
+    if (!state.feed) { var fj = dcJSON("data/feed.json"); if (fj) state.feed = fj; }
     if (state.feed) return Promise.resolve(state.feed);
     return dfetch("data/feed.json" + bust()).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
       .then(function (f) { state.feed = f; return f; });
@@ -1841,18 +1895,39 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
   document.addEventListener("touchcancel", shellSwipeEnd, { passive: true });
 
   // ---------- лента
-  function feedPane(F, ch) {
-    var items = (F.items || []).filter(function (n) { return ch === "all" || n.channel === ch || (n.also || []).some(function (a) { return a.channel === ch; }); });
-    if (!items.length) return '<div class="empty"><strong>Пока пусто</strong>Лента обновляется каждые несколько минут.</div>';
-    var cur = null, html = '<div class="news feed">';
-    items.forEach(function (n) {
-      var k = dayKey(n.date);
-      if (k !== cur) { cur = k; html += '<h2 class="sect-title">' + esc(dayTitle(n.date)) + '</h2>'; }
-      html += '<button class="box ni fi" data-fread="' + esc(n.key) + '">' +
+  var FEED_MORE = [];
+  function feedItem(n, cur) {
+    var html = '', k = dayKey(n.date);
+    if (k !== cur) { cur = k; html += '<h2 class="sect-title">' + esc(dayTitle(n.date)) + '</h2>'; }
+    html += '<button class="box ni fi" data-fread="' + esc(n.key) + '">' +
         '<span class="src"><span><b class="chn">' + esc(n.channel_title) + '</b> · ' + esc(hm(n.date)) + '</span>' +
         ((n.also || []).length ? '<span>ещё в ' + n.also.length + ' ' + (n.also.length === 1 ? "канале" : "каналах") + '</span>' : '') + '</span>' +
         '<span class="fi-body">' + (n.photo ? '<span class="thumb"><img src="' + esc(n.photo) + '" alt="" loading="lazy" decoding="async" onerror="this.parentNode.remove()">' + (n.video ? '<i class="play" aria-label="видео">▶</i>' : '') + '</span>' : '') +
         '<span><h4>' + esc(n.title) + '</h4>' + (function (b) { return b ? '<p>' + esc(b) + '</p>' : ''; })(bodyNoTitle(n.title, n.text)) + '</span></span></button>';
+    return { html: html, cur: cur };
+  }
+  function feedFill() {  // дорисовать остаток ленты по кусочкам, не занимая кадр целиком
+    var el = q(".feed-more");
+    if (!el) return;
+    var job = FEED_MORE[+el.getAttribute("data-fm")];
+    if (!job) { el.remove(); return; }
+    var part = job.items.splice(0, 30), html = "";
+    part.forEach(function (n) { var r = feedItem(n, job.cur); job.cur = r.cur; html += r.html; });
+    var pane = el.closest(".pane"), want = pane && ((state.shs || {}).feed || {})[pane.getAttribute("data-key")];
+    el.insertAdjacentHTML("beforebegin", html);
+    if (!job.items.length) el.remove();
+    if (pane && want && pane.scrollTop < want - 4) pane.scrollTop = want;  // вернуться в ленте туда же, где были
+    setTimeout(feedFill, 30);
+  }
+  function feedPane(F, ch) {
+    var items = (F.items || []).filter(function (n) { return ch === "all" || n.channel === ch || (n.also || []).some(function (a) { return a.channel === ch; }); });
+    if (!items.length) return '<div class="empty"><strong>Пока пусто</strong>Лента обновляется каждые несколько минут.</div>';
+    var cur = null, html = '<div class="news feed">', FIRST = 16;
+    // первые 16 постов — сразу, остальные дорисовываются после первого кадра (лента открывается вдвое быстрее)
+    items.forEach(function (n, idx) {
+      if (idx === FIRST) { html += '<i class="feed-more" data-fm="' + (FEED_MORE.push({ items: items.slice(FIRST), cur: cur }) - 1) + '"></i>'; }
+      if (idx >= FIRST) return;
+      var r = feedItem(n, cur); cur = r.cur; html += r.html;
     });
     return html + '</div>';
   }
@@ -1860,6 +1935,7 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
     var F = state.feed;
     renderShell({ id: "feed", back: "Главная", title: "Лента", tabs: [{ key: "all", label: "Все каналы" }].concat(F ? (F.channels || []).map(function (c) { return { key: c.id, label: c.title }; }) : []),
       pane: function (k) { return F ? feedPane(F, k) : '<div class="empty">' + (state.feedErr ? '<strong>Лента пока не собрана</strong>' : 'Загружаю ленту…') + '</div>'; } });
+    requestAnimationFrame(function () { setTimeout(feedFill, 0); });
   }
 
   // ---------- турниры
@@ -1898,6 +1974,7 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
   var REG_ABBR = { "Европа": "Европа", "Америка": "Америка", "Азия": "Азия" };  // регионы везде по-русски
   var REG_MINI = { "Европа": "EU", "Америка": "AM", "Азия": "AS" };  // в свёрнутом версусе — короткие английские (по просьбе владельца)
   function getRanking() {
+    if (!state.ranking) { var kj = dcJSON("data/ranking.json"); if (kj) { state.ranking = kj; ((kj.vrs || {}).teams || []).forEach(function (t) { rememberLogo(t.name, t.logo); }); } }
     if (state.ranking) return Promise.resolve(state.ranking);
     return dfetch("data/ranking.json" + bust()).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); }).then(function (j) { state.ranking = j; ((j.vrs || {}).teams || []).forEach(function (t) { rememberLogo(t.name, t.logo); }); return j; });
   }
@@ -1924,6 +2001,7 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
   // ---------- команда из рейтинга
   function getTeam(slug) {
     state.teams = state.teams || {};
+    if (!state.teams[slug]) { var tj = dcJSON("data/team/" + encodeURIComponent(slug) + ".json"); if (tj) state.teams[slug] = tj; }
     if (state.teams[slug]) return Promise.resolve(state.teams[slug]);
     return dfetch("data/team/" + encodeURIComponent(slug) + ".json" + bust()).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); }).then(function (j) { state.teams[slug] = j; return j; });
   }
@@ -2145,8 +2223,9 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
     state.results = state.results || {};
     if (state.results[id]) return Promise.resolve(state.results[id]);
     if (DEMO) return Promise.resolve((DEMO.results || {})[id] || null);
-    return dfetch("data/results/" + String(id).replace(/[^\w-]/g, "-") + ".json" + bust()).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
-      .then(function (j) { applyTemp(j, j.tournament); state.results[id] = j; (j.matches || []).forEach(function (x) { (x.teams || []).forEach(function (t) { rememberLogo(t.name, t.logo); }); }); (j.stages || []).forEach(function (st) { st.rounds.forEach(function (rd) { rd.matches.forEach(function (x) { rememberLogo(x.a, x.la); rememberLogo(x.b, x.lb); }); }); }); return j; });
+    var rj = dcJSON("data/results/" + String(id).replace(/[^\w-]/g, "-") + ".json"), took = function (j) { applyTemp(j, j.tournament); state.results[id] = j; (j.matches || []).forEach(function (x) { (x.teams || []).forEach(function (t) { rememberLogo(t.name, t.logo); }); }); (j.stages || []).forEach(function (st) { st.rounds.forEach(function (rd) { rd.matches.forEach(function (x) { rememberLogo(x.a, x.la); rememberLogo(x.b, x.lb); }); }); }); return j; };
+    if (rj) return Promise.resolve(took(rj));
+    return dfetch("data/results/" + String(id).replace(/[^\w-]/g, "-") + ".json" + bust()).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); }).then(took);
   }
 
   function resultRow(x) {
@@ -3341,6 +3420,7 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
     return bs >= 2 ? P.teams[best] : null;
   }
   function posBlock(m) {
+    if (!state.pos) { var pj = dcJSON("data/positions.json"); if (pj) state.pos = pj; }  // из памяти — сразу
     if (!state.pos) {
       if (!state.posLoading) {
         state.posLoading = true;
@@ -3428,6 +3508,7 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
     return '<div class="box">' + (Object.keys(D).length ? posTable(players, D, low) : '<div class="note">На ' + esc(POS_MAPNAME[cur] || cur) + ' демо этой команды пока нет.</div>') + '</div>';
   }
   function teamPosBlock(T) {
+    if (!state.pos) { var pj = dcJSON("data/positions.json"); if (pj) state.pos = pj; }  // из памяти — сразу
     if (!state.pos) {
       if (!state.posLoading) {
         state.posLoading = true;
@@ -4182,8 +4263,10 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
       SH = null;
       var id = mt[1];
       if (state.openId !== id) { state.openId = id; state.tab = "players"; state.teamSub = "players"; state.newsFilter = "all"; state.map = null; state.mapUser = false; state.posMapUser = false; state.scrolls = {}; state.factsAll = false; window.scrollTo(0, 0); }
+      var pd = getDetail(id);  // из памяти — синхронно, без промежуточного «Загружаю»
+      if (state.details[id]) { renderMatch(state.details[id]); setTimeout(function () { refreshOpen(true); }, 300); return; }
       $app.innerHTML = '<div class="empty">Загружаю матч…</div>';
-      getDetail(id).then(function (d) { renderMatch(d); setTimeout(function () { refreshOpen(true); }, 300); }).catch(function () {
+      pd.then(function (d) { renderMatch(d); setTimeout(function () { refreshOpen(true); }, 300); }).catch(function () {
         $app.innerHTML = '<div class="empty"><strong>Подробностей пока нет</strong>Карточка появится после ближайшего сбора — как только станут известны обе команды. <button class="chip" id="back" style="margin-top:8px">Назад</button></div>';
       });
       return;
@@ -4194,9 +4277,9 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
     else if (h === "tours") { state.view = "tours"; showTours(); }
     else if (h === "major") { state.view = "major"; renderShell({ id: "major", back: "Главная", title: "Мейджор", tabs: [{ key: "main", label: "" }],
       pane: function () { return state.list.major_next ? majorBlock(state.list.major_next) : '<div class="empty"><strong>Прогноза пока нет</strong></div>'; } }); }
-    else if (h === "rating") { state.view = "rating"; showRating(); if (!state.ranking) getRanking().then(function () { if (state.view === "rating") showRating(); }).catch(function () { state.rankingErr = true; if (state.view === "rating") showRating(); }); }
-    else if (/^r-/.test(h)) { var sl = h.slice(2); state.view = "team:" + sl; state.teamErr = false; showTeam(sl); getTeam(sl).then(function () { if (state.view === "team:" + sl) showTeam(sl); }).catch(function () { state.teamErr = true; if (state.view === "team:" + sl) showTeam(sl); }); }
-    else if (h === "feed") { state.view = "feed"; showFeed(); if (!state.feed) getFeed().then(function () { if (state.view === "feed") showFeed(); }).catch(function () { state.feedErr = true; if (state.view === "feed") showFeed(); }); }
+    else if (h === "rating") { state.view = "rating"; if (!state.ranking) getRanking().catch(function () {}); showRating(); if (!state.ranking) getRanking().then(function () { if (state.view === "rating") showRating(); }).catch(function () { state.rankingErr = true; if (state.view === "rating") showRating(); }); }
+    else if (/^r-/.test(h)) { var sl = h.slice(2); state.view = "team:" + sl; state.teamErr = false; if (!(state.teams || {})[sl]) getTeam(sl).catch(function () {}); showTeam(sl); getTeam(sl).then(function () { if (state.view === "team:" + sl) showTeam(sl); }).catch(function () { state.teamErr = true; if (state.view === "team:" + sl) showTeam(sl); }); }
+    else if (h === "feed") { state.view = "feed"; if (!state.feed) getFeed().catch(function () {}); showFeed(); if (!state.feed) getFeed().then(function () { if (state.view === "feed") showFeed(); }).catch(function () { state.feedErr = true; if (state.view === "feed") showFeed(); }); }
     else { state.view = "home"; SH = null; renderMenu(); }
   }
   function go(hash) { if (location.hash === hash) route(); else { depth++; location.hash = hash; } }
@@ -4377,7 +4460,7 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
   });
 
   $app.innerHTML = '<div class="empty">Загружаю матчи…</div>';
-  getList().then(function (L) { state.list = L; route(); prefetchAll(); })
+  getList().then(function (L) { state.list = L; route(); IDB_READY.then(prefetchAll); })
     .catch(function () { $app.innerHTML = '<div class="empty"><strong>Не получилось загрузить матчи</strong>Проверь интернет и открой ещё раз. Если не помогает — сборщик данных ещё ни разу не запускался.</div>'; });
 })();
 </script>
