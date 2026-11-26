@@ -6201,6 +6201,7 @@ def hltv_player_info(nick: str, force: bool = False, coach: bool = False) -> dic
     m["mvp"] = max(d.get("mvp") or 0, pd.get("mvp") or 0, len(m["mvp_events"]))
     m["majors"] = (d.get("majors") or 0) + (pd.get("majors") or 0)
     m["major_wins"] = (d.get("major_wins") or 0) + (pd.get("major_wins") or 0)
+    m["photo"] = d.get("photo") or pd.get("photo")
     return m
 
 
@@ -6213,7 +6214,7 @@ def _hltv_person_info(nick: str, force: bool = False, coach: bool = False) -> di
         return None
     key = f"{kp}:{pl['id']}"
     c = hltv_cache.get(key)
-    no_ev = c and ((c.get("data") or {}).get("mvp") and not (c.get("data") or {}).get("mvp_events") and not c.get("mvfix") or not c.get("wfix3")
+    no_ev = c and ((c.get("data") or {}).get("mvp") and not (c.get("data") or {}).get("mvp_events") and not c.get("mvfix") or not c.get("wfix3") or not c.get("ph1")
                    or kp == "cinfo1" and not c.get("pref"))
     if c and not no_ev and (not force or _mvp_new[0] >= MVP_PER_RUN) and (parse_iso(c.get("t")) or NOW) > NOW - timedelta(days=PINFO_TTL_DAYS):
         return c["data"]  # свежее — из кэша; очередь (force) перечитывает тех, чья команда доиграла турнир
@@ -6307,13 +6308,20 @@ def _hltv_person_info(nick: str, force: bool = False, coach: bool = False) -> di
     d = {"mvp": mvp, "mvp_events": ev, "majors": int(pm.group(1)) if pm else 0, "major_wins": int(wm.group(1)) if wm else 0,
          "major_events": mj, "trophies": tro[:40], "event_wins": wins[:40], "event_seconds": seconds[:40], "win_teams": wteams}
     d["mvp_events"] = [str(x) for x in d["mvp_events"]] if isinstance(d["mvp_events"], list) else []
+    # фото игрока (портрет «bodyshot» с img-cdn.hltv.org) — для окна «📷» (владелец 26.11: у PandaScore часто лица не видно)
+    for tag in re.findall(r"<img[^>]+>", b):
+        if "bodyshot" in tag and "placeholder" not in tag and "blankplayer" not in tag:
+            ms_ = re.search(r'src="(https://img-cdn\.hltv\.org/[^"]+)"', tag)
+            if ms_:
+                d["photo"] = _html.unescape(ms_.group(1))
+                break
     if kp == "cinfo1":  # 25.11: у тренера-бывшего игрока (TaZ) на странице тренера ссылка на его страницу игрока
         sl = leet(norm(nick))
         for pid, slug in re.findall(r'href="/player/(\d+)/([\w.-]+)"', b):
             if leet(norm(slug)) == sl:
                 d["pref"] = {"id": int(pid), "slug": slug}
                 break
-    hltv_cache[key] = {"t": iso(NOW), "data": d, "fix": 1, "mvfix": 1, "wfix2": 1, "wfix3": 1, "pref": 1}  # fix=1 — разобрано с полным списком мейджоров (MAJOR_RX)
+    hltv_cache[key] = {"t": iso(NOW), "data": d, "fix": 1, "mvfix": 1, "wfix2": 1, "wfix3": 1, "pref": 1, "ph1": 1}  # fix=1 — разобрано с полным списком мейджоров (MAJOR_RX)
     return d
 
 
@@ -7825,17 +7833,30 @@ def lp_tour_page(name: str) -> str | None:
             break
     return best
 
-PIMG_NEW = 120  # новых фото игроков за полный сбор
+PIMG_NEW = 120  # новых фото игроков с Liquipedia за полный сбор
+PIMG_HLTV_NEW = 40  # новых фото с HLTV за полный сбор (по правилу HLTV — не чаще раза в 2.5 с)
 
 
 def build_player_photos() -> None:
-    """Фото игроков для окна «📷» во вкладке «Игроки» (владелец 26.11: знать, как выглядят). Источник — фото из инфобокса
-    Liquipedia (`|image=` со страницы игрока, `lp_img` в карточке), миниатюра 300 px → pimg/<ник>.<ext>, список — pimg.json
-    {ник в нижнем регистре: путь}. Сначала игроки ближайших матчей, потом страниц команд; промах — повтор через 7 дней."""
+    """Фото игроков для окна «📷» во вкладке «Игроки» (владелец 26.11: знать, как выглядят). Сначала портрет со страницы
+    игрока HLTV (`photo` — разбирается вместе с MVP/мейджорами, страницу заново не запрашиваем, качаем только картинку),
+    иначе фото из инфобокса Liquipedia (`lp_img`, миниатюра 300 px). Файлы pimg/<ник>.<ext>, список pimg.json
+    {ник в нижнем регистре: {f, src}}. Сначала игроки ближайших матчей, потом страниц команд; промах — повтор через 7 дней."""
     path = OUT / "pimg.json"
     H = load_json(path, {}) or {}
     have, miss = H.get("p") or {}, H.get("miss") or {}
-    want: dict = {}  # ник → файл Liquipedia, по порядку важности
+    want: dict = {}  # ник → (ник, фото HLTV, файл Liquipedia), по порядку важности
+
+    def add(p):
+        if not isinstance(p, dict) or not p.get("nick"):
+            return
+        k = norm(p["nick"])
+        hp, lf = p.get("photo"), p.get("lp_img") or p.get("img")
+        if not (hp or lf):
+            return
+        o = want.get(k)
+        want[k] = (p["nick"], (o and o[1]) or hp, (o and o[2]) or lf) if o else (p["nick"], hp, lf)
+
     cards = []
     for f in (OUT / "match").glob("*.json"):
         d = load_json(f, {}) or {}
@@ -7843,31 +7864,62 @@ def build_player_photos() -> None:
     for _, d in sorted(cards, key=lambda x: x[0]):
         for t in d.get("teams") or []:
             for p in (t.get("players") or []) + (t.get("coach") or []):
-                fimg = p.get("lp_img") or p.get("img")
-                if p.get("nick") and fimg:
-                    want.setdefault(norm(p["nick"]), (p["nick"], fimg))
+                add(p)
     for f in sorted((OUT / "team").glob("*.json")):
         d = load_json(f, {}) or {}
-        for p in [x for x in (d.get("roster") or []) + (d.get("players") or []) + (d.get("coach") or []) if isinstance(x, dict)]:
-            if p.get("nick") and (p.get("lp_img") or p.get("img")):
-                want.setdefault(norm(p["nick"]), (p["nick"], p.get("lp_img") or p.get("img")))
-    todo = []
-    for k, (nick, fimg) in want.items():
-        h = have.get(k)
-        if h and h.get("file") == fimg and (OUT / h["f"]).exists():
-            continue
+        for p in (d.get("roster") or []) + (d.get("players") or []) + (d.get("coach") or []):
+            add(p)
+    todo_h, todo_l = [], []
+    for k, (nick, hp, lf) in want.items():
+        h = have.get(k) or {}
+        ok = h.get("f") and (OUT / h["f"]).exists()
         m = miss.get(k) or {}
-        if m.get("file") == fimg and (parse_iso(m.get("t")) or NOW - timedelta(days=30)) > NOW - timedelta(days=7):
+        fresh_miss = lambda key: m.get(key) and (parse_iso(m.get(key)) or NOW - timedelta(days=30)) > NOW - timedelta(days=7)
+        if hp and not (ok and h.get("src") == "hltv" and h.get("url") == hp) and not fresh_miss("th"):
+            if len(todo_h) < PIMG_HLTV_NEW:
+                todo_h.append((k, nick, hp))
             continue
-        todo.append((k, nick, fimg))
-        if len(todo) >= PIMG_NEW:
-            break
-    if not todo:
+        if lf and not ok and not (m.get("file") == lf and fresh_miss("t")) and len(todo_l) < PIMG_NEW:
+            todo_l.append((k, nick, lf))
+    if not (todo_h or todo_l):
         return
     (OUT / "pimg").mkdir(exist_ok=True)
-    got = 0
-    for i in range(0, len(todo), 50):
-        part = todo[i:i + 50]
+
+    def save(k, body, ext, rec):
+        slug = re.sub(r"[^a-z0-9_-]", "_", k) or "p"
+        for old in (OUT / "pimg").glob(slug + ".*"):
+            old.unlink()
+        fn = f"pimg/{slug}.{ext}"
+        (OUT / fn).write_bytes(body)
+        have[k] = {"f": fn, "t": iso(NOW), **rec}
+
+    got_h = got_l = 0
+    for k, nick, url in todo_h:  # HLTV: картинка с их CDN, с той же паузой, что и страницы
+        if _hltv_blocked[0]:
+            break
+        wait = 2.5 - (time.time() - _hltv_last[0])
+        if wait > 0:
+            time.sleep(wait)
+        _hltv_last[0] = time.time()
+        stats["hltv_requests"] = stats.get("hltv_requests", 0) + 1
+        try:
+            body = http_get(url, {"User-Agent": HLTV_UA, "Accept": "image/avif,image/webp,image/*,*/*;q=0.8", "Referer": HLTV + "/"}, retry429=False)
+        except Exception as e:
+            warn(f"Фото HLTV {nick}: {e!r}")
+            miss.setdefault(k, {})["th"] = iso(NOW)
+            if re.search(r"\b(403|429|503)\b", str(e)):
+                break  # отказ — до следующего сбора картинки HLTV не трогаем
+            continue
+        if len(body) < 500 or len(body) > 1_500_000:
+            miss.setdefault(k, {})["th"] = iso(NOW)
+            continue
+        ext = "png" if body[:4] == b"\x89PNG" else "webp" if body[8:12] == b"WEBP" else "jpg"
+        save(k, body, ext, {"src": "hltv", "url": url})
+        got_h += 1
+    for i in range(0, len(todo_l), 50):
+        part = [x for x in todo_l[i:i + 50] if not (have.get(x[0]) or {}).get("src") == "hltv"]
+        if not part:
+            continue
         fl = sorted({x[2] for x in part})
         url = LP_API + "?" + urllib.parse.urlencode({"action": "query", "prop": "imageinfo", "iiprop": "url|mime", "iiurlwidth": 300,
                                                      "titles": "|".join("File:" + x for x in fl), "format": "json"})
@@ -7879,7 +7931,7 @@ def build_player_photos() -> None:
         try:
             q = json.loads(http_get(url, {"User-Agent": LP_UA, "Accept": "application/json"}, retry429=False)).get("query") or {}
         except Exception as e:
-            warn(f"Фото игроков: {e!r}")
+            warn(f"Фото игроков (Liquipedia): {e!r}")
             break
         nm_ = {r["to"]: r["from"] for r in q.get("normalized") or []}
         info = {}
@@ -7891,7 +7943,7 @@ def build_player_photos() -> None:
             ii = info.get(fimg.replace("_", " "))
             src = ii and (ii.get("thumburl") or ii.get("url"))
             if not src or "svg" in (ii.get("mime") or ""):
-                miss[k] = {"file": fimg, "t": iso(NOW)}
+                miss.setdefault(k, {}).update(file=fimg, t=iso(NOW))
                 continue
             ext = src.rsplit(".", 1)[-1].split("?")[0].lower()
             ext = ext if ext in ("png", "webp", "jpg", "jpeg") else "jpg"
@@ -7903,22 +7955,16 @@ def build_player_photos() -> None:
                 body = http_get(src, {"User-Agent": LP_UA}, retry429=False)
             except Exception as e:
                 warn(f"Фото {nick}: {e!r}")
-                miss[k] = {"file": fimg, "t": iso(NOW)}
+                miss.setdefault(k, {}).update(file=fimg, t=iso(NOW))
                 if "429" in str(e):
                     break
                 continue
             if len(body) < 500 or len(body) > 600_000:
-                miss[k] = {"file": fimg, "t": iso(NOW)}
+                miss.setdefault(k, {}).update(file=fimg, t=iso(NOW))
                 continue
-            slug = re.sub(r"[^a-z0-9_-]", "_", k) or "p"
-            fn = f"pimg/{slug}.{ext}"
-            for old in (OUT / "pimg").glob(slug + ".*"):
-                old.unlink()
-            (OUT / fn).write_bytes(body if isinstance(body, bytes) else body.encode("latin-1"))
-            have[k] = {"f": fn, "file": fimg, "t": iso(NOW)}
-            miss.pop(k, None)
-            got += 1
-    print(f"Фото игроков (Liquipedia): новых {got}, всего {len(have)}, ждут {max(0, len(want) - len(have))}")
+            save(k, body, ext, {"src": "lp", "file": fimg})
+            got_l += 1
+    print(f"Фото игроков: новых с HLTV {got_h}, с Liquipedia {got_l}, всего {len(have)} (HLTV {sum(1 for v in have.values() if v.get('src') == 'hltv')})")
     save_json(path, {"updated": iso(NOW), "p": have, "miss": miss})
 
 
@@ -8469,7 +8515,7 @@ def main() -> int:
         warn(f"Позиции ProRoles: {e!r}")
     # «Будущие игры» на страницах команд — на каждом сборе (страницы целиком пересобираются раз в 3–12 ч, а расписание меняется чаще)
     # и сверка со свежими карточками матчей: состав, трофеи, MVP и мажоры у команды должны совпадать с тем, что в матче
-    PFIELDS = ("mvp", "mvp_events", "majors", "major_wins", "major_events", "trophies", "event_wins", "event_seconds", "win_teams", "name_ru", "tags")
+    PFIELDS = ("mvp", "mvp_events", "majors", "major_wins", "major_events", "trophies", "event_wins", "event_seconds", "win_teams", "name_ru", "tags", "photo")
     by_team: dict = {}
     for mf in (OUT / "match").glob("*.json"):
         md = load_json(mf, {}) or {}
