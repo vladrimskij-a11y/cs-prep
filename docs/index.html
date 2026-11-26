@@ -1242,6 +1242,15 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
 @media (prefers-reduced-motion: reduce) { .home-brand h1 .hb-dot { animation: none; } }
 .ptile.tbd b { color: var(--muted); font-weight: 600; } .ptile.tbd .pt-lg i { font-style: normal; font-weight: 800; }
 .rh-ot { display: grid; grid-template-columns: 1fr 1fr; column-gap: 14px; } .rh-ot .rh-grid { grid-template-columns: 36px 1fr 22px; } .rh-ot .rh-row { grid-template-columns: repeat(3, minmax(0, 1fr)); } .rh-ot > .rh-grid + .rh-grid { border-left: 1px solid var(--line); padding-left: 12px; }
+/* История раундов: каждая половина — своя карточка, овертаймы отделены заголовком и подкрашены (владелец 26.11: «всё пестрит») */
+.rh { padding: 8px; background: transparent; border: 0; box-shadow: none; }
+.rh-part { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px 12px; }
+.rh-part + .rh-part { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
+.rh-part.ot { background: color-mix(in srgb, var(--t, #e3a945) 6%, var(--surface)); border-color: color-mix(in srgb, var(--t, #e3a945) 28%, var(--line)); }
+.rh-h { font-size: 12px; color: var(--fg); opacity: .85; margin-bottom: 8px; }
+.rh-otsep { display: flex; align-items: center; gap: 10px; margin: 18px 2px 10px; font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--t, #e3a945); }
+.rh-otsep::before, .rh-otsep::after { content: ""; flex: 1; height: 1px; background: color-mix(in srgb, var(--t, #e3a945) 40%, transparent); }
+.rh-leg { margin-top: 10px; padding: 0 4px; }
 </style>
 
 <div class="wrap" id="app"></div>
@@ -3648,7 +3657,7 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
       return '<div class="rh-part"><div class="rh-h">' + (pi ? "2-я половина" : "1-я половина") + '</div>' + half(p) + '</div>';
     }).join("");
     for (var oi = 2; oi < parts.length; oi += 2)
-      html += '<div class="rh-part"><div class="rh-h">' + (oi / 2) + '-й овертайм</div><div class="rh-ot">' + half(parts[oi]) + (parts[oi + 1] ? half(parts[oi + 1]) : '<div></div>') + '</div></div>';
+      html += (oi === 2 ? '<div class="rh-otsep">Овертаймы</div>' : '') + '<div class="rh-part ot"><div class="rh-h">' + (oi / 2) + '-й овертайм</div><div class="rh-ot">' + half(parts[oi]) + (parts[oi + 1] ? half(parts[oi + 1]) : '<div></div>') + '</div></div>';
     return '<div class="sec"><h3>История раундов <span>' + esc(g.map || "") + (g.score ? ' · ' + g.score[0] + ':' + g.score[1] : '') + '</span></h3><div class="box rh">' + html +
       '<div class="rh-leg"><span>' + RICON.e + 'все убиты</span><span>' + RICON.b + 'взрыв</span><span>' + RICON.d + 'разминирование</span><span>' + RICON.t + 'время</span></div></div></div>';
   }
