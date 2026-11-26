@@ -1165,7 +1165,7 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
 .hero .hbg.a { left: -16%; } .hero .hbg.b { right: -16%; }
 .hero.thero .hbg.t { top: 50%; right: -8%; width: 46%; aspect-ratio: 1; transform: translateY(-50%); opacity: .08; }
 .hero.thero { background: var(--surface); }
-.th-t { background: color-mix(in srgb, var(--sunk) 78%, transparent); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
+.th-t { background: color-mix(in srgb, var(--sunk) 88%, transparent); }  /* без размытия под плитками: в Safari тормозило прокрутку */
 .th-logo { background: color-mix(in srgb, var(--sunk) 70%, transparent); }
 .shead.shbg { isolation: isolate; overflow: hidden; }
 .shead.shbg::before { content: ""; position: absolute; inset: -40px; z-index: -1; background: var(--tb) center / cover no-repeat; filter: blur(22px) saturate(1.5); opacity: .7; }
@@ -1237,7 +1237,7 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
 /* название «Приложение Рима» (владелец 26.11): минимализм, стильно; точка — лампа «в эфире» */
 .home-brand h1 { display: flex; flex-wrap: wrap; align-items: baseline; line-height: 1.04; font-size: clamp(27px, 8.1vw, 34px); margin-bottom: 0; }
 .home-brand h1 .hb-sm { flex-basis: 100%; margin-bottom: 4px; }
-.home-brand h1 .hb-dot { color: var(--onair); text-shadow: 0 0 10px color-mix(in srgb, var(--onair) 60%, transparent); animation: hbOnAir 3s ease-in-out infinite; }
+.home-brand h1 .hb-dot { display: inline-block; color: var(--onair); text-shadow: 0 0 10px color-mix(in srgb, var(--onair) 60%, transparent); animation: hbOnAir 3s ease-in-out infinite; will-change: opacity; transform: translateZ(0); }  /* отдельный слой: мигание без перерисовки страницы (Safari) */
 @keyframes hbOnAir { 0%, 100% { opacity: 1; } 50% { opacity: .82; } }
 @media (prefers-reduced-motion: reduce) { .home-brand h1 .hb-dot { animation: none; } }
 .ptile.tbd b { color: var(--muted); font-weight: 600; } .ptile.tbd .pt-lg i { font-style: normal; font-weight: 800; }
