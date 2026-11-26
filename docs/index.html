@@ -1241,6 +1241,7 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
 @keyframes hbOnAir { 0%, 100% { opacity: 1; } 50% { opacity: .82; } }
 @media (prefers-reduced-motion: reduce) { .home-brand h1 .hb-dot { animation: none; } }
 .ptile.tbd b { color: var(--muted); font-weight: 600; } .ptile.tbd .pt-lg i { font-style: normal; font-weight: 800; }
+.rh-ot { display: grid; grid-template-columns: 1fr 1fr; column-gap: 14px; } .rh-ot .rh-grid { grid-template-columns: 36px 1fr 22px; } .rh-ot .rh-row { grid-template-columns: repeat(3, minmax(0, 1fr)); } .rh-ot > .rh-grid + .rh-grid { border-left: 1px solid var(--line); padding-left: 12px; }
 </style>
 
 <div class="wrap" id="app"></div>
@@ -3621,9 +3622,8 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
     var parts = [], i = 0;
     while (i < R.length) { var n = i < 24 ? 12 : 3; parts.push([i, R.slice(i, i + n)]); i += n; }
     var sideOf = function (r, team) { if (!r) return null; var w = +r[0], s = r[1]; return w === team ? s : (s === "C" ? "T" : "C"); };
-    var html = parts.map(function (p, pi) {
+    var half = function (p) {
       var first = p[1].find(Boolean), sa = sideOf(first, 0), sb = sideOf(first, 1);
-      var title = pi === 0 ? "1-я половина" : pi === 1 ? "2-я половина" : Math.floor(pi / 2) + "-й овертайм · " + (pi % 2 ? "2-я" : "1-я") + " половина";
       var row = function (team, side) {
         return '<div class="rh-row">' + p[1].map(function (r) {
           if (!r || +r[0] !== team) return '<i class="rh-c"></i>';
@@ -3638,11 +3638,17 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
       var sideLbl = function (s) { return s === "C" ? '<b class="ct">CT</b>' : s === "T" ? '<b class="t">T</b>' : ''; };
       // счёт половины — отдельным столбцом справа, цифры строго друг под другом (владелец 25.11)
       var cnt = function (s, team) { return '<span class="rh-n ' + (s === "C" ? "ct" : "t") + '">' + won(team) + '</span>'; };
-      return '<div class="rh-part"><div class="rh-h">' + title + '</div>' +
-        '<div class="rh-grid" style="--n:' + p[1].length + '"><span class="rh-tn">' + who(A) + sideLbl(sa) + '</span>' + row(0) + cnt(sa, 0) +
+      return '<div class="rh-grid" style="--n:' + p[1].length + '"><span class="rh-tn">' + who(A) + sideLbl(sa) + '</span>' + row(0) + cnt(sa, 0) +
         '<span></span><div class="rh-row rh-num">' + p[1].map(function (_, k) { return '<i>' + (p[0] + k + 1) + '</i>'; }).join("") + '</div><span></span>' +
-        '<span class="rh-tn">' + who(B) + sideLbl(sb) + '</span>' + row(1) + cnt(sb, 1) + '</div></div>';
+        '<span class="rh-tn">' + who(B) + sideLbl(sb) + '</span>' + row(1) + cnt(sb, 1) + '</div>';
+    };
+    // основное время — по половинам; овертайм целиком в одном блоке: 3 раунда, счёт, отступ, те же команды
+    // уже за другие стороны и следующие 3 (владелец 26.11: было 4 сегмента на 2 овертайма)
+    var html = parts.slice(0, 2).map(function (p, pi) {
+      return '<div class="rh-part"><div class="rh-h">' + (pi ? "2-я половина" : "1-я половина") + '</div>' + half(p) + '</div>';
     }).join("");
+    for (var oi = 2; oi < parts.length; oi += 2)
+      html += '<div class="rh-part"><div class="rh-h">' + (oi / 2) + '-й овертайм</div><div class="rh-ot">' + half(parts[oi]) + (parts[oi + 1] ? half(parts[oi + 1]) : '<div></div>') + '</div></div>';
     return '<div class="sec"><h3>История раундов <span>' + esc(g.map || "") + (g.score ? ' · ' + g.score[0] + ':' + g.score[1] : '') + '</span></h3><div class="box rh">' + html +
       '<div class="rh-leg"><span>' + RICON.e + 'все убиты</span><span>' + RICON.b + 'взрыв</span><span>' + RICON.d + 'разминирование</span><span>' + RICON.t + 'время</span></div></div></div>';
   }
