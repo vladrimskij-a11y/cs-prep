@@ -4778,6 +4778,18 @@ def d2_sync(listing: list | None = None) -> None:
                 if d2_fill_series(d):
                     ch = True
                     d["live_t"] = iso(NOW)
+        # серия решена по счёту карт dust2 — матч доигран: LIVE снимаем и из списка ближайших убираем
+        # (26.11: Wildcard–CW кончился 2:1, Wildcard уже стоял на завтра, а у нас висел LIVE — PandaScore отстаёт)
+        wins = {}
+        for m0 in (d.get("d2_res") or {}).get("maps") or []:
+            sc, tm = m0.get("score"), m0.get("teams") or []
+            if sc and len(tm) == 2 and sc[0] != sc[1] and max(sc) >= 13:
+                w = tm[0] if sc[0] > sc[1] else tm[1]
+                wins[w] = wins.get(w, 0) + 1
+        if wins and max(wins.values()) >= need // 2 + 1 and d.get("status") != "finished":
+            d["status"] = "finished"; d["live_t"] = iso(NOW); ch = True
+            if str(d.get("id")) in by_id:
+                by_id[str(d.get("id"))]["status"] = "finished"
         if ch:
             save_json(f, d)
     print(f"dust2: матчей в списке {len(lst)}, время поправлено {n_t}, вето перед матчем {n_v}, счёт/статистика карт {n_m}")
@@ -4792,8 +4804,8 @@ def live_series_sync() -> None:
         if not d or d.get("tbd") or len(d.get("teams") or []) != 2:
             continue
         bt = parse_iso(d.get("begin_at"))
-        if not bt or not (NOW - timedelta(hours=8) < bt < NOW + timedelta(minutes=10)) or d.get("status") == "finished":
-            continue
+        if not bt or not (NOW - timedelta(hours=8) < bt < NOW + timedelta(minutes=10)):
+            continue  # и доигранный (по dust2) — статистика последней карты приходит позже
         bids = [t.get("bo3_id") for t in d["teams"]]
         if not all(bids):
             continue

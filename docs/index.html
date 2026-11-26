@@ -1519,7 +1519,10 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
     if (DEMO) return Promise.resolve(DEMO.list);
     var lg = getLogos();
     return dfetch("data/matches.json" + bust()).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
-      .then(function (L) { return lg.then(function () { return L; }); });
+      .then(function (L) {  // доигранный по счёту карт матч (dust2) — уже не «ближайший», он в «Завершённых»
+        if (L && L.matches) L.matches = L.matches.filter(function (m) { return m.status !== "finished"; });
+        return lg.then(function () { return L; });
+      });
   }
   function getDetail(id) {
     if (!state.details[id] && !DEMO) { var dj = dcJSON("data/match/" + id + ".json"); if (dj) { state.details[id] = withOpp(dj); state.detailAt = state.detailAt || {}; state.detailAt[id] = DC[dkey("data/match/" + id + ".json")].t; } }

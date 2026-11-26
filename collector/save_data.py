@@ -114,6 +114,14 @@ def merge(dst: Path) -> None:
             a, b = load(f), load(g)
             if a is not None and b is not None and take_newer(a, b):
                 g.write_text(json.dumps(b, ensure_ascii=False, separators=(",", ":")), "utf-8")
+            if a is not None and b is not None and a.get("status") == "finished" and b.get("status") != "finished":
+                b["status"] = "finished"  # 26.11: серия решена по dust2 — LIVE снимается сразу, не ждём PandaScore
+                g.write_text(json.dumps(b, ensure_ascii=False, separators=(",", ":")), "utf-8")
+                bl = load(dst / "matches.json")
+                for x in (bl or {}).get("matches") or []:
+                    if str(x.get("id")) == f.stem and x.get("status") != "finished":
+                        x["status"] = "finished"
+                        (dst / "matches.json").write_text(json.dumps(bl, ensure_ascii=False, separators=(",", ":")), "utf-8")
             if a is not None and b is not None and a.get("status") == "running" and b.get("status") in (None, "", "not_started"):
                 b["status"] = "running"  # 25.11: LIVE сразу после начала (быстрый сбор), а не со сбором статистики
                 g.write_text(json.dumps(b, ensure_ascii=False, separators=(",", ":")), "utf-8")
