@@ -1213,7 +1213,9 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
 .sec:has(> .box.roster) + .sec:has(> .box.roster) { margin-top: 28px; }
 /* кнопка «📷 Фото» в шапке команды и окно с фото игроков (владелец 26.11) */
 .box.roster > .hd { display: flex; align-items: center; gap: 8px; }
-.phbtn { margin-left: auto; flex: none; font-size: 14px; font-weight: 650; padding: 7px 12px; border-radius: 999px; background: var(--sunk); color: var(--fg); cursor: pointer; position: relative; white-space: nowrap; }
+.hdr-r { margin-left: auto; display: flex; align-items: center; gap: 8px; flex: none; }
+.hdr-r .medal.cup { font-size: 14px; padding: 7px 12px; border-radius: 999px; gap: 4px; } .hdr-r .medal.cup b { font-size: 14px; }
+.phbtn { flex: none; font-size: 14px; font-weight: 650; padding: 7px 12px; border-radius: 999px; background: var(--sunk); color: var(--fg); cursor: pointer; position: relative; white-space: nowrap; }
 .phbtn::after { content: ""; position: absolute; inset: -8px; }
 .pgal { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px 10px; margin-top: 4px; }
 .pgf { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 0; }
@@ -1919,8 +1921,7 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
     return dfetch("data/team/" + encodeURIComponent(slug) + ".json" + bust()).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); }).then(function (j) { state.teams[slug] = j; return j; });
   }
   function prizesLine(pr) {
-    pr = (pr || []).filter(function (x) { return MEDAL[x.place]; });
-    if (!pr.length) return "";
+    pr = (pr || []).filter(function (x) { return MEDAL[x.place]; });  // трофеев нет — кубок с нулём (владелец 26.11)
     return '<span class="tpr">🏆 <b>' + pr.length + '</b> · ' + pr.map(function (x) { return MEDAL[x.place] + ' ' + esc(withYear(x.event, x.date)); }).join(' · ') + '</span>';
   }
   var REG_RU = { "Европа": "Европа", "Америка": "Америка", "Азия": "Азия", Europe: "Европа", Americas: "Америка", Asia: "Азия" };
@@ -3083,8 +3084,7 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
   // медали по столбцам: золото, серебро, бронза — под каждой турниры
   // медали компактно; нажатие — окошко со списком турниров
   function medalsHtml(pr) {
-    pr = (pr || []).filter(function (x) { return MEDAL[x.place]; });
-    if (!pr.length) return "";
+    pr = (pr || []).filter(function (x) { return MEDAL[x.place]; });  // трофеев нет — кубок с нулём (владелец 26.11)
     var cols = [["🥇", ["1st"]], ["🥈", ["2nd"]], ["🥉", ["3rd", "3-4th"]]].map(function (c) {
       return { i: c[0], l: pr.filter(function (x) { return c[1].indexOf(x.place) >= 0; }).map(function (x) { return withYear(x.event, x.date); }) };
     });
@@ -3262,8 +3262,8 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
         return;
       }
       var gal = (t.players || []).map(function (p) { return { n: p.nick, u: p.image || "" }; }).concat((t.coach || []).map(function (c) { return { n: c.nick, u: c.image || "", c: 1 }; }));
-      html += '<div class="sec"><div class="box roster ' + (i ? "b" : "a") + '"><div class="hd"><span class="tn tlink" data-tname="' + esc(t.name) + '">' + esc(t.name) + ' ›</span>' + trophyCount(t.prizes) + medalsHtml(t.prizes) +
-        (gal.length ? '<span class="phbtn" role="button" data-photos="' + esc(JSON.stringify({ t: "📷 " + t.name, g: gal })) + '">📷 Фото</span>' : '') + '</div>';
+      html += '<div class="sec"><div class="box roster ' + (i ? "b" : "a") + '"><div class="hd"><span class="tn tlink" data-tname="' + esc(t.name) + '">' + esc(t.name) + ' ›</span>' + trophyCount(t.prizes) +
+        '<span class="hdr-r">' + (gal.length ? '<span class="phbtn" role="button" data-photos="' + esc(JSON.stringify({ t: "📷 " + t.name, g: gal })) + '">📷 Фото</span>' : '') + medalsHtml(t.prizes) + '</span></div>';
       if (!(t.players || []).length) html += '<div class="note">Состав не указан.</div>';
       html += rosterRows(t.players, t.coach, t, true) + '</div></div>';
     });
