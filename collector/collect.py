@@ -4327,9 +4327,27 @@ def d2_parse_veto(b: str) -> list:
     return steps
 
 
+D2_PHOTOS_F = CACHE / "d2_photos.json"
+d2_photos: dict = load_json(D2_PHOTOS_F, {})  # ник → {url, t}: портрет игрока 100×100 из состава на странице матча dust2
+
+
+def d2_grab_photos(b: str) -> None:
+    """В составах на странице матча dust2 есть портреты игроков с CDN HLTV (100×100, обрезка по лицу, владелец 26.11) —
+    заглушка, пока нет фото со страницы игрока HLTV (400 px) или Liquipedia."""
+    for t in re.findall(r"<img[^>]*lineup-player-image[^>]*>", b):
+        al, sr = re.search(r'alt="([^"]+)"', t), re.search(r'src="([^"]*playerbodyshot[^"]+)"', t)
+        nk = al and re.search(r"'([^']+)'", _html.unescape(al.group(1)))
+        if nk and sr:
+            d2_photos[norm(nk.group(1))] = {"url": _html.unescape(sr.group(1)), "t": iso(NOW)}
+
+
 def d2_parse_result(b: str) -> dict:
     """Со страницы матча dust2.us: счёт доигранных карт (появляется сразу после карты) и статистика игроков
     по каждой карте и по всей серии (вкладки «All maps», «Mirage»…): строки [ник, K, D, ADR, KAST %, рейтинг]."""
+    try:
+        d2_grab_photos(b)
+    except Exception:
+        pass
     out = {"maps": [], "stats": {}}
     i = b.find('class="maps-container"')
     sec = b[i:i + 40000] if i >= 0 else ""
@@ -8022,6 +8040,7 @@ def lp_tour_page(name: str) -> str | None:
     return best
 
 PIMG_NEW = 120  # новых фото игроков с Liquipedia за полный сбор
+PIMG_D2_NEW = 60  # заглушек dust2 (100×100) за сбор — тот же CDN HLTV, пауза 2.5 с
 PIMG_HLTV_NEW = 40  # новых фото с HLTV за полный сбор (по правилу HLTV — не чаще раза в 2.5 с)
 
 
@@ -8040,7 +8059,7 @@ def build_player_photos() -> None:
             return
         k = norm(p["nick"])
         hp, lf = p.get("photo"), p.get("lp_img") or p.get("img")
-        if not (hp or lf):
+        if not (hp or lf or k in d2_photos):
             return
         o = want.get(k)
         want[k] = (p["nick"], (o and o[1]) or hp, (o and o[2]) or lf) if o else (p["nick"], hp, lf)
@@ -8057,19 +8076,26 @@ def build_player_photos() -> None:
         d = load_json(f, {}) or {}
         for p in (d.get("roster") or []) + (d.get("players") or []) + (d.get("coach") or []):
             add(p)
-    todo_h, todo_l = [], []
+    todo_h, todo_l, todo_d = [], [], []
     for k, (nick, hp, lf) in want.items():
         h = have.get(k) or {}
-        ok = h.get("f") and (OUT / h["f"]).exists()
+        ok = h.get("f") and (OUT / h["f"]).exists() and h.get("src") != "d2"  # заглушку dust2 меняем на любое настоящее фото
         m = miss.get(k) or {}
         fresh_miss = lambda key: m.get(key) and (parse_iso(m.get(key)) or NOW - timedelta(days=30)) > NOW - timedelta(days=7)
         if hp and not (ok and h.get("src") == "hltv" and h.get("url") == hp) and not fresh_miss("th"):
             if len(todo_h) < PIMG_HLTV_NEW:
                 todo_h.append((k, nick, hp))
             continue
-        if lf and not ok and not (m.get("file") == lf and fresh_miss("t")) and len(todo_l) < PIMG_NEW:
-            todo_l.append((k, nick, lf))
-    if not (todo_h or todo_l):
+        if lf and not ok and not (m.get("file") == lf and fresh_miss("t")):
+            if len(todo_l) < PIMG_NEW:
+                todo_l.append((k, nick, lf))
+            continue
+        # ни HLTV, ни Liquipedia — маленький портрет из состава на странице матча dust2 (пока не придёт настоящее)
+        dp = (d2_photos.get(k) or {}).get("url")
+        if dp and not ok and not (h.get("src") == "d2" and h.get("f") and (OUT / h["f"]).exists()) and not fresh_miss("td") \
+                and len(todo_d) < PIMG_D2_NEW:
+            todo_d.append((k, nick, dp))
+    if not (todo_h or todo_l or todo_d):
         return
     (OUT / "pimg").mkdir(exist_ok=True)
 
@@ -8081,8 +8107,9 @@ def build_player_photos() -> None:
         (OUT / fn).write_bytes(body)
         have[k] = {"f": fn, "t": iso(NOW), **rec}
 
-    got_h = got_l = 0
-    for k, nick, url in todo_h:  # HLTV: картинка с их CDN, с той же паузой, что и страницы
+    got_h = got_l = got_d = 0
+    # HLTV (портрет со страницы игрока) и заглушки dust2 (тот же CDN HLTV) — с той же паузой, что и страницы HLTV
+    for k, nick, url, kind in [x + ("hltv",) for x in todo_h] + [x + ("d2",) for x in todo_d]:
         if _hltv_blocked[0]:
             break
         wait = 2.5 - (time.time() - _hltv_last[0])
@@ -8090,20 +8117,25 @@ def build_player_photos() -> None:
             time.sleep(wait)
         _hltv_last[0] = time.time()
         stats["hltv_requests"] = stats.get("hltv_requests", 0) + 1
+        mk = "th" if kind == "hltv" else "td"
         try:
-            body = http_get(url, {"User-Agent": HLTV_UA, "Accept": "image/avif,image/webp,image/*,*/*;q=0.8", "Referer": HLTV + "/"}, retry429=False)
+            body = http_get(url, {"User-Agent": HLTV_UA, "Accept": "image/avif,image/webp,image/*,*/*;q=0.8",
+                                  "Referer": (HLTV if kind == "hltv" else D2) + "/"}, retry429=False)
         except Exception as e:
-            warn(f"Фото HLTV {nick}: {e!r}")
-            miss.setdefault(k, {})["th"] = iso(NOW)
+            warn(f"Фото {'HLTV' if kind == 'hltv' else 'dust2'} {nick}: {e!r}")
+            miss.setdefault(k, {})[mk] = iso(NOW)
             if re.search(r"\b(403|429|503)\b", str(e)):
                 break  # отказ — до следующего сбора картинки HLTV не трогаем
             continue
         if len(body) < 500 or len(body) > 1_500_000:
-            miss.setdefault(k, {})["th"] = iso(NOW)
+            miss.setdefault(k, {})[mk] = iso(NOW)
             continue
         ext = "png" if body[:4] == b"\x89PNG" else "webp" if body[8:12] == b"WEBP" else "jpg"
-        save(k, body, ext, {"src": "hltv", "url": url})
-        got_h += 1
+        save(k, body, ext, {"src": kind, "url": url})
+        if kind == "hltv":
+            got_h += 1
+        else:
+            got_d += 1
     for i in range(0, len(todo_l), 50):
         part = [x for x in todo_l[i:i + 50] if not (have.get(x[0]) or {}).get("src") == "hltv"]
         if not part:
@@ -8152,7 +8184,8 @@ def build_player_photos() -> None:
                 continue
             save(k, body, ext, {"src": "lp", "file": fimg})
             got_l += 1
-    print(f"Фото игроков: новых с HLTV {got_h}, с Liquipedia {got_l}, всего {len(have)} (HLTV {sum(1 for v in have.values() if v.get('src') == 'hltv')})")
+    print(f"Фото игроков: новых с HLTV {got_h}, с Liquipedia {got_l}, заглушек dust2 {got_d}, всего {len(have)} "
+          f"(HLTV {sum(1 for v in have.values() if v.get('src') == 'hltv')}, dust2 {sum(1 for v in have.values() if v.get('src') == 'd2')})")
     save_json(path, {"updated": iso(NOW), "p": have, "miss": miss})
 
 
@@ -8629,6 +8662,7 @@ def main() -> int:
     save_json(HLTV_CACHE_F, hltv_cache)
     save_json(VETO_CACHE_F, veto_cache)
     save_json(D2_STATS_F, d2_stats)
+    save_json(D2_PHOTOS_F, d2_photos)
     for k in [k for k in giga_usage if k < (NOW - timedelta(days=40)).strftime("%Y-%m-%d")]:
         del giga_usage[k]
     save_json(GIGA_USAGE_F, giga_usage)
