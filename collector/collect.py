@@ -171,6 +171,10 @@ NAME_RU = {  # русские имена, которые владелец поп
     "xelex": "Адриан Винце",
     "saadzin": "Гильерме Пачеку",  # 26.11: нейросеть дала «Гиларме»
 }
+ROLE_FIX = {  # ручные роли (важнее Liquipedia): ник → {"igl": True/False}; владелец 26.11: у Chinggis Warriors капитан fury5k (HLTV), не cool4st
+    "cool4st": {"igl": False},
+    "fury5k": {"igl": True},
+}
 FIRST_RU = {  # имена, которые нейросеть передаёт неверно: оригинал → как по-русски (владелец 26.11)
     "guilherme": "Гильерме",
 }
@@ -1283,7 +1287,9 @@ def merge_roster(panda_players: list[dict], lp: dict | None) -> tuple[list[dict]
     res = []
     for lp_p in lp["players"]:
         pp = by_nick.get(nick_find(lp_p["nick"], by_nick) or norm(lp_p["nick"]), {})
-        tags = list(dict.fromkeys((["Капитан"] if lp_p.get("igl") else []) + list(lp_p.get("roles") or [])))
+        rf = ROLE_FIX.get(norm(lp_p.get("nick"))) or {}
+        igl = rf["igl"] if "igl" in rf else lp_p.get("igl")
+        tags = list(dict.fromkeys((["Капитан"] if igl else []) + list(lp_p.get("roles") or [])))
         if lp_p.get("note") and lp_p["note"] not in ("player",):
             note = lp_p["note"]
             if "loan" in note:
