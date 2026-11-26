@@ -2011,7 +2011,11 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
   // ---------- команда из рейтинга
   function getTeam(slug) {
     state.teams = state.teams || {};
-    if (!state.teams[slug]) { var tj = dcJSON("data/team/" + encodeURIComponent(slug) + ".json"); if (tj) state.teams[slug] = tj; }
+    // каждый раз из кэша устройства (его подновляет фоновая загрузка), а не из памяти на весь сеанс:
+    // раньше страница команды держалась до перезапуска и расходилась с матчем (владелец 26.11: cool4st «Капитан»)
+    var tu = "data/team/" + encodeURIComponent(slug) + ".json", c0 = DC[dkey(tu)];
+    if (c0 && state.teams[slug] && state.teams[slug].__t === c0.t) return Promise.resolve(state.teams[slug]);
+    var tj = dcJSON(tu); if (tj) { try { Object.defineProperty(tj, "__t", { value: c0.t }); } catch (e) {} state.teams[slug] = tj; }
     if (state.teams[slug]) return Promise.resolve(state.teams[slug]);
     return dfetch("data/team/" + encodeURIComponent(slug) + ".json" + bust()).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); }).then(function (j) { state.teams[slug] = j; return j; });
   }
