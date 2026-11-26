@@ -1175,7 +1175,7 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
 .shead.shbg::after { content: ""; position: absolute; inset: 0; z-index: -1; background: linear-gradient(180deg, color-mix(in srgb, var(--bg) 30%, transparent) 0%, color-mix(in srgb, var(--bg) 72%, transparent) 60%, var(--bg) 100%); }
 
 /* 26.11 (владелец): имена игроков видно издалека — крупнее и светлее, русское произношение белым */
-.pl .rn { font-size: 14px; color: #c3c6cc; line-height: 1.35; }
+.pl .rn { font-size: 14px; color: color-mix(in srgb, var(--fg) 78%, transparent); line-height: 1.35; }
 .pl .rn .pron { font-size: inherit; font-weight: 650; color: var(--fg); }
 /* имя и русское произношение — на всю ширину строки, под ником и плашками ролей; рейтинг — внизу справа, рядом с «Мейджорами» */
 .pl.hasrt .rcol { grid-row: 1; }
@@ -1186,6 +1186,15 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
 .pl .prt b.hi { color: var(--win); } .pl .prt b.lo { color: var(--loss); }
 .pl .prt small { font-size: 10px; color: var(--muted); margin-top: 2px; white-space: nowrap; }
 .mini { gap: 6px; } .mini .mo { gap: 2px; } .mini .mo i { padding: 1px 3px; letter-spacing: -.03em; }  /* исходы в свёрнутой шапке — как до редизайна, одной строкой (владелец 26.11) */
+/* 26.11 (владелец): во всех всплывающих окнах шрифт крупнее, нажимаемые строки выше — проще попасть пальцем */
+.pop-in { font-size: 16px; max-width: min(360px, calc(100vw - 24px)); max-height: 60vh; padding: 14px 16px; }
+.pop-in > b { font-size: 17px; margin-bottom: 8px; }
+.pop-in ul { gap: 6px; }
+.pop-in li.mj { margin-bottom: 8px; line-height: 1.35; }
+.pop-in li.ph { font-size: 12.5px; margin-top: 12px; }
+.pop-in li.psub, .pop-in li.pback { padding: 7px 0; margin: -3px 0; }
+.pop-in li.pback { font-size: 15px; }
+.pop-in .pci b { font-size: 16px; }
 </style>
 
 <div class="wrap" id="app"></div>
