@@ -2731,6 +2731,8 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
     var w = {}; (t.match(/[A-Za-z][A-Za-z0-9._\-]+/g) || []).forEach(function (x) { w[x.toLowerCase()] = 1; });
     return Object.keys(w).length >= 14;
   }
+  // «в стадия 2» → «в стадию 2», «в первая стадия» → «в первую стадию» (винительный падеж после «в»)
+  function vinit(t) { return String(t).replace(/(^|\s)(\S+?)ая(\s+стади)я/g, "$1$2ую$3ю").replace(/(^|\s)стадия(?=\s|$)/g, "$1стадию").replace(/(^|\s)группа(?=\s|$)/g, "$1группу"); }
   function factsBlock(m) {
     // факты для эфира — связи игроков: кто с кем играл вместе и когда, кто играл за соперника (Liquipedia)
     var F = (m.facts || []).filter(function (f) { return f.kind === "link"; });
@@ -3893,7 +3895,7 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
       var S = ((rounds[0] || {}).matches || []).length * 2;
       var sw = stages.filter(function (x) { return isSwiss(x); }), k = sw.indexOf(hit.st);
       var later = /major|мейдж|мажор/i.test(String((m.serie || {}).name || m.tournament || "")) && /(stage|стадия)\s*([123])/i.test(hit.st.title || "") ? (3 - +RegExp.$2) * 8 : sw.slice(k + 1).reduce(function (a, x) { return a + Math.max(0, (((x.rounds || [])[0] || {}).matches || []).length * 2 - S / 2); }, 0);
-      var nx = stages[stages.indexOf(hit.st) + 1], into = nx ? 'в ' + esc(String(nx.title || "следующую стадию").toLowerCase()) : 'дальше';
+      var nx = stages[stages.indexOf(hit.st) + 1], into = nx ? 'в ' + esc(vinit(String(nx.title || "следующую стадию").toLowerCase())) : 'дальше';
       var outRank = function (w) { var lo = S / 2 + 1 + [0, 3, 6][2 - w], hi = lo + (w === 0 ? 1 : 2); return [later + lo, later + hi]; };  // 2:3 → 9–11, 1:3 → 12–14, 0:3 → 15–16 в стадии из 16
       out.push(wv + 1 >= 3 ? ["↗", 'Победитель выходит ' + into + ' (' + (wv + 1) + ':' + lv + ')'] : ["↗", 'Победитель — ' + (wv + 1) + ':' + lv]);
       if (lv + 1 >= 3 && S === 16) { var rr = outRank(wv); out.push(["✗", 'Проигравший вылетает (' + wv + ':3), ' + rr[0] + '–' + rr[1] + '-е место' + reward(rr[0])]); }
@@ -3924,7 +3926,7 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
       out.push(["↗", 'Победитель — в ' + esc(String(nextR.name || "следующий раунд").toLowerCase()) + (opp ? ' против ' + esc(opp) : '')]);
     } else if (hit.st.format !== "playoff") {
       var nextSt = stages[hit.si + 1];
-      out.push(["↗", 'Победитель выходит ' + (nextSt ? 'в ' + esc(String(nextSt.title || "следующую стадию").toLowerCase()) : 'дальше')]);
+      out.push(["↗", 'Победитель выходит ' + (nextSt ? 'в ' + esc(vinit(String(nextSt.title || "следующую стадию").toLowerCase())) : 'дальше')]);
     }
     var nLose = (rd.matches || []).length, above = (nextR ? (nextR.matches || []).length * 2 : 1);
     if (third && /полуфинал|semi/i.test(name)) out.push(["🥉", 'Проигравший сыграет за 3-е место']);

@@ -29,8 +29,17 @@ jobs:
         run: |
           go=1
           if [ "${{ github.event_name }}" = "schedule" ]; then
-            last=$(gh api "repos/${{ github.repository }}/actions/workflows/collect.yml/runs?per_page=10" \
-              --jq '[.workflow_runs[] | select(.id != ${{ github.run_id }}) | select(.conclusion == "success" or .status == "in_progress" or .status == "queued") | .run_started_at][0]')
+            # считаются только настоящие сборы: пропущенный запуск (gate → skip) длится ~20 с и тоже «success» —
+            # 26.11 из-за него каждый пропуск сдвигал отсчёт, и полный сбор не шёл с 15:04 до 16:12 (рейтинг VRS устарел)
+            last=""
+            for row in $(gh api "repos/${{ github.repository }}/actions/workflows/collect.yml/runs?per_page=10" \
+                --jq '.workflow_runs[] | select(.id != ${{ github.run_id }}) | "\(.id),\(.status),\(.run_started_at)"'); do
+              id=${row%%,*}; rest=${row#*,}; st=${rest%%,*}; started=${rest#*,}
+              if [ "$st" = "in_progress" ] || [ "$st" = "queued" ]; then last=$started; break; fi
+              # сбор шёл на деле — задание run выполнено (а не пропущено)
+              rc=$(gh api "repos/${{ github.repository }}/actions/runs/$id/jobs" --jq '[.jobs[] | select(.name == "run") | .conclusion][0]')
+              if [ "$rc" = "success" ] || [ "$rc" = "failure" ] || [ "$rc" = "cancelled" ]; then last=$started; break; fi
+            done
             if [ -n "$last" ] && [ "$last" != "null" ]; then
               age=$(( $(date +%s) - $(date -d "$last" +%s) ))
               echo "Прошлый полный сбор начат $((age / 60)) мин назад"
