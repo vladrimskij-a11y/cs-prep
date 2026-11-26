@@ -10,36 +10,27 @@ jobs:
   probe:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - name: Кэш сборщика
-        uses: actions/cache/restore@v4
-        with:
-          path: cache
-          key: collector-cache-probe-${{ github.run_id }}
-          restore-keys: collector-cache-
-      - name: Запись event3 BLAST в кэше
+      - name: Цены стикеров Сингапура на торговой площадке Steam
         run: |
           python3 - <<'EOF'
-          import json
-          c = json.load(open("cache/hltv.json"))
-          for k, v in c.items():
-              if k.startswith("event3:") and "BLAST" in k:
-                  d = v.get("data") or {}
-                  print(k, "t=", v.get("t"), "tbd2=", v.get("tbd2"), "teams=", len(d.get("teams") or []))
-              if k.startswith("hfail:") and "8295" in k:
-                  print(k, v)
-          EOF
-      - name: Страница события HLTV (один запрос)
-        run: |
-          curl -s -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Safari/537.36" \
-            -H "Accept: text/html" -H "Accept-Language: en-US,en;q=0.9" -o ev.html -w "HTTP %{http_code}\n" \
-            https://www.hltv.org/events/8295/blast-bounty-2027-season-1
-          python3 - <<'EOF'
-          import re
-          b = re.sub(r">\s+<", "><", open("ev.html", encoding="utf-8", errors="replace").read())
-          print("team-name:", b.count('class="team-name"'), "team-box:", b.count("team-box"), "TBD:", b.count("TBD"))
-          for m in list(re.finditer(r"TBD", b))[:6]:
-              print("----TBD----"); print(b[max(0, m.start() - 900):m.start() + 500])
-          i = b.find('class="team-name"')
-          print("----first team-name----"); print(b[i - 300:i + 900])
+          import json, time, urllib.request, urllib.parse
+          UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Safari/537.36"}
+          def get(u):
+              try:
+                  r = urllib.request.urlopen(urllib.request.Request(u, headers=UA), timeout=30)
+                  return r.status, r.read().decode("utf-8", "replace")
+              except urllib.error.HTTPError as e:
+                  return e.code, ""
+          q = urllib.parse.urlencode({"query": "Singapore 2026", "appid": 730, "norender": 1, "count": 30, "sort_column": "quantity", "sort_dir": "desc"})
+          st, body = get("https://steamcommunity.com/market/search/render/?" + q)
+          print("поиск: HTTP", st)
+          items = (json.loads(body) if body else {}).get("results") or []
+          print("найдено всего:", (json.loads(body) if body else {}).get("total_count"))
+          for x in items[:30]:
+              print(f'{x.get("sell_listings"):>8} лотов  {x.get("sell_price_text"):>8}  {x.get("hash_name")}')
+          caps = [x["hash_name"] for x in items if "Capsule" in x["hash_name"]][:2] or [x["hash_name"] for x in items[:2]]
+          for n in caps:
+              time.sleep(4)
+              st, body = get("https://steamcommunity.com/market/priceoverview/?" + urllib.parse.urlencode({"appid": 730, "currency": 5, "market_hash_name": n}))
+              print("цена:", n, "HTTP", st, body)
           EOF

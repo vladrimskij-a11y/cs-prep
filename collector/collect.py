@@ -4009,9 +4009,10 @@ def parse_hltv_event(html: str) -> dict:
         merged.append({**p, "count": 1, "teams": [p["team"]] if p.get("team") else []})
     res["places"] = merged
     # и пустые места «TBD» с путём попадания («Europe Closed Qualifier») — у них нет ссылки на команду (владелец 26.11)
-    teams = re.findall(r'<div class="team-name">(?:<a href="/team/\d+/[^"]+">)?<div class="text-container"><div class="text">([^<]+)</div>'
+    # 27.11: у пустого места HLTV пишет просто <div class="team-name">TBD</div> — без ссылки и text-container
+    teams = re.findall(r'<div class="team-name">\s*(?:(?:<a href="/team/\d+/[^"]+">)?\s*<div class="text-container">\s*<div class="text">([^<]+)</div>|([^<]+?)\s*</div>)'
                        r'(?:(?!class="team-name").)*?<div class="sub-text event-text">(.*?)</div>', b, re.S)
-    res["teams"] = [{"name": strip_html(n), "how": strip_html(h)} for n, h in teams]
+    res["teams"] = [{"name": strip_html(n or n2), "how": strip_html(h)} for n, n2, h in teams]
     lineups = {}
     for box in b.split('class="col standard-box team-box')[1:]:
         tn = re.search(r'<div class="text">([^<]+)</div>', box)
@@ -4069,7 +4070,7 @@ def hltv_cached(key: str, fn, ttl_h: float | None = None):
     return c["data"] if c else None
 
 
-_tbd_rr = [0]  # перечиток событий ради мест TBD за сбор (не больше 4 — HLTV бережём)
+_tbd_rr = [0]  # перечиток (флаг tbd3: 27.11 починили разбор пустых мест) событий ради мест TBD за сбор (не больше 4 — HLTV бережём)
 
 
 def tournament_extras(name: str, final: bool = False) -> dict | None:
@@ -4085,16 +4086,16 @@ def tournament_extras(name: str, final: bool = False) -> dict | None:
         r = hltv_cached("event3:" + name, lambda: _tour_extras_net(name), ttl_h=0) or c["data"]
         hltv_cache["event3:" + name]["fin_try"] = n  # не больше 6 попыток (раз в сбор)
         return r
-    if c and c.get("data") and not c.get("tbd2") and _tbd_rr[0] < 4 and not STATS:
+    if c and c.get("data") and not c.get("tbd3") and _tbd_rr[0] < 4 and not STATS:
         _tbd_rr[0] += 1
         # 26.11: участники теперь с пустыми местами из квалификаций (TBD) — старые записи перечитываем один раз
         r = hltv_cached("event3:" + name, lambda: _tour_extras_net(name), ttl_h=0) or c["data"]
         if hltv_cache.get("event3:" + name):
-            hltv_cache["event3:" + name]["tbd2"] = 1
+            hltv_cache["event3:" + name]["tbd3"] = 1
         return r
     r = hltv_cached("event3:" + name, lambda: _tour_extras_net(name))
     if hltv_cache.get("event3:" + name):
-        hltv_cache["event3:" + name]["tbd2"] = 1
+        hltv_cache["event3:" + name]["tbd3"] = 1
     return r
 
 
