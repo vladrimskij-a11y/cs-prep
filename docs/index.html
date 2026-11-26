@@ -577,7 +577,7 @@ html { overflow-anchor: none; }
 .pop-in li.mj { margin-bottom: 7px; line-height: 1.3; }
 .facts.beef .fact { display: flex; flex-direction: column; gap: 4px; }
 .facts.beef .bf-who { font-size: 12px; font-weight: 700; color: var(--muted); }
-.facts.beef .bf-tag { font-style: normal; display: inline-block; margin-right: 6px; padding: 1px 6px; border-radius: 6px; background: var(--sunk); color: var(--fg); font-size: 11px; }
+.facts .bf-tag { font-style: normal; display: inline-block; margin-right: 6px; padding: 1px 6px; border-radius: 6px; background: var(--sunk); color: var(--fg); font-size: 11px; }
 .facts.beef .bf-t { font-weight: 600; }
 .facts.beef .bf-m { color: var(--muted); font-size: 13px; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
 .facts.beef .bf-src { font-size: 12px; color: var(--muted); }
@@ -1076,7 +1076,7 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
 .fi-body img { width: 88px; height: 88px; border-radius: 12px; }
 .fact { padding: 13px 16px; font-size: 14.5px; line-height: 1.5; }
 .facts.beef .bf-t { font-weight: 700; letter-spacing: -.01em; }
-.facts.beef .bf-tag { border-radius: 6px; font-weight: 700; }
+.facts .bf-tag { border-radius: 6px; font-weight: 700; }
 .ftag { letter-spacing: .04em; }
 .rd h1 { font-family: var(--display); font-weight: 800; font-size: 24px; letter-spacing: -.03em; line-height: 1.2; }
 .rd p { font-size: 16.5px; line-height: 1.62; letter-spacing: -.01em; }
@@ -2645,15 +2645,16 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
     var F = (m.facts || []).filter(function (f) { return f.kind === "link"; });
     // конфликты и громкие истории между людьми из двух команд — посты Telegram-каналов со ссылкой (владелец 24.11)
     var B = (m.facts || []).filter(function (f) { return f.kind === "beef"; });
-    var bh = !B.length ? "" : '<div class="sec"><h3>Истории между игроками <span>из новостей · знать, не цитировать</span></h3><div class="box facts beef">' +
-      B.map(function (f) {
-        return '<div class="fact"><span class="bf-who">' + (f.tag ? '<i class="bf-tag">' + esc(f.tag) + '</i>' : '') + esc(f.who) + '</span><span class="bf-t">' + esc(f.text) + '</span>' + (f.more ? '<span class="bf-m">' + esc(f.more) + '</span>' : '') +
-          '<span class="bf-src">' + (f.date ? esc(fmt(new Date(f.date + "T12:00:00Z"), { day: "numeric", month: "long", year: "numeric" })) + ' · ' : '') + '<a href="' + esc(f.url) + '" data-tg="' + esc(f.url) + '" target="_blank" rel="noopener">источник</a></span></div>';
-      }).join("") + '</div></div>';
-    if (!F.length) return bh;
+    // один блок «Связи игроков» (владелец 26.11): сначала истории из новостей (конфликты, родня, дружба, общие события),
+    // потом где играли вместе и против кого (Liquipedia)
+    if (!F.length && !B.length) return "";
+    var bh = B.map(function (f) {
+      return '<div class="fact"><span class="bf-who">' + (f.tag ? '<i class="bf-tag">' + esc(f.tag) + '</i>' : '') + esc(f.who) + '</span><span class="bf-t">' + esc(f.text) + '</span>' + (f.more ? '<span class="bf-m">' + esc(f.more) + '</span>' : '') +
+        '<span class="bf-src">' + (f.date ? esc(fmt(new Date(f.date + "T12:00:00Z"), { day: "numeric", month: "long", year: "numeric" })) + ' · ' : '') + '<a href="' + esc(f.url) + '" data-tg="' + esc(f.url) + '" target="_blank" rel="noopener">источник</a></span></div>';
+    }).join("");
     var shown = state.factsAll ? F : F.slice(0, 10);
-    var html = bh + '<div class="sec"><h3>Связи игроков <span>по истории команд · Liquipedia</span></h3><div class="box facts">';
-    shown.forEach(function (f) { html += '<div class="fact"><span>' + esc(f.text) + '</span></div>'; });
+    var html = '<div class="sec"><h3>Связи игроков <span>' + (B.length ? 'знать, не цитировать' : 'по истории команд') + '</span></h3><div class="box facts' + (B.length ? ' beef' : '') + '">' + bh;
+    shown.forEach(function (f) { html += '<div class="fact"><span>' + (f.tag && f.tag !== "Связь" ? '<i class="bf-tag">' + esc(f.tag) + '</i> ' : '') + esc(f.text) + '</span></div>'; });
     if (F.length > 10) html += '<button class="fmore" id="facts-more">' + (state.factsAll ? "Свернуть" : "Показать ещё " + (F.length - 10)) + '</button>';
     return html + '</div></div>';
   }
