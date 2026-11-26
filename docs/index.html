@@ -1223,6 +1223,10 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
 .pgf .pgx img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: top; }
 .pgf figcaption { font-size: 15px; font-weight: 700; color: var(--fg); text-align: center; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pgf figcaption small { display: block; font-size: 11px; font-weight: 500; color: var(--muted); }
+/* 26.11 (владелец): кнопки у игрока (🏆, 🏅, 👥, «Мейджоры») — светлее фона строки и с тонкой рамкой, как «📷 Фото» в шапке */
+.pl .medal, .pl .pmaj.tap { background: color-mix(in srgb, var(--fg) 11%, var(--surface)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--fg) 14%, transparent); border-radius: 999px; color: var(--fg); }
+.pl .medal { padding: 3px 9px; } .pl .pmaj.tap { padding: 4px 11px; }
+.pl .pmaj.tap b, .pl .medal b { color: var(--fg); }
 </style>
 
 <div class="wrap" id="app"></div>
