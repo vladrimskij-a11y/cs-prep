@@ -4002,8 +4002,9 @@ def parse_hltv_event(html: str) -> dict:
             continue
         merged.append({**p, "count": 1, "teams": [p["team"]] if p.get("team") else []})
     res["places"] = merged
-    teams = re.findall(r'<div class="team-name"><a href="/team/\d+/[^"]+"><div class="text-container"><div class="text">([^<]+)</div>'
-                       r'.*?<div class="sub-text event-text">(.*?)</div>', b)
+    # и пустые места «TBD» с путём попадания («Europe Closed Qualifier») — у них нет ссылки на команду (владелец 26.11)
+    teams = re.findall(r'<div class="team-name">(?:<a href="/team/\d+/[^"]+">)?<div class="text-container"><div class="text">([^<]+)</div>'
+                       r'(?:(?!class="team-name").)*?<div class="sub-text event-text">(.*?)</div>', b, re.S)
     res["teams"] = [{"name": strip_html(n), "how": strip_html(h)} for n, h in teams]
     lineups = {}
     for box in b.split('class="col standard-box team-box')[1:]:
@@ -4195,7 +4196,7 @@ def build_major(rosters: dict) -> dict | None:
                     h = hltv_get(events[slug])
                     if h:
                         ev = parse_hltv_event(h)
-                        stages[key] = {"teams": ev["teams"], "places": ev["places"], "prize": ev.get("prize"), "url": HLTV + events[slug]}
+                        stages[key] = {"teams": [t for t in ev["teams"] if t["name"].strip().upper() not in ("TBD", "TBA")], "places": ev["places"], "prize": ev.get("prize"), "url": HLTV + events[slug]}
             data["event"] = base
         data["stages"] = stages
         return data

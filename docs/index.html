@@ -1240,6 +1240,7 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
 .home-brand h1 .hb-dot { color: var(--onair); text-shadow: 0 0 10px color-mix(in srgb, var(--onair) 60%, transparent); animation: hbOnAir 3s ease-in-out infinite; }
 @keyframes hbOnAir { 0%, 100% { opacity: 1; } 50% { opacity: .82; } }
 @media (prefers-reduced-motion: reduce) { .home-brand h1 .hb-dot { animation: none; } }
+.ptile.tbd b { color: var(--muted); font-weight: 600; } .ptile.tbd .pt-lg i { font-style: normal; font-weight: 800; }
 </style>
 
 <div class="wrap" id="app"></div>
@@ -2654,6 +2655,8 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
     list = list.map(function (t, i) { return [t, i]; }).sort(function (a, b) { return ord(a[0]) - ord(b[0]) || String(a[0].how).localeCompare(String(b[0].how)) || a[1] - b[1]; }).map(function (x) { return x[0]; });
     return '<div class="sec"><h3>Участники <span>' + list.length + ' ' + plural(list.length, "команда", "команды", "команд") + '</span></h3><div class="ptiles">' + list.map(function (t) {
       var g = howRu(t.how), vrs = /^VRS/.test(g);
+      if (/^(TBD|TBA)$/i.test(String(t.name || "").trim()))  // место ещё не занято — откуда придёт команда (владелец 26.11)
+        return '<div class="ptile tbd"><span class="pt-lg"><i>?</i></span><b>Ждём команду</b><small>' + esc(g || "—") + '</small></div>';
       return '<button class="ptile" data-tname="' + esc(t.name) + '"><span class="pt-lg">' + (logo(t.name) || '<i>' + esc(String(t.name || "?").slice(0, 2)) + '</i>') + '</span>' +
         '<b>' + esc(t.name) + '</b><small class="' + (vrs ? "vrs" : "") + '">' + (vrs ? '<span class="vrs-b">VRS</span>' + esc(g.replace(/^VRS\s*/, "")) : esc(g || "—")) + '</small></button>';
     }).join("") + '</div></div>';
