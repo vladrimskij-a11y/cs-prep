@@ -1235,9 +1235,8 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
 .rk { contain-intrinsic-size: auto 56px; }
 
 /* название «Приложение Рима» (владелец 26.11): минимализм, стильно; точка — лампа «в эфире» */
-.home-brand h1 { display: flex; flex-wrap: wrap; align-items: baseline; line-height: 1; font-size: 44px; }
-.home-brand h1 .hb-sm { flex-basis: 100%; font-family: var(--display); font-size: 12px; font-weight: 600; letter-spacing: .32em;
-  text-transform: uppercase; color: var(--muted); margin: 0 0 10px 2px; }
+.home-brand h1 { display: flex; flex-wrap: wrap; align-items: baseline; line-height: 1.04; font-size: clamp(30px, 9.4vw, 40px); }
+.home-brand h1 .hb-sm { flex-basis: 100%; margin-bottom: 4px; }
 .home-brand h1 .hb-dot { color: var(--onair); animation: hbOnAir 2.6s ease-in-out infinite; }
 @keyframes hbOnAir { 0%, 100% { opacity: 1; text-shadow: 0 0 12px color-mix(in srgb, var(--onair) 55%, transparent); } 50% { opacity: .45; text-shadow: none; } }
 @media (prefers-reduced-motion: reduce) { .home-brand h1 .hb-dot { animation: none; } }
