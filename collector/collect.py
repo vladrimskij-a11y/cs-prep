@@ -165,6 +165,7 @@ def load_json(path: Path, default):
 
 
 NAME_RU = {  # русские имена, которые владелец поправил вручную (важнее нейросети): ник → «Имя Фамилия»
+    "xantares": "Исмаилджан Дёрткардеш",
     "pr": "Олдрич Новый",
     "xertion": "Дориан Берман",
     "sycrone": "Деннис Нильсен",
@@ -3090,13 +3091,35 @@ João — Жуан, -ão — -ан/-ау, «lh» — «льй/ль»; испан
 Порядок «Имя Фамилия» не меняй, ударения не ставь. Верни ТОЛЬКО тех, у кого запись неверна, с исправленной записью.
 Ответ строго JSON: {"fix": [{"nick": "<ник как во входе>", "name_ru": "<исправленная запись>"}]}. Если всё верно — {"fix": []}."""
 _pron_recheck: dict = {}
-PRON_CHECK_RUN = 240  # имён на проверку за полный сбор (пачками по 40, Gemini)
+PRON_CHECK_RUN = 600  # имён на проверку за полный сбор (пачками по 40, Gemini; всего ~480)
 
 
 def pron_recheck() -> None:
     """Владелец 26.11 («Гиларме» вместо «Гильерме»): все русские имена из кэша один раз проверяет Gemini; исправленное
     пишется в кэш (навсегда, флаг chk) и сразу в карточки и страницы команд."""
-    if not gem_ok() or not _pron_recheck:
+    if not gem_ok():
+        print("Проверка русских имён: Gemini недоступен")
+        return
+    # все люди с русским именем из карточек и страниц команд (не только те, кого сбор прогнал через add_pronunciation —
+    # 26.11 список был пуст, проверка не шла: XANTARES «Исмаилкан» вместо «Исмаилджан»)
+    def scan(x):
+        if isinstance(x, dict):
+            if isinstance(x.get("nick"), str) and x.get("name_ru"):
+                full = " ".join(v for v in (x.get("first_name"), x.get("last_name")) if v) or x.get("name") or ""
+                key = norm(x["nick"]) + "|" + norm(full)
+                ent = pron_cache.get(key)
+                if full and ent and ent.get("name_ru") and not ent.get("chk"):
+                    _pron_recheck.setdefault(key, {"nick": x["nick"], "full": full, "cc": x.get("nationality") or x.get("flag"), "ru": ent["name_ru"]})
+            for vv in x.values():
+                if isinstance(vv, (dict, list)):
+                    scan(vv)
+        elif isinstance(x, list):
+            for vv in x:
+                scan(vv)
+    for f in list((OUT / "team").glob("*.json")) + list((OUT / "match").glob("*.json")):
+        scan(load_json(f, None))
+    if not _pron_recheck:
+        print("Проверка русских имён: проверять нечего")
         return
     items = list(_pron_recheck.items())[:PRON_CHECK_RUN]
     fixed = {}
@@ -3114,7 +3137,7 @@ def pron_recheck() -> None:
         for key, v in part:
             new = got.get(norm(v["nick"]))
             ent = pron_cache.get(key) or {}
-            if new and new != v["ru"] and len(new.split()) == len(v["ru"].split()):
+            if new and new != v["ru"].replace("\u0301", "") and len(new.split()) == len(v["ru"].split()):
                 ent["name_ru"] = new
                 fixed[norm(v["nick"])] = (v["ru"], new)
             ent["chk"] = 1
