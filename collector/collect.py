@@ -169,6 +169,10 @@ NAME_RU = {  # русские имена, которые владелец поп
     "xertion": "Дориан Берман",
     "sycrone": "Деннис Нильсен",
     "xelex": "Адриан Винце",
+    "saadzin": "Гильерме Пачеку",  # 26.11: нейросеть дала «Гиларме»
+}
+FIRST_RU = {  # имена, которые нейросеть передаёт неверно: оригинал → как по-русски (владелец 26.11)
+    "guilherme": "Гильерме",
 }
 
 
@@ -178,6 +182,10 @@ def apply_name_ru(x) -> None:
         k = norm(x.get("nick")) if isinstance(x.get("nick"), str) else ""
         if k in NAME_RU and ("name_ru" in x or "first_name" in x or "name" in x or "role" in x):
             x["name_ru"] = NAME_RU[k]
+        elif isinstance(x.get("name_ru"), str) and x["name_ru"]:
+            fn = norm((x.get("first_name") or (x.get("name") or "").split(" ")[0] or ""))
+            if fn in FIRST_RU and not x["name_ru"].startswith(FIRST_RU[fn]):
+                x["name_ru"] = FIRST_RU[fn] + (" " + x["name_ru"].split(" ", 1)[1] if " " in x["name_ru"] else "")
         for v in x.values():
             if isinstance(v, (dict, list)):
                 apply_name_ru(v)
@@ -7289,7 +7297,7 @@ def build_detail(m: dict, prev: dict | None) -> dict:
                 warn(f"Игрок HLTV {p.get('nick')}: {e!r}")
                 info = None
             if info:
-                p.update({k: v for k, v in info.items() if v})
+                p.update({k: v for k, v in info.items() if v}, hl=1)  # hl — данные HLTV есть (0 мейджоров — настоящий ноль)
     # подробности по каждой серии из «Формы» и личных встреч — открываются по нажатию
     series = {}
     for x in detail.get("h2h") or []:
@@ -7487,7 +7495,7 @@ def build_team_page(r: dict) -> dict | None:
             for p, isc in [(x, False) for x in roster] + [(x, True) for x in coach]:
                 info = hltv_player_info(p.get("nick") or "", coach=isc)
                 if info:
-                    p.update({k: v for k, v in info.items() if v})
+                    p.update({k: v for k, v in info.items() if v}, hl=1)  # hl — данные HLTV есть (0 мейджоров — настоящий ноль)
             for p in roster:
                 full = " ".join(x for x in (p.get("first_name"), p.get("last_name")) if x)
                 pc = pron_cache.get(norm(p.get("nick")) + "|" + norm(full)) or {}
@@ -7524,7 +7532,7 @@ def build_team_page(r: dict) -> dict | None:
         for p in roster:
             info = hltv_player_info(p["nick"])
             if info:
-                p.update({k: v for k, v in info.items() if v})
+                p.update({k: v for k, v in info.items() if v}, hl=1)  # hl — данные HLTV есть (0 мейджоров — настоящий ноль)
             pc = next((v for k, v in pron_cache.items() if k.startswith(norm(p["nick"]) + "|") and v.get("name_ru")), None)
             if pc:
                 p["name_ru"] = pc["name_ru"]
@@ -8524,7 +8532,7 @@ def main() -> int:
         warn(f"Позиции ProRoles: {e!r}")
     # «Будущие игры» на страницах команд — на каждом сборе (страницы целиком пересобираются раз в 3–12 ч, а расписание меняется чаще)
     # и сверка со свежими карточками матчей: состав, трофеи, MVP и мажоры у команды должны совпадать с тем, что в матче
-    PFIELDS = ("mvp", "mvp_events", "majors", "major_wins", "major_events", "trophies", "event_wins", "event_seconds", "win_teams", "name_ru", "tags", "photo")
+    PFIELDS = ("mvp", "mvp_events", "majors", "major_wins", "major_events", "trophies", "event_wins", "event_seconds", "win_teams", "name_ru", "tags", "photo", "hl")
     by_team: dict = {}
     for mf in (OUT / "match").glob("*.json"):
         md = load_json(mf, {}) or {}
@@ -8572,7 +8580,7 @@ def main() -> int:
     print(f"Будущие игры обновлены у {n_up} команд, сверено с матчами: {n_sync}")
     for f in list((OUT / "team").glob("*.json")) + list((OUT / "match").glob("*.json")):  # ручные имена — и в старых файлах
         d = load_json(f, None)
-        if d is not None and NAME_RU:
+        if d is not None and (NAME_RU or FIRST_RU):
             before = json.dumps(d, ensure_ascii=False)
             apply_name_ru(d)
             if json.dumps(d, ensure_ascii=False) != before:
