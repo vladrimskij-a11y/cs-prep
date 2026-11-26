@@ -1,0 +1,20 @@
+name: probe-brain
+on: workflow_dispatch
+jobs:
+  p:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/cache/restore@v4
+        with:
+          path: cache
+          key: collector-cache-none
+          restore-keys: collector-cache-
+      - run: |
+          python3 - <<'PY'
+          import json,glob
+          h=json.load(open('cache/hltv.json'))
+          for k,v in h.items():
+              s=json.dumps(v)[:600]
+              if 'brain' in k.lower() or '23294' in s or '"brain"' in s.lower():
+                  print('KEY',k, s[:600])
+          PY
