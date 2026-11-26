@@ -442,6 +442,11 @@ def fetch_bo3_tournaments() -> list[dict]:
             continue
         if (t.get("tier") or "").lower() != "s" and not tier2_ok(bo3_tour_teams(t)):
             continue
+        # bo3 заводит будущий турнир с датой «сейчас» (момент создания, с секундами) и без конца — 26.11 BLAST Open
+        # Spring 2027 (на деле март 2027) «начинался 26 ноября». Такую дату не берём: турнир придёт с HLTV/PandaScore.
+        sd = parse_iso(t.get("start_date"))
+        if sd and not t.get("end_date") and (sd.second or sd.microsecond or sd.minute % 5):
+            continue
         name = (t.get("name") or "").replace("Intel Extreme Masters", "IEM")
         out.append({"id": "bo3-" + str(t["id"]), "name": name, "tier": (t.get("tier") or "").lower(), "image": t.get("image_url"),
                     "begin": (parse_iso(t.get("start_date")) and iso(parse_iso(t["start_date"]))),
