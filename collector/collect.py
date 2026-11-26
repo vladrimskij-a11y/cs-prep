@@ -3057,6 +3057,65 @@ PRON_SYSTEM = """Ты помогаешь русскоязычному спорт
 {"people": [{"nick": "<ник как во входе>", "nick_ru": "...", "name_ru": "..."}]}"""
 
 
+PRON_CHECK_SYSTEM = """Ты — редактор русской транскрипции иностранных имён для спортивного комментатора.
+Тебе дают людей: ник, имя в оригинале, страну и текущую запись по-русски. Проверь запись по правилам практической
+транскрипции с языка этой страны (как пишут в русских СМИ и энциклопедиях): португальский/бразильский Guilherme — Гильерме,
+João — Жуан, -ão — -ан/-ау, «lh» — «льй/ль»; испанский; польский; чешский; датский; шведский; финский; турецкий; монгольский и т. д.
+Порядок «Имя Фамилия» не меняй, ударения не ставь. Верни ТОЛЬКО тех, у кого запись неверна, с исправленной записью.
+Ответ строго JSON: {"fix": [{"nick": "<ник как во входе>", "name_ru": "<исправленная запись>"}]}. Если всё верно — {"fix": []}."""
+_pron_recheck: dict = {}
+PRON_CHECK_RUN = 240  # имён на проверку за полный сбор (пачками по 40, Gemini)
+
+
+def pron_recheck() -> None:
+    """Владелец 26.11 («Гиларме» вместо «Гильерме»): все русские имена из кэша один раз проверяет Gemini; исправленное
+    пишется в кэш (навсегда, флаг chk) и сразу в карточки и страницы команд."""
+    if not gem_ok() or not _pron_recheck:
+        return
+    items = list(_pron_recheck.items())[:PRON_CHECK_RUN]
+    fixed = {}
+    for i in range(0, len(items), 40):
+        part = items[i:i + 40]
+        lines = "\n".join(f"- ник: {v['nick']}; имя: {v['full']}; страна: {v['cc'] or '?'}; сейчас: {v['ru']}" for _, v in part)
+        try:
+            res = parse_json_loose(gemini_call(PRON_CHECK_SYSTEM, [{"text": lines}], 1500))
+        except Exception as e:
+            warn(f"Проверка имён: {e!r}")
+            break
+        if res is None:
+            break
+        got = {norm(x.get("nick")): (x.get("name_ru") or "").strip() for x in (res or {}).get("fix") or [] if isinstance(x, dict)}
+        for key, v in part:
+            new = got.get(norm(v["nick"]))
+            ent = pron_cache.get(key) or {}
+            if new and new != v["ru"] and len(new.split()) == len(v["ru"].split()):
+                ent["name_ru"] = new
+                fixed[norm(v["nick"])] = (v["ru"], new)
+            ent["chk"] = 1
+            pron_cache[key] = ent
+    if fixed:
+        def walk(x):
+            if isinstance(x, dict):
+                k = norm(x.get("nick")) if isinstance(x.get("nick"), str) else ""
+                if k in fixed and x.get("name_ru") == fixed[k][0]:
+                    x["name_ru"] = fixed[k][1]
+                for vv in x.values():
+                    if isinstance(vv, (dict, list)):
+                        walk(vv)
+            elif isinstance(x, list):
+                for vv in x:
+                    walk(vv)
+        for f in list((OUT / "team").glob("*.json")) + list((OUT / "match").glob("*.json")):
+            d = load_json(f, None)
+            if d is not None:
+                b = json.dumps(d, ensure_ascii=False)
+                walk(d)
+                if json.dumps(d, ensure_ascii=False) != b:
+                    save_json(f, d)
+    save_json(PRON_CACHE_F, pron_cache)
+    print(f"Проверка русских имён (Gemini): проверено {len(items)}, исправлено {len(fixed)}" + (": " + ", ".join(f"{a} → {b}" for a, b in list(fixed.values())[:15]) if fixed else ""))
+
+
 def add_pronunciation(people: list[dict]) -> None:
     """Дописывает nick_ru и name_ru (с ударениями). Одним запросом на команду, результат кэшируется навсегда."""
     todo = []
@@ -3066,6 +3125,8 @@ def add_pronunciation(people: list[dict]) -> None:
         p["_pk"] = key
         if key in pron_cache:
             p.update(pron_cache[key])
+            if pron_cache[key].get("name_ru") and not pron_cache[key].get("chk") and full:
+                _pron_recheck.setdefault(key, {"nick": p.get("nick"), "full": full, "cc": p.get("nationality") or p.get("flag"), "ru": pron_cache[key]["name_ru"]})
         else:
             todo.append((p, full))
     if todo and (GIGA_KEY and not _giga["off"] or llm_ok()):
@@ -8578,6 +8639,11 @@ def main() -> int:
                         p[k] = v
         save_json(f, d)
     print(f"Будущие игры обновлены у {n_up} команд, сверено с матчами: {n_sync}")
+    if not STATS:
+        try:
+            pron_recheck()
+        except Exception as e:
+            warn(f"Проверка имён: {e!r}")
     for f in list((OUT / "team").glob("*.json")) + list((OUT / "match").glob("*.json")):  # ручные имена — и в старых файлах
         d = load_json(f, None)
         if d is not None and (NAME_RU or FIRST_RU):
