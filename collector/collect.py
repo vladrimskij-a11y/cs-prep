@@ -8040,7 +8040,7 @@ def lp_tour_page(name: str) -> str | None:
     return best
 
 PIMG_NEW = 120  # новых фото игроков с Liquipedia за полный сбор
-PIMG_D2_NEW = 60  # заглушек dust2 (100×100) за сбор — тот же CDN HLTV, пауза 2.5 с
+PIMG_D2_NEW = 150  # заглушек dust2 (100×100) за сбор — тот же CDN HLTV, пауза 2.5 с
 PIMG_HLTV_NEW = 40  # новых фото с HLTV за полный сбор (по правилу HLTV — не чаще раза в 2.5 с)
 
 
