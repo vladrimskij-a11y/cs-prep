@@ -3670,7 +3670,10 @@ def feed_dedupe(clusters: list[list[dict]]) -> list[list[dict]]:
         text = "\n".join(lines)
         sig = hashlib.sha1(text.encode()).hexdigest()[:16]
         res = (dedup_cache.get("feed:" + sig) or {}).get("res")
+        if res is None and FAST and _ago_min((dedup_cache.get("feed:_last") or {}).get("t")) < 30:
+            continue  # экономия: в быстром проходе новые окна ленты проверяем не чаще раза в 30 мин
         if res is None:
+            dedup_cache["feed:_last"] = {"t": iso(NOW)}
             res = parse_json_loose(giga_chat(FEED_DEDUP_SYSTEM, text, 1400))
             if res is None:
                 continue
@@ -5872,6 +5875,29 @@ DEDUP_SYSTEM = """Ты редактор новостей о Counter-Strike 2. Т
 Ответ строго JSON: {"drop": [номера], "groups": [[номера], [номера]], "stale": [номера]}"""
 
 
+def _ago_min(t) -> float:
+    d = parse_iso(t)
+    return (NOW - d).total_seconds() / 60 if d else 1e9
+
+
+def _dedup_reuse(prev: dict | None, titles: list[str]) -> dict | None:
+    """Экономия запросов: прошлый ответ нейросети по этому матчу переносим на новый список по заголовкам,
+    если новых заголовков меньше 3 и ответу меньше 3 ч. Новые заголовки остаются как есть (их уже склеили правила)."""
+    if not prev or _ago_min(prev.get("t")) > 180:
+        return None
+    old = prev.get("titles") or []
+    if sum(1 for t in titles if t not in old) >= 3:
+        return None
+    pos = {t: i + 1 for i, t in enumerate(titles)}
+    def m(x):
+        return pos.get(old[int(x) - 1]) if str(x).isdigit() and 0 < int(x) <= len(old) else None
+    r = prev.get("res") or {}
+    out = {"drop": [y for y in map(m, r.get("drop") or []) if y], "stale": [y for y in map(m, r.get("stale") or []) if y],
+           "groups": [[y for y in map(m, g) if y] for g in r.get("groups") or []]}
+    out["groups"] = [g for g in out["groups"] if len(g) > 1]
+    return out
+
+
 def stale_ids(res: dict, dates: list) -> set:
     """Устаревшие новости (их обогнало продолжение той же истории). Самую свежую новость не трогаем."""
     out = set()
@@ -5909,8 +5935,14 @@ def dedupe_news(items: list[dict], teams: list[dict], same_who_required: bool = 
         lines = "\n".join(f"{i + 1}. [{max(x['date'] for x in cl).strftime('%d.%m %H:%M')}; {', '.join(cl[0]['about'])}] {cl[0]['title_ru0'] or cl[0]['title']}"
                           for i, cl in enumerate(clusters))
         sig = hashlib.sha1((roster + lines).encode()).hexdigest()[:16]
+        tkey = "m:" + hashlib.sha1(roster.encode()).hexdigest()[:16]
+        titles = [cl[0]["title_ru0"] or cl[0]["title"] for cl in clusters]
         cached = dedup_cache.get(sig)
-        res = cached["res"] if cached else parse_json_loose(giga_chat(DEDUP_SYSTEM, f"Составы:\n{roster}\n\nЗаголовки:\n{lines}", 900))
+        res = cached["res"] if cached else _dedup_reuse(dedup_cache.get(tkey), titles)
+        if res is None:
+            res = parse_json_loose(giga_chat(DEDUP_SYSTEM, f"Составы:\n{roster}\n\nЗаголовки:\n{lines}", 900))
+            if res is not None:
+                dedup_cache[tkey] = {"titles": titles, "res": res, "t": iso(NOW)}
         if res is not None:
             dedup_cache[sig] = {"res": res, "t": iso(NOW)}
             drop = {int(x) - 1 for x in res.get("drop") or [] if str(x).isdigit()}
