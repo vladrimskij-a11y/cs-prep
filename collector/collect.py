@@ -3683,7 +3683,7 @@ def _toks(t: str) -> set:
 
 def dedupe_strict(items: list[dict]) -> list[list[dict]]:
     """Склеиваем только повторы одной и той же новости (почти тот же текст, в пределах 2 суток).
-    Из повторов первой идёт самая подробная (длиннее текст). Фото и текст всегда от одного поста."""
+    Из повторов показываем самый ранний пост (владелец 26.11), остальные — только «ещё в N каналах». Фото и текст всегда от одного поста."""
     clusters: list[list[dict]] = []
     for it in sorted(items, key=lambda x: x["date"], reverse=True):
         tk = _toks((it.get("text") or "") + " " + (it.get("title") or ""))
@@ -3716,7 +3716,7 @@ def dedupe_strict(items: list[dict]) -> list[list[dict]]:
             clusters.append([it])
         else:
             hit.append(it)
-            hit.sort(key=lambda x: len(x.get("text") or ""), reverse=True)  # подробная — главная
+            hit.sort(key=lambda x: x["date"])  # главная — самая первая по времени, повторы не показываем (владелец 26.11)
     clusters.sort(key=lambda cl: max(x["date"] for x in cl), reverse=True)
     return clusters
 
