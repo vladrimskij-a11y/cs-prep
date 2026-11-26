@@ -1532,6 +1532,26 @@ def game_detail(gid: int | None, prio: bool = False) -> dict | None:
                 c["why"] = "".join(round_why(r.get("end_reason")) for r in sorted(g.get("game_rounds") or [], key=lambda r: r.get("round_number") or 0))
             except Exception as e:
                 warn(f"bo3 раунды {gid}: {e!r}")
+        # 26.11 (владелец): ход раундов у только что сыгранной карты — статистика у bo3 бывает раньше раундов, и запись без
+        # раундов застревала навсегда. Без раундов — перечитываем раунды раз в 10 мин, через 3 дня (40 попыток) — хватит
+        if (c.get("players") and not c.get("rounds") and not c.get("rfinal") and (prio or _why_new[0] < WHY_NEW_LIMIT)
+                and (c.get("rchk") or "") < iso(NOW - timedelta(minutes=10))):
+            _why_new[0] += 1
+            try:
+                g = bo3(f"/games/{gid}")
+                wtc, ltc = g.get("winner_team_clan") or {}, g.get("loser_team_clan") or {}
+                c2t = {wtc.get("clan_name"): wtc.get("team_id"), ltc.get("clan_name"): ltc.get("team_id")}
+                rr = sorted(g.get("game_rounds") or [], key=lambda r: r.get("round_number") or 0)
+                if rr:
+                    c["rounds"] = [[r.get("round_number"), c2t.get(r.get("winner_clan_name")), (r.get("winner_clan_side") or "")[:2]] for r in rr]
+                    c["why"] = "".join(round_why(r.get("end_reason")) for r in rr)
+                    c["wt"], c["lt"] = c.get("wt") or wtc.get("team_id"), c.get("lt") or ltc.get("team_id")
+                c["rchk"] = iso(NOW)
+                c["rn"] = (c.get("rn") or 0) + 1
+                if c["rn"] >= 40:
+                    c["rfinal"] = True
+            except Exception as e:
+                warn(f"bo3 раунды {gid}: {e!r}")
         return c
     if c is not None and (c.get("chk") or "") > iso(NOW - timedelta(minutes=20)):
         return c  # без статистики — перепроверяем не чаще раза в 20 минут
