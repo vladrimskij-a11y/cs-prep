@@ -1090,7 +1090,8 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
 .rk-p { font-weight: 750; }
 
 /* сетка и швейцарка */
-.bm { border-radius: 10px; background: var(--sunk); border-color: transparent; }
+.bm { border-radius: 10px; background: color-mix(in srgb, var(--fg) 8%, var(--surface)); border: 1px solid color-mix(in srgb, var(--fg) 20%, transparent); box-shadow: 0 2px 8px rgba(0,0,0,.35); }  /* матчи сетки чётко отделены: светлее фона, с рамкой (владелец 26.11) */
+.bm .bt + .bt { border-top-color: color-mix(in srgb, var(--fg) 10%, transparent); }
 .swg { border-radius: var(--r); }
 .sw-m { border-radius: 10px; box-shadow: none; }
 
@@ -1224,8 +1225,7 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
 .pgf figcaption { font-size: 15px; font-weight: 700; color: var(--fg); text-align: center; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pgf figcaption small { display: block; font-size: 11px; font-weight: 500; color: var(--muted); }
 /* 26.11 (владелец): кнопки у игрока (🏆, 🏅, 👥, «Мейджоры») — светлее фона строки и с тонкой рамкой, как «📷 Фото» в шапке */
-.pl .medal, .pl .pmaj.tap { background: color-mix(in srgb, var(--fg) 11%, var(--surface)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--fg) 14%, transparent); border-radius: 999px; color: var(--fg); }
-.pl .medal { padding: 1px 7px; font-size: 12px; gap: 3px; } .pl .medal b { font-size: 11.5px; } .pl .pmaj.tap { padding: 2px 9px; font-size: 12px; }
+.pl .medal, .pl .pmaj.tap { background: color-mix(in srgb, var(--fg) 11%, var(--surface)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--fg) 14%, transparent); color: var(--fg); }  /* форма прежняя (владелец 26.11), цвет — светлее фона */
 .pl .pmaj.tap b, .pl .medal b { color: var(--fg); }
 </style>
 
@@ -3216,6 +3216,17 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
       if (e.target.closest("[data-pop]")) return;  // тап по другой награде — откроется её окно
       closePop();
       if (!e.target.closest("button, a, [role=button], [data-open], [data-tname], input")) e.preventDefault();  // не кликаем «сквозь» окно по пустому месту
+    }, { passive: false, capture: true });
+    // свайп вбок внутри окна тиммейтов — назад к списку команд (как «‹ Назад»; владелец 26.11)
+    var sx = null, sy = null;
+    document.addEventListener("touchstart", function (e) { var inP = state.pop && e.touches.length === 1 && e.target.closest(".pop-in"); sx = inP ? e.touches[0].clientX : null; sy = inP ? e.touches[0].clientY : null; }, { passive: true, capture: true });
+    document.addEventListener("touchend", function (e) {
+      if (sx == null || !state.pop) return;
+      var t = e.changedTouches[0], dx = t.clientX - sx, dy = t.clientY - sy;
+      sx = null;
+      if (Math.abs(dx) < 50 || Math.abs(dy) > Math.abs(dx) * 0.7) return;
+      var b = state.pop.querySelector('li.pback[data-pop="__back"]');
+      if (b) { e.preventDefault(); openPop("__back", b); }
     }, { passive: false, capture: true });
     // событие прокрутки не слушаем: инерция после касания закрывала окно само — закрываем только по движению пальца
     document.addEventListener("wheel", function (e) { if (state.pop && !e.target.closest(".pop-in")) closePop(); }, { passive: true, capture: true });
