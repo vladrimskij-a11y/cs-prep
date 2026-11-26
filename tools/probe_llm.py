@@ -2,6 +2,7 @@ import os, sys, json, urllib.request
 sys.path.insert(0, "collector")
 os.environ.setdefault("NEWS_ONLY", "1")
 import collect as C
+C.CACHE.mkdir(parents=True, exist_ok=True)
 # 1) GigaChat: остаток пакета
 try:
     tok = C.giga_token()
@@ -17,11 +18,13 @@ try:
     print("models:", [m["name"] for m in j.get("models", []) if "gemma" in m["name"] or "flash" in m["name"]])
 except Exception as e:
     print("models ERR", repr(e)[:300])
-for mdl in ["gemma-3-27b-it", "gemma-3-12b-it"]:
+import time
+for mdl in ["gemma-4-26b-a4b-it", "gemma-4-31b-it", "gemini-3.5-flash-lite", "gemini-3.1-flash-lite", "gemini-2.5-flash-lite"]:
+    t0=time.time()
     try:
-        body = json.dumps({"contents": [{"role": "user", "parts": [{"text": "Ответь одним словом по-русски: столица Франции?"}]}]}).encode()
+        body = json.dumps({"contents": [{"role": "user", "parts": [{"text": "Пост: «donk покинул Team Spirit и перешёл в Falcons». Ответь JSON с полями cat (transfer, match, interview, ad или other) и title_ru (короткий заголовок)"}]}]}).encode()
         req = urllib.request.Request(f"https://generativelanguage.googleapis.com/v1beta/models/{mdl}:generateContent", data=body, method="POST", headers={"Content-Type": "application/json", "x-goog-api-key": key})
         j = json.loads(urllib.request.urlopen(req, timeout=60).read())
-        print(mdl, "OK:", j["candidates"][0]["content"]["parts"][0]["text"][:80])
+        print(mdl, "OK", round(time.time()-t0,1), "с:", j["candidates"][0]["content"]["parts"][-1]["text"][:160].replace("\n"," "))
     except Exception as e:
         print(mdl, "ERR", repr(e)[:200], getattr(e, "read", lambda: b"")()[:300])
