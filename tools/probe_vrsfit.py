@@ -35,7 +35,5 @@ def run(lbl, ew=None, lan=True):
             ew_ += abs(w - h[2]); el_ += abs(l - h[4]); n += 1
             out.append(f"{k}:{w:+d}/{h[2]:+d},{l:+d}/{h[4]:+d}")
     print(f"{lbl}: n={n} ошибка побед {ew_/max(n,1):.2f} поражений {el_/max(n,1):.2f} | " + " ".join(out), flush=True)
-run("база ew=0.3 lan")
-run("lan=False", lan=False)
-for e in (0.2, 0.25, 0.27, 0.33):
+for e in (0.1, 0.14, 0.17, 0.2, 0.22):
     run(f"ew={e}", ew=e)
