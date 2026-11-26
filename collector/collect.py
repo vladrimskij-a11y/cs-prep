@@ -779,7 +779,7 @@ def lp_fresh(key: str) -> bool:
         return False
     age = NOW - (parse_iso(cached.get("t")) or NOW)
     d = cached.get("data") or {}
-    if (d.get("players") or []) and ("hist" not in d["players"][0] or "moves" not in d or any("page" not in m for m in d["moves"][:1]) or (d.get("v") or 0) < LP_VER
+    if (d.get("players") or []) and ("hist" not in d["players"][0] or "img" not in d["players"][0] or "moves" not in d or any("page" not in m for m in d["moves"][:1]) or (d.get("v") or 0) < LP_VER
                                      or any((p.get("flag") or "") in ("XX", "UK") for p in (d.get("players") or []) + (d.get("coach") or []))):
         return False  # записано до 11.11 — без истории команд и прежних ников: перечитать (пачкой в lp_prefetch)
     shaky = not d or any(not p.get("roles") for p in d.get("players") or []) or not d.get("coach") \
@@ -1232,6 +1232,8 @@ def lp_roster(t: dict) -> dict | None:
                 p["aka"] = lp_aka(pg)
                 p["hist"] = lp_history(pg)
                 p["rel"] = lp_rel(pg) or None
+                ib_ = infobox(pg) if pg else ""
+                p["img"] = (lp_param(ib_, "image") or "").strip() or None  # фото игрока (окно «📷» во вкладке «Игроки», владелец 26.11)
                 remember_aka(p["nick"], p["aka"])
             any_igl = any(p["igl"] for p in players)
             for p in players:
@@ -1240,8 +1242,8 @@ def lp_roster(t: dict) -> dict | None:
                 if not any_igl and igl:
                     p["igl"] = True  # в составе капитан не отмечен — берём со страницы игрока
             data = {
-                "coach": [{"nick": p["nick"], "name": p["name"], "flag": p["flag"], "birth": p["birth"], "aka": p["aka"], "hist": p["hist"], "rel": p.get("rel")} for p in people if p["coach"]],
-                "players": [{k: p.get(k) for k in ("nick", "name", "flag", "igl", "roles", "note", "birth", "loan_from", "stand_for", "aka", "hist", "rel")} for p in players],
+                "coach": [{"nick": p["nick"], "name": p["name"], "flag": p["flag"], "birth": p["birth"], "aka": p["aka"], "hist": p["hist"], "rel": p.get("rel"), "img": p.get("img")} for p in people if p["coach"]],
+                "players": [{k: p.get(k) for k in ("nick", "name", "flag", "igl", "roles", "note", "birth", "loan_from", "stand_for", "aka", "hist", "rel", "img")} for p in players],
                 "moves": moves, "v": LP_VER,
             }
     except Exception as e:
@@ -1295,6 +1297,7 @@ def merge_roster(panda_players: list[dict], lp: dict | None) -> tuple[list[dict]
             "age": age_from(lp_p.get("birth")) or pp.get("age"),
             "birth": lp_p.get("birth"),
             "image": pp.get("image"),
+            "lp_img": lp_p.get("img"),
             "tags": tags,
             "aka": lp_p.get("aka") or None,
             "hist": lp_p.get("hist") or None,
@@ -7822,6 +7825,103 @@ def lp_tour_page(name: str) -> str | None:
             break
     return best
 
+PIMG_NEW = 120  # новых фото игроков за полный сбор
+
+
+def build_player_photos() -> None:
+    """Фото игроков для окна «📷» во вкладке «Игроки» (владелец 26.11: знать, как выглядят). Источник — фото из инфобокса
+    Liquipedia (`|image=` со страницы игрока, `lp_img` в карточке), миниатюра 300 px → pimg/<ник>.<ext>, список — pimg.json
+    {ник в нижнем регистре: путь}. Сначала игроки ближайших матчей, потом страниц команд; промах — повтор через 7 дней."""
+    path = OUT / "pimg.json"
+    H = load_json(path, {}) or {}
+    have, miss = H.get("p") or {}, H.get("miss") or {}
+    want: dict = {}  # ник → файл Liquipedia, по порядку важности
+    cards = []
+    for f in (OUT / "match").glob("*.json"):
+        d = load_json(f, {}) or {}
+        cards.append((d.get("begin_at") or "9999", d))
+    for _, d in sorted(cards, key=lambda x: x[0]):
+        for t in d.get("teams") or []:
+            for p in (t.get("players") or []) + (t.get("coach") or []):
+                fimg = p.get("lp_img") or p.get("img")
+                if p.get("nick") and fimg:
+                    want.setdefault(norm(p["nick"]), (p["nick"], fimg))
+    for f in sorted((OUT / "team").glob("*.json")):
+        d = load_json(f, {}) or {}
+        for p in [x for x in (d.get("roster") or []) + (d.get("players") or []) + (d.get("coach") or []) if isinstance(x, dict)]:
+            if p.get("nick") and (p.get("lp_img") or p.get("img")):
+                want.setdefault(norm(p["nick"]), (p["nick"], p.get("lp_img") or p.get("img")))
+    todo = []
+    for k, (nick, fimg) in want.items():
+        h = have.get(k)
+        if h and h.get("file") == fimg and (OUT / h["f"]).exists():
+            continue
+        m = miss.get(k) or {}
+        if m.get("file") == fimg and (parse_iso(m.get("t")) or NOW - timedelta(days=30)) > NOW - timedelta(days=7):
+            continue
+        todo.append((k, nick, fimg))
+        if len(todo) >= PIMG_NEW:
+            break
+    if not todo:
+        return
+    (OUT / "pimg").mkdir(exist_ok=True)
+    got = 0
+    for i in range(0, len(todo), 50):
+        part = todo[i:i + 50]
+        fl = sorted({x[2] for x in part})
+        url = LP_API + "?" + urllib.parse.urlencode({"action": "query", "prop": "imageinfo", "iiprop": "url|mime", "iiurlwidth": 300,
+                                                     "titles": "|".join("File:" + x for x in fl), "format": "json"})
+        wait = 4.0 - (time.time() - _lp_last[0])
+        if wait > 0:
+            time.sleep(wait)
+        _lp_last[0] = time.time()
+        stats["liquipedia_requests"] += 1
+        try:
+            q = json.loads(http_get(url, {"User-Agent": LP_UA, "Accept": "application/json"}, retry429=False)).get("query") or {}
+        except Exception as e:
+            warn(f"Фото игроков: {e!r}")
+            break
+        nm_ = {r["to"]: r["from"] for r in q.get("normalized") or []}
+        info = {}
+        for pg in (q.get("pages") or {}).values():
+            ii = (pg.get("imageinfo") or [None])[0]
+            if ii:
+                info[nm_.get(pg["title"], pg["title"]).split(":", 1)[1].replace("_", " ")] = ii
+        for k, nick, fimg in part:
+            ii = info.get(fimg.replace("_", " "))
+            src = ii and (ii.get("thumburl") or ii.get("url"))
+            if not src or "svg" in (ii.get("mime") or ""):
+                miss[k] = {"file": fimg, "t": iso(NOW)}
+                continue
+            ext = src.rsplit(".", 1)[-1].split("?")[0].lower()
+            ext = ext if ext in ("png", "webp", "jpg", "jpeg") else "jpg"
+            wait = 1.0 - (time.time() - _lp_last[0])
+            if wait > 0:
+                time.sleep(wait)
+            _lp_last[0] = time.time()
+            try:
+                body = http_get(src, {"User-Agent": LP_UA}, retry429=False)
+            except Exception as e:
+                warn(f"Фото {nick}: {e!r}")
+                miss[k] = {"file": fimg, "t": iso(NOW)}
+                if "429" in str(e):
+                    break
+                continue
+            if len(body) < 500 or len(body) > 600_000:
+                miss[k] = {"file": fimg, "t": iso(NOW)}
+                continue
+            slug = re.sub(r"[^a-z0-9_-]", "_", k) or "p"
+            fn = f"pimg/{slug}.{ext}"
+            for old in (OUT / "pimg").glob(slug + ".*"):
+                old.unlink()
+            (OUT / fn).write_bytes(body if isinstance(body, bytes) else body.encode("latin-1"))
+            have[k] = {"f": fn, "file": fimg, "t": iso(NOW)}
+            miss.pop(k, None)
+            got += 1
+    print(f"Фото игроков (Liquipedia): новых {got}, всего {len(have)}, ждут {max(0, len(want) - len(have))}")
+    save_json(path, {"updated": iso(NOW), "p": have, "miss": miss})
+
+
 def build_tour_hq() -> None:
     """Логотип турнира в хорошем качестве для шапки турнира (владелец 25.11: баннер bo3 маленький, при растяжении мылится).
     Страница турнира на Liquipedia — та же, что для призовых (`lp_prize_slots` → `lp_prize_cache[...]["title"]`),
@@ -8358,6 +8458,10 @@ def main() -> int:
             build_tour_hq()
         except Exception as e:
             warn(f"Логотипы турниров: {e!r}")
+        try:
+            build_player_photos()
+        except Exception as e:
+            warn(f"Фото игроков: {e!r}")
     # build_hq_logos() — отключено 25.11: владелец убрал логотипы из шапки матча (функция осталась, файлы logos_hq в ветке data)
     try:
         build_positions()

@@ -61,7 +61,7 @@ def merge(dst: Path) -> None:
         for f in OURS.rglob("*"):
             if f.is_file() and f.name != "feed.json":
                 rel = f.relative_to(OURS)
-                if str(rel) in ("tour_hq.json", "logos_hq.json") and (dst / rel).exists() and not newer(load(f), load(dst / rel)):
+                if str(rel) in ("tour_hq.json", "logos_hq.json", "pimg.json") and (dst / rel).exists() and not newer(load(f), load(dst / rel)):
                     continue  # их пишет только полный сбор: параллельный сбор статистики не должен затирать свежий список старым
                 if rel.parts[0] == "match" and (dst / rel).exists():
                     a, b = load(f), load(dst / rel)

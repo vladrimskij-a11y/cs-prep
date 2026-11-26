@@ -1211,6 +1211,16 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
 .box.roster.a > .hd { background: color-mix(in srgb, var(--ct) 16%, transparent); }
 .box.roster.b > .hd { background: color-mix(in srgb, var(--t) 16%, transparent); }
 .sec:has(> .box.roster) + .sec:has(> .box.roster) { margin-top: 28px; }
+/* кнопка «📷 Фото» в шапке команды и окно с фото игроков (владелец 26.11) */
+.box.roster > .hd { display: flex; align-items: center; gap: 8px; }
+.phbtn { margin-left: auto; flex: none; font-size: 14px; font-weight: 650; padding: 7px 12px; border-radius: 999px; background: var(--sunk); color: var(--fg); cursor: pointer; position: relative; white-space: nowrap; }
+.phbtn::after { content: ""; position: absolute; inset: -8px; }
+.pgal { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px 10px; margin-top: 4px; }
+.pgf { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 0; }
+.pgf .pgx { position: relative; width: 100%; aspect-ratio: 3 / 4; border-radius: 12px; background: var(--sunk); overflow: hidden; display: flex; align-items: center; justify-content: center; font-size: 30px; font-weight: 800; color: var(--muted); }
+.pgf .pgx img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: top; }
+.pgf figcaption { font-size: 15px; font-weight: 700; color: var(--fg); text-align: center; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pgf figcaption small { display: block; font-size: 11px; font-weight: 500; color: var(--muted); }
 </style>
 
 <div class="wrap" id="app"></div>
@@ -1425,6 +1435,19 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
   function getTourHq() {  // логотипы турниров в хорошем качестве (Liquipedia) — для шапки турнира
     if (DEMO) return Promise.resolve();
     return dfetch("data/tour_hq.json" + bust()).then(function (r) { return r.ok ? r.json() : null; }).then(function (j) { if (j && j.tours) TOUR_HQ = j.tours; }).catch(function () {});
+  }
+  var PIMG = null;  // фото игроков (Liquipedia, pimg.json): ник → путь
+  function getPimg() {
+    if (PIMG || DEMO) return Promise.resolve();
+    return dfetch("data/pimg.json" + bust()).then(function (r) { return r.ok ? r.json() : null; }).then(function (j) { PIMG = (j && j.p) || {}; }).catch(function () { PIMG = {}; });
+  }
+  function galHtml(g) {  // окно «📷»: фото игроков с ником (владелец 26.11)
+    return '<div class="pgal">' + g.map(function (x) {
+      var h = (PIMG || {})[String(x.n || "").toLowerCase().replace(/[^a-z0-9а-я]/g, "")], u = h && h.f ? "data/" + h.f : (x.u || "");
+      var ini = esc(String(x.n || "?").charAt(0).toUpperCase());
+      return '<figure class="pgf"><span class="pgx">' + ini + (u ? '<img src="' + esc(u) + '" alt="" loading="lazy" decoding="async" onerror="this.remove()">' : '') + '</span>' +
+        '<figcaption>' + esc(x.n || "?") + (x.c ? '<small>тренер</small>' : '') + '</figcaption></figure>';
+    }).join("") + '</div>';
   }
   function logoHq(name) {
     var h = HQ[nkey(name)];
@@ -3154,7 +3177,7 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
     var d = JSON.parse(data), el = document.createElement("div");
     if (inner && state.popStack.length) d.l = ['__back'].concat(d.l || []);
     el.className = "pop";
-    el.innerHTML = '<div class="pop-in' + (d.c ? ' wide' : '') + '"><b>' + esc(d.t) + '</b>' + (d.c ? '<div class="pcols">' + d.c.map(function (c) { return '<div class="pcol"><div class="pci">' + c.i + ' <b>' + c.l.length + '</b></div>' + (c.l.length ? c.l.map(function (x) { return '<div class="pce">' + esc(x) + '</div>'; }).join("") : '<div class="pce none">—</div>') + '</div>'; }).join("") + '</div>' : (d.l || []).length ? '<ul>' + d.l.map(function (x) { if (x && typeof x === "object" && !x.sub) { var tmm = String(x.tm || "").match(/^(.*?)( \(.*\))?$/); return '<li class="mj' + (x.w ? ' win' : x.s ? ' sec' : '') + '"><span class="mj-e">' + (x.w ? '🏆 ' : x.s ? '🥈 ' : '') + esc(x.e) + '</span>' + (x.p ? ' <span class="mj-p">— ' + esc(x.p) + '</span>' : '') + (x.tm ? '<span class="mj-t">' + esc(tmm[1]) + (tmm[2] ? '<small>' + esc(tmm[2]) + '</small>' : '') + '</span>' : '') + '</li>'; }
+    el.innerHTML = '<div class="pop-in' + (d.c || d.g ? ' wide' : '') + '"><b>' + esc(d.t) + '</b>' + (d.g ? galHtml(d.g) : d.c ? '<div class="pcols">' + d.c.map(function (c) { return '<div class="pcol"><div class="pci">' + c.i + ' <b>' + c.l.length + '</b></div>' + (c.l.length ? c.l.map(function (x) { return '<div class="pce">' + esc(x) + '</div>'; }).join("") : '<div class="pce none">—</div>') + '</div>'; }).join("") + '</div>' : (d.l || []).length ? '<ul>' + d.l.map(function (x) { if (x && typeof x === "object" && !x.sub) { var tmm = String(x.tm || "").match(/^(.*?)( \(.*\))?$/); return '<li class="mj' + (x.w ? ' win' : x.s ? ' sec' : '') + '"><span class="mj-e">' + (x.w ? '🏆 ' : x.s ? '🥈 ' : '') + esc(x.e) + '</span>' + (x.p ? ' <span class="mj-p">— ' + esc(x.p) + '</span>' : '') + (x.tm ? '<span class="mj-t">' + esc(tmm[1]) + (tmm[2] ? '<small>' + esc(tmm[2]) + '</small>' : '') + '</span>' : '') + '</li>'; }
       if (x === "__back") return '<li class="pback" data-pop="__back">‹ Назад</li>';
       if (x && typeof x === "object" && x.sub) return '<li class="psub" data-pop="' + esc(JSON.stringify(x.sub)) + '">' + esc(x.e) + '<i>›</i></li>';
       return String(x).charAt(0) === "§" ? '<li class="ph">' + esc(String(x).slice(1)) + '</li>' : '<li>' + esc(x) + '</li>'; }).join("") + '</ul>' : '<p>Список турниров появится после обновления данных.</p>') + '</div>';
@@ -3238,7 +3261,9 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
           (cs.length ? oppWord(t) + ' матча ' + cs.map(function (c) { return '<span class="tlink" data-tname="' + esc(c.name) + '">' + esc(c.name) + '</span>'; }).join(" — ") + '. Состав появится, когда матч сыграют.' : 'Соперник ещё не определён.') + '</div></div></div>';
         return;
       }
-      html += '<div class="sec"><div class="box roster ' + (i ? "b" : "a") + '"><div class="hd"><span class="tn tlink" data-tname="' + esc(t.name) + '">' + esc(t.name) + ' ›</span>' + trophyCount(t.prizes) + medalsHtml(t.prizes) + '</div>';
+      var gal = (t.players || []).map(function (p) { return { n: p.nick, u: p.image || "" }; }).concat((t.coach || []).map(function (c) { return { n: c.nick, u: c.image || "", c: 1 }; }));
+      html += '<div class="sec"><div class="box roster ' + (i ? "b" : "a") + '"><div class="hd"><span class="tn tlink" data-tname="' + esc(t.name) + '">' + esc(t.name) + ' ›</span>' + trophyCount(t.prizes) + medalsHtml(t.prizes) +
+        (gal.length ? '<span class="phbtn" role="button" data-photos="' + esc(JSON.stringify({ t: "📷 " + t.name, g: gal })) + '">📷 Фото</span>' : '') + '</div>';
       if (!(t.players || []).length) html += '<div class="note">Состав не указан.</div>';
       html += rosterRows(t.players, t.coach, t, true) + '</div></div>';
     });
@@ -4220,9 +4245,10 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
 
   // ---------- клики
   document.addEventListener("click", function (e) {
-    if (state.pop && !e.target.closest(".pop-in")) { closePop(); if (!e.target.closest("[data-pop],[data-tab],[data-tsub],[data-nf]")) { e.preventDefault(); e.stopPropagation(); return; } }  // плашка вкладки в шапке — закрывает окно и переключает
-    var t = e.target.closest("[data-pop],[data-tmap],[data-moves],[data-vplay],[data-snav],[data-goto],[data-sk],[data-team],[data-tname],[data-tseries],[data-fread],[data-close],#facts-more,[data-home],[data-feedch],[data-tg],[data-reader],[data-fact],[data-formall],[data-tsub],[data-pmap],[data-tpmap],[data-open],[data-tour],[data-tab],[data-map],[data-nf],[data-player],[data-link],[data-read],[data-series],[data-vser],[data-rseries],[data-smap],[data-ttab],#back");
+    if (state.pop && !e.target.closest(".pop-in")) { closePop(); if (!e.target.closest("[data-pop],[data-photos],[data-tab],[data-tsub],[data-nf]")) { e.preventDefault(); e.stopPropagation(); return; } }  // плашка вкладки в шапке — закрывает окно и переключает
+    var t = e.target.closest("[data-photos],[data-pop],[data-tmap],[data-moves],[data-vplay],[data-snav],[data-goto],[data-sk],[data-team],[data-tname],[data-tseries],[data-fread],[data-close],#facts-more,[data-home],[data-feedch],[data-tg],[data-reader],[data-fact],[data-formall],[data-tsub],[data-pmap],[data-tpmap],[data-open],[data-tour],[data-tab],[data-map],[data-nf],[data-player],[data-link],[data-read],[data-series],[data-vser],[data-rseries],[data-smap],[data-ttab],#back");
     if (!t) return;
+    if (t.hasAttribute("data-photos")) { e.stopPropagation(); e.preventDefault(); var ph = t.getAttribute("data-photos"); getPimg().then(function () { openPop(ph, t); }); return; }
     if (t.hasAttribute("data-pop")) { e.stopPropagation(); e.preventDefault(); openPop(t.getAttribute("data-pop"), t); return; }
     if (t.hasAttribute("data-vplay")) { var vv = t.parentNode.querySelector("video"); if (vv) { t.remove(); vv.play().catch(function () {}); } return; }
     if (t.hasAttribute("data-snav")) { statsNav(Number(t.getAttribute("data-snav"))); return; }
