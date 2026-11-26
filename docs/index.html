@@ -3172,7 +3172,7 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
   function personRow(p, roles, real, extra, statsHtml, attrs, corner) {
     // строка 1: оригинальное имя · возраст; строка 2: русское произношение (владелец 26.11)
     var ageTxt = p.age ? '<span style="white-space:nowrap">' + esc(p.age) + " " + years(p.age) + '</span>' : "";
-    var ru = p.name_ru ? '<span class="pron">[' + esc(plain(p.name_ru)) + ']</span>' : "";
+    var ru = p.name_ru ? '<span class="pron">' + esc(plain(p.name_ru)) + '</span>' : "";
     var info = [real ? [esc(real), ageTxt].filter(Boolean).join("\u00a0· ") + (ru ? '<br>' + ru : '') : [p.name_ru ? esc(plain(p.name_ru)) : "", ageTxt].filter(Boolean).join("\u00a0· ")]
       .concat(extra || []).filter(Boolean);  // «27 лет» не разрывается (владелец 26.11)
     var majTxt = '🏟 Мейджоры <b>' + esc(p.majors) + '</b>' + (p.major_wins ? ' · 🏆 выиграл <b>' + esc(p.major_wins) + '</b>' : '');
