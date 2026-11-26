@@ -3063,6 +3063,26 @@ def bo3_prize_places(bid: int | None, hist: list[dict]) -> list[dict]:
 QUAL_RX = re.compile(r"(?i)qualif|квалиф|\bqual\b|\bstage\s*\d|стади[яи]\s*\d|play-?in")  # отборочные и отдельные стадии турнира (IEM Kraków Stage 1 — не трофей)
 
 
+def hltv_twin(h: dict, future: list[dict]) -> dict | None:
+    """Будущий турнир bo3/PandaScore, который на HLTV назван иначе: та же серия (`tour_brand`), тот же год в названии,
+    начало в пределах 45 дней (Bounty Winter и Bounty Summer одного года так не спутать) или то же название."""
+    hb, hy = tour_brand(h["name"]), set(re.findall(r"20\d\d", h["name"]))
+    hd = parse_iso(h.get("begin"))
+    best = None
+    for t in future:
+        if str(t.get("id", "")).startswith("hltv-") or t.get("finished"):
+            continue
+        if tour_same(h["name"], tour_norm(t["name"])) or tour_same(t["name"], tour_norm(h["name"])):
+            return t
+        if not hb or tour_brand(t["name"]) != hb or set(re.findall(r"20\d\d", t["name"])) != hy:
+            continue
+        td = parse_iso(t.get("begin"))
+        if hd and td and abs((hd - td).days) <= 45:
+            if best is None or abs((hd - td).days) < abs((hd - parse_iso(best["begin"])).days):
+                best = t
+    return best
+
+
 def tour_brand(ev: str) -> str:
     """«BLAST Rivals Spring 2026» и «BLAST Rivals 2026 Season 1» → «blastrivals»: серия турнира без года/сезона."""
     t = re.sub(r"(?i)\b(20\d\d|season|s\d+|spring|summer|fall|autumn|winter|finals?|\d+)\b", " ", ev or "")
@@ -8769,6 +8789,17 @@ def main() -> int:
             future.append(tr)
             have.add(tour_norm(tr["name"]))
     for tr in hltv_future_tournaments():  # чего нет ни у PandaScore, ни у bo3.gg (BLAST Bounty 2027 Season 1)
+        twin = hltv_twin(tr, future)
+        if twin is not None:
+            # тот же турнир под другим названием («BLAST Bounty Winter 2027» у bo3 = «BLAST Bounty 2027 Season 1» у HLTV):
+            # одна карточка, даты — с HLTV (26.11 bo3 дал 14–24 дек. вместо 14–25 янв.)
+            if (twin.get("begin"), twin.get("end")) != (tr["begin"], tr["end"]):
+                print(f"Турнир {twin['name']}: даты {str(twin.get('begin'))[:10]}–{str(twin.get('end'))[:10]} → по HLTV "
+                      f"{tr['begin'][:10]}–{tr['end'][:10]}")
+            twin["begin"], twin["end"] = tr["begin"], tr["end"]
+            twin["prize_usd"] = twin.get("prize_usd") or tr.get("prize_usd")
+            twin["hltv_name"] = tr["name"]
+            continue
         if not any(tour_same(tr["name"], h) or tour_same(h, tour_norm(tr["name"])) for h in have):
             future.append(tr)
             have.add(tour_norm(tr["name"]))
