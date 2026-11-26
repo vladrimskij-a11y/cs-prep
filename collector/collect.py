@@ -4063,6 +4063,9 @@ def hltv_cached(key: str, fn, ttl_h: float | None = None):
     return c["data"] if c else None
 
 
+_tbd_rr = [0]  # перечиток событий ради мест TBD за сбор (не больше 4 — HLTV бережём)
+
+
 def tournament_extras(name: str, final: bool = False) -> dict | None:
     c = hltv_cache.get("event3:" + name)
     if final and c and c.get("data"):
@@ -4076,7 +4079,17 @@ def tournament_extras(name: str, final: bool = False) -> dict | None:
         r = hltv_cached("event3:" + name, lambda: _tour_extras_net(name), ttl_h=0) or c["data"]
         hltv_cache["event3:" + name]["fin_try"] = n  # не больше 6 попыток (раз в сбор)
         return r
-    return hltv_cached("event3:" + name, lambda: _tour_extras_net(name))
+    if c and c.get("data") and not c.get("tbd2") and _tbd_rr[0] < 4 and not STATS:
+        _tbd_rr[0] += 1
+        # 26.11: участники теперь с пустыми местами из квалификаций (TBD) — старые записи перечитываем один раз
+        r = hltv_cached("event3:" + name, lambda: _tour_extras_net(name), ttl_h=0) or c["data"]
+        if hltv_cache.get("event3:" + name):
+            hltv_cache["event3:" + name]["tbd2"] = 1
+        return r
+    r = hltv_cached("event3:" + name, lambda: _tour_extras_net(name))
+    if hltv_cache.get("event3:" + name):
+        hltv_cache["event3:" + name]["tbd2"] = 1
+    return r
 
 
 def _tour_extras_net(name: str) -> dict | None:
