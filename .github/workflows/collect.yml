@@ -96,6 +96,24 @@ jobs:
           MISTRAL_KEY: ${{ secrets.MISTRAL_KEY }}
         run: python collector/collect.py
 
+      # 27.11: полный сбор и статистика идут одновременно — кто сохранял кэш последним, затирал записи другого
+      # (проверка русских имён шла заново каждый час, тратя лимит Google). Перед сохранением добираем свежий кэш.
+      - name: Отложить свой кэш
+        if: always()
+        run: mv cache cache_mine
+
+      - name: Взять кэш, сохранённый другими сборами за это время
+        if: always()
+        uses: actions/cache/restore@v4
+        with:
+          path: cache
+          key: collector-cache-latest-${{ github.run_id }}
+          restore-keys: collector-cache-
+
+      - name: Слить свой кэш со свежим
+        if: always()
+        run: python tools/merge_cache.py cache_mine cache && rm -rf cache && mv cache_mine cache
+
       - name: Сохранить кэш сборщика
         if: always()
         uses: actions/cache/save@v4
