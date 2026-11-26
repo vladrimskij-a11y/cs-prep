@@ -69,6 +69,10 @@ RSS_FEEDS = [
     ("Cybersport.ru", "https://www.cybersport.ru/rss/materials"),
 ]
 
+# Зарубежные новости (владелец 26.11: про Монголию, Китай, Южную и Северную Америку в наших каналах почти ничего):
+# английский dust2.us (новости HLTV) и бразильский Dust2.com.br; в ленте RSS только 10 последних — копим в кэше за NEWS_DAYS.
+# Заголовок переводится, статья пересказывается по-русски (article_info). HLTV напрямую не трогаем — это те же новости.
+WEB_NEWS_FEEDS = [("dust2.us", "https://www.dust2.us/rss"), ("Dust2.com.br", "https://www.dust2.com.br/rss")]
 UA = "Mozilla/5.0 (compatible; cs-prep-bot/1.0; +https://github.com)"
 NOW = datetime.now(timezone.utc)
 
@@ -4941,6 +4945,38 @@ def fetch_feed(url: str, source: str) -> list[dict]:
     return items
 
 
+_web_news_mem: list = []
+
+
+def web_news() -> list[dict]:
+    """Новости зарубежных сайтов (WEB_NEWS_FEEDS), накопленные за NEWS_DAYS."""
+    if _web_news_mem:
+        return _web_news_mem[0]
+    f = CACHE / "web_news.json"
+    store = load_json(f, {})
+    n_new = 0
+    for src, u in WEB_NEWS_FEEDS:
+        for it in fetch_feed(u, src):
+            if it.get("url") and it["url"] not in store:
+                n_new += 1
+            if it.get("url"):
+                store[it["url"]] = {**it, "date": iso(it["date"])}
+    cut = NOW - timedelta(days=NEWS_DAYS)
+    keep, out = {}, []
+    for k, v in store.items():
+        try:
+            d = datetime.fromisoformat(str(v.get("date")).replace("Z", "+00:00"))
+        except Exception:
+            continue
+        if d >= cut:
+            keep[k] = v
+            out.append({**v, "date": d})
+    save_json(f, keep)
+    print(f"Зарубежные новости: в запасе {len(out)}, новых {n_new}")
+    _web_news_mem.append(out)
+    return out
+
+
 def google_news(query: str, lang: str) -> list[dict]:
     q = f"{query} when:{NEWS_DAYS}d"
     if lang == "ru":
@@ -5517,6 +5553,10 @@ def gather_news(teams: list[dict]) -> list[dict]:
     # Источник новостей — только новостные Telegram-каналы (TG_NEWS_CHANNELS).
     # Сайты (Google News, RSS) отключены по просьбе пользователя: USE_WEB_NEWS=1 вернёт их.
     pool: list[dict] = list(tg_posts())
+    try:
+        pool += web_news()
+    except Exception as e:
+        warn(f"Зарубежные новости: {e!r}")
     if os.environ.get("USE_WEB_NEWS") == "1":
         cs = '(CS2 OR "Counter-Strike")'
         for t in teams:
