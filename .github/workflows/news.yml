@@ -54,6 +54,8 @@ jobs:
           PANDASCORE_TOKEN: ${{ secrets.PANDASCORE_TOKEN }}
           GIGACHAT_KEY: ${{ secrets.GIGACHAT_KEY }}
           GEMINI_KEY: ${{ secrets.GEMINI_KEY }}
+          GROQ_KEY: ${{ secrets.GROQ_KEY }}
+          MISTRAL_KEY: ${{ secrets.MISTRAL_KEY }}
           ODDSPAPI_KEY: ${{ secrets.ODDSPAPI_KEY }}
           REMOTE: "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
         run: |

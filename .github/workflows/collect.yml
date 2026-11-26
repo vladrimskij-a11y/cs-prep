@@ -92,6 +92,8 @@ jobs:
           ODDSPAPI_KEY: ${{ secrets.ODDSPAPI_KEY }}
           GIGACHAT_KEY: ${{ secrets.GIGACHAT_KEY }}
           GEMINI_KEY: ${{ secrets.GEMINI_KEY }}
+          GROQ_KEY: ${{ secrets.GROQ_KEY }}
+          MISTRAL_KEY: ${{ secrets.MISTRAL_KEY }}
         run: python collector/collect.py
 
       - name: Сохранить кэш сборщика

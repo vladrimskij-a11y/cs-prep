@@ -3412,7 +3412,8 @@ other — не про CS2 (другая игра) или мем без ново�
 Ответ строго JSON: {"items": [{"n": 1, "cat": "...", "title": "...", "tour": "..."}]}"""
 
 TG_KEEP = {"quote", "interview", "transfer", "rumor", "conflict", "record", "mvp", "unique_play", "feature", "result"}
-TG_CLASSIFY_LIMIT = int(os.environ.get("TG_CLASSIFY_LIMIT", "400"))  # постов на разбор нейросетью за запуск (пачками по 10)
+TG_CLASSIFY_LIMIT = int(os.environ.get("TG_CLASSIFY_LIMIT", "400"))  # постов на разбор нейросетью за запуск
+TG_BATCH = 25  # постов в одном запросе (было 10)
 AD = re.compile(r"промокод|реклама|#ad\b|erid|казино|casino|ставк\w*|букмекер|розыгрыш|giveaway|подпишись|cs\.? ?money|csmoney"
                 r"|освежи\w* инвент|инвентар\w*|обмен\w* скин\w*|скин\w* (?:на|за) |кейс\w* (?:на|за|с) |фрибет\w*|freebet|бонус\w* (?:за|при|на)"
                 r"|депозит\w*|по ссылке|переходи\w*|забирай\w*|скидк\w*|маркетплейс\w*|market\b", re.IGNORECASE)
@@ -3458,13 +3459,13 @@ def orig_title(text: str, ocr: str = "") -> str:
 
 
 def tg_classify(posts: list[dict]) -> None:
-    """Категория, заголовок и турнир для новых постов — по 10 за запрос (свежие первыми)."""
+    """Категория, заголовок и турнир для новых постов — по TG_BATCH за запрос (свежие первыми; лимит Google — число запросов)."""
     todo = [p for p in sorted(posts, key=lambda p: p["date"], reverse=True)
             if tg_cache.get(f"{p['channel']}/{p['id']}", {}).get("v") != 3][:TG_CLASSIFY_LIMIT]
-    for i in range(0, len(todo), 10):
-        if not llm_ok() or not (gem_ok() or giga_budget_ok("lite")):
+    for i in range(0, len(todo), TG_BATCH):
+        if not llm_ok() or not (gem_ok() or giga_budget_ok("lite") or alt_ok()):
             return
-        chunk = todo[i:i + 10]
+        chunk = todo[i:i + TG_BATCH]
         lines = []
         for n, p in enumerate(chunk):
             info = tg_cache.get(f"{p['channel']}/{p['id']}") or {}
@@ -3472,7 +3473,7 @@ def tg_classify(posts: list[dict]) -> None:
             if info.get("ocr"):
                 body += " [картинка] " + re.sub(r"\s+", " ", info["ocr"])[:400]
             lines.append(f"{n + 1}. {body or '(пусто)'}")
-        res = parse_json_loose(giga_chat(TG_SYSTEM, "\n".join(lines), 1200))
+        res = parse_json_loose(giga_chat(TG_SYSTEM, "\n".join(lines), 3000))
         for it in (res or {}).get("items") or []:
             try:
                 n = int(it.get("n")) - 1
@@ -5470,7 +5471,7 @@ def gem_ok() -> bool:
 
 
 def llm_ok() -> bool:
-    return gem_ok() or bool(GIGA_KEY and not _giga["off"])
+    return gem_ok() or bool(GIGA_KEY and not _giga["off"]) or alt_ok()
 
 
 def gemini_call(system: str | None, parts: list, max_tokens: int = 900, json_mode: bool = True) -> str | None:
@@ -5566,7 +5567,63 @@ def giga_chat(system: str, user: str, max_tokens: int = 900, model: str | None =
         txt = gemini_call(system, [{"text": user}], max_tokens)
         if txt:
             return txt
-    return gigachat_call(system, user, max_tokens, model)
+    txt = gigachat_call(system, user, max_tokens, model)
+    if txt:
+        return txt
+    return alt_call(system, user, max_tokens)
+
+
+# Запасные бесплатные нейросети (OpenAI-совместимые): ключи GROQ_KEY / MISTRAL_KEY в Secrets — по желанию владельца.
+# Идут после Google и GigaChat. Модель с 429/404 пропускается до конца прогона.
+ALT_PROVIDERS = [
+    ("groq", os.environ.get("GROQ_KEY", "").strip(), "https://api.groq.com/openai/v1/chat/completions",
+     [m for m in os.environ.get("GROQ_MODELS", "llama-3.3-70b-versatile,openai/gpt-oss-120b,meta-llama/llama-4-scout-17b-16e-instruct,llama-3.1-8b-instant").split(",") if m]),
+    ("mistral", os.environ.get("MISTRAL_KEY", "").strip(), "https://api.mistral.ai/v1/chat/completions",
+     [m for m in os.environ.get("MISTRAL_MODELS", "mistral-small-latest,open-mistral-nemo").split(",") if m]),
+]
+_alt_dead: set = set()
+
+
+def alt_ok() -> bool:
+    return any(key and f"{name}:{m}" not in _alt_dead for name, key, _, ms in ALT_PROVIDERS for m in ms)
+
+
+def alt_call(system: str, user: str, max_tokens: int = 900) -> str | None:
+    for name, key, url, models in ALT_PROVIDERS:
+        if not key:
+            continue
+        for m in models:
+            tag = f"{name}:{m}"
+            if tag in _alt_dead:
+                continue
+            body = {"model": m, "max_tokens": max_tokens, "temperature": 0.2,
+                    "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}]}
+            try:
+                req = urllib.request.Request(url, data=json.dumps(body).encode(), method="POST",
+                                             headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json",
+                                                      "Accept": "application/json"})
+                with urllib.request.urlopen(req, timeout=90) as r:
+                    j = json.loads(r.read())
+                txt = (j.get("choices") or [{}])[0].get("message", {}).get("content")
+                if txt:
+                    txt = re.sub(r"^\s*```(?:json)?\s*|\s*```\s*$", "", txt.strip())
+                    stats.setdefault("alt_models", {})
+                    stats["alt_models"][tag] = stats["alt_models"].get(tag, 0) + 1
+                    if name == "mistral":
+                        time.sleep(1.1)  # бесплатный тариф Mistral — 1 запрос в секунду
+                    return txt
+            except urllib.error.HTTPError as e:
+                msg = e.read()[:200].decode("utf-8", "replace")
+                if e.code in (401, 403):
+                    _alt_dead.update(f"{name}:{x}" for x in models)
+                    warn(f"{name}: ключ не принят ({e.code})")
+                    break
+                _alt_dead.add(tag)
+                warn(f"{tag}: {e.code} {msg[:120]}")
+            except Exception as e:
+                _alt_dead.add(tag)
+                warn(f"{tag}: {e!r}")
+    return None
 
 
 def gigachat_call(system: str, user: str, max_tokens: int = 900, model: str | None = None) -> str | None:
@@ -5683,6 +5740,53 @@ def summarize_article(it: dict, url: str) -> dict:
     return info
 
 
+SUM_MULTI_SYSTEM = SUM_SYSTEM.replace("Тебе дают статью (на любом языке).", "Тебе дают несколько пронумерованных статей (на любом языке). Каждую пересказывай отдельно.").replace(
+    'Ответ строго в JSON без пояснений:\n{', 'Ответ строго в JSON без пояснений: {"items": [ {"n": <номер статьи>, ').replace(
+    '"quotes": [{"ru": "<цитата по-русски>", "who": "<кто сказал>"}]}', '"quotes": [{"ru": "<цитата по-русски>", "who": "<кто сказал>"}]}, ... ]}')
+SUM_BATCH = 3
+
+
+def summarize_batch(items: list[dict]) -> None:
+    """Пересказы статей пачками по SUM_BATCH в одном запросе (экономия дневного лимита запросов). Пишет сразу в art_cache."""
+    todo = []
+    for it in items:
+        if it.get("tg") or not llm_ok():
+            continue
+        info = art_cache.get(it["key"]) or {}
+        url = info.get("url") or (it["url"] if "news.google.com" not in (it["url"] or "") else None)
+        if not url or info.get("sum_tried") or _art_sum[0] + len(todo) >= ART_SUMMARY_LIMIT:
+            continue
+        text, image = article_text(url)
+        info = dict(info, url=url, image=image, t=info.get("t") or iso(NOW))
+        if not text or len(text) < 200:
+            info["sum_tried"] = True
+            art_cache[it["key"]] = info
+            continue
+        art_cache[it["key"]] = info
+        todo.append((it, text[:4500]))
+    for i in range(0, len(todo), SUM_BATCH):
+        chunk = todo[i:i + SUM_BATCH]
+        _art_sum[0] += len(chunk)
+        body = "\n\n".join(f"=== Статья {n + 1}\nИсточник: {it['source']}\nЗаголовок: {it['title']}\n\n{text}" for n, (it, text) in enumerate(chunk))
+        res = parse_json_loose(giga_chat(SUM_MULTI_SYSTEM, body, 1200 * len(chunk)))
+        if res is None:
+            continue  # не ответила — попробуем по одной в article_info
+        got = {}
+        for r in (res or {}).get("items") or []:
+            try:
+                got[int(r.get("n")) - 1] = r
+            except (TypeError, ValueError):
+                pass
+        for n, (it, _) in enumerate(chunk):
+            info = art_cache[it["key"]]
+            r = got.get(n)
+            if r and r.get("ok") and r.get("summary_ru"):
+                quotes = [q for q in (r.get("quotes") or []) if isinstance(q, dict) and q.get("ru") and len(q["ru"].split()) <= 20][:2]
+                info.update({"title_ru": r.get("title_ru"), "summary_ru": str(r["summary_ru"]).strip(), "quotes": quotes,
+                             "lang": (r.get("lang") or "").lower()[:5] or None})
+            info["sum_tried"] = True
+
+
 def article_info(it: dict) -> dict:
     """Ссылка на оригинал, пересказ, цитаты. Всё кэшируется по новости."""
     if it.get("tg"):
@@ -5698,7 +5802,7 @@ def article_info(it: dict) -> dict:
     if url:
         info["url"] = url
     tried = info.get("sum_tried")
-    if url and GIGA_KEY and not tried and not _giga["off"] and _art_sum[0] < ART_SUMMARY_LIMIT:
+    if url and llm_ok() and not tried and _art_sum[0] < ART_SUMMARY_LIMIT:
         info.update(summarize_article(it, url))
         info["sum_tried"] = True
     if info:
@@ -5814,6 +5918,7 @@ def gather_news(teams: list[dict]) -> list[dict]:
         it["title_ru0"], it["lang0"] = (t_ru if t_lang != "ru" else None), t_lang
     clusters = dedupe_strict(items)  # только повторы одной новости, главная — самая подробная
 
+    summarize_batch([cl[0] for cl in clusters[:NEWS_PER_TEAM * 2]])
     out = []
     for cl in clusters[:NEWS_PER_TEAM * 2]:
         it, others = cl[0], cl[1:]
@@ -8982,6 +9087,8 @@ def main() -> int:
     if stats.get("gemini_models") or _gem_spent():
         print("Нейросеть Google за прогон: " + (", ".join(f"{k} {v}" for k, v in (stats.get("gemini_models") or {}).items()) or "—")
               + (" · исчерпаны на сегодня: " + ", ".join(k for k, v in _gem_spent().items() if v != "нет") if _gem_spent() else ""))
+    if stats.get("alt_models"):
+        print("Запасная нейросеть за прогон: " + ", ".join(f"{k} {v}" for k, v in stats["alt_models"].items()))
     return 0
 
 
