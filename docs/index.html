@@ -1229,6 +1229,7 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
 .pl .pmaj.tap b, .pl .medal b { color: var(--fg); }
 .pl .medal { font-size: 12.5px; padding: 2px 7px; border-radius: 7px; gap: 3px; line-height: 1.25; } .pl .medal b { font-size: 12px; font-weight: 700; }  /* размер по просьбе владельца 26.11 (×1.5 от уменьшенного); зона нажатия — ::after */
 .pl .pmaj.tap { font-size: 12px; padding: 1px 7px; margin-top: 4px; border-radius: 6px; line-height: 1.35; } .pl .pmaj.tap b { font-size: 12px; }  /* тоньше, как плашки AWP/Капитан (владелец 26.11) */
+.sec.news-h { margin-top: 30px; margin-bottom: -6px; }
 </style>
 
 <div class="wrap" id="app"></div>
@@ -2640,11 +2641,19 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
     return score >= 0.45 ? best : null;
   }
 
+  // подборки, опросы, списки — не история между двумя (то же правило, что в сборщике; для уже собранных карточек)
+  function junkStory(f) {
+    var t = (f.text || "") + " " + (f.more || "");
+    if (/опрос|анкет|блиц|ответил[аи]? на вопрос|состав мечты|трансферн\S* новост|отсылк|тир-?лист|\$\s?\d/i.test(t)) return true;
+    if ((t.match(/[\w.\-]{2,}\s*:\s/g) || []).length >= 5) return true;
+    var w = {}; (t.match(/[A-Za-z][A-Za-z0-9._\-]+/g) || []).forEach(function (x) { w[x.toLowerCase()] = 1; });
+    return Object.keys(w).length >= 14;
+  }
   function factsBlock(m) {
     // факты для эфира — связи игроков: кто с кем играл вместе и когда, кто играл за соперника (Liquipedia)
     var F = (m.facts || []).filter(function (f) { return f.kind === "link"; });
     // конфликты и громкие истории между людьми из двух команд — посты Telegram-каналов со ссылкой (владелец 24.11)
-    var B = (m.facts || []).filter(function (f) { return f.kind === "beef"; });
+    var B = (m.facts || []).filter(function (f) { return f.kind === "beef" && !junkStory(f); });
     // один блок «Связи игроков» (владелец 26.11): сначала истории из новостей (конфликты, родня, дружба, общие события),
     // потом где играли вместе и против кого (Liquipedia)
     if (!F.length && !B.length) return "";
@@ -2653,7 +2662,7 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
         '<span class="bf-src">' + (f.date ? esc(fmt(new Date(f.date + "T12:00:00Z"), { day: "numeric", month: "long", year: "numeric" })) + ' · ' : '') + '<a href="' + esc(f.url) + '" data-tg="' + esc(f.url) + '" target="_blank" rel="noopener">источник</a></span></div>';
     }).join("");
     var shown = state.factsAll ? F : F.slice(0, 10);
-    var html = '<div class="sec"><h3>Связи игроков <span>' + (B.length ? 'знать, не цитировать' : 'по истории команд') + '</span></h3><div class="box facts' + (B.length ? ' beef' : '') + '">' + bh;
+    var html = '<div class="sec"><h3>Связи игроков</h3><div class="box facts' + (B.length ? ' beef' : '') + '">' + bh;
     shown.forEach(function (f) { html += '<div class="fact"><span>' + (f.tag && f.tag !== "Связь" ? '<i class="bf-tag">' + esc(f.tag) + '</i> ' : '') + esc(f.text) + '</span></div>'; });
     if (F.length > 10) html += '<button class="fmore" id="facts-more">' + (state.factsAll ? "Свернуть" : "Показать ещё " + (F.length - 10)) + '</button>';
     return html + '</div></div>';
@@ -3626,7 +3635,8 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
     if (key === "team:players") return playersTab(m);
     if (key === "team:pos") return posBlock(m);
     if (key === "stats") return stakeBlock(m) + vrsBlock(m) + pickBlock(m) + mapsTable(m) + mapZone(m) + h2hBlock(m) + formBlock(m);  // форма — после карт (по просьбе владельца)
-    return (key === "news:all" ? factsBlock(m) : "") + newsList(m, key.slice(5));
+    var fb = key === "news:all" ? factsBlock(m) : "";  // связи — отдельным разделом, новости под своим заголовком
+    return fb + (fb ? '<div class="sec news-h"><h3>Новости</h3></div>' : '') + newsList(m, key.slice(5));
   }
 
   // шанс команды выиграть серию: по коэффициентам, а без них — сумма исходов прогноза
