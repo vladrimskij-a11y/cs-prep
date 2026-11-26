@@ -3130,7 +3130,9 @@ def pron_recheck() -> None:
     if not _pron_recheck:
         print("Проверка русских имён: проверять нечего")
         return
-    items = list(_pron_recheck.items())[:PRON_CHECK_RUN]
+    items = [(k, v) for k, v in _pron_recheck.items() if not (pron_cache.get(k) or {}).get("chk")][:PRON_CHECK_RUN]
+    if not items:
+        return
     fixed = {}
     for i in range(0, len(items), 40):
         part = items[i:i + 40]
@@ -8314,6 +8316,11 @@ def main() -> int:
     if STATS:  # быстрый сбор: только то, что бесплатно и не блокируют
         _hltv_blocked[0] = _lp_blocked[0] = True  # dust2 не блокирует — вето ищем и в быстром сборе
         _giga["off"] = _gem["off"] = True
+    if not STATS and not FAST:  # проверка имён — первой, пока дневной лимит Gemini не потрачен на новости (26.11: 429)
+        try:
+            pron_recheck()
+        except Exception as e:
+            warn(f"Проверка имён: {e!r}")
     matches = fetch_upcoming()
     # тир-2: оставляем только турниры, где половина участников — уровня тир-1
     ps_teams = {str(x["id"]): x.get("teams") or [] for x in fetch_future_tournaments()}
