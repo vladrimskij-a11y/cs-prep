@@ -6062,11 +6062,19 @@ def player_beef(d: dict) -> list[dict]:
         txt = x.get("text") or ""
         if not (BEEF_RX.search(txt) or STORY_RX.search(txt)) or re.search(r"дайджест", txt, re.I) or len(re.findall(r"^\s*[—•▪️-]", txt, re.M)) >= 4:
             continue  # дайджесты и списки новостей — не история про двоих
+        # опросы и подборки ответов игроков («s1mple: Габен. NiKo: Неймар…») — не история про двоих (владелец 26.11)
+        if re.search(r"опрос|анкет|блиц|ответил[аи]? на вопрос", txt, re.I) or len(re.findall(r"[\w.\-]{2,}\s*:\s", txt)) >= 5:
+            continue
         kw = [k.start() for k in BEEF_RX.finditer(txt)] + [k.start() for k in STORY_RX.finditer(txt)]
-        near = lambda r: any(abs(m.start() - k) <= 350 for m in r.finditer(txt) for k in kw)
         a = [n for i, n, _ in who if i == 0 and rx[n].search(txt)]
         b = [n for i, n, _ in who if i == 1 and rx[n].search(txt)]
-        if not a or not b or not any(near(rx[n]) for n in a + b):
+        if not a or not b:
+            continue
+        # слово про конфликт/историю должно стоять рядом с людьми ОБЕИХ команд (раньше хватало одного — 26.11 опрос
+        # Perfect World с westmelon и Snappi вышел «конфликтом»)
+        def near_k(names, k, w=250):
+            return any(abs(m.start() - k) <= w for n in names for m in rx[n].finditer(txt))
+        if not any(near_k(a, k) and near_k(b, k) for k in kw):
             continue
         tok = title_tokens(txt[:400])
         if any(len(tok & o) / max(1, len(tok | o)) >= 0.5 for o in seen):
@@ -6075,7 +6083,7 @@ def player_beef(d: dict) -> list[dict]:
         lines = [l.strip() for l in txt.split("\n") if l.strip()]
         head = lines[0] if lines else txt
         body = " ".join(lines[1:])
-        tag = "Конфликт" if any(abs(m.start() - k.start()) <= 350 for n in a + b for m in rx[n].finditer(txt) for k in BEEF_RX.finditer(txt)) else \
+        tag = "Конфликт" if any(near_k(a, k.start()) and near_k(b, k.start()) for k in BEEF_RX.finditer(txt)) else \
             next((t for t, r in STORY_KINDS if re.search(r, txt, re.I)), "История")
         out.append({"tag": tag, "kind": "beef", "who": f"{', '.join(a)} ({teams[0]['name']}) — {', '.join(b)} ({teams[1]['name']})",
                     "text": head[:220], "more": body[:600] or None, "date": x.get("date"), "url": x["url"]})
