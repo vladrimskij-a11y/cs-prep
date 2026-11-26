@@ -3494,6 +3494,19 @@ _tg_titles: dict = {}
 CURRENT_TOURS: list[str] = []   # турниры из нашего расписания — их итоги матчей оставляем
 
 
+def tg_precheck(p: dict) -> bool:
+    """Стоит ли спрашивать нейросеть про пост: заведомо лишнее отсекаем по словам (то же, что потом отсеет tg_keep)."""
+    info = tg_cache.get(f"{p['channel']}/{p['id']}") or {}
+    text = (p["text"] or "") + "\n" + (info.get("ocr") or "")
+    if AD.search(text[:600]) or SPAM.search((p["text"] or "")[:200]):
+        return False
+    if is_stale_preview((p["text"] or "").split("\n", 1)[0], p["date"]):
+        return False
+    if OTHER_GAMES.search(text[:400]) and not CS_STRICT.search(text[:400]):
+        return False  # пост про другую игру (Dota, Valorant…), CS не упомянут
+    return True
+
+
 def tg_keep(info: dict, p: dict) -> bool:
     # посты с большим видео оставляем (владелец 05.11): в приложении — обложка и кнопка «Смотреть видео в Telegram»
     text = (info.get("title") or "") + "\n" + (p["text"] or "") + "\n" + (info.get("ocr") or "")
@@ -3501,6 +3514,8 @@ def tg_keep(info: dict, p: dict) -> bool:
         return False
     if is_stale_preview(info.get("title"), p["date"]) or is_stale_preview((p["text"] or "").split("\n", 1)[0], p["date"]):
         return False  # превью уже сыгранного матча
+    if OTHER_GAMES.search(text[:400]) and not CS_STRICT.search(text[:400]):
+        return False  # про другую игру (нейросеть такие посты уже не смотрит — tg_precheck)
     cat = info.get("cat") if info.get("v") == 3 else None
     if cat == "ad":
         cat = "feature"  # «реклама» по мнению нейросети без рекламных слов — не реклама (06.11: тренер BetBoom и кола zorte)
@@ -3548,7 +3563,9 @@ def tg_posts() -> list[dict]:
             tg_process(p)
             raw.append(p)
     try:
-        tg_classify(raw)
+        # нейросеть — только для постов, которые могут попасть в ленту: явная реклама, спам, превью сыгранного матча,
+        # моменты матча и посты про другие игры без CS отсекаются словами, без запроса (владелец 26.11 — экономия лимита)
+        tg_classify([p for p in raw if tg_precheck(p)])
     except Exception as e:
         warn(f"Разбор постов: {e!r}")
     res = []
