@@ -8837,10 +8837,16 @@ def main() -> int:
         if twin is not None:
             # тот же турнир под другим названием («BLAST Bounty Winter 2027» у bo3 = «BLAST Bounty 2027 Season 1» у HLTV):
             # одна карточка, даты — с HLTV (26.11 bo3 дал 14–24 дек. вместо 14–25 янв.)
-            if (twin.get("begin"), twin.get("end")) != (tr["begin"], tr["end"]):
+            if (twin.get("begin"), twin.get("end")) != (tr["begin"], tr["end"]) and not ((parse_iso(twin.get("begin")) or NOW) <= NOW):
                 print(f"Турнир {twin['name']}: даты {str(twin.get('begin'))[:10]}–{str(twin.get('end'))[:10]} → по HLTV "
                       f"{tr['begin'][:10]}–{tr['end'][:10]}")
-            twin["begin"], twin["end"] = tr["begin"], tr["end"]
+            tb = parse_iso(twin.get("begin"))
+            if tb and tb <= NOW:
+                # турнир уже идёт: начало оставляем своё (у HLTV в списке будущих — только последняя стадия:
+                # 26.11 Сингапур «начался» бы 28.11), конец — позднейший
+                twin["end"] = max(x for x in (twin.get("end"), tr["end"]) if x)
+            else:
+                twin["begin"], twin["end"] = tr["begin"], tr["end"]
             twin["prize_usd"] = twin.get("prize_usd") or tr.get("prize_usd")
             twin["hltv_name"] = tr["name"]
             continue
