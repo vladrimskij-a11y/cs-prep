@@ -642,12 +642,13 @@ html { overflow-anchor: none; }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 body.nav #app > .view, body.nav #app > .sshell .pane, body.nav #app > .mshell .mviewport { animation: viewIn .28s cubic-bezier(.2,.8,.25,1) both; }
 /* переходы между страницами (владелец 26.11): вглубь — въезд справа, назад — слева, по сторонам — лёгкий подъём; только transform и opacity */
-@keyframes navFwd { from { transform: translate3d(42px, 0, 0); opacity: .35; } to { transform: none; opacity: 1; } }
-@keyframes navBack { from { transform: translate3d(-42px, 0, 0); opacity: .35; } to { transform: none; opacity: 1; } }
-@keyframes navSame { from { transform: translate3d(0, 10px, 0); opacity: .5; } to { transform: none; opacity: 1; } }
-body.nav-fwd #app > * { animation: navFwd .32s cubic-bezier(.2,.8,.25,1) both !important; }
-body.nav-back #app > * { animation: navBack .32s cubic-bezier(.2,.8,.25,1) both !important; }
-body.nav-same #app > * { animation: navSame .26s cubic-bezier(.2,.8,.25,1) both !important; }
+@keyframes navFwd { from { transform: translate3d(22%, 0, 0); opacity: .55; } to { transform: none; opacity: 1; } }
+@keyframes navBack { from { transform: translate3d(-22%, 0, 0); opacity: .55; } to { transform: none; opacity: 1; } }
+@keyframes navSame { from { transform: translate3d(0, 18px, 0); opacity: .6; } to { transform: none; opacity: 1; } }
+body.nav-fwd #app > * { animation: navFwd .42s cubic-bezier(.22,1,.36,1) both !important; will-change: transform, opacity; }
+body.nav-back #app > * { animation: navBack .42s cubic-bezier(.22,1,.36,1) both !important; will-change: transform, opacity; }
+body.nav-same #app > * { animation: navSame .34s cubic-bezier(.22,1,.36,1) both !important; will-change: transform, opacity; }
+body.nav-fwd, body.nav-back { overflow-x: hidden; }
 body.nav-fwd #app > * .pane, body.nav-back #app > * .pane, body.nav-same #app > * .pane, body.nav-fwd #app > * .mviewport, body.nav-back #app > * .mviewport, body.nav-same #app > * .mviewport { animation: none !important; }
 .pop .pop-in { animation: popIn .18s cubic-bezier(.2,.8,.25,1) both; transform-origin: top center; }
 .empty { animation: fadeIn .25s ease-out both; }
@@ -1827,7 +1828,7 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
         });
         fixSnap();
         if (shEl.querySelector(".brk-row, .swg")) drawBrackets();
-      }, 0); });
+      }, navDelay()); });
     }
   }
   // притягивание стадий: стадия выше экрана (швейцарка мейджора) не держит прокрутку — иначе на телефоне её низ и всё,
@@ -1969,7 +1970,7 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
     var F = state.feed;
     renderShell({ id: "feed", back: "Главная", title: "Лента", tabs: [{ key: "all", label: "Все каналы" }].concat(F ? (F.channels || []).map(function (c) { return { key: c.id, label: c.title }; }) : []),
       pane: function (k) { return F ? feedPane(F, k) : '<div class="empty">' + (state.feedErr ? '<strong>Лента пока не собрана</strong>' : 'Загружаю ленту…') + '</div>'; } });
-    requestAnimationFrame(function () { setTimeout(feedFill, 0); });
+    requestAnimationFrame(function () { setTimeout(feedFill, navDelay()); });
   }
 
   // ---------- турниры
@@ -4019,7 +4020,7 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
         p.querySelector(".tabbody").innerHTML = tabBodyHtml(m, k);
         if (state.scrolls[k]) p.scrollTop = state.scrolls[k];
       });
-    }, 0); });
+    }, navDelay()); });
   }
   function goKey(k) {
     var keys = paneKeys(), i = keys.indexOf(k);
@@ -4298,6 +4299,8 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
   // ---------- роутинг: "" турниры, #t-ID турнир, #m-ID матч, #feed лента
   var depth = 0;
   var navT = 0, navLvl = 0, navHash = null;
+  // пока идёт анимация перехода, соседние вкладки и хвост ленты не дорисовываем — иначе кадры рвутся (владелец 26.11)
+  function navDelay() { return document.body.classList.contains("nav") ? 440 : 0; }
   function route() {
     closePop();  // переход на другую страницу (в т.ч. «назад» свайпом) — окно наград сворачивается
     saveShell();  // и место в списке (рейтинг, турниры) — чтобы вернуться туда же
@@ -4310,7 +4313,7 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
     document.body.classList.remove("nav", "nav-fwd", "nav-back", "nav-same");
     if (moved) { void document.body.offsetWidth; document.body.classList.add("nav", "nav-" + dir); }
     clearTimeout(navT);
-    navT = setTimeout(function () { document.body.classList.remove("nav", "nav-fwd", "nav-back", "nav-same"); }, 420);
+    navT = setTimeout(function () { document.body.classList.remove("nav", "nav-fwd", "nav-back", "nav-same"); }, 460);
     var mt = /^m-(\d+)$/.exec(h), tt = /^t-([\w-]+)$/.exec(h);
     closeOverlay(true);
     updateBackBtn();
