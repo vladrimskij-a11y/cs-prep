@@ -6637,12 +6637,21 @@ def hltv_players_warm() -> None:
     forms: dict = {}  # ник → форма его команды (турнир, дата серии)
     files = sorted((load_json(f, {}) or {} for f in (OUT / "match").glob("*.json")), key=lambda d: d.get("begin_at") or "9999")
     coaches: set = set()
+    # тёзки с ручной страницей HLTV (HLTV_ID_FIX, Brain из Betclic): без «кто это» очередь их пропускала — 27.11
+    fixwho: dict = {}
+
+    def mark_fix(pls):
+        for p in pls:
+            w = pimg_key(p.get("nick") or "", p.get("first_name") or p.get("name"))
+            if p.get("nick") and w in HLTV_ID_FIX:
+                fixwho.setdefault(p["nick"], set()).add(w)
     soon: dict = {}  # ник → начало ближайшего матча в ближайшие 3 дня (или идущего)
     for d in files:
         bt = parse_iso(d.get("begin_at"))
         near = bt is not None and NOW - timedelta(hours=8) < bt < NOW + timedelta(days=3)
         for t in d.get("teams") or []:
             ps = [p.get("nick") for p in (t.get("players") or []) + (t.get("coach") or [])]
+            mark_fix(t.get("players") or [])
             if near:
                 for n in ps:
                     if n and (n not in soon or d["begin_at"] < soon[n]):
@@ -6654,6 +6663,7 @@ def hltv_players_warm() -> None:
     for f in sorted((OUT / "team").glob("*.json")):
         d = load_json(f, {}) or {}
         ps = [p.get("nick") for p in (d.get("roster") or []) + (d.get("coach") or [])]
+        mark_fix(d.get("roster") or [])
         coaches |= {norm(p.get("nick")) for p in d.get("coach") or []}
         nicks += ps
         for n in ps:
@@ -6677,9 +6687,9 @@ def hltv_players_warm() -> None:
                 return True
         return False
     queue = []
-    for i, n in enumerate(dict.fromkeys(x for x in nicks if x)):
-        isc = norm(n) in coaches
-        pl, kp, _ = hltv_ref(n, isc)
+    for i, (n, who) in enumerate((n, w) for n in dict.fromkeys(x for x in nicks if x) for w in [None] + sorted(fixwho.get(n) or ())):
+        isc = norm(n) in coaches and not who
+        pl, kp, _ = hltv_ref(n, isc, who)
         if not pl:
             continue
         c = hltv_cache.get(f"{kp}:{pl['id']}")
@@ -6697,14 +6707,14 @@ def hltv_players_warm() -> None:
                 and rank != 1):
             continue
         # сначала — все, кто играет в ближайшие 3 дня (по времени матча), в любой ступени; потом остальные по ступеням
-        queue.append((0 if n in soon else 1, soon.get(n) or "", rank, (c or {}).get("t") or "", i, n, isc))
+        queue.append((0 if n in soon else 1, soon.get(n) or "", rank, (c or {}).get("t") or "", i, n, isc, who or ""))
     queue.sort()
     done = 0
-    for *_, n, isc in queue:
+    for *_, n, isc, who in queue:
         if _mvp_new[0] >= MVP_PER_RUN or _hltv_blocked[0]:
             break
         try:
-            if hltv_player_info(n, force=True, coach=isc):
+            if hltv_player_info(n, force=True, coach=isc, who=who or None):
                 done += 1
         except Exception as e:
             warn(f"Игрок HLTV {n}: {e!r}")
