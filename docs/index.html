@@ -1260,6 +1260,9 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
 .rh-otsep { display: flex; align-items: center; gap: 10px; margin: 18px 2px 10px; font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
 .rh-otsep::before, .rh-otsep::after { content: ""; flex: 1; height: 1px; background: var(--line); }
 .rh-leg { margin-top: 10px; padding: 0 4px; }
+.ov-bar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bg); }
+.ov-bar > .pin { max-width: 640px; margin: 0 auto; padding: 8px max(16px, env(safe-area-inset-right, 0px)) 8px max(16px, env(safe-area-inset-left, 0px)); }
+.ov-bar .sfilt { margin-top: 0; }
 </style>
 
 <div class="wrap" id="app"></div>
@@ -3693,8 +3696,9 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
         return j > 0 ? mapSquare(g, i, A, B).replace('<div class="pp-m', '<div role="button" data-smap="' + j + '" class="pp-m') : mapSquare(g, i, A, B);
       }).join("") + unplayed.map(function (v, j) {
         return '<div class="pp-m n left' + mapBg(v.map) + '"><span class="pp-n">Карта ' + (maps.length + j + 1) + '</span><b>' + esc(v.map) + '</b><small>не сыграна</small></div>';
-      }).join("") + '</div>' : '') + (keys.length > 1 && maps.some(hasR) ? '<div class="sd-leg" style="text-align:center">Нажми на карту — история раундов</div>' : '') + '</section>' +
-      (keys.length > 1 ? '<div class="filt sfilt" role="tablist">' + keys.map(function (k, j) { return '<button class="chip" data-smap="' + j + '" aria-pressed="' + (j === 0) + '">' + (k < 0 ? "Вся серия" : esc(maps[k].map || ("Карта " + (k + 1)))) + '</button>'; }).join("") + '</div>' : '');
+      }).join("") + '</div>' : '') + (keys.length > 1 && maps.some(hasR) ? '<div class="sd-leg" style="text-align:center">Нажми на карту — история раундов</div>' : '') + '</section>';
+    // «Вся серия / карты» — отдельной липкой строкой: при прокрутке едет вместе со страницей вверху (владелец 26.11)
+    var bar = (keys.length > 1 ? '<div class="filt sfilt" role="tablist">' + keys.map(function (k, j) { return '<button class="chip" data-smap="' + j + '" aria-pressed="' + (j === 0) + '">' + (k < 0 ? "Вся серия" : esc(maps[k].map || ("Карта " + (k + 1)))) + '</button>'; }).join("") + '</div>' : '');
     var vetoHtml = (S.veto || []).length ? '<div class="sec"><h3>Вето</h3><div class="box veto">' + S.veto.map(function (v, i) {
       var who = v.team ? ([A, B].findIndex(function (t) { return t && t.name && (t.name.toLowerCase().indexOf(v.team.toLowerCase()) >= 0 || v.team.toLowerCase().indexOf(String(t.name).toLowerCase()) >= 0); })) : -1;
       return '<div class="vt"><span class="vt-n num">' + (i + 1) + '</span><span class="vt-t ' + (who === 0 ? "a" : who === 1 ? "b" : "") + '">' + esc(v.team || "") + '</span>' +
@@ -3714,7 +3718,7 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
     }
     var panes = keys.length ? keys.map(function (k) { return '<div class="opane"><div class="pin">' + (k < 0 ? vetoHtml : roundsBlock(maps[k], A, B)) + tables(k < 0 ? S.players : maps[k].players) + '</div></div>'; }).join("")
       : '<div class="opane"><div class="pin">' + vetoHtml + '<div class="box note" style="margin-top:12px">Статистики игроков по этому матчу пока нет.</div></div></div>';
-    return '<div class="ov-head"><div class="pin">' + head + '</div></div><div class="ov-vp"><div class="ov-track">' + panes + '</div></div>';
+    return '<div class="ov-head"><div class="pin">' + head + '</div></div>' + (bar ? '<div class="ov-bar"><div class="pin">' + bar + '</div></div>' : '') + '<div class="ov-vp"><div class="ov-track">' + panes + '</div></div>';
   }
   function ovTrackTo(i, anim) {
     var O = state.ovl, tr = O && O.el.querySelector(".ov-track");
