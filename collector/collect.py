@@ -2751,19 +2751,19 @@ _vrs_calib: dict = {}
 VRS_CALIB_N = 8  # последних матчей того же вида (стадия мейджора / прочее)
 
 
-def vrs_calib(kind: str) -> tuple[float, float]:
+def vrs_calib(kind: str, tkey: str | None = None) -> tuple[float, float]:
     """Поправка прогноза «Победа/Поражение» по журналу: во сколько раз настоящее изменение очков (живой рейтинг HLTV)
-    отличалось от нашего сырого прогноза — отдельно у победителя и проигравшего. Последние VRS_CALIB_N матчей того же
-    вида; априори — как будто один матч совпал точно (после 1–2 матчей поправка уже почти полная). Без своих данных
-    Stage 2 берёт поправку Stage 1. Выбросы (знак не тот, расхождение больше чем в 2.5 раза) не считаются."""
+    отличалось от нашего сырого прогноза — отдельно у победителя и проигравшего. Сначала по виду матча (стадия мейджора /
+    прочее; Stage 2 без своих данных берёт Stage 1), потом — под конкретный турнир (`tkey`), с опорой на поправку вида.
+    Последние VRS_CALIB_N матчей; априори — «один матч совпал с опорой» (после 1–2 матчей поправка почти полная).
+    Выбросы (знак не тот, расхождение больше чем в 2.5 раза) не считаются."""
     if not _vrs_calib:
         if not vrs_log:
             vrs_log.update((load_json(VRS_LOG_F, {}) or {}).get("entries") or {})
-        by: dict = {}
-        for e in sorted(vrs_log.values(), key=lambda e: e.get("begin") or ""):
-            if e.get("kind") and e.get("raw") and e.get("act") and e.get("w") in (0, 1):
-                by.setdefault(e["kind"], []).append(e)
-        for k, es in by.items():
+        es_all = [e for e in sorted(vrs_log.values(), key=lambda e: e.get("begin") or "")
+                  if e.get("kind") and e.get("raw") and e.get("act") and e.get("w") in (0, 1)]
+
+        def fit(es, base):
             out = []
             for side in (0, 1):  # 0 — победитель, 1 — проигравший
                 sa = sp = n = 0
@@ -2774,12 +2774,30 @@ def vrs_calib(kind: str) -> tuple[float, float]:
                     if abs(p) < 3 or p * a <= 0 or not 0.4 <= a / p <= 2.5:
                         continue
                     sa, sp, n = sa + a * p, sp + p * p, n + 1
-                c = (sa + sp / n) / (sp + sp / n) if n else 1.0
+                c = (sa + base[side] * sp / n) / (sp + sp / n) if n else base[side]
                 out.append((round(min(1.6, max(0.6, c)), 3), n))
-            _vrs_calib[k] = out
+            return out
+
+        by: dict = {}
+        for e in es_all:
+            by.setdefault(e["kind"], []).append(e)
+        for k, es in sorted(by.items()):  # m1 раньше m2 — m2 опирается на m1
+            base = (1.0, 1.0)
+            if k == "m2" and "m1" in _vrs_calib:
+                base = tuple(x[0] for x in _vrs_calib["m1"])
+            _vrs_calib[k] = out = fit(es, base)
             print(f"VRS: поправка «{k}» — победитель ×{out[0][0]} ({out[0][1]} матч.), проигравший ×{out[1][0]} ({out[1][1]} матч.)")
+        byt: dict = {}
+        for e in es_all:
+            if e.get("tkey"):
+                byt.setdefault(e["tkey"], []).append(e)
+        for k, es in byt.items():
+            kd = es[-1]["kind"]
+            base = tuple(x[0] for x in _vrs_calib.get(kd) or _vrs_calib.get("m1" if kd == "m2" else "") or [(1.0, 0), (1.0, 0)])
+            _vrs_calib["t:" + k] = out = fit(es, base)
+            print(f"VRS: поправка турнира «{k}» — победитель ×{out[0][0]}, проигравший ×{out[1][0]} ({out[0][1]}/{out[1][1]} матч.)")
         _vrs_calib.setdefault("_", True)
-    c = _vrs_calib.get(kind)
+    c = (_vrs_calib.get("t:" + tkey) if tkey else None) or _vrs_calib.get(kind)
     if not c and kind == "m2":
         c = _vrs_calib.get("m1")
     return (c[0][0], c[1][0]) if c else (1.0, 1.0)
@@ -2822,8 +2840,9 @@ def vrs_outcomes_live(a: dict, b: dict, table: list[dict], brief: dict, lan: boo
     # над BetBoom теряет очки, FURIA выходит на №2). Разница очков ±1 к HLTV неустранима: дробной части их очков нет.
     keys = [L.key(r["name"]) for r in table]
     kind = f"m{ms}" if ms in MAJOR_STAGE_EW else "x"
-    cw, cl = vrs_calib(kind)  # 26.11 (владелец): подстройка по своим же итогам — «за пару матчей выравнивается»
-    res = {"kind": kind, "raw": [], "k": [cw, cl]}
+    tkey = tn + (f"|{kind}" if ms else "")
+    cw, cl = vrs_calib(kind, tkey)  # 26.11 (владелец): подстройка по своим же итогам — «за пару матчей выравнивается»
+    res = {"kind": kind, "tkey": tkey, "raw": [], "k": [cw, cl]}
     for win_i, lab in ((0, "a_win"), (1, "b_win")):
         sh = f[lab + "_all"]
         res["raw"].append([round(f[lab][0], 1), round(f[lab][1], 1)])
@@ -6416,7 +6435,7 @@ def vrs_log_put(brief: dict, bids: list, rows: list, O: dict | None) -> None:
         "names": [r["name"] for r in rows], "cur": [[r["rank"], r["points"]] for r in rows],
         "pred": [[[x["rank"], x["delta"]] for x in O["win0"]], [[x["rank"], x["delta"]] for x in O["win1"]]]}
     if O.get("raw") and O.get("kind"):  # сырой прогноз (без поправки) — по нему считается поправка vrs_calib
-        vrs_log[str(brief["id"])].update(raw=O["raw"], kind=O["kind"])
+        vrs_log[str(brief["id"])].update(raw=O["raw"], kind=O["kind"], tkey=O.get("tkey"))
 
 
 PICK_LOG_F = OUT / "pick_log.json"
