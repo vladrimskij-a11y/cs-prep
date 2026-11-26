@@ -8325,6 +8325,12 @@ PIMG_D2_NEW = 150  # заглушек dust2 (100×100) за сбор — тот 
 PIMG_HLTV_NEW = 40  # новых фото с HLTV за полный сбор (по правилу HLTV — не чаще раза в 2.5 с)
 
 
+def lp_photo_fresh(fname: str) -> bool:
+    """Фото Liquipedia свежее, если в имени файла год этого или прошлого сезона («Torzsi at IEM Rio 2026.jpg»)."""
+    ys = [int(y) for y in re.findall(r"(?<!\d)(20\d\d)(?!\d)", fname or "")]
+    return bool(ys) and max(ys) >= NOW.year - 1
+
+
 def build_player_photos() -> None:
     """Фото игроков для окна «📷» во вкладке «Игроки» (владелец 26.11: знать, как выглядят). Сначала портрет со страницы
     игрока HLTV (`photo` — разбирается вместе с MVP/мейджорами, страницу заново не запрашиваем, качаем только картинку),
@@ -8363,6 +8369,11 @@ def build_player_photos() -> None:
         ok = h.get("f") and (OUT / h["f"]).exists() and h.get("src") != "d2"  # заглушку dust2 меняем на любое настоящее фото
         m = miss.get(k) or {}
         fresh_miss = lambda key: m.get(key) and (parse_iso(m.get(key)) or NOW - timedelta(days=30)) > NOW - timedelta(days=7)
+        lp_new = lf and lp_photo_fresh(lf) and not (m.get("file") == lf and fresh_miss("t"))
+        if lp_new:  # свежее фото Liquipedia (этого/прошлого года, крупный план) важнее HLTV — владелец 26.11
+            if not (ok and h.get("src") == "lp" and h.get("file") == lf) and len(todo_l) < PIMG_NEW:
+                todo_l.append((k, nick, lf))
+            continue
         if hp and not (ok and h.get("src") == "hltv" and h.get("url") == hp) and not fresh_miss("th"):
             if len(todo_h) < PIMG_HLTV_NEW:
                 todo_h.append((k, nick, hp))
@@ -8418,11 +8429,11 @@ def build_player_photos() -> None:
         else:
             got_d += 1
     for i in range(0, len(todo_l), 50):
-        part = [x for x in todo_l[i:i + 50] if not (have.get(x[0]) or {}).get("src") == "hltv"]
+        part = [x for x in todo_l[i:i + 50] if lp_photo_fresh(x[2]) or not (have.get(x[0]) or {}).get("src") == "hltv"]
         if not part:
             continue
         fl = sorted({x[2] for x in part})
-        url = LP_API + "?" + urllib.parse.urlencode({"action": "query", "prop": "imageinfo", "iiprop": "url|mime", "iiurlwidth": 300,
+        url = LP_API + "?" + urllib.parse.urlencode({"action": "query", "prop": "imageinfo", "iiprop": "url|mime", "iiurlwidth": 400,
                                                      "titles": "|".join("File:" + x for x in fl), "format": "json"})
         wait = 4.0 - (time.time() - _lp_last[0])
         if wait > 0:
