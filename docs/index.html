@@ -3616,13 +3616,14 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
   function roundsBlock(g, A, B) {
     var R = (g && g.rounds) || [];
     if (!R.some(Boolean)) return '';
-    // половины: 12 + 12, овертаймы по 6 (MR12)
+    // половины: 12 + 12; овертайм (MR3) — две половины по 3 раунда, после каждой смена сторон.
+    // Раньше блок овертайма был по 6 раундов, а подписи «Овертайм 1 · 1-я/2-я» шли по блокам — путались (владелец 26.11)
     var parts = [], i = 0;
-    while (i < R.length) { var n = i < 24 ? 12 : 6; parts.push([i, R.slice(i, i + n)]); i += n; }
+    while (i < R.length) { var n = i < 24 ? 12 : 3; parts.push([i, R.slice(i, i + n)]); i += n; }
     var sideOf = function (r, team) { if (!r) return null; var w = +r[0], s = r[1]; return w === team ? s : (s === "C" ? "T" : "C"); };
     var html = parts.map(function (p, pi) {
       var first = p[1].find(Boolean), sa = sideOf(first, 0), sb = sideOf(first, 1);
-      var title = pi === 0 ? "1-я половина" : pi === 1 ? "2-я половина" : "Овертайм " + Math.ceil((pi - 1) / 2) + (pi % 2 ? " · 1-я" : " · 2-я");
+      var title = pi === 0 ? "1-я половина" : pi === 1 ? "2-я половина" : Math.floor(pi / 2) + "-й овертайм · " + (pi % 2 ? "2-я" : "1-я") + " половина";
       var row = function (team, side) {
         return '<div class="rh-row">' + p[1].map(function (r) {
           if (!r || +r[0] !== team) return '<i class="rh-c"></i>';
