@@ -1195,6 +1195,10 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
 .pop-in li.psub, .pop-in li.pback { padding: 7px 0; margin: -3px 0; }
 .pop-in li.pback { font-size: 15px; }
 .pop-in .pci b { font-size: 16px; }
+.pop-in ul, .pop-in p { color: color-mix(in srgb, var(--fg) 88%, transparent); }  /* текст окон светлее — не серый на сером (владелец 26.11) */
+.pop-in li.ph { color: color-mix(in srgb, var(--fg) 62%, transparent); }
+.pop-in li.mj .mj-p, .pop-in li.psub i, .pop-in li.mj .mj-t small { color: color-mix(in srgb, var(--fg) 62%, transparent); }
+.pop-in li.pback { color: var(--fg); }
 </style>
 
 <div class="wrap" id="app"></div>
