@@ -6063,7 +6063,13 @@ def player_beef(d: dict) -> list[dict]:
         if not (BEEF_RX.search(txt) or STORY_RX.search(txt)) or re.search(r"дайджест", txt, re.I) or len(re.findall(r"^\s*[—•▪️-]", txt, re.M)) >= 4:
             continue  # дайджесты и списки новостей — не история про двоих
         # опросы и подборки ответов игроков («s1mple: Габен. NiKo: Неймар…») — не история про двоих (владелец 26.11)
-        if re.search(r"опрос|анкет|блиц|ответил[аи]? на вопрос", txt, re.I) or len(re.findall(r"[\w.\-]{2,}\s*:\s", txt)) >= 5:
+        if re.search(r"опрос|анкет|блиц|ответил[аи]? на вопрос|состав мечты|трансферн\w+ новост|отсылк|тир-?лист|\$\s?\d", txt, re.I) \
+                or len(re.findall(r"[\w.\-]{2,}\s*:\s", txt)) >= 5:
+            continue
+        # подборки и списки: много разных ников/команд латиницей или пункты с номерами/значками (M80–100T 26.11:
+        # «трансферные новости», «собери состав мечты», «отсылки на автографах» вышли «конфликтом»/«роднёй»)
+        if len({w.lower() for w in re.findall(r"(?<![\w])[A-Za-z][A-Za-z0-9._\-]+", txt)}) >= 14 \
+                or len(re.findall(r"^\s*(?:\d{1,2}[.)]|[^\w\s«\"(]{1,3}\s)", txt, re.M)) >= 4:
             continue
         kw = [k.start() for k in BEEF_RX.finditer(txt)] + [k.start() for k in STORY_RX.finditer(txt)]
         a = [n for i, n, _ in who if i == 0 and rx[n].search(txt)]
