@@ -2280,7 +2280,54 @@ def parse_ranked(h: str) -> list[dict]:
     return out
 
 
+_vrs_adj: dict = {}
+
+
 def vrs_table() -> list[dict]:
+    """Живой рейтинг для показа и прогнозов. Свежий (< 2 ч) — как на HLTV. Если страница рейтинга HLTV давно не
+    отвечала (26.11: пауза после отказа, очки не менялись с 13:19, а команды сыграли Round 4 — у LVG и Heroic были
+    старые очки), к очкам HLTV прибавляется сдвиг по нашей модели: пересчёт «сейчас» минус пересчёт на момент снимка
+    HLTV. Это добавляет только сыгранное после снимка, остальное остаётся как на HLTV."""
+    tbl = vrs_table_raw()
+    c = hltv_cache.get("vrs3") or {}
+    t0 = parse_iso(c.get("t"))
+    if not tbl or not t0 or NOW - t0 < timedelta(hours=2) or FAST or _vrs_adj.get("busy"):
+        return tbl
+    if "tbl" in _vrs_adj:
+        return _vrs_adj["tbl"]
+    _vrs_adj["busy"] = True
+    try:
+        L = vrs_live()
+        d0 = _days(t0)
+        r0 = VM.compute(L.ds, now=d0, matches=[m for m in L.ds["matches"] + L.new if m["t"] <= d0], prizes=L.prizes)["rating"]
+        r1 = L.base
+        out, n = [], 0
+        for r in tbl:
+            k = L.key(r["name"])
+            if k in r0 and k in r1 and abs(r1[k] - r0[k]) < 150:
+                d = r1[k] - r0[k]
+                if abs(d) >= 0.5:
+                    n += 1
+                r = dict(r, points=int(round(r["points"] + d)))
+            out.append(r)
+        out.sort(key=lambda r: -(r.get("points") or 0))
+        reg = {}
+        for i, r in enumerate(out, 1):
+            r["rank"] = i
+            if r.get("region"):
+                reg[r["region"]] = reg.get(r["region"], 0) + 1
+                r["reg_rank"] = reg[r["region"]]
+        print(f"VRS: рейтинг HLTV не обновлялся {(NOW - t0).total_seconds() / 3600:.1f} ч — очки сдвинуты по модели у {n} команд")
+        _vrs_adj["tbl"] = out
+        return out
+    except Exception as e:
+        warn(f"VRS: сдвиг по модели: {e!r}")
+        return tbl
+    finally:
+        _vrs_adj["busy"] = False
+
+
+def vrs_table_raw() -> list[dict]:
     """Живой рейтинг Valve с HLTV: место, очки, регион (учитывает и незавершённые турниры)."""
     def fn():
         h = hltv_get("/valve-ranking/teams")
@@ -2649,7 +2696,7 @@ def vrs_live():
         _vrs_live["warm"] = True
         n0 = len(_bo3_hist)
         try:
-            for r in vrs_table()[:VRS_WARM_TOP]:
+            for r in vrs_table_raw()[:VRS_WARM_TOP]:
                 bid = team_by_name(r["name"])
                 if bid and bid not in _bo3_hist:
                     bo3_history(bid, pages=1)
@@ -2782,7 +2829,7 @@ def vrs_live():
     L.base = L.compute(now)["rating"]
     if not _vrs_live:  # контроль раз за запуск: насколько «живой» пересчёт совпадает с очками HLTV
         try:
-            d = [abs(L.base[k] - r["points"]) for r in vrs_table()[:40]
+            d = [abs(L.base[k] - r["points"]) for r in vrs_table_raw()[:40]
                  for k in [L.key(r["name"])] if k in L.base]
             if d:
                 print(f"VRS: живой пересчёт против HLTV, топ-40 — ср. расхождение {sum(d) / len(d):.1f}, макс {max(d):.0f} (команд {len(d)})")
@@ -8692,7 +8739,7 @@ def main() -> int:
         warn(f"Журнал пика: {e!r}")
     try:
         if vrs_log or VRS_LOG_F.exists():
-            vrs_log_resolve(vrs_table())  # в быстром сборе — рейтинг из кэша полного
+            vrs_log_resolve(vrs_table_raw())  # только настоящие очки HLTV (без сдвига по модели) — иначе поправка учится сама на себе
     except Exception as e:
         warn(f"Журнал прогнозов: {e!r}")
     prune_caches()
