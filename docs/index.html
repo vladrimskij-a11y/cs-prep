@@ -1142,8 +1142,11 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
 .rh-leg span { display: inline-flex; align-items: center; gap: 4px; } .rh-leg svg { width: 13px; height: 13px; }
 .sres .pp-m[data-smap] { cursor: pointer; }
 .sres .pp-m[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--fg); }
-.mchips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
-.mch { display: inline-flex; align-items: center; gap: 7px; padding: 5px 10px 5px 8px; border-radius: 9px; background: var(--sunk); font-size: 13px; line-height: 1.2; }
+.mchips { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; margin-top: 8px; }  /* карты в ряд одинаковой ширины: BO3 — одна строка, BO5 — 3 + 2 (владелец 26.11) */
+.mch { display: flex; align-items: center; gap: 4px; min-width: 0; padding: 5px 6px 5px 5px; border-radius: 9px; background: var(--sunk); font-size: 11.5px; letter-spacing: -.1px; line-height: 1.2; white-space: nowrap; }
+.mch b { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.match.res > .mchips { grid-column: 1 / -1; margin: -2px -4px 0; }  /* плашки карт — на всю ширину карточки */
+.mch .num { flex: none; }
 .mch::before { content: ""; width: 3px; height: 14px; border-radius: 2px; background: var(--line); flex: none; }  /* цвет победителя карты — ровная черта, не по скруглению */
 .mch.a::before { background: var(--ct); } .mch.b::before { background: var(--t); }
 .mch b { font-weight: 650; color: var(--fg); }
@@ -1176,6 +1179,10 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
 .shead.shbg.hq::before { inset: 0; filter: none; opacity: .24; background: var(--tb) right 14px center / auto 86% no-repeat; }
 .shead.shbg.hq::after { background: linear-gradient(90deg, var(--bg) 0%, color-mix(in srgb, var(--bg) 55%, transparent) 60%, transparent 100%), linear-gradient(180deg, transparent 55%, var(--bg) 100%); }
 .shead.shbg::after { content: ""; position: absolute; inset: 0; z-index: -1; background: linear-gradient(180deg, color-mix(in srgb, var(--bg) 30%, transparent) 0%, color-mix(in srgb, var(--bg) 72%, transparent) 60%, var(--bg) 100%); }
+
+/* 26.11 (владелец): имена игроков видно издалека — крупнее и светлее, русское произношение белым */
+.pl .rn { font-size: 14px; color: #c3c6cc; line-height: 1.35; }
+.pl .rn .pron { font-size: inherit; font-weight: 650; color: var(--fg); }
 </style>
 
 <div class="wrap" id="app"></div>
@@ -2074,7 +2081,7 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
       '<div class="vs"><div class="row"><span class="dot a"></span>' + logo(A.name, A.logo) + '<span class="tname' + (x.winner === 0 ? ' won' : '') + '">' + esc(A.name || "?") + '</span><b class="rs num a' + (x.winner === 0 ? ' won' : '') + '">' + esc(A.score) + '</b></div>' +
       '<div class="row"><span class="dot b"></span>' + logo(B.name, B.logo) + '<span class="tname' + (x.winner === 1 ? ' won' : '') + '">' + esc(B.name || "?") + '</span><b class="rs num b' + (x.winner === 1 ? ' won' : '') + '">' + esc(B.score) + '</b></div>' +
       (sub ? '<div class="tour">' + esc(sub) + '</div>' : '') +
-      ((x.maps || []).length ? '<div class="mchips">' + x.maps.map(mapChip).join("") + '</div>' : '') + '</div>' +
+      '</div>' + ((x.maps || []).length ? '<div class="mchips">' + x.maps.map(mapChip).join("") + '</div>' : '') +
       '</button>';
   }
 
