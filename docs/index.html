@@ -1,4 +1,4 @@
-<title>RIM·CS</title>
+<title>Приложение Рима</title>
 <link rel="icon" type="image/svg+xml" href="img/icon/icon.svg">
 <link rel="icon" type="image/png" sizes="192x192" href="img/icon/icon-192.png">
 <link rel="apple-touch-icon" href="img/icon/apple-touch-icon.png">
@@ -1233,6 +1233,14 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
 /* плавность (26.11): невидимые за экраном строки длинных списков не рисуются, пока до них не долистали */
 .news.feed > .ni, .rk { content-visibility: auto; contain-intrinsic-size: auto 120px; }
 .rk { contain-intrinsic-size: auto 56px; }
+
+/* название «Приложение Рима» (владелец 26.11): минимализм, стильно; точка — лампа «в эфире» */
+.home-brand h1 { display: flex; flex-wrap: wrap; align-items: baseline; line-height: 1; font-size: 44px; }
+.home-brand h1 .hb-sm { flex-basis: 100%; font-family: var(--display); font-size: 12px; font-weight: 600; letter-spacing: .32em;
+  text-transform: uppercase; color: var(--muted); margin: 0 0 10px 2px; }
+.home-brand h1 .hb-dot { color: var(--onair); animation: hbOnAir 2.6s ease-in-out infinite; }
+@keyframes hbOnAir { 0%, 100% { opacity: 1; text-shadow: 0 0 12px color-mix(in srgb, var(--onair) 55%, transparent); } 50% { opacity: .45; text-shadow: none; } }
+@media (prefers-reduced-motion: reduce) { .home-brand h1 .hb-dot { animation: none; } }
 </style>
 
 <div class="wrap" id="app"></div>
@@ -1745,7 +1753,7 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
     // плитка с рисунком раздела (img/home/*.svg — векторные, чёткие на любом экране; редизайн 25.11)
     function card(h, t, sub, ill) { return '<button class="mcard' + (ill ? ' ill i-' + ill : '') + '" data-goto="' + h + '"><span class="mc-t">' + t + '</span><span class="mc-s">' + esc(sub) + '</span><i class="chev2">›</i></button>'; }
     $app.innerHTML = '<div class="view home">' +
-      '<div class="menu"><div class="home-brand"><h1>RIM<b>·</b>CS</h1><span class="upd">обновлено ' + esc(ago(L.updated)) + '</span></div>' + card("feed", "Лента", "Новости Telegram-каналов без повторов и мусора", "feed") +
+      '<div class="menu"><div class="home-brand"><h1><span class="hb-sm">Приложение</span>Рима<b class="hb-dot">.</b></h1><span class="upd">обновлено ' + esc(ago(L.updated)) + '</span></div>' + card("feed", "Лента", "Новости Telegram-каналов без повторов и мусора", "feed") +
       card("tours", "Турниры", c.live[0] ? "Идёт: " + c.live.map(function (t) { return t.name; }).slice(0, 2).join(", ") : c.up[0] ? "Скоро: " + c.up[0].name : "Тир-1 и тир-2", "tours") +
       card("rating", "Рейтинг", "Топ-100 команд по VRS", "rating") + majorCard() + '</div></div>';
     function majorCard() {
