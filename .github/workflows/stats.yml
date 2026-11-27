@@ -81,7 +81,7 @@ jobs:
       # (проверка русских имён шла заново каждый час, тратя лимит Google). Перед сохранением добираем свежий кэш.
       - name: Отложить свой кэш
         if: always() && env.SKIP != '1'
-        run: mv cache cache_mine
+        run: if [ -d cache ]; then mv cache cache_mine; fi
 
       - name: Взять кэш, сохранённый другими сборами за это время
         if: always() && env.SKIP != '1'
@@ -93,7 +93,7 @@ jobs:
 
       - name: Слить свой кэш со свежим
         if: always() && env.SKIP != '1'
-        run: python tools/merge_cache.py cache_mine cache && rm -rf cache && mv cache_mine cache
+        run: if [ -d cache_mine ]; then python tools/merge_cache.py cache_mine cache && rm -rf cache && mv cache_mine cache; fi
 
       - name: Сохранить кэш сборщика
         if: always() && env.SKIP != '1'

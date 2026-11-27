@@ -61,8 +61,11 @@ jobs:
         with:
           python-version: "3.12"
 
+      # 27.11: сборка lxml однажды упала — и весь сбор вместе с ней. Сборщик без этих библиотек работает (проще читает статьи),
+      # поэтому: только готовые сборки, один повтор, и сбор идёт дальше даже при неудаче
       - name: Установить библиотеку для чтения статей
-        run: pip install --quiet trafilatura pillow
+        continue-on-error: true
+        run: pip install --quiet --prefer-binary trafilatura pillow || (sleep 20; pip install --quiet --prefer-binary trafilatura pillow)
 
       - name: Взять текущие данные (ветка data)
         run: |
@@ -100,7 +103,7 @@ jobs:
       # (проверка русских имён шла заново каждый час, тратя лимит Google). Перед сохранением добираем свежий кэш.
       - name: Отложить свой кэш
         if: always()
-        run: mv cache cache_mine
+        run: if [ -d cache ]; then mv cache cache_mine; fi
 
       - name: Взять кэш, сохранённый другими сборами за это время
         if: always()
@@ -112,7 +115,7 @@ jobs:
 
       - name: Слить свой кэш со свежим
         if: always()
-        run: python tools/merge_cache.py cache_mine cache && rm -rf cache && mv cache_mine cache
+        run: if [ -d cache_mine ]; then python tools/merge_cache.py cache_mine cache && rm -rf cache && mv cache_mine cache; fi
 
       - name: Сохранить кэш сборщика
         if: always()
