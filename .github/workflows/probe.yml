@@ -10,16 +10,23 @@ jobs:
   probe:
     runs-on: ubuntu-latest
     steps:
-      - name: Liquipedia — где Anlelele на странице Astralis (один запрос)
+      - uses: actions/checkout@v4
+      - name: Кэш сборщика
+        uses: actions/cache/restore@v4
+        with:
+          path: cache
+          key: collector-cache-probe-${{ github.run_id }}
+          restore-keys: collector-cache-
+      - name: Составы стадий мейджора из кэша HLTV (без запросов)
         run: |
-          curl -s --compressed -A "cs-prep/1.0 (https://github.com/vladrimskij-a11y/cs-prep; cs-prep-bot@users.noreply.github.com)" \
-            "https://liquipedia.net/counterstrike/api.php?action=query&prop=revisions&rvprop=content&rvslots=main&format=json&formatversion=2&titles=Astralis" -o a.json
           python3 - <<'EOF'
-          import json, re
-          t = json.load(open("a.json"))["query"]["pages"][0]["revisions"][0]["slots"]["main"]["content"]
-          for m in re.finditer(r"\{\{Squad[^\n]*", t):
-              print("БЛОК:", m.group(0)[:120])
-          for ln in t.split("\n"):
-              if re.search(r"anlelele|jabbi|siuhy|Stand-in|loan", ln, re.I):
-                  print("СТРОКА:", ln[:300])
+          import json
+          c = json.load(open("cache/hltv.json"))
+          for k, v in c.items():
+              if k.startswith("event3:") and "Singapore" in k:
+                  lu = (v.get("data") or {}).get("lineups") or {}
+                  print(k, v.get("t"), "составов:", len(lu))
+                  for tn, pl in lu.items():
+                      if len(pl) != 5 or tn.lower() in ("astralis", "heroic"):
+                          print("   ", tn, [p["nick"] for p in pl])
           EOF
