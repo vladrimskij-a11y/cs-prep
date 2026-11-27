@@ -3171,6 +3171,14 @@ João — Жуан, -ão — -ан/-ау, «lh» — «льй/ль»; испан
 Порядок «Имя Фамилия» не меняй, ударения не ставь. Верни ТОЛЬКО тех, у кого запись неверна, с исправленной записью.
 Ответ строго JSON: {"fix": [{"nick": "<ник как во входе>", "name_ru": "<исправленная запись>"}]}. Если всё верно — {"fix": []}."""
 _pron_recheck: dict = {}
+PRON_CHK_V = 2  # 27.11: повторная проверка всех имён (часть исправлений 26.11 потерялась при сохранении кэша)
+
+
+def pron_checked(ent) -> bool:
+    c = (ent or {}).get("chk")
+    return isinstance(c, int) and c >= PRON_CHK_V
+
+
 PRON_CHECK_RUN = 600  # имён на проверку за полный сбор (пачками по 40, Gemini; всего ~480)
 
 
@@ -3188,7 +3196,7 @@ def pron_recheck() -> None:
                 full = " ".join(v for v in (x.get("first_name"), x.get("last_name")) if v) or x.get("name") or ""
                 key = norm(x["nick"]) + "|" + norm(full)
                 ent = pron_cache.get(key)
-                if full and ent and ent.get("name_ru") and not ent.get("chk"):
+                if full and ent and ent.get("name_ru") and not pron_checked(ent):
                     _pron_recheck.setdefault(key, {"nick": x["nick"], "full": full, "cc": x.get("nationality") or x.get("flag"), "ru": ent["name_ru"]})
             for vv in x.values():
                 if isinstance(vv, (dict, list)):
@@ -3201,7 +3209,7 @@ def pron_recheck() -> None:
     if not _pron_recheck:
         print("Проверка русских имён: проверять нечего")
         return
-    items = [(k, v) for k, v in _pron_recheck.items() if not (pron_cache.get(k) or {}).get("chk")][:PRON_CHECK_RUN]
+    items = [(k, v) for k, v in _pron_recheck.items() if not pron_checked(pron_cache.get(k))][:PRON_CHECK_RUN]
     if not items:
         return
     fixed = {}
@@ -3222,7 +3230,7 @@ def pron_recheck() -> None:
             if new and new != v["ru"].replace("\u0301", "") and len(new.split()) == len(v["ru"].split()):
                 ent["name_ru"] = new
                 fixed[norm(v["nick"])] = (v["ru"], new)
-            ent["chk"] = 1
+            ent["chk"] = PRON_CHK_V
             pron_cache[key] = ent
     if fixed:
         def walk(x):
@@ -3244,7 +3252,7 @@ def pron_recheck() -> None:
                 if json.dumps(d, ensure_ascii=False) != b:
                     save_json(f, d)
     save_json(PRON_CACHE_F, pron_cache)
-    print(f"Проверка русских имён (Gemini): проверено {len(items)}, исправлено {len(fixed)}" + (": " + ", ".join(f"{a} → {b}" for a, b in list(fixed.values())[:15]) if fixed else ""))
+    print(f"Проверка русских имён (Gemini): проверено {len(items)}, исправлено {len(fixed)}" + (": " + ", ".join(f"{a} → {b}" for a, b in list(fixed.values())) if fixed else ""))
 
 
 def add_pronunciation(people: list[dict]) -> None:
@@ -3256,7 +3264,7 @@ def add_pronunciation(people: list[dict]) -> None:
         p["_pk"] = key
         if key in pron_cache:
             p.update(pron_cache[key])
-            if pron_cache[key].get("name_ru") and not pron_cache[key].get("chk") and full:
+            if pron_cache[key].get("name_ru") and not pron_checked(pron_cache[key]) and full:
                 _pron_recheck.setdefault(key, {"nick": p.get("nick"), "full": full, "cc": p.get("nationality") or p.get("flag"), "ru": pron_cache[key]["name_ru"]})
         else:
             todo.append((p, full))

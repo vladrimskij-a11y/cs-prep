@@ -17,7 +17,8 @@ def merge(a, b):
     if isinstance(a, dict) and isinstance(b, dict):
         # запись с отметкой времени — главная та, что новее; проверенное имя (chk) — главнее непроверенного (27.11)
         ta, tb = a.get("t"), b.get("t")
-        if isinstance(ta, str) and isinstance(tb, str) and tb > ta or b.get("chk") and not a.get("chk"):
+        ca, cb = a.get("chk"), b.get("chk")
+        if isinstance(ta, str) and isinstance(tb, str) and tb > ta or cb and (not ca or type(ca) is type(cb) and cb > ca):
             a, b = b, a
         out = dict(a)
         for k, v in b.items():
