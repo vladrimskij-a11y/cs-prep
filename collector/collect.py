@@ -7808,6 +7808,35 @@ def team_by_roster(players: list[dict], name: str | None = None) -> str | None:
     return None
 
 
+def fill_from_event(players: list, tname: str, names: list, ps_players: list) -> list:
+    """27.11: на Liquipedia в составе меньше пяти (Astralis: аренда Anlelele на мейджор там не записана) — недостающих
+    берём из заявки HLTV на этот турнир (страницы стадий в кэше, без новых запросов)."""
+    if not players or len(players) >= 5 or not tname:
+        return players
+    keys = {norm(n) for n in names if n} - {""}
+    lu = None
+    for nm in (tname, f"{tname} Stage 1", f"{tname} Stage 2", f"{tname} Stage 3"):
+        for tn, l in (((hltv_cache.get("event3:" + nm) or {}).get("data") or {}).get("lineups") or {}).items():
+            if norm(tn) in keys and len(l) >= 5:
+                lu = l
+    if not lu:
+        return players
+    have = {norm(p.get("nick")) for p in players}
+    by_ps = {norm(p.get("nick")): p for p in ps_players or []}
+    for x in lu:
+        if len(players) >= 5:
+            break
+        if norm(x["nick"]) in have:
+            continue
+        pp = by_ps.get(norm(x["nick"]), {})
+        hltv_player_ids.setdefault(norm(x["nick"]), {"id": x["id"], "slug": x["slug"]})
+        players.append({"id": pp.get("id"), "nick": x["nick"], "first_name": pp.get("first_name"), "last_name": pp.get("last_name"),
+                        "nationality": pp.get("nationality"), "age": pp.get("age"), "image": pp.get("image"),
+                        "tags": ["В заявке на турнир"]})
+        print(f"Состав {sorted(keys)[0]}: {x['nick']} — из заявки HLTV на {tname}")
+    return players
+
+
 def build_detail(m: dict, prev: dict | None) -> dict:
     brief = match_brief(m)
     teams, bids, hists = [], [], []
@@ -7820,7 +7849,9 @@ def build_detail(m: dict, prev: dict | None) -> dict:
         lpr = lp_roster({**t, "name": full.get("name") or t.get("name")})
         if not lpr and alt:
             lpr = lp_roster({**t, "id": "n:" + norm(alt), "name": alt})
+        ps_players = players
         players, coach = merge_roster(players, lpr)
+        players = fill_from_event(players, tournament_label(m), [t.get("name"), full.get("name"), alt], ps_players)
         if not alt:  # у PandaScore состава нет — узнаём по составу с Liquipedia
             alt = team_by_roster(players, full.get("name") or t.get("name"))
             if alt:
@@ -9233,7 +9264,7 @@ def main() -> int:
         mt = by_team.get(logo_key(d["name"]))
         if mt and mt.get("players"):
             mp = {norm(p.get("nick")): p for p in mt["players"]}
-            if not d.get("roster_src") == "lp" and mt.get("players"):
+            if (not d.get("roster_src") == "lp" or len(d.get("roster") or []) < 5 <= len(mt["players"])) and mt.get("players"):
                 # у матча состав точнее (Liquipedia + расписание): берём его, со всеми полями
                 d["roster"] = [dict(p) for p in mt["players"]]
                 d["coach"] = mt.get("coach") or d.get("coach") or []
