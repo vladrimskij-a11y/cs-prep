@@ -175,6 +175,7 @@ NAME_RU = {  # русские имена, которые владелец поп
     "sycrone": "Деннис Нильсен",
     "xelex": "Адриан Винце",
     "saadzin": "Гильерме Пачеку",  # 26.11: нейросеть дала «Гиларме»
+    "matheos": "Матео Пришлин",  # 27.11: хорват Mateo Prišlin, нейросеть дала «Матей»
 }
 ROLE_FIX = {  # ручные роли (важнее Liquipedia): ник → {"igl": True/False}; владелец 26.11: у Chinggis Warriors капитан fury5k (HLTV), не cool4st
     "cool4st": {"igl": False},
