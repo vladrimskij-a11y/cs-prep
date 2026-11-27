@@ -2317,6 +2317,13 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
       }
       var m = (state.list.matches || []).find(function (mm) { var t = mm.teams || []; return t.length === 2 && ((nkey(t[0].name) === A && nkey(t[1].name) === B) || (nkey(t[0].name) === B && nkey(t[1].name) === A)); });
       if (m) return m.id;
+      // названия в сетке и в расписании разные («Ninjas in Pyjamas» / «NIP», «PARIVISION» / «PVISION»): тот же час и хотя бы одна команда совпадает
+      // (владелец 27.11: часть матчей швейцарки не открывалась)
+      var tx = x.date ? Date.parse(x.date) : 0;
+      if (tx) {
+        var near = (state.list.matches || []).filter(function (mm) { var t = mm.teams || []; return t.length === 2 && Math.abs(Date.parse(mm.begin_at) - tx) <= 90 * 60000 && t.some(function (tt) { var k = nkey(tt.name); return k === A || k === B; }); });
+        if (near.length === 1) return near[0].id;
+      }
       // в расписании соперник ещё не вписан (карточка с одной командой) — открываем её, если она в тот же день
       var one2 = (state.list.matches || []).find(function (mm) { var t = mm.teams || []; return t.length === 1 && (nkey(t[0].name) === A || nkey(t[0].name) === B) && x.date && dayKey(mm.begin_at) === dayKey(x.date); });
       return one2 ? one2.id : null;
