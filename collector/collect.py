@@ -8786,6 +8786,13 @@ def build_logos() -> None:
             put(t.get("name"), t.get("image"), "panda"); names.add(t.get("name"))
     for t in (((load_json(OUT / "ranking.json", {}) or {}).get("vrs") or {}).get("teams") or []):
         put(t.get("name"), t.get("logo"), "hltv"); names.add(t.get("name"))
+    # временные названия на мейджоре (THE ONE = 1win, GOSH = BC.Game…): логотип основной команды — у PandaScore
+    # «THE ONE» чёрный (lightmode) и сливается с тёмным фоном (владелец 27.11)
+    for nm in list(names):
+        real = TEAM_TEMP_NAMES.get(norm(nm or ""))
+        rk, k = logo_key(real or ""), logo_key(nm or "")
+        if real and k and logos.get(rk) and "lightmode" in (logos.get(k) or "lightmode"):  # свои цветные (GOSH) не трогаем
+            logos[k], srcs[k] = logos[rk], srcs.get(rk, "")
     # у кого нет логотипа с bo3 — ищем там по названию (неудачи повторяем раз в неделю)
     left = LOGO_LOOKUPS
     for nm in sorted(n for n in names if n):
