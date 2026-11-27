@@ -2685,7 +2685,7 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
     return '<div class="sec"><h3>Участники <span>' + list.length + ' ' + plural(list.length, "команда", "команды", "команд") + '</span></h3><div class="ptiles">' + list.map(function (t) {
       var g = howRu(t.how), vrs = /^VRS/.test(g);
       if (/^(TBD|TBA)$/i.test(String(t.name || "").trim()))  // место ещё не занято — откуда придёт команда (владелец 26.11)
-        return '<div class="ptile tbd"><span class="pt-lg"><i>?</i></span><b>Ждём команду</b><small>' + esc(g || "—") + '</small></div>';
+        return '<div class="ptile tbd"><span class="pt-lg"><i>?</i></span><small>' + esc(g || "—") + '</small></div>';
       return '<button class="ptile" data-tname="' + esc(t.name) + '"><span class="pt-lg">' + (logo(t.name) || '<i>' + esc(String(t.name || "?").slice(0, 2)) + '</i>') + '</span>' +
         '<b>' + esc(t.name) + '</b><small class="' + (vrs ? "vrs" : "") + '">' + (vrs ? '<span class="vrs-b">VRS</span>' + esc(g.replace(/^VRS\s*/, "")) : esc(g || "—")) + '</small></button>';
     }).join("") + '</div></div>';
