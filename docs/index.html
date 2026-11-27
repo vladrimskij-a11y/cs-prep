@@ -1873,7 +1873,7 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
   var ss = null;
   document.addEventListener("touchstart", function (e) {
     ss = null;
-    if (!SH || !q(".sshell") || state.ovl || e.touches.length !== 1) return;
+    if (!SH || !q(".sshell") || state.ovl || state.pop || e.touches.length !== 1) return;
     var x = e.touches[0].clientX;
     if (x < 20 || x > window.innerWidth - 20 || e.target.closest("video, input")) return;
     if (e.target.closest(".tmz, #tpos")) return;  // зона карты и «Позиции» на странице команды листают карты сами
@@ -2174,7 +2174,7 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
   }
   (function () {  // свайп по зоне карты и по «Позициям» на странице команды — соседняя карта
     var s0 = null;
-    document.addEventListener("touchstart", function (e) { var z = e.target.closest(".tmz, #tpos"); s0 = z && e.touches.length === 1 && !e.target.closest(".mapsel") ? { x: e.touches[0].clientX, y: e.touches[0].clientY, z: z } : null; }, { passive: true });
+    document.addEventListener("touchstart", function (e) { var z = e.target.closest(".tmz, #tpos"); s0 = z && !state.pop && e.touches.length === 1 && !e.target.closest(".mapsel") ? { x: e.touches[0].clientX, y: e.touches[0].clientY, z: z } : null; }, { passive: true });
     document.addEventListener("touchend", function (e) {
       if (!s0) return;
       var t = e.changedTouches[0], dx = t.clientX - s0.x, dy = t.clientY - s0.y, z = s0.z; s0 = null;
@@ -3306,7 +3306,12 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
     function fresh() { return state.pop && Date.now() - (state.popAt || 0) < 600; }
     var x0 = null;  // и вверх-вниз, и вбок (свайп на соседнюю вкладку) — окно сворачивается
     document.addEventListener("touchstart", function (e) { var ok = state.pop && e.touches.length === 1 && !e.target.closest(".pop-in"); y0 = ok ? e.touches[0].clientY : null; x0 = ok ? e.touches[0].clientX : null; }, { passive: true, capture: true });
-    document.addEventListener("touchmove", function (e) { if (y0 != null && !fresh() && (Math.abs(e.touches[0].clientY - y0) > 14 || Math.abs(e.touches[0].clientX - x0) > 14)) { y0 = null; closePop(); } }, { passive: true, capture: true });
+    document.addEventListener("touchmove", function (e) {
+      if (y0 == null || fresh()) return;
+      var ax = Math.abs(e.touches[0].clientX - x0), ay = Math.abs(e.touches[0].clientY - y0);
+      if (ay > 14 && ay > ax) { y0 = null; closePop(); }  // листают страницу — окно сворачивается
+      else if (ax > 14) y0 = null;                          // свайп вбок — его обработает свайп окна ниже
+    }, { passive: true, capture: true });
     // тап по свободному месту — тоже закрывает (в Telegram на iPhone по пустому месту «клик» не приходит, ловим само касание)
     var tx = null, ty = null, moved = false;
     document.addEventListener("touchstart", function (e) { moved = false; if (state.pop && e.touches.length === 1 && !e.target.closest(".pop-in")) { tx = e.touches[0].clientX; ty = e.touches[0].clientY; } else tx = null; }, { passive: true, capture: true });
@@ -3318,16 +3323,18 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
       closePop();
       if (!e.target.closest("button, a, [role=button], [data-open], [data-tname], input")) e.preventDefault();  // не кликаем «сквозь» окно по пустому месту
     }, { passive: false, capture: true });
-    // свайп вбок внутри окна тиммейтов — назад к списку команд (как «‹ Назад»; владелец 26.11)
+    // свайп вбок (в окне или рядом): есть предыдущее окно (тиммейты → «Команды») — возвращаемся к нему, нет — окно закрывается
+    // (владелец 27.11: «последнее окно при свайпе закрывается, а если есть предыдущее — возвращается на него»)
     var sx = null, sy = null;
-    document.addEventListener("touchstart", function (e) { var inP = state.pop && e.touches.length === 1 && e.target.closest(".pop-in"); sx = inP ? e.touches[0].clientX : null; sy = inP ? e.touches[0].clientY : null; }, { passive: true, capture: true });
+    document.addEventListener("touchstart", function (e) { var ok = state.pop && e.touches.length === 1; sx = ok ? e.touches[0].clientX : null; sy = ok ? e.touches[0].clientY : null; }, { passive: true, capture: true });
     document.addEventListener("touchend", function (e) {
       if (sx == null || !state.pop) return;
       var t = e.changedTouches[0], dx = t.clientX - sx, dy = t.clientY - sy;
       sx = null;
       if (Math.abs(dx) < 50 || Math.abs(dy) > Math.abs(dx) * 0.7) return;
+      if (e.cancelable) e.preventDefault();
       var b = state.pop.querySelector('li.pback[data-pop="__back"]');
-      if (b) { e.preventDefault(); openPop("__back", b); }
+      if (b) openPop("__back", b); else closePop();
     }, { passive: false, capture: true });
     // событие прокрутки не слушаем: инерция после касания закрывала окно само — закрываем только по движению пальца
     document.addEventListener("wheel", function (e) { if (state.pop && !e.target.closest(".pop-in")) closePop(); }, { passive: true, capture: true });
@@ -3996,7 +4003,7 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
   // ---------- свайпы в матче
   var sw = null;
   function swipeOk(e) {
-    if (!state.openId || !q(".mshell") || state.ovl || e.touches.length !== 1) return false;
+    if (!state.openId || !q(".mshell") || state.ovl || state.pop || e.touches.length !== 1) return false;
     var x = e.touches[0].clientX;
     if (x < 20 || x > window.innerWidth - 20) return false;  // у края — системный жест «назад»
     if (e.target.closest("video, input, textarea")) return false;
@@ -4211,7 +4218,7 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
   var rs = null;
   document.addEventListener("touchstart", function (e) {
     rs = null;
-    if (!state.ovl || e.touches.length !== 1 || e.target.closest("video")) return;
+    if (!state.ovl || state.pop || e.touches.length !== 1 || e.target.closest("video")) return;
     var sc = e.target.closest(".filt");
     if (sc && sc.scrollWidth > sc.clientWidth + 2) return;
     rs = { x: e.touches[0].clientX, y: e.touches[0].clientY, t: Date.now(), dx: 0, lock: null, v: state.ovl.el, tr: state.ovl.el.querySelector(".ov-track"), i: state.ovl.i || 0 };
@@ -4340,7 +4347,7 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
   function ptrHide() { if (prEl) { prEl.style.transition = "transform .2s ease-out, opacity .2s"; prEl.style.transform = "translate3d(-50%,-60px,0)"; prEl.style.opacity = "0"; } }
   document.addEventListener("touchstart", function (e) {
     pr = null;
-    if (e.touches.length !== 1 || state.refreshing || !state.list || !atTop()) return;
+    if (e.touches.length !== 1 || state.refreshing || state.pop || !state.list || !atTop()) return;
     pr = { x: e.touches[0].clientX, y: e.touches[0].clientY, dy: 0, lock: null };
   }, { passive: true });
   document.addEventListener("touchmove", function (e) {
