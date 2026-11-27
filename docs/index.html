@@ -1610,9 +1610,10 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
   function nkeyG(n) { return nkey(n); }
   function nkey(n) { return String(n || "").toLowerCase().replace(/^(the|team)\s+|\s+(team|esports|gaming)$/g, "").replace(/[^a-z0-9а-я]/g, ""); }
   function rememberLogo(name, url) { if (name && url) LOGOS[nkey(name)] = LOGOS[nkey(name)] || url; }
+  function okLogo(u) { return u && !/^\/(?!\/)|placeholder/.test(u) ? u : ""; }  // 27.11: заглушка HLTV — относительная ссылка, давала 404
   function logoUrl(name, url) {
-    var k = nkey(name), u = PRIMARY[k] || url || LOGOS[k];
-    if (!u && typeof TEAM_ALT !== "undefined" && TEAM_ALT[tnorm(name)]) { var r = nkey(TEAM_ALT[tnorm(name)]); u = PRIMARY[r] || LOGOS[r]; }  // логотипа мейджора (THE ONE) нет — настоящий
+    var k = nkey(name), u = okLogo(PRIMARY[k]) || okLogo(url) || okLogo(LOGOS[k]);
+    if (!u && typeof TEAM_ALT !== "undefined" && TEAM_ALT[tnorm(name)]) { var r = nkey(TEAM_ALT[tnorm(name)]); u = okLogo(PRIMARY[r]) || okLogo(LOGOS[r]); }  // логотипа мейджора (THE ONE) нет — настоящий
     return u || "";
   }
   // логотип фоном (редизайн 25.11): шапка матча и страница команды
@@ -2576,14 +2577,16 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
       pane: function (k) {
         if (k === "overview") {
           var R0 = (state.results || {})[id];
-          if (!R0) { getResults(id).then(function () { if (state.view === "tour:" + id) showTour(id); }).catch(function () {}); return '<div class="empty">Загружаю сетку…</div>'; }
+          if (!R0) { var pR = getResults(id); R0 = (state.results || {})[id]; }  // из памяти устройства — синхронно
+          if (!R0) { pR.then(function () { if (state.view === "tour:" + id) showTour(id); }).catch(function () {}); return '<div class="empty">Загружаю сетку…</div>'; }
           var pz = t && (t.hltv || t.major) ? prizeBlock(Object.assign({}, t.hltv || {}, { major: t.major })) : '';
           return ((R0.stages || []).length ? bracketHtml(R0) : '') + pz || '<div class="empty"><strong>Сетка и призовые ещё собираются</strong>Появятся после ближайшего полного сбора.</div>';
         }
         if (k === "done") {
           var R = (state.results || {})[id];
+          if (!R) { var pD = getResults(id); R = (state.results || {})[id]; }  // из памяти устройства — синхронно
           if (!R) {
-            getResults(id).then(function () { if (state.view === "tour:" + id) showTour(id); }).catch(function () {});
+            pD.then(function () { if (state.view === "tour:" + id) showTour(id); }).catch(function () {});
             return '<div class="empty">Загружаю результаты…</div>';
           }
           var html = "", cur = null;
@@ -2691,55 +2694,6 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
     }).join("") + '</div></div>';
   }
 
-
-  // ---------- мейджор
-  function getMajor() {
-    if (state.major) return Promise.resolve(state.major);
-    if (DEMO) return Promise.resolve(DEMO.major || null);
-    return dfetch("data/major.json" + bust()).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
-      .then(function (j) { state.major = j; return j; });
-  }
-  var REG_RU = { Europe: "Европа", Americas: "Америка", Asia: "Азия" };
-  function renderMajor() {
-    var html = homeHeader("major");
-    var M = state.major;
-    if (!M) { $app.innerHTML = html + '<div class="empty">Загружаю…</div></div>'; return; }
-    var main = (M.stages || {}).main || {};
-    var confirmed = {};
-    ["stage1", "stage2", "main"].forEach(function (k) { ((M.stages || {})[k] || { teams: [] }).teams.forEach(function (t) { confirmed[t.name.toLowerCase()] = k; }); });
-    html += '<div class="subhead" style="margin-top:12px"><h1>' + esc((M.title || "Мейджор").replace(/ ranking on .*/, "")) + '</h1>' +
-      '<span class="upd">приглашения по рейтингу VRS на ' + esc(M.invite_date || "") + (main.prize ? ' · ' + esc(usd(main.prize)) : '') + '</span></div>' +
-      '<div class="note" style="padding:8px 0 0">Stage 3 — сильнейшие, сразу в последнюю стадию перед плей-офф; Stage 2 и Stage 1 — раньше, через швейцарскую систему. Приглашение получает состав, а не клуб.</div>';
-    var reg = state.majorReg || ((M.regions || [])[0] || {}).region;
-    html += '<div class="filt" style="margin-top:10px">' + (M.regions || []).map(function (r) {
-      return '<button class="chip" data-mreg="' + esc(r.region) + '" aria-pressed="' + (r.region === reg) + '">' + esc(REG_RU[r.region] || r.region) + '</button>';
-    }).join("") + '</div>';
-    var R = (M.regions || []).find(function (r) { return r.region === reg; });
-    (R ? R.sections : []).forEach(function (sec) {
-      var isStage = /stage/i.test(sec.key);
-      var title = isStage ? sec.title : (sec.title && !/^[a-z-]+$/.test(sec.title) ? sec.title : "Ближайшие в очереди");
-      html += '<div class="sec"><h3>' + esc(title.replace("Stage", "Stage")) + ' <span>' + sec.teams.length + ' ' + (isStage ? "мест" : "команд") + '</span></h3><div class="box mj">';
-      sec.teams.forEach(function (t) {
-        var rc = t.roster_change;
-        html += '<div class="mj-row' + (isStage ? '' : ' wait') + '"><span class="mj-pos num">#' + t.pos + '</span><span class="mj-name"><b>' + esc(t.name) + '</b>' +
-          (confirmed[t.name.toLowerCase()] ? ' <span class="ok">✓</span>' : '') +
-          '<small>' + esc((t.roster || []).join(", ")) + '</small>' +
-          (rc ? '<small class="warn">состав изменился: ' + (rc.out.length ? '−' + esc(rc.out.join(", −")) : '') + (rc["in"].length ? ' +' + esc(rc["in"].join(", +")) : '') + '</small>' : '') +
-          '</span><span class="mj-pts num">' + t.points + '</span></div>';
-      });
-      html += '</div></div>';
-    });
-    html += '<div class="note" style="padding:12px 0">✓ — команда уже в списке участников стадии на HLTV. Если команда откажется или потеряет приглашение из-за смены состава, место переходит следующей в очереди своего региона.</div>';
-    $app.innerHTML = html + '</div>';
-  }
-
-  function renderMine() {
-    var L = state.list;
-    var ms = (L.matches || []).filter(function (m) { return mine.has(String(m.id)); });
-    var html = '<div class="view"><header class="top">' + backBtn("Турниры") + '<div class="subhead"><h1>Комментирую</h1><span class="upd">отмеченные тобой матчи из всех турниров</span></div></header>';
-    html += ms.length ? byDays(ms, true) : '<div class="empty"><strong>Пока ничего не отмечено</strong>Нажми на микрофон у матча, который ведёшь, — он появится здесь.</div>';
-    $app.innerHTML = html + '</div>';
-  }
 
   function backBtn(label) { return TG ? '' : '<button class="back" id="back">' + ARROW + esc(label) + '</button>'; }
 
@@ -4335,9 +4289,9 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
       var id = mt[1];
       if (state.openId !== id) { state.openId = id; state.tab = "players"; state.teamSub = "players"; state.newsFilter = "all"; state.map = null; state.mapUser = false; state.posMapUser = false; state.scrolls = {}; state.factsAll = false; window.scrollTo(0, 0); }
       var pd = getDetail(id);  // из памяти — синхронно, без промежуточного «Загружаю»
-      if (state.details[id]) { renderMatch(state.details[id]); setTimeout(function () { refreshOpen(true); }, 300); return; }
+      if (state.details[id]) { renderMatch(state.details[id]); setTimeout(function () { refreshOpen(true); }, navDelay() ? 700 : 300);  /* после анимации перехода */ return; }
       $app.innerHTML = '<div class="empty">Загружаю матч…</div>';
-      pd.then(function (d) { renderMatch(d); setTimeout(function () { refreshOpen(true); }, 300); }).catch(function () {
+      pd.then(function (d) { renderMatch(d); setTimeout(function () { refreshOpen(true); }, navDelay() ? 700 : 300);  /* после анимации перехода */ }).catch(function () {
         $app.innerHTML = '<div class="empty"><strong>Подробностей пока нет</strong>Карточка появится после ближайшего сбора — как только станут известны обе команды. <button class="chip" id="back" style="margin-top:8px">Назад</button></div>';
       });
       return;
@@ -4349,7 +4303,7 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
     else if (h === "major") { state.view = "major"; renderShell({ id: "major", back: "Главная", title: "Мейджор", tabs: [{ key: "main", label: "" }],
       pane: function () { return state.list.major_next ? majorBlock(state.list.major_next) : '<div class="empty"><strong>Прогноза пока нет</strong></div>'; } }); }
     else if (h === "rating") { state.view = "rating"; if (!state.ranking) getRanking().catch(function () {}); showRating(); if (!state.ranking) getRanking().then(function () { if (state.view === "rating") showRating(); }).catch(function () { state.rankingErr = true; if (state.view === "rating") showRating(); }); }
-    else if (/^r-/.test(h)) { var sl = h.slice(2); state.view = "team:" + sl; state.teamErr = false; if (!(state.teams || {})[sl]) getTeam(sl).catch(function () {}); showTeam(sl); getTeam(sl).then(function () { if (state.view === "team:" + sl) showTeam(sl); }).catch(function () { state.teamErr = true; if (state.view === "team:" + sl) showTeam(sl); }); }
+    else if (/^r-/.test(h)) { var sl = h.slice(2); state.view = "team:" + sl; state.teamErr = false; if (!(state.teams || {})[sl]) getTeam(sl).catch(function () {}); var T0 = (state.teams || {})[sl]; showTeam(sl); getTeam(sl).then(function (T) { if (state.view === "team:" + sl && T !== T0) showTeam(sl); }).catch(function () { state.teamErr = true; if (state.view === "team:" + sl) showTeam(sl); }); }
     else if (h === "feed") { state.view = "feed"; if (!state.feed) getFeed().catch(function () {}); showFeed(); if (!state.feed) getFeed().then(function () { if (state.view === "feed") showFeed(); }).catch(function () { state.feedErr = true; if (state.view === "feed") showFeed(); }); }
     else { state.view = "home"; SH = null; renderMenu(); }
   }
@@ -4426,9 +4380,24 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
     state.refreshing = true;
     ptrShow(56, "Обновляю…", true);
     try { TG && TG.HapticFeedback && TG.HapticFeedback.impactOccurred("light"); } catch (err) {}
-    state.details = {}; state.feed = null; state.results = {}; state.ranking = null; state.teams = {};
-    getList().then(function (L) { state.list = L; (L.matches || []).forEach(function (m) { (m.teams || []).forEach(function (t) { rememberLogo(t.name, t.image); }); }); route(); }).catch(function () {})
-      .then(function () { setTimeout(function () { state.refreshing = false; ptrHide(); }, 400); });
+    // 27.11: старая страница остаётся на экране, пока из сети не придут список и файл открытой страницы — потом одна перерисовка
+    // (раньше всё сбрасывалось сразу и на полсекунды показывалось «Загружаю…»)
+    var h = location.hash.replace("#", ""), mm = /^m-(\d+)$/.exec(h), tt = /^t-([\w-]+)$/.exec(h), need = [];
+    if (mm) need.push("data/match/" + mm[1] + ".json");
+    else if (tt) need.push("data/results/" + tt[1].replace(/[^\w-]/g, "-") + ".json");
+    else if (h === "feed") need.push("data/feed.json");
+    else if (h === "rating") need.push("data/ranking.json");
+    else if (/^r-/.test(h)) need.push("data/team/" + encodeURIComponent(h.slice(2)) + ".json");
+    var pages = Promise.all(need.map(function (u) { return fromNet(u + bust(), dkey(u)).catch(function () {}); }));
+    getList().then(function (L) {
+      return pages.then(function () {
+        state.refreshing = false;
+        state.details = {}; state.feed = null; state.results = {}; state.ranking = null; state.teams = {};
+        state.list = L; (L.matches || []).forEach(function (m) { (m.teams || []).forEach(function (t) { rememberLogo(t.name, t.image); }); });
+        route();
+      });
+    }).catch(function () {})
+      .then(function () { state.refreshing = false; setTimeout(ptrHide, 300); });
   }
   window.addEventListener("hashchange", route);
 

@@ -290,6 +290,7 @@ details_cache: dict = load_json(DETAILS_CACHE_F, {})
 DETAILS_NEW_LIMIT = int(os.environ.get("DETAILS_NEW_LIMIT", "1500" if os.environ.get("STATS_ONLY") == "1" else "3500"))  # bo3 — открытый API; 450 не хватало, мелкие команды оставались без статистики игроков  # новых карт с раундами за запуск
 _details_new = [0]
 teams_map: dict = load_json(TEAMS_CACHE_F, {})
+_bo3_miss: dict = teams_map.setdefault("_miss", {})  # PandaScore id → когда bo3 не нашёл команду (сохраняется с teams_map)
 tr_cache: dict = load_json(TR_CACHE_F, {})
 roster_cache: dict = load_json(ROSTER_CACHE_F, {})
 
@@ -1459,6 +1460,10 @@ def bo3_team_id(t: dict) -> int | None:
     key = str(t["id"])
     if teams_map.get(key):
         return teams_map[key]
+    # 27.11: не найденную команду (bo3 отвечал 500 на «33») не ищем заново 12 ч — было 8 лишних запросов за каждый сбор
+    miss = _bo3_miss.get(key)
+    if miss and miss > iso(NOW - timedelta(hours=12)):
+        return None
     found = None
     tries = []
     if t.get("slug"):
@@ -1485,6 +1490,7 @@ def bo3_team_id(t: dict) -> int | None:
             break
     if found is None:
         warn(f"bo3: не нашёл команду {t.get('name')}")
+        _bo3_miss[key] = iso(NOW)
     else:
         teams_map[key] = found
     return found
