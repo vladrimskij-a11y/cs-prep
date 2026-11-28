@@ -2730,6 +2730,8 @@ body { font-family: var(--body); font-size: 15px; letter-spacing: -.006em; font-
   // подборки, опросы, списки — не история между двумя (то же правило, что в сборщике; для уже собранных карточек)
   function junkStory(f) {
     var t = (f.text || "") + " " + (f.more || "");
+    if (f.date && Date.now() - Date.parse(f.date) > 183 * 864e5) return true;  // владелец 28.11: старше полугода — «не в тему»
+    if (f.tag === "Конфликт" && !/конфликт|скандал|тр[эе]ш.?ток|оскорб|ссор|вражд|обвин|наехал|токсич|драм|беф|beef|ненавид|перепалк|разборк|предал|увёл девушк|увел девушк|извин|хейт/i.test(t)) return true;
     if (/опрос|анкет|блиц|ответил[аи]? на вопрос|состав мечты|трансферн\S* новост|отсылк|тир-?лист|\$\s?\d/i.test(t)) return true;
     if ((t.match(/[\w.\-]{2,}\s*:\s/g) || []).length >= 5) return true;
     var w = {}; (t.match(/[A-Za-z][A-Za-z0-9._\-]+/g) || []).forEach(function (x) { w[x.toLowerCase()] = 1; });

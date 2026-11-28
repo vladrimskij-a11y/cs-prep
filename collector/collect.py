@@ -6415,6 +6415,7 @@ BEEF_F = CACHE / "beef_search.json"
 beef_cache: dict = load_json(BEEF_F, {})      # ник → {"t": когда искали, "posts": [{url, date, text}]}
 BEEF_REQ = [int(os.environ.get("BEEF_REQ", "150"))]  # запросов к t.me за сбор (ник × канал)
 BEEF_TTL_DAYS = 7
+STORY_DAYS = 183  # истории из новостей — за полгода (владелец 28.11: посты 2025 года «не в тему»)
 # не только конфликты (владелец 24.11): родня, друзья, вместе работали/жили/учились, наставник — всё, что связывает людей матча
 STORY_KINDS = [
     ("Родня", r"брат|близнец|сестр|двоюродн|кузен|отец|сын\b|сына\b|дяд|племянник|родственн"),
@@ -6424,8 +6425,8 @@ STORY_KINDS = [
     ("Встреча", r"впервые сыграют против|встретятся|встреча бывших|против бывш\w+ (команды|клуба|тиммейт)|реванш|принцип"),
 ]
 STORY_RX = re.compile("|".join(f"(?:{r})" for _, r in STORY_KINDS), re.I)
-BEEF_RX = re.compile(r"конфликт|скандал|тр[эе]ш.?ток|оскорб|ссор|вражд|обвин|наехал|токсич|драм[аы]|измен[аи]л|девушк|"
-                     r"извин|прощени|посвят|хейт|тролл|подкол|разборк|перепалк|высмеял|унизил|провокац|не здоровал|не пожал|руку не|"
+BEEF_RX = re.compile(r"конфликт|скандал|тр[эе]ш.?ток|оскорб|ссор|вражд|обвин|наехал|токсич|драм[аы]|измен[аи]л|увёл девушк|увел девушк|"
+                     r"извин|прощени|хейт|тролл|подкол|разборк|перепалк|высмеял|унизил|провокац|не здоровал|не пожал|руку не|"
                      r"беф|beef|drama|trash.?talk|чит[еа]р|обман|предал|предательств|кинул|слил|ненавид|злост|публично ответил|ответил на слова",
                      re.I)
 
@@ -6495,8 +6496,11 @@ def player_beef(d: dict) -> list[dict]:
         if isinstance(x, dict) and x.get("url") and x.get("text"):
             pool.setdefault(x["url"], {"url": x["url"], "date": str(x.get("date") or "")[:10], "text": x["text"]})
     out, seen = [], []
+    old = (NOW - timedelta(days=STORY_DAYS)).strftime("%Y-%m-%d")
     for x in sorted(pool.values(), key=lambda x: x.get("date") or "", reverse=True):
         txt = x.get("text") or ""
+        if (x.get("date") or "") < old:
+            continue  # владелец 28.11: новости прошлого года «не в тему»
         if not (BEEF_RX.search(txt) or STORY_RX.search(txt)) or re.search(r"дайджест", txt, re.I) or len(re.findall(r"^\s*[—•▪️-]", txt, re.M)) >= 4:
             continue  # дайджесты и списки новостей — не история про двоих
         # опросы и подборки ответов игроков («s1mple: Габен. NiKo: Неймар…») — не история про двоих (владелец 26.11)
@@ -6517,8 +6521,9 @@ def player_beef(d: dict) -> list[dict]:
         # Perfect World с westmelon и Snappi вышел «конфликтом»)
         def near_k(names, k, w=250):
             return any(abs(m.start() - k) <= w for n in names for m in rx[n].finditer(txt))
-        if not any(near_k(a, k) and near_k(b, k) for k in kw):
-            continue
+        if not any(near_k(a, k) and near_k(b, k) for k in [k.start() for k in BEEF_RX.finditer(txt)]) \
+                and not any(near_k(a, k, 90) and near_k(b, k, 90) for k in [k.start() for k in STORY_RX.finditer(txt)]):
+            continue  # родня/дружба/работали — слово совсем рядом с обоими (28.11: «Брат Нико…» вышел роднёй huNter- и malbsMd)
         tok = title_tokens(txt[:400])
         if any(len(tok & o) / max(1, len(tok | o)) >= 0.5 for o in seen):
             continue  # та же история из другого канала
@@ -6527,7 +6532,7 @@ def player_beef(d: dict) -> list[dict]:
         head = lines[0] if lines else txt
         body = " ".join(lines[1:])
         tag = "Конфликт" if any(near_k(a, k.start()) and near_k(b, k.start()) for k in BEEF_RX.finditer(txt)) else \
-            next((t for t, r in STORY_KINDS if re.search(r, txt, re.I)), "История")
+            next((t for t, r in STORY_KINDS if any(near_k(a, k.start(), 90) and near_k(b, k.start(), 90) for k in re.finditer(r, txt, re.I))), "История")
         out.append({"tag": tag, "kind": "beef", "who": f"{', '.join(a)} ({teams[0]['name']}) — {', '.join(b)} ({teams[1]['name']})",
                     "text": head[:220], "more": body[:600] or None, "date": x.get("date"), "url": x["url"]})
         if len(out) >= 16:
