@@ -196,6 +196,7 @@ NAME_RU = {  # русские имена, которые владелец поп
     "mopoz": "Алехандро Фернандес",  # Gemini добавил вторую фамилию
     "w0nderful": "Игорь Жданов",  # владелец 27.11: привычное в эфире
     "b1ad3": "Андрей Городенский",  # владелец 27.11: привычное в эфире
+    "anlelele": "Антон Хюинь",  # 28.11: датчанин вьетнамского происхождения (Huỳnh)
     # 27.11: разбор повторной проверки Gemini — откаты и единый вид (как в оригинале, без монгольских ү/ө)
     "aquars": "Александр Ковалёв",
     "blitz": "Гаридмагнай Бямбасурэн",
@@ -234,6 +235,7 @@ NAME_RU = {  # русские имена, которые владелец поп
     "mopoz": "Алехандро Фернандес",  # Gemini добавил вторую фамилию
     "w0nderful": "Игорь Жданов",  # владелец 27.11: привычное в эфире
     "b1ad3": "Андрей Городенский",  # владелец 27.11: привычное в эфире
+    "anlelele": "Антон Хюинь",  # 28.11: датчанин вьетнамского происхождения (Huỳnh)
 }
 ROLE_FIX = {  # ручные роли (важнее Liquipedia): ник → {"igl": True/False}; владелец 26.11: у Chinggis Warriors капитан fury5k (HLTV), не cool4st
     "cool4st": {"igl": False},
@@ -7824,9 +7826,28 @@ def fill_from_event(players: list, tname: str, names: list, ps_players: list) ->
             continue
         pp = by_ps.get(norm(x["nick"]), {})
         hltv_player_ids.setdefault(norm(x["nick"]), {"id": x["id"], "slug": x["slug"]})
-        players.append({"id": pp.get("id"), "nick": x["nick"], "first_name": pp.get("first_name"), "last_name": pp.get("last_name"),
-                        "nationality": pp.get("nationality"), "age": pp.get("age"), "image": pp.get("image"),
-                        "tags": ["В заявке на турнир"]})
+        # 28.11: в составе команды на Liquipedia его нет — имя, страна, возраст, история и фото со страницы самого игрока
+        pg = ""
+        try:
+            pg = (lp_pages([x["nick"]]) or {}).get(x["nick"], "") or ""
+        except Exception as e:
+            warn(f"Liquipedia, страница игрока {x['nick']}: {e!r}")
+        mm = re.search(r"^\|\s*(?:romanized_name|name)\s*=\s*([^\n|}]+)", pg, re.M)
+        nm = mm.group(1).strip() if mm else None
+        ib_ = infobox(pg) if pg else ""
+        birth = birth_date(pg) if pg else None
+        owner = infobox_team(pg) if pg else None
+        tags = ["В заявке на турнир"] + ([f"В аренде из {owner}"] if owner and norm(owner) not in keys else [])
+        roles = player_roles(pg)[0] if pg else []
+        players.append({"id": pp.get("id"), "nick": x["nick"],
+                        "first_name": pp.get("first_name") or (nm.split(" ", 1)[0] if nm else None),
+                        "last_name": pp.get("last_name") or (nm.split(" ", 1)[1] if nm and " " in nm else None),
+                        "nationality": pp.get("nationality") or (infobox_cc(pg) if pg else None),
+                        "age": age_from(birth) or pp.get("age"), "birth": birth, "image": pp.get("image"),
+                        "lp_img": (lp_param(ib_, "image") or "").strip() or None,
+                        "tags": tags + [r for r in roles if r not in tags],
+                        "aka": (lp_aka(pg) if pg else None) or None, "hist": (lp_history(pg) if pg else None) or None,
+                        "rel": (lp_rel(pg) if pg else None) or None})
         print(f"Состав {sorted(keys)[0]}: {x['nick']} — из заявки HLTV на {tname}")
     return players
 
